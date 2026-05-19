@@ -5,8 +5,10 @@ import { ValueProposition } from "@/components/sections/ValueProposition";
 import { WhyChooseUs } from "@/components/sections/WhyChooseUs";
 import { FeaturesGrid } from "@/components/sections/FeaturesGrid";
 import { Courses } from "@/components/sections/Courses";
+import { Testimonials } from "@/components/sections/Testimonials";
 import { InfoRDC } from "@/components/sections/InfoRDC";
 import { Pricing } from "@/components/sections/Pricing";
+import { FAQ } from "@/components/sections/FAQ";
 
 export default function Home() {
   return (
@@ -18,8 +20,10 @@ export default function Home() {
         <WhyChooseUs />
         <FeaturesGrid />
         <Courses />
+        <Testimonials />
         <InfoRDC />
         <Pricing />
+        <FAQ />
       </main>
       <Footer />
     </div>

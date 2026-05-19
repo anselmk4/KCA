@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-
+import { MobileMenu } from "@/components/layout/MobileMenu";
 import { GraduationCap } from "lucide-react";
 
 export function Navbar() {
@@ -29,9 +29,10 @@ export function Navbar() {
           <Link href="/login" className="text-sm font-medium hover:underline underline-offset-4 hidden sm:block">
             Se connecter
           </Link>
-          <Link href="/register" className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-blue-600 text-white hover:bg-blue-600/90 h-10 px-4 py-2">
+          <Link href="/register" className="hidden sm:inline-flex items-center justify-center rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-600/90 h-10 px-4 py-2 transition-colors">
             S'inscrire
           </Link>
+          <MobileMenu />
         </div>
       </div>
     </header>
