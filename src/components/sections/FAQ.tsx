@@ -5,24 +5,28 @@ import { ChevronDown } from "lucide-react";
 
 const faqs = [
   {
-    q: "Quel niveau faut-il pour commencer ?",
-    a: "Aucun prérequis. Nos formations sont conçues pour accompagner du débutant absolu jusqu'au niveau avancé, étape par étape."
+    q: "Comment mes apprenants payent-ils mes formations ?",
+    a: "Vos apprenants peuvent acheter vos cours en utilisant les moyens de paiement locaux les plus populaires en Afrique : Airtel Money, M-Pesa, Orange Money, ainsi que par carte bancaire (Stripe) et PayPal."
   },
   {
-    q: "Comment se déroule le paiement ?",
-    a: "Nous acceptons Stripe (carte bancaire), PayPal et Mobile Money (Airtel Money, M-Pesa, Orange Money). Le paiement est sécurisé et vous accédez immédiatement à vos cours."
+    q: "Comment puis-je retirer les revenus générés par mes ventes ?",
+    a: "Vous pouvez initier des retraits de vos gains accumulés à tout moment directement vers votre compte Mobile Money (Airtel, M-Pesa, Orange), PayPal ou par virement bancaire depuis votre tableau de bord instructeur."
   },
   {
-    q: "Est-ce que je reçois un certificat ?",
-    a: "Oui. Après avoir complété 100% des modules et réussi les QCM, un certificat numérique vérifiable est généré à votre nom."
+    q: "Quelles sont les limites du Plan Free ?",
+    a: "Le Plan Free est gratuit à vie. Il vous permet de créer 1 cours actif et d'inscrire jusqu'à 15 apprenants simultanément. C'est parfait pour valider votre concept avant de passer aux forfaits supérieurs."
   },
   {
-    q: "Puis-je suivre les cours à mon rythme ?",
-    a: "Absolument. Tous les contenus sont accessibles 24h/24. Vous progressez à votre propre vitesse, sans date limite."
+    q: "Puis-je changer d'abonnement ou résilier à tout moment ?",
+    a: "Absolument. Vous pouvez passer d'un forfait à l'autre (par exemple, de Free à Pro) ou résilier votre abonnement à tout moment directement depuis la page 'Abonnement' de votre espace de gestion."
   },
   {
-    q: "Y a-t-il un accompagnement personnalisé ?",
-    a: "Oui. Vous avez accès à un groupe privé Discord/Telegram avec des mentors disponibles pour répondre à vos questions. Le module IA inclut un mentorat 1-on-1."
+    q: "Puis-je personnaliser les certificats de réussite ?",
+    a: "Oui. À partir du Plan Pro, la plateforme génère automatiquement des certificats de réussite personnalisés à l'image de votre marque / académie dès qu'un élève valide 100% de sa formation."
+  },
+  {
+    q: "Est-il possible d'utiliser mon propre nom de domaine ?",
+    a: "Oui. Le Plan Max vous permet d'associer votre nom de domaine personnalisé (ex: formation.monnom.com) afin d'offrir une expérience de marque totalement intégrée à vos apprenants."
   }
 ];
 
@@ -35,7 +39,7 @@ export function FAQ() {
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-5xl font-bold mb-4">Questions fréquentes</h2>
           <p className="text-lg text-muted-foreground">
-            Tout ce que vous devez savoir avant de rejoindre Kuettu.
+            Tout ce que vous devez savoir pour lancer et gérer votre académie avec Kuettu Pro.
           </p>
         </div>
 

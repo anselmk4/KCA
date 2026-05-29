@@ -4,28 +4,28 @@ export function ValueProposition() {
   const values = [
     {
       icon: <Target className="h-10 w-10 text-blue-500" />,
-      title: "Focus sur l'Action",
-      description: "Des cours pratiques conçus pour vous rendre opérationnel immédiatement sur le marché du Web3."
+      title: "Monétisation Simplifiée",
+      description: "Encaissez les inscriptions à vos cours directement par Mobile Money (Airtel, M-Pesa, Orange), Cartes bancaires ou PayPal."
     },
     {
       icon: <TrendingUp className="h-10 w-10 text-blue-500" />,
-      title: "Opportunités de Croissance",
-      description: "Accédez à des stratégies d'investissement exclusives et comprenez les tendances lourdes de l'IA."
+      title: "Contrôle et Flexibilité",
+      description: "Fixez vos propres prix, gérez vos coupons de réduction et gardez jusqu'à 100% de vos revenus sans intermédiaires."
     },
     {
       icon: <Users className="h-10 w-10 text-blue-500" />,
-      title: "Communauté Active",
-      description: "Rejoignez un réseau d'entrepreneurs et de passionnés en Afrique pour collaborer et grandir ensemble."
+      title: "Pédagogie Avancée",
+      description: "Engagez vos élèves avec des quiz interactifs, des supports de cours téléchargeables et des certificats de réussite automatisés."
     }
   ];
 
   return (
-    <section id="features" className="py-24 bg-slate-50 dark:bg-zinc-900/50">
+    <section className="py-24 bg-slate-50 dark:bg-zinc-900/50">
       <div className="container mx-auto px-4 md:px-8">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Notre Proposition de Valeur</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Pourquoi Kuettu Crypto Academy est le meilleur choix pour votre avenir financier et technologique.
+            Kuettu Pro est conçu pour donner aux formateurs africains le pouvoir de diffuser leur savoir à l'échelle du continent.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

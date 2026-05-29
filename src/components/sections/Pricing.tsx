@@ -4,64 +4,55 @@ import Link from "next/link";
 export function Pricing() {
   const plans = [
     {
-      name: "Blockchain",
-      price: "300$",
-      description: "Maîtrisez les concepts fondamentaux et avancés de la technologie blockchain et des registres distribués.",
+      name: "Plan Free",
+      price: "0$",
+      unit: "/ mois",
+      description: "Parfait pour lancer votre académie et valider vos premiers cours auprès d'un petit groupe d'apprenants.",
       features: [
-        "Architecture des Blockchains",
-        "Smart Contracts (Bases)",
-        "Sécurité et Cryptographie",
-        "Cas d'usage en Afrique",
-        "Certificat de complétion"
+        "1 cours actif maximum",
+        "Jusqu'à 15 apprenants inscrits",
+        "Quiz de validation simples",
+        "Encaissement Mobile Money & Carte",
+        "Frais de transaction : 5%",
+        "Support communautaire"
       ],
       popular: false,
-      buttonText: "S'inscrire au module",
-      href: "/register?module=blockchain"
+      buttonText: "Commencer gratuitement",
+      href: "/register?plan=free"
     },
     {
-      name: "Crypto-monnaie / Trading",
-      price: "500$",
-      description: "Devenez un trader rentable avec nos stratégies d'investissement exclusives et d'analyse de marché.",
+      name: "Plan Pro",
+      price: "49$",
+      unit: "/ mois",
+      description: "La solution idéale pour les formateurs professionnels et les académies en croissance.",
       features: [
-        "Analyse Technique & Fondamentale",
-        "Gestion des Risques (Risk Management)",
-        "Finance Décentralisée (DeFi)",
-        "Psychologie du Trader",
-        "Accès au groupe privé de signaux"
+        "Jusqu'à 10 cours actifs",
+        "Jusqu'à 200 apprenants inscrits",
+        "Quiz et examens illimités",
+        "Certificats de réussite automatisés",
+        "Frais de transaction réduits : 2%",
+        "Support prioritaire sous 24h"
       ],
       popular: true,
-      buttonText: "S'inscrire au module",
-      href: "/register?module=trading"
+      buttonText: "Démarrer avec le Plan Pro",
+      href: "/register?plan=pro"
     },
     {
-      name: "Intelligence Artificielle",
-      price: "1000$",
-      description: "Le parcours élite pour maîtriser l'IA, automatiser vos processus et créer des solutions innovantes.",
+      name: "Plan Max",
+      price: "200$",
+      unit: "/ mois",
+      description: "Pour les grandes académies et les écoles de formation exigeant une puissance et un accompagnement sans limites.",
       features: [
-        "Machine Learning pour débutants",
-        "Création d'agents IA (LLMs)",
-        "Automatisation de workflows",
-        "IA appliquée au Web3",
-        "Mentorat 1-on-1 exclusif"
+        "Cours en ligne illimités",
+        "Apprenants illimités",
+        "Quiz, examens et diplômes illimités",
+        "0% de frais de transaction",
+        "Nom de domaine personnalisé (ex: ecole.com)",
+        "Gestionnaire de compte dédié & WhatsApp"
       ],
       popular: false,
-      buttonText: "S'inscrire au module",
-      href: "/register?module=ai"
-    },
-    {
-      name: "Développement Web3",
-      price: "1500$",
-      description: "Créez vos propres Smart Contracts et dApps sur Ethereum et d'autres blockchains.",
-      features: [
-        "Solidity de A à Z",
-        "Création de Tokens (ERC-20 & ERC-721)",
-        "Développement de dApps",
-        "Déploiement sur Testnet & Mainnet",
-        "Audit de sécurité des contrats"
-      ],
-      popular: false,
-      buttonText: "S'inscrire au module",
-      href: "/register?module=web3"
+      buttonText: "Activer le Plan Max",
+      href: "/register?plan=max"
     }
   ];
 
@@ -69,13 +60,13 @@ export function Pricing() {
     <section id="pricing" className="py-24 bg-black text-white border-t border-white/10">
       <div className="container mx-auto px-4 md:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold mb-6">Tarifs par Module</h2>
+          <h2 className="text-3xl md:text-5xl font-bold mb-6">Des Tarifs Transparents et Adaptés</h2>
           <p className="text-lg text-zinc-400 max-w-2xl mx-auto">
-            Investissez dans les compétences les plus demandées sur le marché mondial.
+            Choisissez le forfait qui correspond au niveau de développement de votre académie. Annulez ou changez de plan à tout moment.
           </p>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {plans.map((plan, index) => (
             <div 
               key={index} 
@@ -87,7 +78,7 @@ export function Pricing() {
             >
               {plan.popular && (
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-1 text-sm font-bold rounded-full shadow-lg">
-                  Le plus demandé
+                  Recommandé
                 </div>
               )}
               <div className="mb-8 mt-4">
@@ -95,7 +86,10 @@ export function Pricing() {
                 <p className="text-zinc-400 text-sm min-h-[60px]">{plan.description}</p>
               </div>
               <div className="mb-8 pb-8 border-b border-white/10">
-                <span className="text-5xl font-extrabold text-white">{plan.price}</span>
+                <div className="flex items-baseline">
+                  <span className="text-5xl font-extrabold text-white">{plan.price}</span>
+                  <span className="text-zinc-400 text-lg ml-2">{plan.unit}</span>
+                </div>
               </div>
               <ul className="space-y-4 mb-8 flex-grow">
                 {plan.features.map((feature, idx) => (

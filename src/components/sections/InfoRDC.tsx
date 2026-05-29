@@ -6,16 +6,16 @@ export function InfoRDC() {
     <section className="py-24 bg-gradient-to-b from-black to-blue-950 text-white relative overflow-hidden">
       <div className="container mx-auto px-4 md:px-8 relative z-10">
         <div className="max-w-3xl mx-auto text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold mb-6">L'innovation au cœur de la RDC</h2>
+          <h2 className="text-3xl md:text-5xl font-bold mb-6">Optimisé pour la RDC et l'Afrique</h2>
           <p className="text-lg md:text-xl text-blue-200">
-            Découvrez comment Kuettu Crypto Academy transforme le paysage technologique et financier en Afrique.
+            Découvrez comment Kuettu Pro résout les défis de paiement et de monétisation pour les créateurs de contenu éducatif en Afrique.
           </p>
         </div>
         
         <div className="max-w-5xl mx-auto aspect-video w-full rounded-2xl overflow-hidden border border-white/10 shadow-[0_0_50px_rgba(37,99,235,0.2)] relative group cursor-pointer">
           <Image 
             src="/images/video-thumb.png" 
-            alt="Présentation Vidéo" 
+            alt="Présentation Vidéo Kuettu Pro" 
             fill 
             className="object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500"
           />
@@ -24,7 +24,7 @@ export function InfoRDC() {
             <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-blue-600/90 backdrop-blur-md flex items-center justify-center group-hover:scale-110 group-hover:bg-blue-500 transition-all mb-4 shadow-[0_0_30px_rgba(37,99,235,0.6)]">
               <Play className="h-8 w-8 md:h-10 md:w-10 text-white fill-white ml-2" />
             </div>
-            <span className="font-semibold text-lg md:text-xl tracking-wide">Regarder la présentation</span>
+            <span className="font-semibold text-lg md:text-xl tracking-wide">Découvrir la solution en vidéo</span>
           </div>
         </div>
       </div>

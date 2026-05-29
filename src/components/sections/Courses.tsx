@@ -2,66 +2,66 @@ import Link from "next/link";
 import { ArrowRight, Bitcoin, BrainCircuit, Code2 } from "lucide-react";
 
 export function Courses() {
-  const courses = [
+  const templates = [
     {
-      title: "Fondamentaux de la Blockchain",
-      description: "Comprendre le fonctionnement des registres distribués, des wallets et des transactions sécurisées.",
-      icon: <Bitcoin className="h-8 w-8 text-orange-500" />,
-      level: "Débutant",
-      duration: "4 semaines"
-    },
-    {
-      title: "Trading & DeFi",
-      description: "Apprenez à analyser les marchés, à utiliser les DEX et à générer des rendements passifs.",
-      icon: <TrendingUpIcon className="h-8 w-8 text-green-500" />,
-      level: "Intermédiaire",
-      duration: "6 semaines"
-    },
-    {
-      title: "Développement Web3",
-      description: "Créez vos propres Smart Contracts et dApps sur Ethereum et d'autres blockchains.",
+      title: "Web3 Developer Academy",
+      description: "Un modèle complet pour enseigner Solidity, la programmation de smart contracts et le développement d'applications décentralisées (dApps).",
       icon: <Code2 className="h-8 w-8 text-blue-500" />,
-      level: "Avancé",
-      duration: "8 semaines"
+      tag: "Populaire",
+      courses: "3 cours inclus"
     },
     {
-      title: "IA pour les Affaires",
-      description: "Automatisez vos processus et boostez votre productivité avec les derniers outils d'IA.",
+      title: "Crypto & Trading School",
+      description: "Optimisé pour l'enseignement de l'analyse technique, de la gestion des risques et de la finance décentralisée (DeFi).",
+      icon: <TrendingUpIcon className="h-8 w-8 text-green-500" />,
+      tag: "Trading",
+      courses: "2 cours inclus"
+    },
+    {
+      title: "Artificial Intelligence Hub",
+      description: "Parfait pour former à la création d'agents IA, à l'ingénierie de prompts et à l'automatisation intelligente de workflows.",
       icon: <BrainCircuit className="h-8 w-8 text-purple-500" />,
-      level: "Tous niveaux",
-      duration: "5 semaines"
+      tag: "IA & Data",
+      courses: "4 cours inclus"
+    },
+    {
+      title: "Blockchain Business School",
+      description: "Conçu pour introduire les fondamentaux de la décentralisation, les cas d'usages industriels et l'économie du Web3.",
+      icon: <Bitcoin className="h-8 w-8 text-orange-500" />,
+      tag: "Business",
+      courses: "2 cours inclus"
     }
   ];
 
   return (
-    <section id="courses" className="py-24 bg-slate-50 dark:bg-zinc-900/50">
+    <section id="templates" className="py-24 bg-slate-50 dark:bg-zinc-900/50">
       <div className="container mx-auto px-4 md:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Nos Parcours de Formation</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Modèles d'Académie Prêts à Déployer</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Des modules structurés et progressifs pour vous accompagner de zéro à expert.
+            Sélectionnez un modèle structuré et personnalisez-le avec vos propres leçons et supports.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {courses.map((course, index) => (
+          {templates.map((template, index) => (
             <div key={index} className="bg-white dark:bg-zinc-900 rounded-2xl p-6 border shadow-sm hover:shadow-md transition-all flex flex-col h-full">
               <div className="mb-4">
-                {course.icon}
+                {template.icon}
               </div>
-              <h3 className="text-xl font-bold mb-2">{course.title}</h3>
+              <h3 className="text-xl font-bold mb-2">{template.title}</h3>
               <p className="text-muted-foreground text-sm flex-grow mb-6">
-                {course.description}
+                {template.description}
               </p>
               <div className="flex items-center justify-between mt-auto pt-4 border-t text-sm font-medium">
-                <span className="text-blue-600 dark:text-blue-400">{course.level}</span>
-                <span className="text-muted-foreground">{course.duration}</span>
+                <span className="text-blue-600 dark:text-blue-400">{template.tag}</span>
+                <span className="text-muted-foreground">{template.courses}</span>
               </div>
             </div>
           ))}
         </div>
         <div className="mt-12 text-center">
-          <Link href="/courses" className="inline-flex items-center text-blue-600 font-semibold hover:text-blue-700 transition-colors">
-            Voir tous les cours <ArrowRight className="ml-2 h-4 w-4" />
+          <Link href="/register" className="inline-flex items-center text-blue-600 font-semibold hover:text-blue-700 transition-colors">
+            Lancer mon académie à partir d'un modèle <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </div>
       </div>

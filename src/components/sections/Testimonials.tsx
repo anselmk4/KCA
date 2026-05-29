@@ -3,25 +3,25 @@ import { Star } from "lucide-react";
 export function Testimonials() {
   const reviews = [
     {
-      name: "Patrick M.",
-      role: "Entrepreneur, Kinshasa",
-      text: "Grâce à Kuettu, j'ai compris la blockchain en 3 semaines. Aujourd'hui je gère mon propre portefeuille crypto et je forme d'autres personnes.",
+      name: "Prof. Patrick M.",
+      role: "Formateur Finance & Trading, Kinshasa",
+      text: "Grâce à Kuettu Pro, j'ai lancé mon école de trading. La plateforme encaisse les frais d'inscription via Mobile Money sans que je n'aie à coder. Mes revenus ont doublé en 3 mois.",
       rating: 5,
-      module: "Blockchain"
+      academy: "Kinshasa Trading School"
     },
     {
       name: "Sarah K.",
-      role: "Développeuse, Bukavu",
-      text: "Le module IA m'a permis d'automatiser 80% de mes tâches répétitives. Le retour sur investissement est incroyable.",
+      role: "Formatrice Web3 & IA, Goma",
+      text: "J'adore la simplicité d'utilisation. J'ai 150 étudiants actifs sur mon académie d'IA générative. Les quiz automatiques me font gagner un temps fou dans les corrections.",
       rating: 5,
-      module: "Intelligence Artificielle"
+      academy: "Web3/AI Africa Academy"
     },
     {
-      name: "Jean-Claude B.",
-      role: "Trader indépendant, Lubumbashi",
-      text: "Les signaux du groupe privé et les cours de trading m'ont rendu rentable en 2 mois. Meilleur investissement de ma vie.",
+      name: "Dr. Jean-Claude B.",
+      role: "Enseignant Blockchain, Lubumbashi",
+      text: "Mes étudiants reçoivent des certificats automatisés très professionnels à la fin du cursus. Les retraits de mes commissions vers mon Airtel Money se font instantanément.",
       rating: 5,
-      module: "Trading"
+      academy: "Lubumbashi Tech Institute"
     }
   ];
 
@@ -29,9 +29,9 @@ export function Testimonials() {
     <section className="py-24 bg-white dark:bg-black">
       <div className="container mx-auto px-4 md:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold mb-4">Ils nous font confiance</h2>
+          <h2 className="text-3xl md:text-5xl font-bold mb-4">Ils réussissent avec Kuettu Pro</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Des centaines d'entrepreneurs africains transforment leur avenir grâce à Kuettu.
+            Découvrez les témoignages de formateurs et professeurs qui gèrent leurs académies en ligne de A à Z.
           </p>
         </div>
 
@@ -57,7 +57,7 @@ export function Testimonials() {
                   <p className="text-sm text-zinc-500 dark:text-zinc-400">{review.role}</p>
                 </div>
                 <span className="text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-full">
-                  {review.module}
+                  {review.academy}
                 </span>
               </div>
             </div>

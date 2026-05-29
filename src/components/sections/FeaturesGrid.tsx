@@ -2,12 +2,12 @@ import { Zap, Shield, Smartphone, Globe } from "lucide-react";
 
 export function FeaturesGrid() {
   return (
-    <section className="py-24 bg-slate-50 dark:bg-zinc-900/30 border-y">
+    <section id="features" className="py-24 bg-slate-50 dark:bg-zinc-900/30 border-y">
       <div className="container mx-auto px-4 md:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Un parcours complet et modulable</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Une plateforme d'enseignement puissante</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Notre plateforme est conçue pour s'adapter à votre rythme et à vos objectifs spécifiques.
+            Kuettu Pro vous fournit tous les outils nécessaires pour créer, gérer et rentabiliser votre contenu éducatif.
           </p>
         </div>
         
@@ -17,8 +17,8 @@ export function FeaturesGrid() {
               <Zap className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h3 className="text-xl font-bold mb-2">Apprentissage Rapide</h3>
-              <p className="text-muted-foreground">Des micro-leçons conçues pour retenir l'attention et maximiser la mémorisation en un minimum de temps.</p>
+              <h3 className="text-xl font-bold mb-2">Générateur de Cours Intuitif</h3>
+              <p className="text-muted-foreground">Structurez vos cours en modules et leçons, ajoutez des vidéos et des ressources de manière simple et rapide.</p>
             </div>
           </div>
           
@@ -27,8 +27,8 @@ export function FeaturesGrid() {
               <Shield className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h3 className="text-xl font-bold mb-2">Pratique Sécurisée</h3>
-              <p className="text-muted-foreground">Entraînez-vous sur nos simulateurs de trading et d'environnement Web3 sans risquer vos fonds réels.</p>
+              <h3 className="text-xl font-bold mb-2">Quiz & Évaluations</h3>
+              <p className="text-muted-foreground">Créez des QCM interactifs pour tester les connaissances de vos apprenants avec correction automatique.</p>
             </div>
           </div>
           
@@ -37,8 +37,8 @@ export function FeaturesGrid() {
               <Smartphone className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h3 className="text-xl font-bold mb-2">Accessible Partout</h3>
-              <p className="text-muted-foreground">Une application optimisée pour mobile pour apprendre où que vous soyez, même avec une faible connexion.</p>
+              <h3 className="text-xl font-bold mb-2">Paiements et Retraits Mobiles</h3>
+              <p className="text-muted-foreground">Encaissez les inscriptions en ligne et retirez vos gains directement via Airtel Money, M-Pesa et Orange Money.</p>
             </div>
           </div>
           
@@ -47,8 +47,8 @@ export function FeaturesGrid() {
               <Globe className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h3 className="text-xl font-bold mb-2">Réseau Panafricain</h3>
-              <p className="text-muted-foreground">Connectez-vous avec des étudiants et professionnels de toute l'Afrique et créez des synergies uniques.</p>
+              <h3 className="text-xl font-bold mb-2">Analyses et Suivi Élèves</h3>
+              <p className="text-muted-foreground">Suivez la progression moyenne de vos apprenants, les taux de complétion des cours et vos statistiques de revenus.</p>
             </div>
           </div>
         </div>

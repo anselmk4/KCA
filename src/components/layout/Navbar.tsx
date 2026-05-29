@@ -10,15 +10,15 @@ export function Navbar() {
         <Link href="/" className="flex items-center space-x-2">
           <GraduationCap className="h-8 w-8 text-blue-600" />
           <span className="font-bold text-xl hidden sm:inline-block">
-            Kuettu Crypto Academy
+            Kuettu Pro
           </span>
         </Link>
         <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
           <Link href="#features" className="transition-colors hover:text-foreground/80 text-foreground/60">
-            Avantages
+            Fonctionnalités
           </Link>
-          <Link href="/courses" className="transition-colors hover:text-foreground/80 text-foreground/60">
-            Nos Cours
+          <Link href="#templates" className="transition-colors hover:text-foreground/80 text-foreground/60">
+            Modèles d'Académie
           </Link>
           <Link href="#pricing" className="transition-colors hover:text-foreground/80 text-foreground/60">
             Tarifs
@@ -27,10 +27,10 @@ export function Navbar() {
         <div className="flex items-center space-x-4">
           <ThemeToggle />
           <Link href="/login" className="text-sm font-medium hover:underline underline-offset-4 hidden sm:block">
-            Se connecter
+            Espace Instructeur
           </Link>
           <Link href="/register" className="hidden sm:inline-flex items-center justify-center rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-600/90 h-10 px-4 py-2 transition-colors">
-            S'inscrire
+            Créer mon Académie
           </Link>
           <MobileMenu />
         </div>

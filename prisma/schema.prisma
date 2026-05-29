@@ -1,0 +1,257 @@
+// prisma/schema.prisma
+// Prisma schema for Kuettu Crypto Academy relational database
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  FINANCE_ADMIN
+  ACADEMIC_ADMIN
+  SUPPORT_AGENT
+  INSTRUCTOR
+  TEACHING_ASSISTANT
+  STUDENT
+}
+
+enum CourseStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  CANCELLED
+}
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  COMPLETED
+  AT_RISK
+}
+
+enum CertificateStatus {
+  ELIGIBLE
+  ISSUED
+  REVOKED
+  EXPIRED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model User {
+  id            String          @id @default(uuid())
+  email         String          @unique
+  name          String
+  passwordHash  String
+  role          Role            @default(STUDENT)
+  status        StudentStatus   @default(ACTIVE)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  profile       Profile?
+  enrollments   Enrollment[]
+  transactions  Transaction[]
+  payouts       Payout[]        @relation("InstructorPayouts")
+  authoredCourses Course[]       @relation("AuthoredCourses")
+  quizAttempts  QuizAttempt[]
+  certificates  Certificate[]
+  supportTickets SupportTicket[] @relation("UserTickets")
+  assignedTickets SupportTicket[] @relation("AgentTickets")
+}
+
+model Profile {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  level      String   @default("Débutant") // "Débutant" | "Intermédiaire" | "Avancé"
+  bio        String?
+  avatarUrl  String?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Course {
+  id          String       @id @default(uuid())
+  title       String
+  slug        String       @unique
+  description String
+  price       Float
+  status      CourseStatus @default(DRAFT)
+  instructorId String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  instructor  User          @relation("AuthoredCourses", fields: [instructorId], references: [id])
+  sections    CourseSection[]
+  enrollments Enrollment[]
+  quizzes     Quiz[]
+  certificates Certificate[]
+}
+
+model CourseSection {
+  id        String   @id @default(uuid())
+  courseId  String
+  title     String
+  order     Int
+  createdAt DateTime @default(now())
+
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons   Lesson[]
+}
+
+model Lesson {
+  id          String   @id @default(uuid())
+  sectionId   String
+  title       String
+  description String?
+  content     String?  // Rich text/markdown content
+  videoUrl    String?
+  durationMin Int      @default(0)
+  order       Int
+  createdAt   DateTime @default(now())
+
+  section     CourseSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  resources   Resource[]
+  progress    Progress[]
+}
+
+model Resource {
+  id        String   @id @default(uuid())
+  lessonId  String
+  name      String
+  url       String
+  createdAt DateTime @default(now())
+
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+}
+
+model Enrollment {
+  id              String   @id @default(uuid())
+  studentId       String
+  courseId        String
+  progressPercent Float    @default(0.0)
+  joinedAt        DateTime @default(now())
+
+  student         User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course          Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessonProgress  Progress[]
+
+  @@unique([studentId, courseId])
+}
+
+model Progress {
+  id           String    @id @default(uuid())
+  enrollmentId String
+  lessonId     String
+  completed    Boolean   @default(false)
+  completedAt  DateTime?
+
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson       Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+}
+
+model Quiz {
+  id             String        @id @default(uuid())
+  courseId       String
+  title          String
+  passPercentage Float         @default(70.0)
+  createdAt      DateTime      @default(now())
+
+  course         Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  questions      Question[]
+  attempts       QuizAttempt[]
+}
+
+model Question {
+  id           String   @id @default(uuid())
+  quizId       String
+  text         String
+  choices      String[] // List of text options
+  correctIndex Int
+  createdAt    DateTime @default(now())
+
+  quiz         Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+}
+
+model QuizAttempt {
+  id        String   @id @default(uuid())
+  studentId String
+  quizId    String
+  score     Float
+  passed    Boolean
+  createdAt DateTime @default(now())
+
+  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+}
+
+model Certificate {
+  id           String            @id @default(uuid())
+  studentId    String
+  courseId     String
+  status       CertificateStatus @default(ISSUED)
+  code         String            @unique // Verification code
+  issuedAt     DateTime          @default(now())
+  expiresAt    DateTime?
+
+  student      User              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course       Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+model Transaction {
+  id        String        @id @default(uuid())
+  userId    String
+  amount    Float
+  courseId  String
+  method    String        // "Carte" | "Mobile Money" | "PayPal"
+  status    PaymentStatus @default(PENDING)
+  date      DateTime      @default(now())
+
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Payout {
+  id           String        @id @default(uuid())
+  instructorId String
+  amount       Float
+  status       PaymentStatus @default(PENDING)
+  date         DateTime      @default(now())
+
+  instructor   User          @relation("InstructorPayouts", fields: [instructorId], references: [id], onDelete: Cascade)
+}
+
+model SupportTicket {
+  id          String       @id @default(uuid())
+  userId      String
+  subject     String
+  message     String
+  status      TicketStatus @default(OPEN)
+  agentId     String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user        User         @relation("UserTickets", fields: [userId], references: [id], onDelete: Cascade)
+  agent       User?        @relation("AgentTickets", fields: [agentId], references: [id])
+}
