@@ -65,7 +65,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
               {initials}
             </div>
             <div className="hidden md:block">
-              <p className="text-sm font-semibold text-zinc-900 dark:text-white leading-none">{session?.name?.split(" ")[0] || "Étudiant"}</p>
+              <p className="text-sm font-semibold text-zinc-900 dark:text-white leading-none">{session?.name?.split(" ")?.[0] || "Étudiant"}</p>
               <p className="text-xs text-zinc-500 mt-1">Plan {session?.plan || "FREE"}</p>
             </div>
             <ChevronDown className="w-4 h-4 text-zinc-500 hidden md:block" />

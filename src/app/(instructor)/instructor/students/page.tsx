@@ -131,7 +131,7 @@ export default function StudentsPage() {
               return (
                 <div key={student.id} className="px-6 py-4 flex items-center gap-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
                   <div className="w-10 h-10 bg-teal-100 dark:bg-teal-900/30 rounded-full flex items-center justify-center text-teal-600 font-bold text-sm shrink-0">
-                    {student.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                    {(student.name || "").split(" ").map(n => n[0] || "").join("").slice(0, 2)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-zinc-900 dark:text-white text-sm truncate">{student.name}</p>

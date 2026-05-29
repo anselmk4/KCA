@@ -45,15 +45,15 @@ export default function MessagesPage() {
 
     const mockConversations: Conversation[] = students.map((student, i) => ({
       userId: student.id,
-      name: student.name,
-      avatar: student.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2),
+      name: student.name || "Apprenant",
+      avatar: (student.name || "").split(" ").map((n: string) => n[0] || "").join("").slice(0, 2),
       preview: i % 2 === 0 ? "Merci pour le cours, super contenu !" : "J'ai une question sur le module 3...",
       time: `${10 + i}:${30 + i < 60 ? 30 + i : "00"}`,
       unread: i % 3 === 0 ? 2 : 0,
       messages: [
-        { id: "m1", from: student.name, text: i % 2 === 0 ? "Bonjour, j'ai adoré le cours !" : "Bonjour, j'ai une question.", time: "09:00" },
+        { id: "m1", from: student.name || "Apprenant", text: i % 2 === 0 ? "Bonjour, j'ai adoré le cours !" : "Bonjour, j'ai une question.", time: "09:00" },
         { id: "m2", from: s.name || "Vous", text: "Merci ! Posez votre question.", time: "09:05", own: true },
-        { id: "m3", from: student.name, text: i % 2 === 0 ? "Merci pour le cours, super contenu !" : "J'ai une question sur le module 3...", time: "09:10" },
+        { id: "m3", from: student.name || "Apprenant", text: i % 2 === 0 ? "Merci pour le cours, super contenu !" : "J'ai une question sur le module 3...", time: "09:10" },
       ]
     }));
 

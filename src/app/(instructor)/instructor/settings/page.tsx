@@ -56,7 +56,7 @@ export default function SettingsPage() {
     }));
     setAcademyForm(f => ({
       ...f,
-      academyName: `Académie ${s?.name?.split(" ")[0] || "Crypto"}`,
+      academyName: `Académie ${s?.name?.split(" ")?.[0] || "Crypto"}`,
       tagline: "Apprendre la blockchain, simplement.",
       topics: "Blockchain, DeFi, NFT, Trading",
     }));
