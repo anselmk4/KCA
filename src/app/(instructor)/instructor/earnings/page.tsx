@@ -34,7 +34,7 @@ export default function EarningsPage() {
     </div>
   );
 
-  const myCourseIds = db.courses.filter(c => c.instructorId === session.userId).map(c => c.id);
+  const myCourseIds = db.courses.filter(c => c.instructorId === (session?.userId ?? "")).map(c => c.id);
   // Use transactions (the actual DB field) filtered to instructor's courses
   const myTransactions = db.transactions.filter(tx => myCourseIds.includes(tx.courseId));
 

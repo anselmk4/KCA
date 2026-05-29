@@ -37,7 +37,7 @@ export default function StudentsPage() {
     </div>
   );
 
-  const myCourseIds = db.courses.filter(c => c.instructorId === session.userId).map(c => c.id);
+  const myCourseIds = db.courses.filter(c => c.instructorId === (session?.userId ?? "")).map(c => c.id);
   const myEnrollments = db.enrollments.filter(e => myCourseIds.includes(e.courseId));
   const enrolledStudentIds = [...new Set(myEnrollments.map(e => e.studentId))];
   const students = db.users.filter(u => enrolledStudentIds.includes(u.id) && u.role === "STUDENT");

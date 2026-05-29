@@ -29,7 +29,7 @@ export default function BillingPage() {
   }
 
   // Calculate usage stats dynamically based on database
-  const myCourses = db.courses.filter(c => c.instructorId === session.userId);
+  const myCourses = db.courses.filter(c => c.instructorId === (session?.userId ?? ""));
   const myCourseIds = myCourses.map(c => c.id);
   const myEnrollments = db.enrollments.filter(e => myCourseIds.includes(e.courseId));
   const totalStudents = new Set(myEnrollments.map(e => e.studentId)).size;
@@ -63,7 +63,7 @@ export default function BillingPage() {
       // Update local storage database
       const database = getDB();
       const updatedUsers = database.users.map(u => {
-        if (u.id === session.userId) {
+        if (u.id === session?.userId) {
           return { ...u, plan: newPlan };
         }
         return u;

@@ -31,7 +31,7 @@ export default function AnalyticsPage() {
     </div>
   );
 
-  const myCourses = db.courses.filter(c => c.instructorId === session.userId);
+  const myCourses = db.courses.filter(c => c.instructorId === (session?.userId ?? ""));
   const myCourseIds = myCourses.map(c => c.id);
   const myEnrollments = db.enrollments.filter(e => myCourseIds.includes(e.courseId));
   const totalStudents = new Set(myEnrollments.map(e => e.studentId)).size;

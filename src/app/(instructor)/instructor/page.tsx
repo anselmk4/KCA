@@ -37,8 +37,8 @@ export default function InstructorDashboardPage() {
     );
   }
 
-  const instructorId = session.userId;
-  const instructorName = session.name;
+  const instructorId = session?.userId ?? "";
+  const instructorName = session?.name ?? "";
 
   // Instructor-specific data
   const myCourses = db.courses.filter((c) => c.instructorId === instructorId);
