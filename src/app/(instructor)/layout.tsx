@@ -51,11 +51,16 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
   const profileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setSession(getSimulatedSession());
+    const s = getSimulatedSession();
+    if (s.role !== "INSTRUCTOR" && s.role !== "TEACHING_ASSISTANT") {
+      router.replace("/");
+      return;
+    }
+    setSession(s);
     const handleStorage = () => setSession(getSimulatedSession());
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
-  }, []);
+  }, [router]);
 
   // Close profile dropdown on outside click
   useEffect(() => {

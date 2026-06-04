@@ -50,11 +50,11 @@ export default function InstructorDashboardPage() {
   const totalStudents = new Set(myEnrollments.map((e) => e.studentId)).size;
 
   const myTransactions = db.transactions.filter(
-    (t) => myCourseIds.includes(t.courseId) && t.status === "Complété"
+    (t) => myCourseIds.includes(t.courseId) && t.status === "PAID"
   );
   const totalRevenue = myTransactions.reduce((sum, t) => sum + t.amount, 0);
   const pendingPayouts = db.payouts
-    .filter((p) => p.instructorId === instructorId && p.status === "En attente")
+    .filter((p) => p.instructorId === instructorId && p.status === "PENDING")
     .reduce((sum, p) => sum + p.amount, 0);
 
   const avgProgress =
@@ -157,7 +157,7 @@ export default function InstructorDashboardPage() {
             {myCourses.slice(0, 4).map((course) => {
               const enrollCount = db.enrollments.filter((e) => e.courseId === course.id).length;
               const courseRevenue = db.transactions
-                .filter((t) => t.courseId === course.id && t.status === "Complété")
+                .filter((t) => t.courseId === course.id && t.status === "PAID")
                 .reduce((s, t) => s + t.amount, 0);
               return (
                 <div

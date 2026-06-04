@@ -1,17 +1,30 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, CreditCard, Settings, LogOut, ShieldAlert } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { LayoutDashboard, Users, CreditCard, LogOut, ShieldAlert, LifeBuoy } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { getSimulatedSession, canAccessRoute } from "@/lib/rbac";
+
+const ADMIN_ROLES = ["SUPER_ADMIN", "ADMIN", "FINANCE_ADMIN", "ACADEMIC_ADMIN", "SUPPORT_AGENT"];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    const session = getSimulatedSession();
+    if (!ADMIN_ROLES.includes(session.role)) {
+      router.replace("/");
+    }
+  }, [router]);
 
   const menuItems = [
     { icon: <LayoutDashboard className="w-5 h-5" />, label: "Vue d'ensemble", href: "/admin" },
     { icon: <Users className="w-5 h-5" />, label: "Utilisateurs", href: "/admin/users" },
     { icon: <CreditCard className="w-5 h-5" />, label: "Transactions", href: "/admin/transactions" },
+    { icon: <LifeBuoy className="w-5 h-5" />, label: "Tickets Support", href: "/admin/support" },
   ];
 
   return (

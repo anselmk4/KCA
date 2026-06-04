@@ -61,7 +61,7 @@ export function Courses() {
         </div>
         <div className="mt-12 text-center">
           <Link href="/register" className="inline-flex items-center text-blue-600 font-semibold hover:text-blue-700 transition-colors">
-            Lancer mon académie à partir d'un modèle <ArrowRight className="ml-2 h-4 w-4" />
+            S'inscrire gratuitement <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </div>
       </div>

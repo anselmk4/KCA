@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getDB, Database, addCourse } from "@/lib/db";
+import RichEditor from '@/components/editor/RichEditor';
+import EditorChoice, { EditorMode } from '@/components/editor/EditorChoice';
 import {
   BookOpen,
   Plus,
@@ -15,6 +16,7 @@ import {
   Filter,
 } from "lucide-react";
 import Link from "next/link";
+import { deleteCourse, addCourse, getDB, saveDB, Database } from '@/lib/db';
 
 const INSTRUCTOR_ID = "u3";
 
@@ -40,6 +42,7 @@ export default function InstructorCoursesPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const [editorMode, setEditorMode] = useState<EditorMode>('rich');
   const [newDescription, setNewDescription] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [creating, setCreating] = useState(false);
@@ -47,6 +50,13 @@ export default function InstructorCoursesPage() {
   useEffect(() => {
     setDb(getDB());
   }, []);
+
+  const handleDelete = (courseId: string) => {
+    if (confirm('Êtes‑vous sûr de vouloir supprimer ce cours ? Cette action est irréversible.')) {
+      deleteCourse(courseId);
+      setDb(getDB());
+    }
+  };
 
   if (!db) {
     return (
@@ -165,7 +175,7 @@ export default function InstructorCoursesPage() {
           {filtered.map((course) => {
             const enrollCount = db.enrollments.filter((e) => e.courseId === course.id).length;
             const revenue = db.transactions
-              .filter((t) => t.courseId === course.id && t.status === "Complété")
+                              .filter(tx => tx.courseId === course.id && tx.status === "PAID")
               .reduce((s, t) => s + t.amount, 0);
             const sectionCount = db.sections.filter((s) => s.courseId === course.id).length;
             const lessonCount = db.sections
@@ -242,9 +252,7 @@ export default function InstructorCoursesPage() {
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
-                  Titre du cours *
-                </label>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Titre du cours *</label>
                 <input
                   type="text"
                   value={newTitle}
@@ -254,21 +262,7 @@ export default function InstructorCoursesPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
-                  Description
-                </label>
-                <textarea
-                  value={newDescription}
-                  onChange={(e) => setNewDescription(e.target.value)}
-                  placeholder="Décrivez brièvement votre cours..."
-                  rows={3}
-                  className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 resize-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
-                  Prix ($)
-                </label>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Prix ($)</label>
                 <input
                   type="number"
                   value={newPrice}

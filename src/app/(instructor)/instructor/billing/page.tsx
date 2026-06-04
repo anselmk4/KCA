@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getDB, saveDB, Database } from "@/lib/db";
 import { getSimulatedSession, setSimulatedSession, CurrentSession } from "@/lib/rbac";
 import { Check, CreditCard, Sparkles, Zap, Award, CheckCircle2, ShieldAlert } from "lucide-react";
 
 export default function BillingPage() {
+  const router = useRouter();
   const [session, setSession] = useState<CurrentSession | null>(null);
   const [db, setDb] = useState<Database | null>(null);
   const [loading, setLoading] = useState(false);
@@ -37,12 +39,13 @@ export default function BillingPage() {
   const currentPlan = session.plan || "FREE";
 
   const limits = {
-    FREE: { courses: 1, students: 15, fee: "5%" },
-    PRO: { courses: 10, students: 200, fee: "2%" },
+    FREE: { courses: 1, students: 15, fee: "50%" },
+    BASE: { courses: 3, students: 50, fee: "10%" },
+    PRO: { courses: 10, students: 200, fee: "5%" },
     MAX: { courses: Infinity, students: Infinity, fee: "0%" }
   };
 
-  const currentLimit = limits[currentPlan];
+  const currentLimit = limits[currentPlan as keyof typeof limits] || limits.FREE;
 
   // Progress percentages
   const coursesPercent = currentLimit.courses === Infinity 
@@ -53,8 +56,13 @@ export default function BillingPage() {
     ? 0 
     : Math.min((totalStudents / currentLimit.students) * 100, 100);
 
-  const handleUpgradePlan = (newPlan: "FREE" | "PRO" | "MAX") => {
+  const handleUpgradePlan = (newPlan: "FREE" | "BASE" | "PRO" | "MAX") => {
     if (newPlan === currentPlan) return;
+    
+    if (newPlan === "BASE" || newPlan === "PRO" || newPlan === "MAX") {
+      router.push(`/instructor/billing/pay?plan=${newPlan}`);
+      return;
+    }
     
     setLoading(true);
     setSuccessMsg(null);
@@ -182,12 +190,12 @@ export default function BillingPage() {
       </div>
 
       {/* Warning banner for limit reached */}
-      {currentPlan === "FREE" && (myCourses.length >= currentLimit.courses || totalStudents >= currentLimit.students) && (
+      {(currentPlan === "FREE" || currentPlan === "BASE") && (myCourses.length >= currentLimit.courses || totalStudents >= currentLimit.students) && (
         <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl flex items-start gap-3 text-amber-800 dark:text-amber-400 text-sm font-medium">
           <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5 text-amber-500" />
           <div>
             <p className="font-bold">Quota de ressources épuisé</p>
-            <p className="text-xs mt-1 text-zinc-500 dark:text-zinc-400">Vous avez atteint les limites du forfait gratuit. Pour ajouter de nouveaux cours ou accueillir plus d'élèves, veuillez souscrire au Plan Pro.</p>
+            <p className="text-xs mt-1 text-zinc-500 dark:text-zinc-400">Vous avez atteint les limites de votre forfait actuel ({currentPlan === "FREE" ? "Gratuit" : "Base"}). Pour ajouter de nouveaux cours ou accueillir plus d'élèves, veuillez mettre à niveau votre forfait.</p>
           </div>
         </div>
       )}
@@ -198,7 +206,7 @@ export default function BillingPage() {
           Tous nos Forfaits
         </h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Plan Free Card */}
           <div className={`bg-white dark:bg-zinc-900 p-6 rounded-2xl border flex flex-col justify-between h-full relative ${
             currentPlan === "FREE" ? "border-teal-500 shadow-md ring-1 ring-teal-500" : "border-zinc-200 dark:border-zinc-800"
@@ -223,7 +231,7 @@ export default function BillingPage() {
                   <Check className="w-4 h-4 text-teal-600" /> 15 apprenants max
                 </li>
                 <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
-                  <Check className="w-4 h-4 text-teal-600" /> 5% frais de transaction
+                  <Check className="w-4 h-4 text-teal-600" /> 50% frais de transaction
                 </li>
               </ul>
             </div>
@@ -237,6 +245,47 @@ export default function BillingPage() {
               }`}
             >
               Activer gratuitement
+            </button>
+          </div>
+
+          {/* Plan Base Card */}
+          <div className={`bg-white dark:bg-zinc-900 p-6 rounded-2xl border flex flex-col justify-between h-full relative ${
+            currentPlan === "BASE" ? "border-teal-500 shadow-md ring-1 ring-teal-500" : "border-zinc-200 dark:border-zinc-800"
+          }`}>
+            {currentPlan === "BASE" && (
+              <span className="absolute -top-3 right-4 bg-teal-500 text-white text-[10px] font-bold uppercase tracking-wide px-2.5 py-0.5 rounded-full">
+                Actif
+              </span>
+            )}
+            <div>
+              <h3 className="font-bold text-lg text-zinc-900 dark:text-white">Plan Base</h3>
+              <p className="text-xs text-zinc-400 mt-1 min-h-[48px]">Pour les formateurs sérieux qui lancent leur académie.</p>
+              <div className="my-6">
+                <span className="text-3xl font-extrabold text-zinc-900 dark:text-white">19$</span>
+                <span className="text-zinc-400 text-sm ml-1">/ mois</span>
+              </div>
+              <ul className="space-y-3 mb-6 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
+                  <Check className="w-4 h-4 text-teal-600" /> Jusqu'à 3 cours actifs
+                </li>
+                <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
+                  <Check className="w-4 h-4 text-teal-600" /> 50 apprenants max
+                </li>
+                <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
+                  <Check className="w-4 h-4 text-teal-600" /> 10% frais de transaction
+                </li>
+              </ul>
+            </div>
+            <button 
+              disabled={currentPlan === "BASE" || loading}
+              onClick={() => handleUpgradePlan("BASE")}
+              className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${
+                currentPlan === "BASE"
+                  ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 cursor-default"
+                  : "bg-teal-600 hover:bg-teal-500 text-white"
+              }`}
+            >
+              {currentPlan === "FREE" ? "Passer au Plan Base" : "Retourner au Plan Base"}
             </button>
           </div>
 

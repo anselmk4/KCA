@@ -38,6 +38,13 @@ enum PaymentStatus {
   CANCELLED
 }
 
+enum PaymentProvider {
+  STRIPE
+  PAYPAL
+  MOBILE_MONEY
+  CRYPTO
+}
+
 enum StudentStatus {
   ACTIVE
   INACTIVE

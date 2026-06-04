@@ -13,12 +13,29 @@ export function Pricing() {
         "Jusqu'à 15 apprenants inscrits",
         "Quiz de validation simples",
         "Encaissement Mobile Money & Carte",
-        "Frais de transaction : 5%",
+        "Frais de transaction : 50%",
         "Support communautaire"
       ],
       popular: false,
       buttonText: "Commencer gratuitement",
       href: "/register?plan=free"
+    },
+    {
+      name: "Plan Base",
+      price: "19$",
+      unit: "/ mois",
+      description: "Pour les créateurs sérieux qui lancent leur académie.",
+      features: [
+        "Jusqu'à 3 cours actifs",
+        "Jusqu'à 50 apprenants inscrits",
+        "Quiz de validation simples",
+        "Encaissement Mobile Money & Carte",
+        "Frais de transaction : 10%",
+        "Support par email"
+      ],
+      popular: false,
+      buttonText: "Démarrer avec le Plan Base",
+      href: "/register?plan=base"
     },
     {
       name: "Plan Pro",
@@ -30,7 +47,7 @@ export function Pricing() {
         "Jusqu'à 200 apprenants inscrits",
         "Quiz et examens illimités",
         "Certificats de réussite automatisés",
-        "Frais de transaction réduits : 2%",
+        "Frais de transaction réduits : 5%",
         "Support prioritaire sous 24h"
       ],
       popular: true,
@@ -66,7 +83,7 @@ export function Pricing() {
           </p>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
           {plans.map((plan, index) => (
             <div 
               key={index} 

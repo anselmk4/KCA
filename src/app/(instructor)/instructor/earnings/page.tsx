@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getDB, initDB, Database } from "@/lib/db";
+import { normalizeStatus } from "@/lib/statusHelpers";
 import { getSimulatedSession } from "@/lib/rbac";
 import {
   Wallet,
@@ -38,11 +39,12 @@ export default function EarningsPage() {
   // Use transactions (the actual DB field) filtered to instructor's courses
   const myTransactions = db.transactions.filter(tx => myCourseIds.includes(tx.courseId));
 
+
   const totalRevenue = myTransactions
-    .filter(tx => tx.status === "Complété")
+    .filter(tx => normalizeStatus(tx.status) === "PAID")
     .reduce((s, tx) => s + tx.amount, 0);
   const pendingRevenue = myTransactions
-    .filter(tx => tx.status === "En attente")
+    .filter(tx => normalizeStatus(tx.status) === "PENDING")
     .reduce((s, tx) => s + tx.amount, 0);
   const commissionRate = 0.7; // 70% instructor share
   const netRevenue = totalRevenue * commissionRate;
@@ -98,7 +100,7 @@ export default function EarningsPage() {
           },
           {
             label: "Paiements reçus",
-            value: myTransactions.filter(tx => tx.status === "Complété").length,
+            value: myTransactions.filter(tx => normalizeStatus(tx.status) === "PAID").length,
             icon: CheckCircle2,
             color: "text-emerald-600",
             bg: "bg-emerald-50 dark:bg-emerald-900/20",
@@ -165,11 +167,11 @@ export default function EarningsPage() {
             {recentTransactions.map(tx => (
               <div key={tx.id} className="px-6 py-4 flex items-center gap-4">
                 <div className={`p-2.5 rounded-xl shrink-0 ${
-                  tx.status === "Complété"
+                  normalizeStatus(tx.status) === "PAID"
                     ? "bg-emerald-50 dark:bg-emerald-900/20"
                     : "bg-amber-50 dark:bg-amber-900/20"
                 }`}>
-                  {tx.status === "Complété"
+                  {normalizeStatus(tx.status) === "PAID"
                     ? <ArrowDownRight className="w-4 h-4 text-emerald-600" />
                     : <Clock className="w-4 h-4 text-amber-600" />
                   }
@@ -179,17 +181,17 @@ export default function EarningsPage() {
                   <p className="text-xs text-zinc-400 mt-0.5">par {tx.studentName} · {tx.method}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className={`text-sm font-bold ${tx.status === "Complété" ? "text-emerald-600" : "text-amber-600"}`}>
+                  <p className={`text-sm font-bold ${normalizeStatus(tx.status) === "PAID" ? "text-emerald-600" : "text-amber-600"}`}>
                     +{(tx.amount * commissionRate).toFixed(2)} €
                   </p>
                   <p className="text-[10px] text-zinc-400">{new Date(tx.date).toLocaleDateString("fr-FR")}</p>
                 </div>
                 <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase shrink-0 ${
-                  tx.status === "Complété"
+                  normalizeStatus(tx.status) === "PAID"
                     ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                    : tx.status === "Échoué"
-                    ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                    : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                    : normalizeStatus(tx.status) === "PENDING"
+                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                    : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
                 }`}>
                   {tx.status}
                 </span>

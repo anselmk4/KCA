@@ -45,14 +45,14 @@ export default function AdminTransactionsPage() {
                   <td className="px-6 py-4 text-zinc-500">{new Date(tx.date).toLocaleDateString()}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-1.5">
-                      {tx.status === "Complété" && <CheckCircle2 className="w-4 h-4 text-green-500" />}
-                      {tx.status === "Échoué" && <XCircle className="w-4 h-4 text-red-500" />}
-                      {tx.status === "En attente" && <Clock className="w-4 h-4 text-orange-500" />}
+                      {tx.status === "PAID" && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                      {tx.status === "FAILED" && <XCircle className="w-4 h-4 text-red-500" />}
+                      {tx.status === "PENDING" && <Clock className="w-4 h-4 text-orange-500" />}
                       <span className={`font-semibold text-xs ${
-                        tx.status === 'Complété' ? 'text-green-600 dark:text-green-400' :
-                        tx.status === 'Échoué' ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'
+                        tx.status === 'PAID' ? 'text-green-600 dark:text-green-400' :
+                        tx.status === 'FAILED' ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'
                       }`}>
-                        {tx.status}
+                        {tx.status === 'PAID' ? 'Complété' : tx.status === 'FAILED' ? 'Échoué' : 'En attente'}
                       </span>
                     </div>
                   </td>

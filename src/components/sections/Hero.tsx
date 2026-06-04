@@ -20,7 +20,7 @@ export function Hero() {
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-4">
               <Link href="/register" className="inline-flex items-center justify-center rounded-lg text-base font-semibold transition-all bg-blue-600 text-white hover:bg-blue-500 h-14 px-8 w-full sm:w-auto shadow-[0_0_20px_rgba(37,99,235,0.4)]">
-                Lancer mon académie gratuitement
+                S'inscrire gratuitement
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </div>

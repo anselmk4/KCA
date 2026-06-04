@@ -51,9 +51,11 @@ export default function InstructorQuizzesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Quiz & Examens</h1>
-          <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">
-            Gérez les évaluations de vos cours.
-          </p>
+          <div className="mt-2">
+            <Link href="/instructor/quizzes/create" className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition-colors">
+              <Plus className="w-4 h-4"/> Ajouter un quiz
+            </Link>
+          </div>
         </div>
       </div>
 

@@ -129,7 +129,7 @@ export default function CourseContentBuilderPage() {
       description: "",
       content: "",
       videoUrl: "",
-      durationMin: parseInt(newLessonDuration) || 15,
+      durationMin: Math.max(parseInt(newLessonDuration) || 15, 5),
       order: existingLessons.length + 1,
     };
     db.lessons.push(newLesson);

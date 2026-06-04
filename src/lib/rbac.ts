@@ -28,7 +28,12 @@ export type Permission =
   | "certificate:issue"
   | "certificate:revoke"
   | "certificate:download"
+  | "course:manageContent"
+  | "course:preview"
+  | "quiz:manage"
+  | "payment:chooseProvider"
   | "quiz:attempt";
+
 
 // Centralized permission assignments per role
 export const RolePermissions: Record<Role, Permission[]> = {
@@ -90,6 +95,11 @@ export const RolePermissions: Record<Role, Permission[]> = {
     "course:read",
     "payout:trigger",
     "support:create",
+    "course:delete",
+    "payment:chooseProvider",
+    "course:manageContent",
+    "course:preview",
+    "quiz:manage",
   ],
   TEACHING_ASSISTANT: [
     "course:read",
@@ -159,7 +169,7 @@ export type CurrentSession = {
   email: string;
   role: Role;
   status: StudentStatus;
-  plan?: "FREE" | "PRO" | "MAX";
+  plan?: "FREE" | "BASE" | "PRO" | "MAX";
 };
 
 // Helper to retrieve the current simulated session

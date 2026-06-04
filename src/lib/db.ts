@@ -10,7 +10,7 @@ export type User = {
   joinedAt: string;
   activeCourse: string;
   status: "Actif" | "Suspendu" | "En attente";
-  plan?: "FREE" | "PRO" | "MAX";
+  plan?: "FREE" | "BASE" | "PRO" | "MAX";
 };
 
 export type Course = {
@@ -94,6 +94,7 @@ export type Certificate = {
   issuedAt: string;
 };
 
+// Updated Transaction status to use English enums
 export type Transaction = {
   id: string;
   userId: string;
@@ -101,7 +102,7 @@ export type Transaction = {
   amount: number;
   courseId: string;
   date: string;
-  status: "Complété" | "Échoué" | "En attente";
+  status: "PAID" | "FAILED" | "PENDING";
   method: "Carte" | "Mobile Money" | "PayPal";
 };
 
@@ -109,7 +110,7 @@ export type Payout = {
   id: string;
   instructorId: string;
   amount: number;
-  status: "Complété" | "Échoué" | "En attente";
+  status: "PAID" | "FAILED" | "PENDING";
   date: string;
 };
 
@@ -392,7 +393,7 @@ const defaultDB: Database = {
       amount: 300,
       courseId: "blockchain",
       date: new Date(Date.now() - 86400000 * 8).toISOString(),
-      status: "Complété",
+      status: "PAID",
       method: "Mobile Money",
     },
     {
@@ -402,7 +403,7 @@ const defaultDB: Database = {
       amount: 1000,
       courseId: "ai",
       date: new Date(Date.now() - 86400000 * 5).toISOString(),
-      status: "Complété",
+      status: "PAID",
       method: "Carte",
     }
   ],
@@ -411,14 +412,14 @@ const defaultDB: Database = {
       id: "po1",
       instructorId: "u3",
       amount: 850,
-      status: "Complété",
+      status: "PAID",
       date: new Date(Date.now() - 86400000 * 4).toISOString(),
     },
     {
       id: "po2",
       instructorId: "u3",
       amount: 1200,
-      status: "En attente",
+      status: "PENDING",
       date: new Date(Date.now() - 86400000 * 1).toISOString(),
     }
   ],
@@ -473,7 +474,7 @@ export const saveDB = (db: Database) => {
   }
 };
 
-export const addUser = (user: Omit<User, "id" | "joinedAt" | "status" | "role" | "plan"> & { role?: "STUDENT" | "INSTRUCTOR" | "ADMIN"; plan?: "FREE" | "PRO" | "MAX" }) => {
+export const addUser = (user: Omit<User, "id" | "joinedAt" | "status" | "role" | "plan"> & { role?: "STUDENT" | "INSTRUCTOR" | "ADMIN"; plan?: "FREE" | "BASE" | "PRO" | "MAX" }) => {
   const db = getDB();
   const newUser: User = {
     ...user,
@@ -500,6 +501,28 @@ export const addTransaction = (tx: Omit<Transaction, "id" | "date">) => {
   return newTx;
 };
 
+export const addCourse = (course: Partial<Course> & { title: string; price: number; description?: string; instructorId?: string; instructorName?: string }) => {
+  const db = getDB();
+  const id = `c${Date.now()}`;
+  const slug = course.slug || course.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const newCourse: Course = {
+    id,
+    title: course.title,
+    slug,
+    description: course.description || "",
+    price: course.price,
+    status: "DRAFT",
+    instructorId: course.instructorId || "u3",
+    instructorName: course.instructorName || "Prof. Kuettu",
+    createdAt: new Date().toISOString(),
+    rating: 0,
+    category: "",
+    level: "",
+  };
+  db.courses.push(newCourse);
+  saveDB(db);
+  return newCourse;
+};
 export const addSupportTicket = (ticket: Omit<SupportTicket, "id" | "createdAt" | "status" | "replies">) => {
   const db = getDB();
   const newTicket: SupportTicket = {
@@ -507,19 +530,56 @@ export const addSupportTicket = (ticket: Omit<SupportTicket, "id" | "createdAt" 
     id: `t${Date.now()}`,
     status: "OPEN",
     createdAt: new Date().toISOString(),
-    replies: [
-      {
-        id: `r${Date.now()}`,
-        senderId: ticket.userId,
-        senderName: ticket.userName,
-        message: ticket.message,
-        createdAt: new Date().toISOString(),
-      }
-    ]
+    replies: [],
   };
   db.supportTickets.push(newTicket);
   saveDB(db);
   return newTicket;
+};
+
+// Export function to add a quiz
+export const addQuiz = (quiz: Omit<Quiz, "id">) => {
+  const db = getDB();
+  const newQuiz: Quiz = {
+    ...quiz,
+    id: `q_${Date.now()}`,
+  };
+  db.quizzes.push(newQuiz);
+  saveDB(db);
+  return newQuiz;
+};
+
+// Export function to add a question
+export const addQuestion = (question: Omit<Question, "id">) => {
+  const db = getDB();
+  const newQuestion: Question = {
+    ...question,
+    id: `qn_${Date.now()}`,
+  };
+  db.questions.push(newQuestion);
+  saveDB(db);
+  return newQuestion;
+};
+
+export const deleteCourse = (courseId: string) => {
+  const db = getDB();
+  // Remove the course
+  db.courses = db.courses.filter((c) => c.id !== courseId);
+  // Remove related sections
+  db.sections = db.sections.filter((s) => s.courseId !== courseId);
+  // Remove lessons belonging to those sections
+  const sectionIds = db.sections.map((s) => s.id);
+  db.lessons = db.lessons.filter((l) => sectionIds.includes(l.sectionId) === false);
+  // Remove enrollments for the course
+  db.enrollments = db.enrollments.filter((e) => e.courseId !== courseId);
+  // Remove related quizzes and questions
+  const quizIds = db.quizzes.filter((q) => q.courseId === courseId).map((q) => q.id);
+  db.quizzes = db.quizzes.filter((q) => q.courseId !== courseId);
+  db.questions = db.questions.filter((qn) => quizIds.includes(qn.quizId) === false);
+  // Remove transactions for the course
+  db.transactions = db.transactions.filter((t) => t.courseId !== courseId);
+  saveDB(db);
+  return true;
 };
 
 export const addReplyToTicket = (ticketId: string, reply: Omit<SupportTicketReply, "id" | "createdAt">) => {
@@ -564,26 +624,4 @@ export const addCertificate = (cert: Omit<Certificate, "id" | "issuedAt" | "code
   return newCert;
 };
 
-export const addCourse = (course: Omit<Course, "id" | "createdAt" | "status">) => {
-  const db = getDB();
-  const newCourse: Course = {
-    ...course,
-    id: `course_${Date.now()}`,
-    status: "DRAFT",
-    createdAt: new Date().toISOString(),
-  };
-  db.courses.push(newCourse);
-  saveDB(db);
-  return newCourse;
-};
 
-export const updateCourseStatus = (courseId: string, status: Course["status"]) => {
-  const db = getDB();
-  const course = db.courses.find(c => c.id === courseId);
-  if (course) {
-    course.status = status;
-    saveDB(db);
-    return course;
-  }
-  return null;
-};

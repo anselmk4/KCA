@@ -11,7 +11,8 @@ import {
   LogOut,
   GraduationCap,
   CreditCard,
-  X
+  X,
+  LifeBuoy
 } from "lucide-react";
 
 interface SidebarProps {
@@ -28,6 +29,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     { icon: <CreditCard className="w-5 h-5" />, label: "Paiements", href: "/dashboard/payments" },
     { icon: <Award className="w-5 h-5" />, label: "Certificats", href: "/dashboard/certificates" },
     { icon: <Users className="w-5 h-5" />, label: "Communauté", href: "/dashboard/community" },
+    { icon: <LifeBuoy className="w-5 h-5" />, label: "Support Technique", href: "/dashboard/support" },
   ];
 
   return (
