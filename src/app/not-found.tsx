@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { GraduationCap, ArrowLeft } from "lucide-react";
+import Image from "next/image";
+import { ArrowLeft } from "lucide-react";
 
 export default function NotFound() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black p-4">
       <div className="text-center max-w-md">
         <div className="flex justify-center mb-8">
-          <GraduationCap className="w-16 h-16 text-blue-600" />
+          <Image src="/logo.png" alt="ANSELLA" width={64} height={64} className="object-contain" />
         </div>
         <h1 className="text-7xl font-extrabold text-zinc-900 dark:text-white mb-4">404</h1>
         <p className="text-xl text-zinc-500 dark:text-zinc-400 mb-8">

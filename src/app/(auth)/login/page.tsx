@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { GraduationCap, AlertCircle, ArrowRight, Loader2 } from "lucide-react";
+import Image from "next/image";
+import { AlertCircle, ArrowRight, Loader2 } from "lucide-react";
 import { initDB } from "@/lib/db";
 import { loginWithEmail } from "@/lib/supabase/auth-helpers";
 
@@ -52,7 +53,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-zinc-200 dark:border-white/10 p-8">
         <div className="flex flex-col items-center mb-8">
           <Link href="/" className="flex items-center space-x-2 mb-6">
-            <GraduationCap className="h-10 w-10 text-blue-600" />
+            <Image src="/logo.png" alt="ANSELLA" width={40} height={40} className="object-contain" />
             <span className="font-bold text-2xl text-zinc-900 dark:text-white">ANSELLA</span>
           </Link>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Bienvenue</h1>

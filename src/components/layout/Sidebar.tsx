@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, 
@@ -9,7 +10,7 @@ import {
   Users, 
   Settings, 
   LogOut,
-  GraduationCap,
+
   CreditCard,
   X,
   LifeBuoy
@@ -37,7 +38,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       ${open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
       <div className="h-16 flex items-center justify-between px-6 border-b border-zinc-100 dark:border-zinc-800">
         <Link href="/" className="flex items-center space-x-2">
-          <GraduationCap className="h-6 w-6 text-blue-600" />
+          <Image src="/logo.png" alt="ANSELLA" width={24} height={24} className="object-contain" />
           <span className="font-bold text-lg text-zinc-900 dark:text-white">ANSELLA</span>
         </Link>
         <button className="lg:hidden p-1 text-zinc-500" onClick={onClose}>

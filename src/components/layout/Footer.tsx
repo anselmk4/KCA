@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { GraduationCap } from "lucide-react";
+import Image from "next/image";
 
 function FacebookIcon(props: any) {
   return (
@@ -32,7 +32,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-1">
             <Link href="/" className="flex items-center space-x-2 mb-4">
-              <GraduationCap className="h-6 w-6 text-blue-600" />
+              <Image src="/logo.png" alt="ANSELLA" width={24} height={24} className="object-contain" />
               <span className="font-bold text-lg">ANSELLA</span>
             </Link>
             <p className="text-sm text-muted-foreground mb-4">
