@@ -8,20 +8,26 @@ export function Hero() {
       <div className="container mx-auto px-4 md:px-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="text-left">
-            <div className="inline-flex items-center rounded-full border border-blue-500/30 px-3 py-1 text-sm font-semibold mb-6 text-blue-400 bg-blue-950/50 backdrop-blur-sm">
+            <div className="inline-flex items-center rounded-full border border-blue-500/30 px-3 py-1 text-sm font-semibold mb-4 text-blue-400 bg-blue-950/50 backdrop-blur-sm">
               <span className="flex h-2 w-2 rounded-full bg-blue-500 mr-2 animate-pulse"></span>
-              Plateforme SaaS ANSELLA
+              🇨🇩 Plateforme 100% Congolaise
             </div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-8 leading-tight text-white">
-              Créez et Vendez vos Formations Web3 & IA
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6 leading-tight text-white">
+              Créez, vendez vos formations partout et facilement.
             </h1>
-            <p className="text-xl md:text-2xl text-zinc-400 mb-10 max-w-xl">
-              ANSELLA est la plateforme d'apprentissage tout-en-un conçue pour les instructeurs. Hébergez vos cours, évaluez vos élèves et encaissez vos gains facilement.
+            <p className="text-lg md:text-xl text-zinc-400 mb-3 max-w-xl font-semibold">
+              ANSELLA est une plateforme 100% Congolaise tout-en-un.
+            </p>
+            <p className="text-base text-zinc-500 mb-10 max-w-xl">
+              Hébergez vos cours, évaluez vos apprenants, encaissez vos gains en Mobile Money — et faites grandir votre académie sans limite.
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-4">
               <Link href="/register" className="inline-flex items-center justify-center rounded-lg text-base font-semibold transition-all bg-blue-600 text-white hover:bg-blue-500 h-14 px-8 w-full sm:w-auto shadow-[0_0_20px_rgba(37,99,235,0.4)]">
-                S'inscrire gratuitement
+                Créer mon académie gratuitement
                 <ArrowRight className="ml-2 h-5 w-5" />
+              </Link>
+              <Link href="/courses" className="inline-flex items-center justify-center rounded-lg text-base font-semibold transition-all border border-white/20 text-white hover:bg-white/10 h-14 px-8 w-full sm:w-auto">
+                Voir le catalogue
               </Link>
             </div>
             
@@ -59,8 +65,8 @@ export function Hero() {
             
             <div className="relative w-full h-full rounded-2xl overflow-hidden border border-white/10 shadow-2xl backdrop-blur-sm bg-black/20">
               <Image 
-                src="/images/hero.png" 
-                alt="Web3 and AI Visualization" 
+                src="/african-expert-hero.png" 
+                alt="Expert africain présentant ses formations sur ANSELLA" 
                 fill 
                 className="object-cover"
                 priority

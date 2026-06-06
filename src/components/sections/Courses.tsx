@@ -60,8 +60,8 @@ export function Courses() {
           ))}
         </div>
         <div className="mt-12 text-center">
-          <Link href="/register" className="inline-flex items-center text-blue-600 font-semibold hover:text-blue-700 transition-colors">
-            S'inscrire gratuitement <ArrowRight className="ml-2 h-4 w-4" />
+          <Link href="/courses" className="inline-flex items-center text-blue-600 font-semibold hover:text-blue-700 transition-colors">
+            Voir le catalogue des cours <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </div>
       </div>

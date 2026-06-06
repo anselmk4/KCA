@@ -11,7 +11,7 @@ export type AuthProfile = {
   id: string;
   email: string;
   full_name: string;
-  role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN' | 'SUPER_ADMIN';
+  role: 'STUDENT' | 'INSTRUCTOR' | 'TEACHING_ASSISTANT' | 'ADMIN' | 'SUPER_ADMIN' | 'FINANCE_ADMIN' | 'ACADEMIC_ADMIN' | 'SUPPORT_AGENT';
   plan: 'FREE' | 'BASE' | 'PRO' | 'MAX';
   status: string;
 };
@@ -50,7 +50,11 @@ export async function fetchUserProfile(userId: string): Promise<AuthProfile | nu
 
     if (roleNames.includes('SUPER_ADMIN')) role = 'SUPER_ADMIN';
     else if (roleNames.includes('ADMIN')) role = 'ADMIN';
+    else if (roleNames.includes('FINANCE_ADMIN')) role = 'FINANCE_ADMIN';
+    else if (roleNames.includes('ACADEMIC_ADMIN')) role = 'ACADEMIC_ADMIN';
+    else if (roleNames.includes('SUPPORT_AGENT')) role = 'SUPPORT_AGENT';
     else if (roleNames.includes('INSTRUCTOR')) role = 'INSTRUCTOR';
+    else if (roleNames.includes('TEACHING_ASSISTANT')) role = 'TEACHING_ASSISTANT';
 
     return {
       id: profile.id,
@@ -159,10 +163,18 @@ export async function loginWithEmail(
   });
 
   // Determine redirect
-  const redirectTo =
-    profile.role === 'INSTRUCTOR' || profile.role === 'ADMIN' || profile.role === 'SUPER_ADMIN'
-      ? '/instructor'
-      : '/dashboard';
+  let redirectTo = '/dashboard';
+  if (
+    profile.role === 'SUPER_ADMIN' ||
+    profile.role === 'ADMIN' ||
+    profile.role === 'FINANCE_ADMIN' ||
+    profile.role === 'ACADEMIC_ADMIN' ||
+    profile.role === 'SUPPORT_AGENT'
+  ) {
+    redirectTo = '/admin';
+  } else if (profile.role === 'INSTRUCTOR' || profile.role === 'TEACHING_ASSISTANT') {
+    redirectTo = '/instructor';
+  }
 
   return { profile, redirectTo };
 }

@@ -36,7 +36,7 @@ export function Footer() {
               <span className="font-bold text-lg">ANSELLA</span>
             </Link>
             <p className="text-sm text-muted-foreground mb-4">
-              Formations certifiantes en Web3, Blockchain et IA pour entrepreneurs africains.
+              Formations certifiantes et outils d'apprentissage pour entrepreneurs africains.
             </p>
             <div className="flex space-x-3">
               <Link href="#" className="text-muted-foreground hover:text-blue-600 transition-colors">
@@ -57,9 +57,9 @@ export function Footer() {
           <div>
             <h3 className="font-semibold mb-4">Liens Rapides</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link href="#features" className="hover:text-foreground transition-colors">Pourquoi nous ?</Link></li>
+              <li><Link href="/about" className="hover:text-foreground transition-colors">À propos de nous</Link></li>
               <li><Link href="/courses" className="hover:text-foreground transition-colors">Nos formations</Link></li>
-              <li><Link href="#pricing" className="hover:text-foreground transition-colors">Tarifs</Link></li>
+              <li><Link href="/#pricing" className="hover:text-foreground transition-colors">Tarifs</Link></li>
               <li><Link href="/login" className="hover:text-foreground transition-colors">Se connecter</Link></li>
             </ul>
           </div>
@@ -75,9 +75,9 @@ export function Footer() {
           <div>
             <h3 className="font-semibold mb-4">Contact</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>Email: contact@kuettu.com</li>
-              <li>Téléphone: +243 000 000 000</li>
-              <li>Bukavu, RDC</li>
+              <li>Email: info@ansella.app</li>
+              <li>Téléphone: +243990387237</li>
+              <li>Goma / Bukavu, RDC</li>
             </ul>
           </div>
         </div>

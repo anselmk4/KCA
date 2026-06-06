@@ -20,13 +20,22 @@ export function MobileMenu() {
       {open && (
         <div className="absolute top-16 left-0 right-0 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 shadow-xl z-50 animate-in slide-in-from-top-2">
           <nav className="flex flex-col p-6 space-y-4">
-            <Link href="#features" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
-              Avantages
+            <Link href="/about" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
+              À propos
             </Link>
-            <Link href="/courses" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
-              Nos Cours
+            <Link href="/#features" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
+              Fonctionnalités
             </Link>
-            <Link href="#pricing" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
+            <Link href="/#templates" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
+              Modèle d'académie
+            </Link>
+            <Link href="/services" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
+              Services
+            </Link>
+            <Link href="/cases" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
+              Cas d'utilisation
+            </Link>
+            <Link href="/#pricing" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
               Tarifs
             </Link>
             <div className="flex flex-col gap-3 pt-4">
