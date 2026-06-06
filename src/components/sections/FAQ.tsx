@@ -39,7 +39,7 @@ export function FAQ() {
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-5xl font-bold mb-4">Questions fréquentes</h2>
           <p className="text-lg text-muted-foreground">
-            Tout ce que vous devez savoir pour lancer et gérer votre académie avec Kuettu Pro.
+            Tout ce que vous devez savoir pour lancer et gérer votre académie avec ANSELLA.
           </p>
         </div>
 

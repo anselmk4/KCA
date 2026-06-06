@@ -229,7 +229,7 @@ export default function SettingsPage() {
             { key: "newMessage", label: "Nouveau message d'un étudiant", desc: "Recevoir une alerte pour chaque message" },
             { key: "newReview", label: "Nouveaux avis / évaluations", desc: "Être notifié des retours de vos étudiants" },
             { key: "weeklySummary", label: "Résumé hebdomadaire", desc: "Rapport de vos performances chaque lundi" },
-            { key: "marketingEmails", label: "Emails marketing Kuettu", desc: "Actualités, nouvelles fonctionnalités, offres" },
+            { key: "marketingEmails", label: "Emails marketing ANSELLA", desc: "Actualités, nouvelles fonctionnalités, offres" },
           ].map(({ key, label, desc }) => (
             <div key={key} className="flex items-center justify-between py-4 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
               <div>

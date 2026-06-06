@@ -452,6 +452,10 @@ export const initDB = () => {
     if (!existing) {
       localStorage.setItem("kuettu_db", JSON.stringify(defaultDB));
     }
+    // Asynchronously trigger sync from Supabase to load real data
+    import("./supabase/sync").then(({ syncFromSupabase }) => {
+      syncFromSupabase().catch(err => console.error("Error in background sync:", err));
+    });
   }
 };
 
@@ -474,18 +478,66 @@ export const saveDB = (db: Database) => {
   }
 };
 
-export const addUser = (user: Omit<User, "id" | "joinedAt" | "status" | "role" | "plan"> & { role?: "STUDENT" | "INSTRUCTOR" | "ADMIN"; plan?: "FREE" | "BASE" | "PRO" | "MAX" }) => {
+const RoleUUIDs = {
+  SUPER_ADMIN: "bad87955-3c4d-4e49-8ad8-86764e78fdcd",
+  ADMIN: "1f349fbc-2447-445b-9ffc-ba140563d30f",
+  FINANCE_ADMIN: "939b225c-5684-4780-b5e2-45ab0bee23da",
+  ACADEMIC_ADMIN: "a7e9ca7a-a47e-438b-ba05-d9823d21d342",
+  SUPPORT_AGENT: "54eb301d-f5f7-421c-a4b8-c3918ceef476",
+  INSTRUCTOR: "79bb40ee-3ff8-4673-9078-a91b53221f8f",
+  TEACHING_ASSISTANT: "44b4fcf9-8469-4530-87bd-219c1c6eda30",
+  STUDENT: "09ecfd8e-b5c8-4f55-bebb-fa72344e0472"
+};
+
+export const addUser = (user: Omit<User, "id" | "joinedAt" | "status" | "role" | "plan"> & { id?: string; role?: "STUDENT" | "INSTRUCTOR" | "ADMIN"; plan?: "FREE" | "BASE" | "PRO" | "MAX" }) => {
   const db = getDB();
+  const userId = user.id || `u${Date.now()}`;
   const newUser: User = {
     ...user,
     role: user.role || "STUDENT",
     plan: user.plan || "FREE",
-    id: `u${Date.now()}`,
+    id: userId,
     joinedAt: new Date().toISOString(),
     status: "Actif",
   };
   db.users.push(newUser);
   saveDB(db);
+
+  // Sync to Supabase in background
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const levelMap: Record<string, "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "EXPERT"> = {
+        "Débutant": "BEGINNER",
+        "Intermédiaire": "INTERMEDIATE",
+        "Avancé": "ADVANCED",
+        "Expert": "EXPERT"
+      };
+      const mappedLevel = levelMap[newUser.level] || "BEGINNER";
+      const mappedRole = newUser.role as keyof typeof RoleUUIDs;
+      const roleId = RoleUUIDs[mappedRole] || RoleUUIDs.STUDENT;
+
+      const { error: profileError } = await supabase.from("profiles").upsert({
+        id: newUser.id,
+        full_name: newUser.name,
+        email: newUser.email,
+        level: mappedLevel,
+        status: "ACTIVE",
+        plan: newUser.plan as any,
+        created_at: newUser.joinedAt,
+        updated_at: newUser.joinedAt
+      });
+      if (profileError) throw profileError;
+
+      const { error: roleError } = await supabase.from("user_roles").upsert({
+        user_id: newUser.id,
+        role_id: roleId
+      });
+      if (roleError) throw roleError;
+    } catch (err) {
+      console.error("Error inserting profile/role in Supabase:", err);
+    }
+  });
+
   return newUser;
 };
 
@@ -498,6 +550,64 @@ export const addTransaction = (tx: Omit<Transaction, "id" | "date">) => {
   };
   db.transactions.push(newTx);
   saveDB(db);
+
+  // Sync to Supabase in background (Orders, Order Items, Payments)
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const orderId = `ord_${Date.now()}`;
+      const orderNumber = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      
+      // Create order
+      const { error: orderError } = await supabase.from("orders").insert({
+        id: orderId,
+        user_id: newTx.userId,
+        order_number: orderNumber,
+        status: newTx.status === "PAID" ? "COMPLETED" : newTx.status === "PENDING" ? "PENDING" : "CANCELLED",
+        subtotal: newTx.amount,
+        total: newTx.amount,
+        currency: "USD",
+        created_at: newTx.date,
+        updated_at: newTx.date
+      });
+      if (orderError) throw orderError;
+
+      // Create order item
+      const { error: itemError } = await supabase.from("order_items").insert({
+        id: `oi_${Date.now()}`,
+        order_id: orderId,
+        course_id: newTx.courseId,
+        unit_price: newTx.amount,
+        final_price: newTx.amount,
+        created_at: newTx.date
+      });
+      if (itemError) throw itemError;
+
+      // Create payment
+      const providerMap: Record<string, "STRIPE" | "PAYPAL" | "MOBILE_MONEY" | "MANUAL"> = {
+        "Carte": "STRIPE",
+        "PayPal": "PAYPAL",
+        "Mobile Money": "MOBILE_MONEY"
+      };
+      const provider = providerMap[newTx.method] || "MANUAL";
+      
+      const { error: paymentError } = await supabase.from("payments").insert({
+        id: newTx.id,
+        order_id: orderId,
+        user_id: newTx.userId,
+        amount: newTx.amount,
+        currency: "USD",
+        status: newTx.status as any,
+        provider: provider,
+        method: newTx.method,
+        created_at: newTx.date,
+        updated_at: newTx.date
+      });
+      if (paymentError) throw paymentError;
+    } catch (err) {
+      console.error("Error creating transaction in Supabase:", err);
+    }
+  });
+
   return newTx;
 };
 
@@ -521,8 +631,30 @@ export const addCourse = (course: Partial<Course> & { title: string; price: numb
   };
   db.courses.push(newCourse);
   saveDB(db);
+
+  // Sync to Supabase in background
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const { error } = await supabase.from("courses").insert({
+        id: newCourse.id,
+        title: newCourse.title,
+        slug: newCourse.slug,
+        description: newCourse.description,
+        price: newCourse.price,
+        status: "DRAFT",
+        instructor_id: newCourse.instructorId,
+        created_at: newCourse.createdAt,
+        updated_at: newCourse.createdAt
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error creating course in Supabase:", err);
+    }
+  });
+
   return newCourse;
 };
+
 export const addSupportTicket = (ticket: Omit<SupportTicket, "id" | "createdAt" | "status" | "replies">) => {
   const db = getDB();
   const newTicket: SupportTicket = {
@@ -534,6 +666,27 @@ export const addSupportTicket = (ticket: Omit<SupportTicket, "id" | "createdAt" 
   };
   db.supportTickets.push(newTicket);
   saveDB(db);
+
+  // Sync to Supabase in background
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const ticketNumber = `TCK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      const { error } = await supabase.from("support_tickets").insert({
+        id: newTicket.id,
+        user_id: newTicket.userId,
+        subject: newTicket.subject,
+        message: newTicket.message,
+        status: "OPEN",
+        ticket_number: ticketNumber,
+        created_at: newTicket.createdAt,
+        updated_at: newTicket.createdAt
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error creating support ticket in Supabase:", err);
+    }
+  });
+
   return newTicket;
 };
 
@@ -546,6 +699,23 @@ export const addQuiz = (quiz: Omit<Quiz, "id">) => {
   };
   db.quizzes.push(newQuiz);
   saveDB(db);
+
+  // Sync to Supabase in background
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const { error } = await supabase.from("quizzes").insert({
+        id: newQuiz.id,
+        course_id: newQuiz.courseId,
+        title: newQuiz.title,
+        pass_percentage: newQuiz.passPercentage,
+        is_published: true
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error creating quiz in Supabase:", err);
+    }
+  });
+
   return newQuiz;
 };
 
@@ -558,6 +728,23 @@ export const addQuestion = (question: Omit<Question, "id">) => {
   };
   db.questions.push(newQuestion);
   saveDB(db);
+
+  // Sync to Supabase in background
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const { error } = await supabase.from("questions").insert({
+        id: newQuestion.id,
+        quiz_id: newQuestion.quizId,
+        text: newQuestion.text,
+        choices: newQuestion.choices as any,
+        correct_index: newQuestion.correctIndex
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error creating question in Supabase:", err);
+    }
+  });
+
   return newQuestion;
 };
 
@@ -579,6 +766,17 @@ export const deleteCourse = (courseId: string) => {
   // Remove transactions for the course
   db.transactions = db.transactions.filter((t) => t.courseId !== courseId);
   saveDB(db);
+
+  // Sync to Supabase in background
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const { error } = await supabase.from("courses").delete().eq("id", courseId);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error deleting course in Supabase:", err);
+    }
+  });
+
   return true;
 };
 
@@ -594,6 +792,29 @@ export const addReplyToTicket = (ticketId: string, reply: Omit<SupportTicketRepl
     ticket.replies.push(newReply);
     ticket.status = reply.senderId === ticket.userId ? "OPEN" : "IN_PROGRESS";
     saveDB(db);
+
+    // Sync to Supabase in background
+    import("./supabase/client").then(async ({ supabase }) => {
+      try {
+        const { error: replyError } = await supabase.from("support_ticket_replies").insert({
+          id: newReply.id,
+          ticket_id: ticketId,
+          sender_id: newReply.senderId,
+          message: newReply.message,
+          created_at: newReply.createdAt
+        });
+        if (replyError) throw replyError;
+
+        const { error: ticketError } = await supabase.from("support_tickets").update({
+          status: ticket.status as any,
+          updated_at: new Date().toISOString()
+        }).eq("id", ticketId);
+        if (ticketError) throw ticketError;
+      } catch (err) {
+        console.error("Error creating ticket reply in Supabase:", err);
+      }
+    });
+
     return ticket;
   }
   return null;
@@ -608,6 +829,24 @@ export const addQuizAttempt = (attempt: Omit<QuizAttempt, "id" | "createdAt">) =
   };
   db.quizAttempts.push(newAttempt);
   saveDB(db);
+
+  // Sync to Supabase in background
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const { error } = await supabase.from("quiz_attempts").insert({
+        id: newAttempt.id,
+        student_id: newAttempt.studentId,
+        quiz_id: newAttempt.quizId,
+        score: newAttempt.score,
+        passed: newAttempt.passed,
+        created_at: newAttempt.createdAt
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error creating quiz attempt in Supabase:", err);
+    }
+  });
+
   return newAttempt;
 };
 
@@ -621,7 +860,29 @@ export const addCertificate = (cert: Omit<Certificate, "id" | "issuedAt" | "code
   };
   db.certificates.push(newCert);
   saveDB(db);
+
+  // Sync to Supabase in background
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const { error } = await supabase.from("certificates").insert({
+        id: newCert.id,
+        student_id: newCert.studentId,
+        course_id: newCert.courseId,
+        code: newCert.code,
+        status: "ISSUED",
+        issued_at: newCert.issuedAt,
+        created_at: newCert.issuedAt,
+        updated_at: newCert.issuedAt
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error creating certificate in Supabase:", err);
+    }
+  });
+
   return newCert;
 };
+
+
 
 

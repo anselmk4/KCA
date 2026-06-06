@@ -38,7 +38,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       <div className="h-16 flex items-center justify-between px-6 border-b border-zinc-100 dark:border-zinc-800">
         <Link href="/" className="flex items-center space-x-2">
           <GraduationCap className="h-6 w-6 text-blue-600" />
-          <span className="font-bold text-lg text-zinc-900 dark:text-white">Kuettu Pro</span>
+          <span className="font-bold text-lg text-zinc-900 dark:text-white">ANSELLA</span>
         </Link>
         <button className="lg:hidden p-1 text-zinc-500" onClick={onClose}>
           <X className="w-5 h-5" />

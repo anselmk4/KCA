@@ -25,7 +25,7 @@ export default function CertificatesPage() {
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in">
       <div>
         <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Mes Certificats</h1>
-        <p className="text-zinc-500 dark:text-zinc-400">Vos accomplissements et diplômes obtenus sur Kuettu.</p>
+        <p className="text-zinc-500 dark:text-zinc-400">Vos accomplissements et diplômes obtenus sur ANSELLA.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -77,7 +77,7 @@ export default function CertificatesPage() {
             </li>
             <li className="flex items-start gap-3">
               <CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-              <span>Accédez à des opportunités exclusives au sein du réseau Kuettu Pro.</span>
+              <span>Accédez à des opportunités exclusives au sein du réseau ANSELLA.</span>
             </li>
           </ul>
         </div>

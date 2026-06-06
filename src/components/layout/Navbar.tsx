@@ -10,7 +10,7 @@ export function Navbar() {
         <Link href="/" className="flex items-center space-x-2">
           <GraduationCap className="h-8 w-8 text-blue-600" />
           <span className="font-bold text-xl hidden sm:inline-block">
-            Kuettu Pro
+            ANSELLA
           </span>
         </Link>
         <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">

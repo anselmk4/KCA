@@ -8,8 +8,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Kuettu Crypto Academy | Maîtrisez le Web3, la Blockchain et l'IA en Afrique",
-  description: "Kuettu Crypto Academy : formations certifiantes en Blockchain, Trading Crypto, Intelligence Artificielle et Développement Web3 pour entrepreneurs africains.",
+  title: "ANSELLA | Maîtrisez le Web3, la Blockchain et l'IA en Afrique",
+  description: "ANSELLA : formations certifiantes en Blockchain, Trading Crypto, Intelligence Artificielle et Développement Web3 pour entrepreneurs africains.",
 };
 
 export default function RootLayout({

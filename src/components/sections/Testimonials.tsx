@@ -5,7 +5,7 @@ export function Testimonials() {
     {
       name: "Prof. Patrick M.",
       role: "Formateur Finance & Trading, Kinshasa",
-      text: "Grâce à Kuettu Pro, j'ai lancé mon école de trading. La plateforme encaisse les frais d'inscription via Mobile Money sans que je n'aie à coder. Mes revenus ont doublé en 3 mois.",
+      text: "Grâce à ANSELLA, j'ai lancé mon école de trading. La plateforme encaisse les frais d'inscription via Mobile Money sans que je n'aie à coder. Mes revenus ont doublé en 3 mois.",
       rating: 5,
       academy: "Kinshasa Trading School"
     },
@@ -29,7 +29,7 @@ export function Testimonials() {
     <section className="py-24 bg-white dark:bg-black">
       <div className="container mx-auto px-4 md:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold mb-4">Ils réussissent avec Kuettu Pro</h2>
+          <h2 className="text-3xl md:text-5xl font-bold mb-4">Ils réussissent avec ANSELLA</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Découvrez les témoignages de formateurs et professeurs qui gèrent leurs académies en ligne de A à Z.
           </p>

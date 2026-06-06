@@ -7,7 +7,7 @@ export function FeaturesGrid() {
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Une plateforme d'enseignement puissante</h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Kuettu Pro vous fournit tous les outils nécessaires pour créer, gérer et rentabiliser votre contenu éducatif.
+            ANSELLA vous fournit tous les outils nécessaires pour créer, gérer et rentabiliser votre contenu éducatif.
           </p>
         </div>
         

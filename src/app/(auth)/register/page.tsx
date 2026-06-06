@@ -4,8 +4,11 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GraduationCap, ArrowRight, ArrowLeft, CheckCircle2, BookOpen, Sparkles, User, ShieldCheck } from "lucide-react";
-import { addUser, getDB, saveDB, initDB } from "@/lib/db";
+import { initDB } from "@/lib/db";
 import { setSimulatedSession } from "@/lib/rbac";
+import { supabase } from "@/lib/supabase/client";
+import { ensureProfile } from "@/lib/supabase/auth-helpers";
+
 
 function RegisterForm() {
   const router = useRouter();
@@ -51,6 +54,7 @@ function RegisterForm() {
   }, [searchParams]);
 
   const [formError, setFormError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const handleNext = () => {
     setFormError(null);
@@ -69,81 +73,126 @@ function RegisterForm() {
     }
   };
 
-  const handleComplete = (e: React.FormEvent) => {
+  const handleComplete = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+    setLoading(true);
     
-    if (role === "INSTRUCTOR") {
-      // Create new instructor user in the local database
-      const newUser = addUser({
-        name: name || "Ansel Instructeur",
-        email: email || "ansel@example.com",
-        role: "INSTRUCTOR",
-        plan: selectedPlan,
-        level: academyName || "Mon Académie",
-        activeCourse: thematic
+    try {
+      // 1. Sign up in Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: name } }
       });
 
-      // Update simulated session to login as this instructor
-      setSimulatedSession({
-        userId: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        role: "INSTRUCTOR",
-        status: "ACTIVE",
-        plan: newUser.plan
-      });
-
-      // Store academic info in localStorage for display consistency
-      localStorage.setItem("kuettu_academy_name", academyName || "Mon Académie");
-      localStorage.setItem("kuettu_academy_thematic", thematic);
-      localStorage.setItem("kuettu_user_name", name || "Ansel Instructeur");
-      
-      // Redirect to the instructor area
-      router.push("/instructor");
-    } else {
-      // Create new student user in the local database
-      const newUser = addUser({
-        name: name || "Ansel Apprenant",
-        email: email || "student@example.com",
-        role: "STUDENT",
-        plan: "FREE",
-        level: studentLevel,
-        activeCourse: interestCourse
-      });
-
-      // Update simulated session to login as this student
-      setSimulatedSession({
-        userId: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        role: "STUDENT",
-        status: "ACTIVE",
-        plan: "FREE"
-      });
-
-      // Store student info in localStorage for display consistency
-      localStorage.setItem("kuettu_user_name", name || "Ansel Apprenant");
-      localStorage.setItem("kuettu_user_level", studentLevel);
-      localStorage.setItem("kuettu_active_module", interestCourse);
-
-      // Auto-enroll the student in their chosen course
-      const db = getDB();
-      const existingEnrollment = db.enrollments.find(
-        (e) => e.studentId === newUser.id && e.courseId === interestCourse
-      );
-      if (!existingEnrollment) {
-        db.enrollments.push({
-          id: `e${Date.now()}`,
-          studentId: newUser.id,
-          courseId: interestCourse,
-          progressPercent: 0,
-          joinedAt: new Date().toISOString()
-        });
-        saveDB(db);
+      if (authError) {
+        const msg = authError.message.toLowerCase();
+        if (msg.includes("already registered") || msg.includes("user already exists") || msg.includes("duplicate")) {
+          setFormError("Cet email est déjà utilisé. Essayez de vous connecter.");
+        } else if (msg.includes("database error saving new user")) {
+          setFormError("Erreur lors de la création. Cet email est peut-être déjà utilisé.");
+        } else if (msg.includes("password")) {
+          setFormError("Mot de passe trop faible. Minimum 8 caractères.");
+        } else if (msg.includes("invalid email") || msg.includes("unable to validate email") || msg.includes("email address") && msg.includes("invalid")) {
+          setFormError("Adresse email invalide.");
+        } else if (msg.includes("email rate limit") || msg.includes("rate limit")) {
+          setFormError("Trop de tentatives. Attendez quelques minutes et réessayez.");
+        } else if (msg.includes("email") && msg.includes("confirm")) {
+          setFormError("Un email de confirmation a été envoyé. Vérifiez votre boîte mail.");
+        } else {
+          setFormError(authError.message);
+        }
+        setLoading(false);
+        return;
       }
-      
-      // Redirect to the student dashboard
-      router.push("/dashboard");
+
+      const sessionUser = authData.user;
+      if (!sessionUser) {
+        setFormError("Erreur lors de l'inscription.");
+        setLoading(false);
+        return;
+      }
+
+      // 2. Ensure profile exists in public.profiles (trigger fallback)
+      await ensureProfile(sessionUser.id, email, name);
+
+      // 3. If INSTRUCTOR → assign INSTRUCTOR role in Supabase
+      if (role === "INSTRUCTOR") {
+        const { data: instructorRole } = await supabase
+          .from("roles")
+          .select("id")
+          .eq("name", "INSTRUCTOR")
+          .single();
+        if (instructorRole) {
+          await supabase.from("user_roles").upsert(
+            { user_id: sessionUser.id, role_id: instructorRole.id },
+            { onConflict: "user_id,role_id", ignoreDuplicates: true }
+          );
+        }
+        // Update plan in profile
+        await supabase
+          .from("profiles")
+          .update({ plan: selectedPlan })
+          .eq("id", sessionUser.id);
+
+        // Set session
+        setSimulatedSession({
+          userId: sessionUser.id,
+          name,
+          email,
+          role: "INSTRUCTOR",
+          status: "ACTIVE",
+          plan: selectedPlan
+        });
+
+        localStorage.setItem("kuettu_academy_name", academyName || "Mon Académie");
+        localStorage.setItem("kuettu_academy_thematic", thematic);
+        localStorage.setItem("kuettu_user_name", name);
+
+        router.push("/instructor");
+      } else {
+        // STUDENT — set session
+        setSimulatedSession({
+          userId: sessionUser.id,
+          name,
+          email,
+          role: "STUDENT",
+          status: "ACTIVE",
+          plan: "FREE"
+        });
+
+        localStorage.setItem("kuettu_user_name", name);
+        localStorage.setItem("kuettu_user_level", studentLevel);
+        localStorage.setItem("kuettu_active_module", interestCourse);
+
+        // Auto-enroll in chosen course
+        const COURSE_MAP: Record<string, string> = {
+          blockchain: "10000000-0000-0000-0000-000000000001",
+          trading: "10000000-0000-0000-0000-000000000002",
+          ai: "10000000-0000-0000-0000-000000000003",
+          web3: "10000000-0000-0000-0000-000000000004",
+        };
+        const courseId = COURSE_MAP[interestCourse] || interestCourse;
+
+        const { error: enrollError } = await supabase.from("enrollments").upsert({
+          student_id: sessionUser.id,
+          course_id: courseId,
+          progress_percent: 0,
+          status: "ACTIVE",
+          enrolled_at: new Date().toISOString()
+        }, { onConflict: "student_id,course_id", ignoreDuplicates: true });
+
+        if (enrollError) {
+          console.error("Auto-enrollment error during registration:", enrollError.message);
+        }
+
+        router.push("/dashboard");
+      }
+    } catch (err: any) {
+      setFormError(err.message || "Une erreur est survenue.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -163,7 +212,7 @@ function RegisterForm() {
       <div className="flex flex-col items-center mb-8 mt-4">
         <Link href="/" className="flex items-center space-x-2 mb-4">
           <GraduationCap className="h-10 w-10 text-blue-600" />
-          <span className="font-bold text-2xl text-zinc-900 dark:text-white">Kuettu Pro</span>
+          <span className="font-bold text-2xl text-zinc-900 dark:text-white">ANSELLA</span>
         </Link>
         <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2 text-center">
           {role === null && "Choisissez votre profil"}
@@ -376,16 +425,18 @@ function RegisterForm() {
             <button 
               type="button" 
               onClick={handlePrev}
-              className="px-4 py-3.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-semibold rounded-xl transition-colors"
+              disabled={loading}
+              className="px-4 py-3.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <button 
               type="submit"
-              className="flex-1 py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
+              disabled={loading}
+              className="flex-1 py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 disabled:opacity-70"
             >
-              {step === 2 ? "Finaliser et Accéder à mon Espace" : "Suivant"}
-              {step < 2 && <ArrowRight className="w-5 h-5" />}
+              {loading ? "Création du compte..." : (step === 2 ? "Finaliser et Accéder à mon Espace" : "Suivant")}
+              {!loading && step < 2 && <ArrowRight className="w-5 h-5" />}
             </button>
           </div>
         </form>

@@ -17,7 +17,7 @@ export function WhyChooseUs() {
         <div className="flex flex-col lg:flex-row items-center gap-16">
           <div className="lg:w-1/2">
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 leading-tight">
-              Pourquoi choisir Kuettu Pro ?
+              Pourquoi choisir ANSELLA ?
             </h2>
             <p className="text-lg text-zinc-400 mb-10">
               Nous combinons une technologie de pointe et une connaissance approfondie des marchés locaux pour vous aider à développer votre activité d'enseignement en ligne en toute sérénité.
@@ -36,7 +36,7 @@ export function WhyChooseUs() {
               <div className="absolute inset-0 bg-blue-500/20 group-hover:bg-transparent transition-colors z-10 duration-500"></div>
               <Image 
                 src="/images/students.png" 
-                alt="Dashboard et analytics Kuettu Pro" 
+                alt="Dashboard et analytics ANSELLA" 
                 fill 
                 className="object-cover transition-transform duration-700 group-hover:scale-105"
               />

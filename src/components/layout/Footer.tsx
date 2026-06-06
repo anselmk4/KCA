@@ -33,7 +33,7 @@ export function Footer() {
           <div className="col-span-1 md:col-span-1">
             <Link href="/" className="flex items-center space-x-2 mb-4">
               <GraduationCap className="h-6 w-6 text-blue-600" />
-              <span className="font-bold text-lg">Kuettu Crypto Academy</span>
+              <span className="font-bold text-lg">ANSELLA</span>
             </Link>
             <p className="text-sm text-muted-foreground mb-4">
               Formations certifiantes en Web3, Blockchain et IA pour entrepreneurs africains.
@@ -83,7 +83,7 @@ export function Footer() {
         </div>
         
         <div className="mt-12 pt-8 border-t text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} Kuettu Crypto Academy. Tous droits réservés.</p>
+          <p>&copy; {new Date().getFullYear()} ANSELLA. Tous droits réservés.</p>
         </div>
       </div>
     </footer>

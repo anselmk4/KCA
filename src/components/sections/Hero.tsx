@@ -10,13 +10,13 @@ export function Hero() {
           <div className="text-left">
             <div className="inline-flex items-center rounded-full border border-blue-500/30 px-3 py-1 text-sm font-semibold mb-6 text-blue-400 bg-blue-950/50 backdrop-blur-sm">
               <span className="flex h-2 w-2 rounded-full bg-blue-500 mr-2 animate-pulse"></span>
-              Plateforme SaaS Kuettu Pro
+              Plateforme SaaS ANSELLA
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-8 leading-tight text-white">
               Créez et Vendez vos Formations Web3 & IA
             </h1>
             <p className="text-xl md:text-2xl text-zinc-400 mb-10 max-w-xl">
-              Kuettu Pro est la plateforme d'apprentissage tout-en-un conçue pour les instructeurs. Hébergez vos cours, évaluez vos élèves et encaissez vos gains facilement.
+              ANSELLA est la plateforme d'apprentissage tout-en-un conçue pour les instructeurs. Hébergez vos cours, évaluez vos élèves et encaissez vos gains facilement.
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-4">
               <Link href="/register" className="inline-flex items-center justify-center rounded-lg text-base font-semibold transition-all bg-blue-600 text-white hover:bg-blue-500 h-14 px-8 w-full sm:w-auto shadow-[0_0_20px_rgba(37,99,235,0.4)]">

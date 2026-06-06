@@ -8,14 +8,14 @@ export function InfoRDC() {
         <div className="max-w-3xl mx-auto text-center mb-16">
           <h2 className="text-3xl md:text-5xl font-bold mb-6">Optimisé pour la RDC et l'Afrique</h2>
           <p className="text-lg md:text-xl text-blue-200">
-            Découvrez comment Kuettu Pro résout les défis de paiement et de monétisation pour les créateurs de contenu éducatif en Afrique.
+            Découvrez comment ANSELLA résout les défis de paiement et de monétisation pour les créateurs de contenu éducatif en Afrique.
           </p>
         </div>
         
         <div className="max-w-5xl mx-auto aspect-video w-full rounded-2xl overflow-hidden border border-white/10 shadow-[0_0_50px_rgba(37,99,235,0.2)] relative group cursor-pointer">
           <Image 
             src="/images/video-thumb.png" 
-            alt="Présentation Vidéo Kuettu Pro" 
+            alt="Présentation Vidéo ANSELLA" 
             fill 
             className="object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500"
           />
