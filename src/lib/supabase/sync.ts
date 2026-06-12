@@ -106,6 +106,20 @@ export async function syncFromSupabase(): Promise<LocalDatabase | null> {
       else if (c.level === 'ADVANCED') level = 'Avancé';
       else if (c.level === 'EXPERT') level = 'Expert';
 
+      let allowInstallments = false;
+      let installmentsCount = 1;
+      if (c.short_description) {
+        try {
+          const parsed = JSON.parse(c.short_description);
+          if (parsed && typeof parsed === 'object') {
+            allowInstallments = !!parsed.allowInstallments;
+            installmentsCount = Number(parsed.installmentsCount) || 1;
+          }
+        } catch {
+          // Ignore
+        }
+      }
+
       return {
         id: c.id,
         title: c.title,
@@ -118,7 +132,9 @@ export async function syncFromSupabase(): Promise<LocalDatabase | null> {
         createdAt: c.created_at,
         rating: c.rating_avg || 0,
         category: c.category_id || '', // Handled simply
-        level
+        level,
+        allowInstallments,
+        installmentsCount
       };
     });
 
@@ -148,7 +164,8 @@ export async function syncFromSupabase(): Promise<LocalDatabase | null> {
       studentId: e.student_id,
       courseId: e.course_id,
       progressPercent: e.progress_percent || 0,
-      joinedAt: e.enrolled_at
+      joinedAt: e.enrolled_at,
+      status: (e.status as any) || "ACTIVE"
     }));
 
     // 6. Lesson Progress
@@ -165,7 +182,8 @@ export async function syncFromSupabase(): Promise<LocalDatabase | null> {
       id: q.id,
       courseId: q.course_id,
       title: q.title,
-      passPercentage: q.pass_percentage || 75
+      passPercentage: q.pass_percentage || 75,
+      sectionId: q.section_id || undefined
     }));
 
     // 8. Questions

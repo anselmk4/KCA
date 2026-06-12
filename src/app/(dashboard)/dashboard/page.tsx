@@ -1,15 +1,46 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { PlayCircle, Clock, BookOpen, ChevronRight, TrendingUp, BrainCircuit, Bitcoin, Code2 } from "lucide-react";
+import { PlayCircle, Clock, BookOpen, ChevronRight, TrendingUp, BrainCircuit, Bitcoin, Code2, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { getDB, updateEnrollmentStatus, Database, Enrollment, Course } from "@/lib/db";
+import { getSimulatedSession } from "@/lib/rbac";
 
 export default function DashboardPage() {
   const [activeModule, setActiveModule] = useState<string>("blockchain");
   const [userLevel, setUserLevel] = useState<string>("Débutant");
   const [userName, setUserName] = useState<string>("Ansel");
 
+  const [db, setDb] = useState<Database | null>(null);
+  const [session, setSession] = useState<any>(null);
+  const [inactiveEnrollments, setInactiveEnrollments] = useState<(Enrollment & { course?: Course })[]>([]);
+
+  const loadDashboardData = () => {
+    const database = getDB();
+    const currentSession = getSimulatedSession();
+    setDb(database);
+    setSession(currentSession);
+
+    if (currentSession && database) {
+      const inactive = database.enrollments
+        .filter(e => e.studentId === currentSession.userId && e.status === "INACTIVE")
+        .map(e => {
+          const course = database.courses.find(c => c.id === e.courseId);
+          return { ...e, course };
+        });
+      setInactiveEnrollments(inactive);
+    }
+  };
+
+  const handleAcceptInvitation = (courseId: string) => {
+    if (!session) return;
+    updateEnrollmentStatus(session.userId, courseId, "ACTIVE");
+    alert("Invitation acceptée avec succès !");
+    loadDashboardData();
+  };
+
   useEffect(() => {
+    loadDashboardData();
     // Read from localStorage on mount
     const savedModule = localStorage.getItem("kuettu_active_module");
     const savedLevel = localStorage.getItem("kuettu_user_level");
@@ -73,6 +104,43 @@ export default function DashboardPage() {
           Reprendre le cours
         </button>
       </div>
+
+      {/* Active Invitations */}
+      {inactiveEnrollments.length > 0 && (
+        <div className="space-y-4">
+          {inactiveEnrollments.map((enrollment) => (
+            <div
+              key={enrollment.id}
+              className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 dark:from-amber-500/5 dark:to-orange-500/5 border border-amber-500/20 dark:border-amber-500/10 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in slide-in-from-top-2 duration-300"
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl flex items-center justify-center shrink-0">
+                  <Sparkles className="w-6 h-6 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-zinc-900 dark:text-white text-base">
+                    Invitation à rejoindre un cours
+                  </h3>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                    Un instructeur vous a invité à rejoindre la formation :{" "}
+                    <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                      {enrollment.course?.title || "Cours"}
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 w-full sm:w-auto shrink-0">
+                <button
+                  onClick={() => handleAcceptInvitation(enrollment.courseId)}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-amber-500/10 cursor-pointer"
+                >
+                  Accepter l'invitation
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Progress & Active Course */}

@@ -85,6 +85,13 @@ export default function CourseDetailPage() {
   const [newLessonTitle, setNewLessonTitle] = useState("");
   const [newLessonDuration, setNewLessonDuration] = useState("15");
 
+  // Quiz Inline Add States
+  const [addingQuizToSection, setAddingQuizToSection] = useState<string | null>(null);
+  const [newQuizTitleInline, setNewQuizTitleInline] = useState("");
+
+  // Context Menu state
+  const [activeMenuSectionId, setActiveMenuSectionId] = useState<string | null>(null);
+
   // Active Lesson Form (Right Panel)
   const [lessonForm, setLessonForm] = useState({
     title: "",
@@ -116,12 +123,15 @@ export default function CourseDetailPage() {
 
   // Tab: Students Invite States
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteName, setInviteName] = useState("");
-  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteStudentId, setInviteStudentId] = useState("");
+  const [searchedStudent, setSearchedStudent] = useState<any>(null);
+  const [searchError, setSearchError] = useState("");
   const [inviteSuccess, setInviteSuccess] = useState(false);
 
   // Tab: Price States
   const [coursePrice, setCoursePrice] = useState("0");
+  const [allowInstallments, setAllowInstallments] = useState(false);
+  const [installmentsCount, setInstallmentsCount] = useState(2);
   const [priceSavedMessage, setPriceSavedMessage] = useState(false);
 
   // Tab: Settings States
@@ -149,6 +159,8 @@ export default function CourseDetailPage() {
         description: course.description || "",
       });
       setCoursePrice(course.price.toString());
+      setAllowInstallments(course.allowInstallments || false);
+      setInstallmentsCount(course.installmentsCount || 2);
       setCourseStatus(course.status);
     }
   };
@@ -246,6 +258,19 @@ export default function CourseDetailPage() {
     setNewLessonTitle("");
     setNewLessonDuration("15");
     setAddingLessonToSection(null);
+    reloadData();
+  };
+
+  const handleAddQuizInline = (sectionId: string) => {
+    if (!newQuizTitleInline.trim()) return;
+    addQuiz({
+      courseId,
+      sectionId,
+      title: newQuizTitleInline.trim(),
+      passPercentage: 70
+    });
+    setNewQuizTitleInline("");
+    setAddingQuizToSection(null);
     reloadData();
   };
 
@@ -391,37 +416,36 @@ export default function CourseDetailPage() {
   const enrolledStudentIds = courseEnrollments.map(e => e.studentId);
   const courseStudents = db.users.filter(u => enrolledStudentIds.includes(u.id) && u.role === "STUDENT");
 
+  const handleSearchStudent = () => {
+    setSearchError("");
+    setSearchedStudent(null);
+    if (!inviteStudentId.trim()) return;
+
+    const student = db.users.find(u => u.id === inviteStudentId.trim() && u.role === "STUDENT");
+    if (student) {
+      setSearchedStudent(student);
+    } else {
+      setSearchError("Aucun compte étudiant trouvé avec cet identifiant UUID.");
+    }
+  };
+
   const handleInviteStudent = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteName.trim() || !inviteEmail.trim()) return;
+    if (!searchedStudent) return;
 
-    // Check if user exists, otherwise create
-    let student = db.users.find(u => u.email.toLowerCase() === inviteEmail.toLowerCase());
-    if (!student) {
-      const dbInstance = getDB();
-      const newUserId = `u_${Date.now()}`;
-      student = {
-        id: newUserId,
-        name: inviteName.trim(),
-        email: inviteEmail.trim().toLowerCase(),
-        role: "STUDENT",
-        level: "Débutant",
-        joinedAt: new Date().toISOString(),
-        activeCourse: courseId,
-        status: "Actif",
-        plan: "FREE",
-      };
-      dbInstance.users.push(student);
-      localStorage.setItem("kuettu_db", JSON.stringify(dbInstance));
+    const alreadyEnrolled = db.enrollments.some(e => e.studentId === searchedStudent.id && e.courseId === courseId);
+    if (alreadyEnrolled) {
+      setSearchError("Cet étudiant est déjà inscrit ou invité à ce cours.");
+      return;
     }
 
-    addEnrollment(student.id, courseId);
+    addEnrollment(searchedStudent.id, courseId, "INACTIVE");
     setInviteSuccess(true);
     setTimeout(() => {
       setInviteSuccess(false);
       setShowInviteModal(false);
-      setInviteName("");
-      setInviteEmail("");
+      setInviteStudentId("");
+      setSearchedStudent(null);
       reloadData();
     }, 2000);
   };
@@ -430,6 +454,8 @@ export default function CourseDetailPage() {
   const handleSavePrice = () => {
     updateCourseDetails(courseId, {
       price: parseFloat(coursePrice) || 0,
+      allowInstallments: allowInstallments,
+      installmentsCount: Number(installmentsCount) || 2,
     });
     setPriceSavedMessage(true);
     setTimeout(() => setPriceSavedMessage(false), 3000);
@@ -575,11 +601,11 @@ export default function CourseDetailPage() {
                     return (
                       <div
                         key={section.id}
-                        className="rounded-xl border border-zinc-150 dark:border-zinc-800 overflow-hidden bg-zinc-50/50 dark:bg-zinc-900/30"
+                        className="rounded-xl border border-zinc-150 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 relative"
                       >
                         {/* Section Bar */}
                         <div
-                          className="flex items-center justify-between px-4 py-3 bg-zinc-100/50 dark:bg-zinc-850/60 cursor-pointer hover:bg-zinc-150/50 dark:hover:bg-zinc-800/60 transition-all"
+                          className={`flex items-center justify-between px-4 py-3 bg-zinc-100/50 dark:bg-zinc-850/60 cursor-pointer hover:bg-zinc-150/50 dark:hover:bg-zinc-800/60 transition-all rounded-t-xl ${!isExpanded ? "rounded-b-xl" : ""}`}
                           onClick={() => toggleSection(section.id)}
                         >
                           <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -702,8 +728,54 @@ export default function CourseDetailPage() {
                               );
                             })}
 
-                            {/* Add Lesson inline form */}
-                            {addingLessonToSection === section.id ? (
+                            {/* Section Quizzes */}
+                            {(db.quizzes || []).filter(q => q.sectionId === section.id).map((quiz) => (
+                              <div
+                                key={quiz.id}
+                                onClick={() => {
+                                  setSelectedQuizId(quiz.id);
+                                  setActiveTab("quizzes");
+                                }}
+                                className="flex items-center justify-between px-5 py-2.5 cursor-pointer hover:bg-zinc-100/30 dark:hover:bg-zinc-850/20 text-zinc-700 dark:text-zinc-300 transition-colors"
+                                title="Modifier ce quiz dans l'onglet Quiz"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <ClipboardCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                  <span className="text-xs font-semibold truncate text-zinc-650 dark:text-zinc-350">Quiz : {quiz.title}</span>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span className="text-[9px] bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full font-bold">QCM</span>
+                                </div>
+                              </div>
+                            ))}
+
+                            {/* Inline Quiz Add Form */}
+                            {addingQuizToSection === section.id ? (
+                              <div className="p-3 bg-zinc-50 dark:bg-zinc-800/40 flex flex-col gap-2">
+                                <input
+                                  type="text"
+                                  value={newQuizTitleInline}
+                                  onChange={e => setNewQuizTitleInline(e.target.value)}
+                                  placeholder="Nom du nouveau Quiz"
+                                  className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-905 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs"
+                                  autoFocus
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => handleAddQuizInline(section.id)}
+                                    className="flex-1 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold"
+                                  >
+                                    Créer le Quiz
+                                  </button>
+                                  <button
+                                    onClick={() => setAddingQuizToSection(null)}
+                                    className="p-1.5 text-zinc-400 hover:text-zinc-650 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            ) : addingLessonToSection === section.id ? (
                               <div className="p-3 bg-zinc-50 dark:bg-zinc-800/40 flex flex-col gap-2">
                                 <input
                                   type="text"
@@ -736,12 +808,54 @@ export default function CourseDetailPage() {
                                 </div>
                               </div>
                             ) : (
-                              <button
-                                onClick={() => setAddingLessonToSection(section.id)}
-                                className="w-full px-5 py-2.5 text-left text-xs text-teal-600 hover:bg-teal-50/30 dark:hover:bg-teal-950/10 transition-colors flex items-center gap-1.5 font-semibold cursor-pointer"
-                              >
-                                <Plus className="w-3.5 h-3.5" /> Ajouter une leçon
-                              </button>
+                              <div className="relative">
+                                <button
+                                  onClick={() => setActiveMenuSectionId(activeMenuSectionId === section.id ? null : section.id)}
+                                  className="w-full px-5 py-2.5 text-left text-xs text-teal-600 hover:bg-teal-50/30 dark:hover:bg-teal-950/10 transition-colors flex items-center gap-1.5 font-semibold cursor-pointer"
+                                >
+                                  <Plus className="w-3.5 h-3.5" /> Ajouter une leçon...
+                                </button>
+                                
+                                {activeMenuSectionId === section.id && (
+                                  <>
+                                    <div 
+                                      className="fixed inset-0 z-40" 
+                                      onClick={() => setActiveMenuSectionId(null)}
+                                    />
+                                    <div className="absolute left-4 top-full mt-1 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-lg z-50 py-1 font-semibold text-xs text-zinc-750 dark:text-zinc-300">
+                                      <button
+                                        onClick={() => {
+                                          setAddingLessonToSection(section.id);
+                                          setAddingQuizToSection(null);
+                                          setActiveMenuSectionId(null);
+                                        }}
+                                        className="w-full text-left px-3.5 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2 cursor-pointer"
+                                      >
+                                        <BookOpen className="w-3.5 h-3.5 text-teal-600 shrink-0" /> Ajouter une leçon
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setAddingQuizToSection(section.id);
+                                          setAddingLessonToSection(null);
+                                          setActiveMenuSectionId(null);
+                                        }}
+                                        className="w-full text-left px-3.5 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2 cursor-pointer"
+                                      >
+                                        <ClipboardCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" /> Ajouter un Quiz
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setShowNewSection(true);
+                                          setActiveMenuSectionId(null);
+                                        }}
+                                        className="w-full text-left px-3.5 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2 cursor-pointer border-t border-zinc-100 dark:border-zinc-800"
+                                      >
+                                        <Plus className="w-3.5 h-3.5 text-blue-500 shrink-0" /> Nouveau chapitre
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
                             )}
                           </div>
                         )}
@@ -1205,11 +1319,13 @@ export default function CourseDetailPage() {
                         </div>
                         <span className="hidden md:inline col-span-2 text-center">
                           <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
-                            isActif
+                            enr?.status === "ACTIVE"
                               ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-450"
+                              : enr?.status === "INACTIVE"
+                              ? "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-450"
                               : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-450"
                           }`}>
-                            {student.status}
+                            {enr?.status === "ACTIVE" ? "Actif" : enr?.status === "INACTIVE" ? "En attente" : enr?.status || "—"}
                           </span>
                         </span>
                       </div>
@@ -1236,7 +1352,7 @@ export default function CourseDetailPage() {
               )}
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Prix d'accès (USD)</label>
                 <div className="relative rounded-xl shadow-sm max-w-xs">
@@ -1255,10 +1371,50 @@ export default function CourseDetailPage() {
                 <p className="text-[10px] text-zinc-400 mt-1.5">Définir le prix à 0 rendra le cours gratuit d'accès.</p>
               </div>
 
+              {Number(coursePrice) > 0 && (
+                <div className="pt-4 border-t border-zinc-150 dark:border-zinc-850 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="allowInstallments"
+                      checked={allowInstallments}
+                      onChange={(e) => setAllowInstallments(e.target.checked)}
+                      className="w-4 h-4 rounded text-teal-650 border-zinc-300 focus:ring-teal-500 cursor-pointer"
+                    />
+                    <label htmlFor="allowInstallments" className="text-xs font-bold text-zinc-700 dark:text-zinc-300 cursor-pointer">
+                      Activer le paiement en plusieurs tranches
+                    </label>
+                  </div>
+
+                  {allowInstallments && (
+                    <div className="pl-7 space-y-3 animate-in slide-in-from-top-1 duration-200">
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-600 dark:text-zinc-450 mb-1.5">Nombre de tranches</label>
+                        <input
+                          type="number"
+                          value={installmentsCount}
+                          onChange={(e) => setInstallmentsCount(Math.max(2, Number(e.target.value) || 2))}
+                          min="2"
+                          max="12"
+                          className="px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs w-28"
+                        />
+                      </div>
+                      <div className="p-3.5 bg-zinc-50 dark:bg-zinc-850 rounded-xl border border-zinc-150 dark:border-zinc-800 text-xs text-zinc-600 dark:text-zinc-350">
+                        Montant estimé par tranche :{" "}
+                        <span className="font-extrabold text-teal-600">
+                          {(parseFloat(coursePrice) / installmentsCount).toFixed(2)}$
+                        </span>{" "}
+                        / tranche (Total : {installmentsCount} mensualités/tranches).
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="pt-4 border-t border-zinc-150 dark:border-zinc-850 flex justify-end">
                 <button
                   onClick={handleSavePrice}
-                  className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold cursor-pointer shadow-md shadow-teal-500/10"
+                  className="px-5 py-2.5 bg-teal-650 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold cursor-pointer shadow-md shadow-teal-500/10"
                 >
                   Mettre à jour le tarif
                 </button>
@@ -1473,42 +1629,68 @@ export default function CourseDetailPage() {
         </div>
       )}
 
-      {/* MODAL: Enrôler / inviter étudiant */}
+      {/* MODAL: Enrôler / inviter étudiant par UUID */}
       {showInviteModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowInviteModal(false)}>
           <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5 pb-2 border-b border-zinc-150 dark:border-zinc-855">
-              <h2 className="text-base font-bold text-zinc-900 dark:text-white">Inscrire un nouvel Apprenant</h2>
+              <h2 className="text-base font-bold text-zinc-900 dark:text-white">Inscrire par ID (UUID)</h2>
               <button onClick={() => setShowInviteModal(false)} className="p-1 rounded-lg text-zinc-500 hover:bg-zinc-150 dark:hover:bg-zinc-800 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
             {inviteSuccess ? (
-              <div className="py-8 flex flex-col items-center gap-3 text-center">
-                <CheckCircle2 className="w-12 h-12 text-teal-500" />
-                <p className="font-bold text-zinc-900 dark:text-white">Inscription Réussie !</p>
-                <p className="text-xs text-zinc-500">L'apprenant a été inscrit à ce cours et ajouté à la base de données.</p>
+              <div className="py-8 flex flex-col items-center gap-3 text-center animate-in fade-in">
+                <CheckCircle2 className="w-12 h-12 text-teal-500 animate-bounce" />
+                <p className="font-bold text-zinc-900 dark:text-white">Invitation Envoyée !</p>
+                <p className="text-xs text-zinc-500">L'étudiant a été invité. L'inscription apparaîtra en statut "En attente" jusqu'à validation.</p>
               </div>
             ) : (
-              <form onSubmit={handleInviteStudent} className="space-y-4">
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Nom complet *</label>
-                  <input required type="text" value={inviteName} onChange={e => setInviteName(e.target.value)} placeholder="Ex: Jean Dupont" className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-zinc-950 dark:text-white border border-zinc-200 dark:border-zinc-700 text-xs focus:ring-1 focus:ring-teal-500 outline-none" />
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">UUID du compte étudiant *</label>
+                  <div className="flex gap-2">
+                    <input
+                      required
+                      type="text"
+                      value={inviteStudentId}
+                      onChange={e => setInviteStudentId(e.target.value)}
+                      placeholder="Ex: d3b07384-d113-4956-a5db-85d18d40798e"
+                      className="flex-1 px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs focus:ring-1 focus:ring-teal-500 outline-none text-zinc-900 dark:text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSearchStudent}
+                      className="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-800 dark:text-zinc-200 rounded-xl text-xs font-bold transition-colors"
+                    >
+                      Rechercher
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Adresse Email *</label>
-                  <input required type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="jean.dupont@exemple.com" className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-zinc-950 dark:text-white border border-zinc-200 dark:border-zinc-700 text-xs focus:ring-1 focus:ring-teal-500 outline-none" />
-                </div>
-                <div className="flex items-center gap-2 p-3 bg-teal-50/50 dark:bg-teal-950/20 border border-teal-100 dark:border-teal-900/40 rounded-xl">
-                  <CheckCircle2 className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" />
-                  <p className="text-[10px] text-teal-700 dark:text-teal-450 leading-relaxed">
-                    Si l'apprenant ne possède pas de compte sur la plateforme, un compte étudiant gratuit lui sera automatiquement créé dans la base de données.
-                  </p>
-                </div>
-                <button type="submit" className="w-full py-3 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-xl transition-colors text-xs cursor-pointer">
-                  Inscrire l'étudiant
-                </button>
-              </form>
+
+                {searchError && (
+                  <div className="p-3 bg-red-50/50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 text-xs rounded-xl flex items-center gap-2">
+                    <XCircle className="w-4 h-4 shrink-0" />
+                    <span>{searchError}</span>
+                  </div>
+                )}
+
+                {searchedStudent && (
+                  <div className="p-4 bg-zinc-50 dark:bg-zinc-850 rounded-xl border border-zinc-200 dark:border-zinc-855 space-y-3 animate-in fade-in">
+                    <p className="text-[10px] uppercase font-extrabold text-teal-650 tracking-wider">Compte Trouvé</p>
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-zinc-900 dark:text-white">{searchedStudent.name}</p>
+                      <p className="text-[11px] text-zinc-500">{searchedStudent.email}</p>
+                    </div>
+                    <button
+                      onClick={handleInviteStudent}
+                      className="w-full py-2.5 bg-teal-650 hover:bg-teal-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                    >
+                      Envoyer l'invitation (Statut Inactif)
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>

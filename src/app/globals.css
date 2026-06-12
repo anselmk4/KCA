@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
@@ -46,6 +47,16 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Custom extended palette used in instructor course builder */
+  --color-teal-650: #0e857b;
+  --color-teal-750: #106a64;
+  --color-teal-850: #11524e;
+  --color-zinc-150: #ececee;
+  --color-zinc-650: #494950;
+  --color-zinc-750: #333338;
+  --color-zinc-850: #202023;
+  --color-zinc-905: #111113;
 }
 
 :root {
@@ -127,4 +138,86 @@
   html {
     @apply font-sans;
   }
+}
+
+/* Custom rich text / TipTap styles fallback if @tailwindcss/typography is overridden or to refine custom display */
+.ProseMirror {
+  outline: none;
+  min-height: 220px;
+}
+.ProseMirror p {
+  margin-bottom: 0.75em;
+  line-height: 1.6;
+}
+.ProseMirror h1 {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  color: inherit;
+}
+.ProseMirror h2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.4rem;
+  color: inherit;
+}
+.ProseMirror h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 0.8rem;
+  margin-bottom: 0.3rem;
+  color: inherit;
+}
+.ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 0.75em;
+}
+.ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin-bottom: 0.75em;
+}
+.ProseMirror li {
+  margin-bottom: 0.25em;
+}
+.ProseMirror strong {
+  font-weight: 700;
+}
+.ProseMirror em {
+  font-style: italic;
+}
+.ProseMirror blockquote {
+  border-left: 4px solid #0d9488;
+  padding-left: 1rem;
+  font-style: italic;
+  margin-bottom: 0.75em;
+  color: #4b5563;
+}
+.dark .ProseMirror blockquote {
+  color: #9ca3af;
+}
+.ProseMirror pre {
+  background-color: #f4f4f5;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  font-family: monospace;
+  overflow-x: auto;
+  margin-bottom: 0.75em;
+}
+.dark .ProseMirror pre {
+  background-color: #27272a;
+}
+.ProseMirror hr {
+  border: 0;
+  border-top: 1px solid #e4e4e7;
+  margin: 1.5rem 0;
+}
+.dark .ProseMirror hr {
+  border-top-color: #27272a;
+}
+.ProseMirror u {
+  text-decoration: underline;
 }

@@ -6,9 +6,13 @@ import StarterKit from "@tiptap/starter-kit";
 import Heading from "@tiptap/extension-heading";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
+import Underline from "@tiptap/extension-underline";
 import {
   Bold,
   Italic,
+  Underline as UnderlineIcon,
+  Strikethrough,
+  Minus,
   List,
   ListOrdered,
   Heading1,
@@ -35,6 +39,7 @@ export const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeho
         heading: false, // Turn off default heading to use the custom configured one
       }),
       Heading.configure({ levels: [1, 2, 3] }),
+      Underline,
       Link.configure({
         openOnClick: false,
         HTMLAttributes: {
@@ -59,7 +64,7 @@ export const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeho
   });
 
   useEffect(() => {
-    if (editor && editor.getHTML() !== value) {
+    if (editor && editor.getHTML() !== value && !editor.isFocused) {
       editor.commands.setContent(value, { emitUpdate: false });
     }
   }, [value, editor]);
@@ -103,6 +108,18 @@ export const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeho
       isActive: () => editor.isActive("italic"),
     },
     {
+      icon: UnderlineIcon,
+      title: "Souligné",
+      action: () => editor.chain().focus().toggleUnderline().run(),
+      isActive: () => editor.isActive("underline"),
+    },
+    {
+      icon: Strikethrough,
+      title: "Barré",
+      action: () => editor.chain().focus().toggleStrike().run(),
+      isActive: () => editor.isActive("strike"),
+    },
+    {
       icon: Heading1,
       title: "Titre 1",
       action: () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
@@ -143,6 +160,12 @@ export const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeho
       title: "Bloc de code",
       action: () => editor.chain().focus().toggleCodeBlock().run(),
       isActive: () => editor.isActive("codeBlock"),
+    },
+    {
+      icon: Minus,
+      title: "Ligne horizontale",
+      action: () => editor.chain().focus().setHorizontalRule().run(),
+      isActive: () => false,
     },
     {
       icon: LinkIcon,

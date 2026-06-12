@@ -43,6 +43,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
   const pathname = usePathname();
   const router = useRouter();
   const [session, setSession] = useState<any>(null);
+  const [academyName, setAcademyName] = useState<string>("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -57,7 +58,11 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
       return;
     }
     setSession(s);
-    const handleStorage = () => setSession(getSimulatedSession());
+    setAcademyName(localStorage.getItem("kuettu_academy_name") || "Mon Académie");
+    const handleStorage = () => {
+      setSession(getSimulatedSession());
+      setAcademyName(localStorage.getItem("kuettu_academy_name") || "Mon Académie");
+    };
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
   }, [router]);
@@ -173,6 +178,11 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
               <Menu className="w-5 h-5" />
             </button>
             <span className="text-sm font-semibold text-teal-600 hidden sm:block">Espace Instructeur</span>
+            {academyName && (
+              <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 hidden md:inline border-l border-zinc-200 dark:border-zinc-700 pl-3">
+                {academyName}
+              </span>
+            )}
             {session?.plan && (
               <span className={`text-[10px] tracking-wider font-bold px-2.5 py-0.5 rounded-full uppercase border ${
                 session.plan === "MAX"

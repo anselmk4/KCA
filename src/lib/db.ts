@@ -26,6 +26,8 @@ export type Course = {
   rating?: number;
   category?: string;
   level?: string;
+  allowInstallments?: boolean;
+  installmentsCount?: number;
 };
 
 export type CourseSection = {
@@ -52,6 +54,7 @@ export type Enrollment = {
   courseId: string;
   progressPercent: number;
   joinedAt: string;
+  status?: "ACTIVE" | "INACTIVE" | "SUSPENDED" | "COMPLETED" | "AT_RISK";
 };
 
 export type Progress = {
@@ -65,6 +68,7 @@ export type Progress = {
 export type Quiz = {
   id: string;
   courseId: string;
+  sectionId?: string;
   title: string;
   passPercentage: number;
 };
@@ -445,6 +449,17 @@ const defaultDB: Database = {
   ]
 };
 
+export const generateUUID = (): string => {
+  if (typeof window !== "undefined" && window.crypto && window.crypto.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 // Initialize DB if empty
 export const initDB = () => {
   if (typeof window !== "undefined") {
@@ -491,7 +506,7 @@ const RoleUUIDs = {
 
 export const addUser = (user: Omit<User, "id" | "joinedAt" | "status" | "role" | "plan"> & { id?: string; role?: "STUDENT" | "INSTRUCTOR" | "ADMIN"; plan?: "FREE" | "BASE" | "PRO" | "MAX" }) => {
   const db = getDB();
-  const userId = user.id || `u${Date.now()}`;
+  const userId = user.id || generateUUID();
   const newUser: User = {
     ...user,
     role: user.role || "STUDENT",
@@ -545,7 +560,7 @@ export const addTransaction = (tx: Omit<Transaction, "id" | "date">) => {
   const db = getDB();
   const newTx: Transaction = {
     ...tx,
-    id: `tx${Date.now()}`,
+    id: generateUUID(),
     date: new Date().toISOString(),
   };
   db.transactions.push(newTx);
@@ -554,7 +569,7 @@ export const addTransaction = (tx: Omit<Transaction, "id" | "date">) => {
   // Sync to Supabase in background (Orders, Order Items, Payments)
   import("./supabase/client").then(async ({ supabase }) => {
     try {
-      const orderId = `ord_${Date.now()}`;
+      const orderId = generateUUID();
       const orderNumber = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       
       // Create order
@@ -573,7 +588,7 @@ export const addTransaction = (tx: Omit<Transaction, "id" | "date">) => {
 
       // Create order item
       const { error: itemError } = await supabase.from("order_items").insert({
-        id: `oi_${Date.now()}`,
+        id: generateUUID(),
         order_id: orderId,
         course_id: newTx.courseId,
         unit_price: newTx.amount,
@@ -613,7 +628,7 @@ export const addTransaction = (tx: Omit<Transaction, "id" | "date">) => {
 
 export const addCourse = (course: Partial<Course> & { title: string; price: number; description?: string; instructorId?: string; instructorName?: string }) => {
   const db = getDB();
-  const id = `c${Date.now()}`;
+  const id = generateUUID();
   const slug = course.slug || course.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   const newCourse: Course = {
     id,
@@ -659,7 +674,7 @@ export const addSupportTicket = (ticket: Omit<SupportTicket, "id" | "createdAt" 
   const db = getDB();
   const newTicket: SupportTicket = {
     ...ticket,
-    id: `t${Date.now()}`,
+    id: generateUUID(),
     status: "OPEN",
     createdAt: new Date().toISOString(),
     replies: [],
@@ -695,7 +710,7 @@ export const addQuiz = (quiz: Omit<Quiz, "id">) => {
   const db = getDB();
   const newQuiz: Quiz = {
     ...quiz,
-    id: `q_${Date.now()}`,
+    id: generateUUID(),
   };
   db.quizzes.push(newQuiz);
   saveDB(db);
@@ -708,6 +723,7 @@ export const addQuiz = (quiz: Omit<Quiz, "id">) => {
         course_id: newQuiz.courseId,
         title: newQuiz.title,
         pass_percentage: newQuiz.passPercentage,
+        section_id: newQuiz.sectionId || null,
         is_published: true
       });
       if (error) throw error;
@@ -724,7 +740,7 @@ export const addQuestion = (question: Omit<Question, "id">) => {
   const db = getDB();
   const newQuestion: Question = {
     ...question,
-    id: `qn_${Date.now()}`,
+    id: generateUUID(),
   };
   db.questions.push(newQuestion);
   saveDB(db);
@@ -824,7 +840,7 @@ export const addQuizAttempt = (attempt: Omit<QuizAttempt, "id" | "createdAt">) =
   const db = getDB();
   const newAttempt: QuizAttempt = {
     ...attempt,
-    id: `qa${Date.now()}`,
+    id: generateUUID(),
     createdAt: new Date().toISOString(),
   };
   db.quizAttempts.push(newAttempt);
@@ -854,7 +870,7 @@ export const addCertificate = (cert: Omit<Certificate, "id" | "issuedAt" | "code
   const db = getDB();
   const newCert: Certificate = {
     ...cert,
-    id: `cert${Date.now()}`,
+    id: generateUUID(),
     code: `KCA-${Math.random().toString(36).substring(2, 8).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
     issuedAt: new Date().toISOString(),
   };
@@ -915,6 +931,14 @@ export const updateCourseDetails = (courseId: string, updates: Partial<Course>) 
       if (updates.category !== undefined) sbUpdates.category_id = updates.category;
       if (updates.level !== undefined) sbUpdates.level = levelMap[updates.level] || "BEGINNER";
       
+      // Serialize installments settings to short_description so they persist
+      if (updates.allowInstallments !== undefined || updates.installmentsCount !== undefined) {
+        sbUpdates.short_description = JSON.stringify({
+          allowInstallments: updatedCourse.allowInstallments ?? false,
+          installmentsCount: updatedCourse.installmentsCount ?? 1
+        });
+      }
+      
       sbUpdates.updated_at = new Date().toISOString();
 
       const { error } = await supabase
@@ -934,7 +958,7 @@ export const updateCourseDetails = (courseId: string, updates: Partial<Course>) 
 export const addSection = (courseId: string, title: string, order: number) => {
   const db = getDB();
   const newSection: CourseSection = {
-    id: `s_${Date.now()}`,
+    id: generateUUID(),
     courseId,
     title,
     order,
@@ -1019,7 +1043,7 @@ export const deleteSection = (sectionId: string) => {
 export const addLesson = (sectionId: string, lessonData: Omit<Lesson, "id" | "sectionId">) => {
   const db = getDB();
   const newLesson: Lesson = {
-    id: `l_${Date.now()}`,
+    id: generateUUID(),
     sectionId,
     ...lessonData,
   };
@@ -1204,17 +1228,29 @@ export const deleteQuestion = (questionId: string) => {
   return true;
 };
 
-export const addEnrollment = (studentId: string, courseId: string) => {
+export const addEnrollment = (studentId: string, courseId: string, status: "ACTIVE" | "INACTIVE" | "SUSPENDED" | "COMPLETED" | "AT_RISK" = "ACTIVE") => {
   const db = getDB();
   const existing = db.enrollments.find(e => e.studentId === studentId && e.courseId === courseId);
-  if (existing) return existing;
+  if (existing) {
+    existing.status = status;
+    saveDB(db);
+    import("./supabase/client").then(async ({ supabase }) => {
+      try {
+        await supabase.from("enrollments").update({ status }).eq("id", existing.id);
+      } catch (err) {
+        console.error("Error updating enrollment status in Supabase:", err);
+      }
+    });
+    return existing;
+  }
 
   const newEnrollment: Enrollment = {
-    id: `e_${Date.now()}`,
+    id: generateUUID(),
     studentId,
     courseId,
     progressPercent: 0,
     joinedAt: new Date().toISOString(),
+    status,
   };
   db.enrollments.push(newEnrollment);
   saveDB(db);
@@ -1227,7 +1263,7 @@ export const addEnrollment = (studentId: string, courseId: string) => {
         course_id: newEnrollment.courseId,
         progress_percent: 0,
         enrolled_at: newEnrollment.joinedAt,
-        status: "ACTIVE"
+        status: newEnrollment.status
       }, { onConflict: "student_id,course_id" });
       if (error) throw error;
     } catch (err) {
@@ -1236,4 +1272,31 @@ export const addEnrollment = (studentId: string, courseId: string) => {
   });
 
   return newEnrollment;
+};
+
+export const updateEnrollmentStatus = (studentId: string, courseId: string, status: "ACTIVE" | "INACTIVE" | "SUSPENDED" | "COMPLETED" | "AT_RISK") => {
+  const db = getDB();
+  const enrollmentIdx = db.enrollments.findIndex(e => e.studentId === studentId && e.courseId === courseId);
+  if (enrollmentIdx === -1) return null;
+
+  const current = db.enrollments[enrollmentIdx];
+  const updatedEnrollment = {
+    ...current,
+    status
+  };
+  db.enrollments[enrollmentIdx] = updatedEnrollment;
+  saveDB(db);
+
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const { error } = await supabase.from("enrollments").update({
+        status
+      }).eq("id", current.id);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error updating enrollment status in Supabase:", err);
+    }
+  });
+
+  return updatedEnrollment;
 };

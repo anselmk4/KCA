@@ -254,7 +254,7 @@ export default function InstructorCoursesPage() {
                       Gérer le cours
                     </Link>
                     <Link
-                      href={`/courses/${course.slug}`}
+                      href={`/courses/${course.id}/preview`}
                       className="px-3 py-2 bg-zinc-50 dark:bg-zinc-800 text-zinc-500 rounded-lg text-xs font-medium hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
                     >
                       <Eye className="w-3.5 h-3.5" />

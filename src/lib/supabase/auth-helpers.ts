@@ -76,17 +76,38 @@ export async function fetchUserProfile(userId: string): Promise<AuthProfile | nu
  */
 export async function ensureProfile(userId: string, email: string, fullName: string): Promise<void> {
   try {
-    const { error } = await supabase.from('profiles').upsert(
-      {
+    // Check if the profile already exists (normally created via database trigger on auth.users)
+    const { data: existing, error: fetchError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error('[auth-helpers] error checking existing profile:', fetchError.message);
+    }
+
+    if (existing) {
+      // If it exists, update it to avoid needing the INSERT RLS policy required by upsert
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          email,
+          full_name: fullName || email.split('@')[0],
+        })
+        .eq('id', userId);
+      if (error) console.error('[auth-helpers] ensureProfile update error:', error.message);
+    } else {
+      // If it does not exist, insert it (requires INSERT policy or trigger fallback)
+      const { error } = await supabase.from('profiles').insert({
         id: userId,
         email,
         full_name: fullName || email.split('@')[0],
         status: 'ACTIVE',
         plan: 'FREE',
-      },
-      { onConflict: 'id', ignoreDuplicates: false }
-    );
-    if (error) console.error('[auth-helpers] ensureProfile upsert error:', error.message);
+      });
+      if (error) console.error('[auth-helpers] ensureProfile insert error:', error.message);
+    }
 
     // Ensure STUDENT role exists
     const { data: studentRole } = await supabase
@@ -96,9 +117,10 @@ export async function ensureProfile(userId: string, email: string, fullName: str
       .single();
 
     if (studentRole) {
-      await supabase
+      const { error: roleError } = await supabase
         .from('user_roles')
         .upsert({ user_id: userId, role_id: studentRole.id }, { onConflict: 'user_id,role_id', ignoreDuplicates: true });
+      if (roleError) console.error('[auth-helpers] ensureProfile user_roles upsert error:', roleError.message);
     }
   } catch (err) {
     console.error('[auth-helpers] ensureProfile error:', err);
