@@ -8,7 +8,7 @@ import { ArrowRight, ArrowLeft, CheckCircle2, BookOpen, Sparkles, User, ShieldCh
 import { initDB } from "@/lib/db";
 import { setSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
-import { ensureProfile } from "@/lib/supabase/auth-helpers";
+import { ensureProfile, fetchUserProfile } from "@/lib/supabase/auth-helpers";
 
 
 function RegisterForm() {
@@ -36,6 +36,42 @@ function RegisterForm() {
   useEffect(() => {
     initDB();
     
+    const checkSession = async () => {
+      try {
+        const { data: { session: activeSession } } = await supabase.auth.getSession();
+        if (activeSession?.user) {
+          const profile = await fetchUserProfile(activeSession.user.id);
+          if (profile) {
+            setSimulatedSession({
+              userId: profile.id,
+              name: profile.full_name,
+              email: profile.email,
+              role: profile.role,
+              status: profile.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
+              plan: profile.plan,
+            });
+
+            if (profile.role === 'INSTRUCTOR' || profile.role === 'TEACHING_ASSISTANT') {
+              router.replace('/instructor');
+            } else if (
+              profile.role === 'SUPER_ADMIN' ||
+              profile.role === 'ADMIN' ||
+              profile.role === 'FINANCE_ADMIN' ||
+              profile.role === 'ACADEMIC_ADMIN' ||
+              profile.role === 'SUPPORT_AGENT'
+            ) {
+              router.replace('/admin');
+            } else {
+              router.replace('/dashboard');
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error checking active session on register page load:", err);
+      }
+    };
+    checkSession();
+    
     // Read query params for smart role pre-selection
     const queryPlan = searchParams.get("plan")?.toUpperCase();
     const queryModule = searchParams.get("module")?.toLowerCase();
@@ -52,7 +88,7 @@ function RegisterForm() {
     } else if (queryRole === "STUDENT" || queryRole === "LEARNER" || queryRole === "APPRENANT") {
       setRole("STUDENT");
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

@@ -883,6 +883,357 @@ export const addCertificate = (cert: Omit<Certificate, "id" | "issuedAt" | "code
   return newCert;
 };
 
+export const updateCourseDetails = (courseId: string, updates: Partial<Course>) => {
+  const db = getDB();
+  const courseIdx = db.courses.findIndex((c) => c.id === courseId);
+  if (courseIdx === -1) return null;
 
+  const current = db.courses[courseIdx];
+  const updatedCourse = {
+    ...current,
+    ...updates,
+  };
+  db.courses[courseIdx] = updatedCourse;
+  saveDB(db);
 
+  // Sync to Supabase in background
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const levelMap: Record<string, string> = {
+        "Débutant": "BEGINNER",
+        "Intermédiaire": "INTERMEDIATE",
+        "Avancé": "ADVANCED",
+        "Expert": "EXPERT"
+      };
+      
+      const sbUpdates: any = {};
+      if (updates.title !== undefined) sbUpdates.title = updates.title;
+      if (updates.slug !== undefined) sbUpdates.slug = updates.slug;
+      if (updates.description !== undefined) sbUpdates.description = updates.description;
+      if (updates.price !== undefined) sbUpdates.price = updates.price;
+      if (updates.status !== undefined) sbUpdates.status = updates.status;
+      if (updates.category !== undefined) sbUpdates.category_id = updates.category;
+      if (updates.level !== undefined) sbUpdates.level = levelMap[updates.level] || "BEGINNER";
+      
+      sbUpdates.updated_at = new Date().toISOString();
 
+      const { error } = await supabase
+        .from("courses")
+        .update(sbUpdates)
+        .eq("id", courseId);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error updating course in Supabase:", err);
+    }
+  });
+
+  return updatedCourse;
+};
+
+export const addSection = (courseId: string, title: string, order: number) => {
+  const db = getDB();
+  const newSection: CourseSection = {
+    id: `s_${Date.now()}`,
+    courseId,
+    title,
+    order,
+  };
+  db.sections.push(newSection);
+  saveDB(db);
+
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const { error } = await supabase.from("course_sections").insert({
+        id: newSection.id,
+        course_id: newSection.courseId,
+        title: newSection.title,
+        sort_order: newSection.order,
+        created_at: new Date().toISOString()
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error creating section in Supabase:", err);
+    }
+  });
+
+  return newSection;
+};
+
+export const updateSection = (sectionId: string, updates: Partial<Omit<CourseSection, "id" | "courseId">>) => {
+  const db = getDB();
+  const sectionIdx = db.sections.findIndex((s) => s.id === sectionId);
+  if (sectionIdx === -1) return null;
+
+  const current = db.sections[sectionIdx];
+  const updatedSection = {
+    ...current,
+    ...updates,
+  };
+  db.sections[sectionIdx] = updatedSection;
+  saveDB(db);
+
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const sbUpdates: any = {};
+      if (updates.title !== undefined) sbUpdates.title = updates.title;
+      if (updates.order !== undefined) sbUpdates.sort_order = updates.order;
+
+      const { error } = await supabase
+        .from("course_sections")
+        .update(sbUpdates)
+        .eq("id", sectionId);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error updating section in Supabase:", err);
+    }
+  });
+
+  return updatedSection;
+};
+
+export const deleteSection = (sectionId: string) => {
+  const db = getDB();
+  const lessonIds = db.lessons.filter((l) => l.sectionId === sectionId).map((l) => l.id);
+  
+  db.sections = db.sections.filter((s) => s.id !== sectionId);
+  db.lessons = db.lessons.filter((l) => l.sectionId !== sectionId);
+  saveDB(db);
+
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      if (lessonIds.length > 0) {
+        await supabase.from("lessons").delete().in("id", lessonIds);
+      }
+      const { error } = await supabase.from("course_sections").delete().eq("id", sectionId);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error deleting section in Supabase:", err);
+    }
+  });
+
+  return true;
+};
+
+export const addLesson = (sectionId: string, lessonData: Omit<Lesson, "id" | "sectionId">) => {
+  const db = getDB();
+  const newLesson: Lesson = {
+    id: `l_${Date.now()}`,
+    sectionId,
+    ...lessonData,
+  };
+  db.lessons.push(newLesson);
+  saveDB(db);
+
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const { error } = await supabase.from("lessons").insert({
+        id: newLesson.id,
+        section_id: newLesson.sectionId,
+        title: newLesson.title,
+        description: newLesson.description || "",
+        content: newLesson.content || "",
+        video_url: newLesson.videoUrl || "",
+        duration_minutes: newLesson.durationMin || 0,
+        sort_order: newLesson.order,
+        created_at: new Date().toISOString()
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error creating lesson in Supabase:", err);
+    }
+  });
+
+  return newLesson;
+};
+
+export const updateLesson = (lessonId: string, updates: Partial<Omit<Lesson, "id" | "sectionId">>) => {
+  const db = getDB();
+  const lessonIdx = db.lessons.findIndex((l) => l.id === lessonId);
+  if (lessonIdx === -1) return null;
+
+  const current = db.lessons[lessonIdx];
+  const updatedLesson = {
+    ...current,
+    ...updates,
+  };
+  db.lessons[lessonIdx] = updatedLesson;
+  saveDB(db);
+
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const sbUpdates: any = {};
+      if (updates.title !== undefined) sbUpdates.title = updates.title;
+      if (updates.description !== undefined) sbUpdates.description = updates.description;
+      if (updates.content !== undefined) sbUpdates.content = updates.content;
+      if (updates.videoUrl !== undefined) sbUpdates.video_url = updates.videoUrl;
+      if (updates.durationMin !== undefined) sbUpdates.duration_minutes = updates.durationMin;
+      if (updates.order !== undefined) sbUpdates.sort_order = updates.order;
+
+      const { error } = await supabase
+        .from("lessons")
+        .update(sbUpdates)
+        .eq("id", lessonId);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error updating lesson in Supabase:", err);
+    }
+  });
+
+  return updatedLesson;
+};
+
+export const deleteLesson = (lessonId: string) => {
+  const db = getDB();
+  db.lessons = db.lessons.filter((l) => l.id !== lessonId);
+  saveDB(db);
+
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const { error } = await supabase.from("lessons").delete().eq("id", lessonId);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error deleting lesson in Supabase:", err);
+    }
+  });
+
+  return true;
+};
+
+export const updateQuiz = (quizId: string, updates: Partial<Omit<Quiz, "id" | "courseId">>) => {
+  const db = getDB();
+  const quizIdx = db.quizzes.findIndex((q) => q.id === quizId);
+  if (quizIdx === -1) return null;
+
+  const current = db.quizzes[quizIdx];
+  const updatedQuiz = {
+    ...current,
+    ...updates,
+  };
+  db.quizzes[quizIdx] = updatedQuiz;
+  saveDB(db);
+
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const sbUpdates: any = {};
+      if (updates.title !== undefined) sbUpdates.title = updates.title;
+      if (updates.passPercentage !== undefined) sbUpdates.pass_percentage = updates.passPercentage;
+
+      const { error } = await supabase
+        .from("quizzes")
+        .update(sbUpdates)
+        .eq("id", quizId);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error updating quiz in Supabase:", err);
+    }
+  });
+
+  return updatedQuiz;
+};
+
+export const deleteQuiz = (quizId: string) => {
+  const db = getDB();
+  db.quizzes = db.quizzes.filter((q) => q.id !== quizId);
+  db.questions = db.questions.filter((qn) => qn.quizId !== quizId);
+  saveDB(db);
+
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const { error } = await supabase.from("quizzes").delete().eq("id", quizId);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error deleting quiz in Supabase:", err);
+    }
+  });
+
+  return true;
+};
+
+export const updateQuestion = (questionId: string, updates: Partial<Omit<Question, "id" | "quizId">>) => {
+  const db = getDB();
+  const qIdx = db.questions.findIndex((qn) => qn.id === questionId);
+  if (qIdx === -1) return null;
+
+  const current = db.questions[qIdx];
+  const updatedQ = {
+    ...current,
+    ...updates,
+  };
+  db.questions[qIdx] = updatedQ;
+  saveDB(db);
+
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const sbUpdates: any = {};
+      if (updates.text !== undefined) sbUpdates.text = updates.text;
+      if (updates.choices !== undefined) sbUpdates.choices = updates.choices as any;
+      if (updates.correctIndex !== undefined) sbUpdates.correct_index = updates.correctIndex;
+
+      const { error } = await supabase
+        .from("questions")
+        .update(sbUpdates)
+        .eq("id", questionId);
+
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error updating question in Supabase:", err);
+    }
+  });
+
+  return updatedQ;
+};
+
+export const deleteQuestion = (questionId: string) => {
+  const db = getDB();
+  db.questions = db.questions.filter((qn) => qn.id !== questionId);
+  saveDB(db);
+
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const { error } = await supabase.from("questions").delete().eq("id", questionId);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error deleting question in Supabase:", err);
+    }
+  });
+
+  return true;
+};
+
+export const addEnrollment = (studentId: string, courseId: string) => {
+  const db = getDB();
+  const existing = db.enrollments.find(e => e.studentId === studentId && e.courseId === courseId);
+  if (existing) return existing;
+
+  const newEnrollment: Enrollment = {
+    id: `e_${Date.now()}`,
+    studentId,
+    courseId,
+    progressPercent: 0,
+    joinedAt: new Date().toISOString(),
+  };
+  db.enrollments.push(newEnrollment);
+  saveDB(db);
+
+  import("./supabase/client").then(async ({ supabase }) => {
+    try {
+      const { error } = await supabase.from("enrollments").upsert({
+        id: newEnrollment.id,
+        student_id: newEnrollment.studentId,
+        course_id: newEnrollment.courseId,
+        progress_percent: 0,
+        enrolled_at: newEnrollment.joinedAt,
+        status: "ACTIVE"
+      }, { onConflict: "student_id,course_id" });
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error creating enrollment in Supabase:", err);
+    }
+  });
+
+  return newEnrollment;
+};

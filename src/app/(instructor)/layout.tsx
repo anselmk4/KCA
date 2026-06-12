@@ -25,13 +25,12 @@ import {
   Bell,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { getSimulatedSession, setSimulatedSession } from "@/lib/rbac";
+import { getSimulatedSession, setSimulatedSession, clearSimulatedSession } from "@/lib/rbac";
+import { supabase } from "@/lib/supabase/client";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Tableau de bord", href: "/instructor" },
   { icon: BookOpen, label: "Mes cours", href: "/instructor/courses" },
-  { icon: ClipboardCheck, label: "Quiz & Examens", href: "/instructor/quizzes" },
-  { icon: Users, label: "Étudiants", href: "/instructor/students" },
   { icon: Video, label: "Sessions live", href: "/instructor/live" },
   { icon: BarChart3, label: "Analytique", href: "/instructor/analytics" },
   { icon: Wallet, label: "Revenus", href: "/instructor/earnings" },
@@ -94,9 +93,10 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
     setTimeout(() => { setPasswordMsg(null); setShowPasswordModal(false); }, 2000);
   };
 
-  const handleLogout = () => {
-    setSimulatedSession({ userId: "u1", name: "Jean Dupont", email: "jean@example.com", role: "STUDENT", status: "ACTIVE", plan: "FREE" });
-    router.push("/");
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    clearSimulatedSession();
+    router.push("/login");
   };
 
   const initials = session?.name

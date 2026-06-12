@@ -217,3 +217,17 @@ export function setSimulatedSession(session: CurrentSession) {
     window.dispatchEvent(new Event("storage"));
   }
 }
+
+// Helper to clear the simulated session (proper logout)
+export function clearSimulatedSession() {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("kuettu_session");
+    localStorage.removeItem("kuettu_user_name");
+    localStorage.removeItem("kuettu_active_role");
+    localStorage.removeItem("kuettu_academy_name");
+    localStorage.removeItem("kuettu_academy_thematic");
+    localStorage.removeItem("kuettu_user_level");
+    localStorage.removeItem("kuettu_active_module");
+    window.dispatchEvent(new Event("storage"));
+  }
+}

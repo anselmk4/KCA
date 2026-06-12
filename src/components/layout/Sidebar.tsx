@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -10,11 +10,12 @@ import {
   Users, 
   Settings, 
   LogOut,
-
   CreditCard,
   X,
   LifeBuoy
 } from "lucide-react";
+import { clearSimulatedSession } from "@/lib/rbac";
+import { supabase } from "@/lib/supabase/client";
 
 interface SidebarProps {
   open?: boolean;
@@ -23,6 +24,7 @@ interface SidebarProps {
 
 export function Sidebar({ open = false, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
 
   const menuItems = [
     { icon: <LayoutDashboard className="w-5 h-5" />, label: "Vue d'ensemble", href: "/dashboard" },
@@ -32,6 +34,12 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     { icon: <Users className="w-5 h-5" />, label: "Communauté", href: "/dashboard/community" },
     { icon: <LifeBuoy className="w-5 h-5" />, label: "Support Technique", href: "/dashboard/support" },
   ];
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    clearSimulatedSession();
+    router.push("/login");
+  };
 
   return (
     <aside className={`w-64 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 h-screen flex flex-col fixed left-0 top-0 z-40 transition-transform duration-300
@@ -80,14 +88,15 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           <Settings className="w-5 h-5" />
           <span className="text-sm">Paramètres</span>
         </Link>
-        <Link 
-          href="/"
+        <button 
+          onClick={handleLogout}
           className="flex items-center space-x-3 px-4 py-3 rounded-xl text-zinc-500 dark:text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-all"
         >
           <LogOut className="w-5 h-5" />
           <span className="text-sm">Déconnexion</span>
-        </Link>
+        </button>
       </div>
     </aside>
   );
 }
+
