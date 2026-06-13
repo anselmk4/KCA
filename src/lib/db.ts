@@ -650,6 +650,24 @@ export const addCourse = (course: Partial<Course> & { title: string; price: numb
   // Sync to Supabase in background
   import("./supabase/client").then(async ({ supabase }) => {
     try {
+      // Resolve the real Supabase auth user ID to satisfy FK constraint
+      let instructorId = newCourse.instructorId;
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (authSession?.user?.id) {
+        instructorId = authSession.user.id;
+      } else {
+        // If no auth session, check if the ID exists in profiles
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", instructorId)
+          .maybeSingle();
+        if (!profile) {
+          console.warn("[addCourse] No auth session and instructor_id not found in profiles. Skipping Supabase sync.");
+          return;
+        }
+      }
+
       const { error } = await supabase.from("courses").insert({
         id: newCourse.id,
         title: newCourse.title,
@@ -657,13 +675,15 @@ export const addCourse = (course: Partial<Course> & { title: string; price: numb
         description: newCourse.description,
         price: newCourse.price,
         status: "DRAFT",
-        instructor_id: newCourse.instructorId,
+        instructor_id: instructorId,
         created_at: newCourse.createdAt,
         updated_at: newCourse.createdAt
       });
-      if (error) throw error;
+      if (error) {
+        console.error("[addCourse] Supabase insert error:", error.message, error.details, error.hint);
+      }
     } catch (err) {
-      console.error("Error creating course in Supabase:", err);
+      console.error("[addCourse] Error creating course in Supabase:", err);
     }
   });
 
@@ -786,10 +806,17 @@ export const deleteCourse = (courseId: string) => {
   // Sync to Supabase in background
   import("./supabase/client").then(async ({ supabase }) => {
     try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (!authSession) {
+        console.warn("[deleteCourse] No auth session. Skipping Supabase sync.");
+        return;
+      }
       const { error } = await supabase.from("courses").delete().eq("id", courseId);
-      if (error) throw error;
+      if (error) {
+        console.error("[deleteCourse] Supabase delete error:", error.message, error.details);
+      }
     } catch (err) {
-      console.error("Error deleting course in Supabase:", err);
+      console.error("[deleteCourse] Error deleting course in Supabase:", err);
     }
   });
 
@@ -915,6 +942,13 @@ export const updateCourseDetails = (courseId: string, updates: Partial<Course>) 
   // Sync to Supabase in background
   import("./supabase/client").then(async ({ supabase }) => {
     try {
+      // Verify auth session exists for RLS
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (!authSession) {
+        console.warn("[updateCourseDetails] No auth session. Skipping Supabase sync.");
+        return;
+      }
+
       const levelMap: Record<string, string> = {
         "Débutant": "BEGINNER",
         "Intermédiaire": "INTERMEDIATE",
@@ -946,9 +980,11 @@ export const updateCourseDetails = (courseId: string, updates: Partial<Course>) 
         .update(sbUpdates)
         .eq("id", courseId);
 
-      if (error) throw error;
+      if (error) {
+        console.error("[updateCourseDetails] Supabase update error:", error.message, error.details);
+      }
     } catch (err) {
-      console.error("Error updating course in Supabase:", err);
+      console.error("[updateCourseDetails] Error updating course in Supabase:", err);
     }
   });
 
@@ -968,6 +1004,11 @@ export const addSection = (courseId: string, title: string, order: number) => {
 
   import("./supabase/client").then(async ({ supabase }) => {
     try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (!authSession) {
+        console.warn("[addSection] No auth session. Skipping Supabase sync.");
+        return;
+      }
       const { error } = await supabase.from("course_sections").insert({
         id: newSection.id,
         course_id: newSection.courseId,
@@ -975,9 +1016,11 @@ export const addSection = (courseId: string, title: string, order: number) => {
         sort_order: newSection.order,
         created_at: new Date().toISOString()
       });
-      if (error) throw error;
+      if (error) {
+        console.error("[addSection] Supabase insert error:", error.message, error.details);
+      }
     } catch (err) {
-      console.error("Error creating section in Supabase:", err);
+      console.error("[addSection] Error creating section in Supabase:", err);
     }
   });
 
@@ -1052,6 +1095,11 @@ export const addLesson = (sectionId: string, lessonData: Omit<Lesson, "id" | "se
 
   import("./supabase/client").then(async ({ supabase }) => {
     try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      if (!authSession) {
+        console.warn("[addLesson] No auth session. Skipping Supabase sync.");
+        return;
+      }
       const { error } = await supabase.from("lessons").insert({
         id: newLesson.id,
         section_id: newLesson.sectionId,
@@ -1063,9 +1111,11 @@ export const addLesson = (sectionId: string, lessonData: Omit<Lesson, "id" | "se
         sort_order: newLesson.order,
         created_at: new Date().toISOString()
       });
-      if (error) throw error;
+      if (error) {
+        console.error("[addLesson] Supabase insert error:", error.message, error.details);
+      }
     } catch (err) {
-      console.error("Error creating lesson in Supabase:", err);
+      console.error("[addLesson] Error creating lesson in Supabase:", err);
     }
   });
 
