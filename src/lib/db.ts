@@ -647,44 +647,27 @@ export const addCourse = (course: Partial<Course> & { title: string; price: numb
   db.courses.push(newCourse);
   saveDB(db);
 
-  // Sync to Supabase in background
-  import("./supabase/client").then(async ({ supabase }) => {
-    try {
-      // Resolve the real Supabase auth user ID to satisfy FK constraint
-      let instructorId = newCourse.instructorId;
-      const { data: { session: authSession } } = await supabase.auth.getSession();
-      if (authSession?.user?.id) {
-        instructorId = authSession.user.id;
-      } else {
-        // If no auth session, check if the ID exists in profiles
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("id", instructorId)
-          .maybeSingle();
-        if (!profile) {
-          console.warn("[addCourse] No auth session and instructor_id not found in profiles. Skipping Supabase sync.");
-          return;
-        }
-      }
-
-      const { error } = await supabase.from("courses").insert({
-        id: newCourse.id,
-        title: newCourse.title,
-        slug: newCourse.slug,
-        description: newCourse.description,
-        price: newCourse.price,
-        status: "DRAFT",
-        instructor_id: instructorId,
-        created_at: newCourse.createdAt,
-        updated_at: newCourse.createdAt
-      });
-      if (error) {
-        console.error("[addCourse] Supabase insert error:", error.message, error.details, error.hint);
-      }
-    } catch (err) {
-      console.error("[addCourse] Error creating course in Supabase:", err);
+  // Sync to Supabase via server-side API route (cookie-based auth, bypasses RLS issues)
+  fetch('/api/courses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: newCourse.id,
+      title: newCourse.title,
+      slug: newCourse.slug,
+      description: newCourse.description,
+      price: newCourse.price,
+      createdAt: newCourse.createdAt,
+    }),
+  }).then(async (res) => {
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.error('[addCourse] API error:', res.status, body?.error);
+    } else {
+      console.log('[addCourse] Course persisted to Supabase via API ✓');
     }
+  }).catch((err) => {
+    console.error('[addCourse] Fetch error:', err);
   });
 
   return newCourse;
@@ -803,24 +786,19 @@ export const deleteCourse = (courseId: string) => {
   db.transactions = db.transactions.filter((t) => t.courseId !== courseId);
   saveDB(db);
 
-  // Sync to Supabase in background
-  import("./supabase/client").then(async ({ supabase }) => {
-    try {
-      const { data: { session: authSession } } = await supabase.auth.getSession();
-      if (!authSession) {
-        console.warn("[deleteCourse] No auth session. Skipping Supabase sync.");
-        return;
-      }
-      const { error } = await supabase.from("courses").delete().eq("id", courseId);
-      if (error) {
-        console.error("[deleteCourse] Supabase delete error:", error.message, error.details);
-      }
-    } catch (err) {
-      console.error("[deleteCourse] Error deleting course in Supabase:", err);
+  // Sync to Supabase via server-side API route
+  fetch(`/api/courses?id=${courseId}`, {
+    method: 'DELETE',
+  }).then(async (res) => {
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.error('[deleteCourse] API error:', res.status, body?.error);
     }
+  }).catch((err) => {
+    console.error('[deleteCourse] Fetch error:', err);
   });
 
-  return true;
+  return courseId;
 };
 
 export const addReplyToTicket = (ticketId: string, reply: Omit<SupportTicketReply, "id" | "createdAt">) => {
@@ -939,53 +917,18 @@ export const updateCourseDetails = (courseId: string, updates: Partial<Course>) 
   db.courses[courseIdx] = updatedCourse;
   saveDB(db);
 
-  // Sync to Supabase in background
-  import("./supabase/client").then(async ({ supabase }) => {
-    try {
-      // Verify auth session exists for RLS
-      const { data: { session: authSession } } = await supabase.auth.getSession();
-      if (!authSession) {
-        console.warn("[updateCourseDetails] No auth session. Skipping Supabase sync.");
-        return;
-      }
-
-      const levelMap: Record<string, string> = {
-        "Débutant": "BEGINNER",
-        "Intermédiaire": "INTERMEDIATE",
-        "Avancé": "ADVANCED",
-        "Expert": "EXPERT"
-      };
-      
-      const sbUpdates: any = {};
-      if (updates.title !== undefined) sbUpdates.title = updates.title;
-      if (updates.slug !== undefined) sbUpdates.slug = updates.slug;
-      if (updates.description !== undefined) sbUpdates.description = updates.description;
-      if (updates.price !== undefined) sbUpdates.price = updates.price;
-      if (updates.status !== undefined) sbUpdates.status = updates.status;
-      if (updates.category !== undefined) sbUpdates.category_id = updates.category;
-      if (updates.level !== undefined) sbUpdates.level = levelMap[updates.level] || "BEGINNER";
-      
-      // Serialize installments settings to short_description so they persist
-      if (updates.allowInstallments !== undefined || updates.installmentsCount !== undefined) {
-        sbUpdates.short_description = JSON.stringify({
-          allowInstallments: updatedCourse.allowInstallments ?? false,
-          installmentsCount: updatedCourse.installmentsCount ?? 1
-        });
-      }
-      
-      sbUpdates.updated_at = new Date().toISOString();
-
-      const { error } = await supabase
-        .from("courses")
-        .update(sbUpdates)
-        .eq("id", courseId);
-
-      if (error) {
-        console.error("[updateCourseDetails] Supabase update error:", error.message, error.details);
-      }
-    } catch (err) {
-      console.error("[updateCourseDetails] Error updating course in Supabase:", err);
+  // Sync to Supabase via server-side API route
+  fetch('/api/courses', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: courseId, ...updates }),
+  }).then(async (res) => {
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.error('[updateCourseDetails] API error:', res.status, body?.error);
     }
+  }).catch((err) => {
+    console.error('[updateCourseDetails] Fetch error:', err);
   });
 
   return updatedCourse;
@@ -1002,26 +945,25 @@ export const addSection = (courseId: string, title: string, order: number) => {
   db.sections.push(newSection);
   saveDB(db);
 
-  import("./supabase/client").then(async ({ supabase }) => {
-    try {
-      const { data: { session: authSession } } = await supabase.auth.getSession();
-      if (!authSession) {
-        console.warn("[addSection] No auth session. Skipping Supabase sync.");
-        return;
-      }
-      const { error } = await supabase.from("course_sections").insert({
-        id: newSection.id,
-        course_id: newSection.courseId,
-        title: newSection.title,
-        sort_order: newSection.order,
-        created_at: new Date().toISOString()
-      });
-      if (error) {
-        console.error("[addSection] Supabase insert error:", error.message, error.details);
-      }
-    } catch (err) {
-      console.error("[addSection] Error creating section in Supabase:", err);
+  // Sync to Supabase via server-side API route
+  fetch('/api/sections', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: newSection.id,
+      courseId: newSection.courseId,
+      title: newSection.title,
+      order: newSection.order,
+    }),
+  }).then(async (res) => {
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.error('[addSection] API error:', res.status, body?.error);
+    } else {
+      console.log('[addSection] Section persisted to Supabase via API ✓');
     }
+  }).catch((err) => {
+    console.error('[addSection] Fetch error:', err);
   });
 
   return newSection;
@@ -1040,21 +982,18 @@ export const updateSection = (sectionId: string, updates: Partial<Omit<CourseSec
   db.sections[sectionIdx] = updatedSection;
   saveDB(db);
 
-  import("./supabase/client").then(async ({ supabase }) => {
-    try {
-      const sbUpdates: any = {};
-      if (updates.title !== undefined) sbUpdates.title = updates.title;
-      if (updates.order !== undefined) sbUpdates.sort_order = updates.order;
-
-      const { error } = await supabase
-        .from("course_sections")
-        .update(sbUpdates)
-        .eq("id", sectionId);
-
-      if (error) throw error;
-    } catch (err) {
-      console.error("Error updating section in Supabase:", err);
+  // Sync to Supabase via server-side API route
+  fetch('/api/sections', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: sectionId, ...updates }),
+  }).then(async (res) => {
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.error('[updateSection] API error:', res.status, body?.error);
     }
+  }).catch((err) => {
+    console.error('[updateSection] Fetch error:', err);
   });
 
   return updatedSection;
@@ -1062,22 +1001,21 @@ export const updateSection = (sectionId: string, updates: Partial<Omit<CourseSec
 
 export const deleteSection = (sectionId: string) => {
   const db = getDB();
-  const lessonIds = db.lessons.filter((l) => l.sectionId === sectionId).map((l) => l.id);
   
   db.sections = db.sections.filter((s) => s.id !== sectionId);
   db.lessons = db.lessons.filter((l) => l.sectionId !== sectionId);
   saveDB(db);
 
-  import("./supabase/client").then(async ({ supabase }) => {
-    try {
-      if (lessonIds.length > 0) {
-        await supabase.from("lessons").delete().in("id", lessonIds);
-      }
-      const { error } = await supabase.from("course_sections").delete().eq("id", sectionId);
-      if (error) throw error;
-    } catch (err) {
-      console.error("Error deleting section in Supabase:", err);
+  // Sync to Supabase via server-side API route
+  fetch(`/api/sections?id=${sectionId}`, {
+    method: 'DELETE',
+  }).then(async (res) => {
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.error('[deleteSection] API error:', res.status, body?.error);
     }
+  }).catch((err) => {
+    console.error('[deleteSection] Fetch error:', err);
   });
 
   return true;
@@ -1093,30 +1031,29 @@ export const addLesson = (sectionId: string, lessonData: Omit<Lesson, "id" | "se
   db.lessons.push(newLesson);
   saveDB(db);
 
-  import("./supabase/client").then(async ({ supabase }) => {
-    try {
-      const { data: { session: authSession } } = await supabase.auth.getSession();
-      if (!authSession) {
-        console.warn("[addLesson] No auth session. Skipping Supabase sync.");
-        return;
-      }
-      const { error } = await supabase.from("lessons").insert({
-        id: newLesson.id,
-        section_id: newLesson.sectionId,
-        title: newLesson.title,
-        description: newLesson.description || "",
-        content: newLesson.content || "",
-        video_url: newLesson.videoUrl || "",
-        duration_minutes: newLesson.durationMin || 0,
-        sort_order: newLesson.order,
-        created_at: new Date().toISOString()
-      });
-      if (error) {
-        console.error("[addLesson] Supabase insert error:", error.message, error.details);
-      }
-    } catch (err) {
-      console.error("[addLesson] Error creating lesson in Supabase:", err);
+  // Sync to Supabase via server-side API route
+  fetch('/api/lessons', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id: newLesson.id,
+      sectionId: newLesson.sectionId,
+      title: newLesson.title,
+      description: newLesson.description,
+      content: newLesson.content,
+      videoUrl: newLesson.videoUrl,
+      durationMin: newLesson.durationMin,
+      order: newLesson.order,
+    }),
+  }).then(async (res) => {
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.error('[addLesson] API error:', res.status, body?.error);
+    } else {
+      console.log('[addLesson] Lesson persisted to Supabase via API ✓');
     }
+  }).catch((err) => {
+    console.error('[addLesson] Fetch error:', err);
   });
 
   return newLesson;
@@ -1135,25 +1072,18 @@ export const updateLesson = (lessonId: string, updates: Partial<Omit<Lesson, "id
   db.lessons[lessonIdx] = updatedLesson;
   saveDB(db);
 
-  import("./supabase/client").then(async ({ supabase }) => {
-    try {
-      const sbUpdates: any = {};
-      if (updates.title !== undefined) sbUpdates.title = updates.title;
-      if (updates.description !== undefined) sbUpdates.description = updates.description;
-      if (updates.content !== undefined) sbUpdates.content = updates.content;
-      if (updates.videoUrl !== undefined) sbUpdates.video_url = updates.videoUrl;
-      if (updates.durationMin !== undefined) sbUpdates.duration_minutes = updates.durationMin;
-      if (updates.order !== undefined) sbUpdates.sort_order = updates.order;
-
-      const { error } = await supabase
-        .from("lessons")
-        .update(sbUpdates)
-        .eq("id", lessonId);
-
-      if (error) throw error;
-    } catch (err) {
-      console.error("Error updating lesson in Supabase:", err);
+  // Sync to Supabase via server-side API route
+  fetch('/api/lessons', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: lessonId, ...updates }),
+  }).then(async (res) => {
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.error('[updateLesson] API error:', res.status, body?.error);
     }
+  }).catch((err) => {
+    console.error('[updateLesson] Fetch error:', err);
   });
 
   return updatedLesson;
@@ -1164,13 +1094,16 @@ export const deleteLesson = (lessonId: string) => {
   db.lessons = db.lessons.filter((l) => l.id !== lessonId);
   saveDB(db);
 
-  import("./supabase/client").then(async ({ supabase }) => {
-    try {
-      const { error } = await supabase.from("lessons").delete().eq("id", lessonId);
-      if (error) throw error;
-    } catch (err) {
-      console.error("Error deleting lesson in Supabase:", err);
+  // Sync to Supabase via server-side API route
+  fetch(`/api/lessons?id=${lessonId}`, {
+    method: 'DELETE',
+  }).then(async (res) => {
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.error('[deleteLesson] API error:', res.status, body?.error);
     }
+  }).catch((err) => {
+    console.error('[deleteLesson] Fetch error:', err);
   });
 
   return true;

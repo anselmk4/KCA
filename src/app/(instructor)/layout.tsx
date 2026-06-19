@@ -123,9 +123,9 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
       <aside className={`w-64 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 h-screen flex flex-col fixed left-0 top-0 z-40 transition-transform duration-300
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-zinc-100 dark:border-zinc-800">
-          <Link href="/instructor" className="flex items-center space-x-2" onClick={() => setSidebarOpen(false)}>
-            <Image src="/logo.png" alt="ANSELLA" width={24} height={24} className="object-contain" />
-            <span className="font-bold text-lg text-zinc-900 dark:text-white">Instructeur Pro</span>
+          <Link href="/instructor" className="flex items-center" onClick={() => setSidebarOpen(false)}>
+            <Image src="/logo.png" alt="ANSELLA" width={100} height={30} className="object-contain h-7 w-auto" />
+            <span className="font-bold text-xs text-zinc-400 dark:text-zinc-500 border-l border-zinc-200 dark:border-zinc-700 pl-2 ml-2 leading-none">Instructeur</span>
           </Link>
           <button className="lg:hidden p-1 text-zinc-500" onClick={() => setSidebarOpen(false)}>
             <X className="w-5 h-5" />

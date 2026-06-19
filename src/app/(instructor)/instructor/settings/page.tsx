@@ -52,8 +52,26 @@ export default function SettingsPage() {
       name: s?.name || "",
       email: s?.email || "",
       specialty: "Blockchain & DeFi",
-      bio: "Instructeur passionné par les technologies blockchain et la finance décentralisée. Je partage mes connaissances pour démocratiser le Web3.",
+      bio: "Instructeur passionné par les technologies blockchain et la finance décentralisée.",
     }));
+
+    // Fetch the actual profile from Supabase to load the saved bio and details
+    fetch('/api/profile')
+      .then(async (res) => {
+        if (res.ok) {
+          const { profile } = await res.json();
+          if (profile) {
+            setProfileForm(f => ({
+              ...f,
+              name: profile.full_name || f.name,
+              email: profile.email || f.email,
+              bio: profile.bio || "",
+            }));
+          }
+        }
+      })
+      .catch((err) => console.error("Error loading profile from Supabase:", err));
+
     setAcademyForm(f => ({
       ...f,
       academyName: `Académie ${s?.name?.split(" ")?.[0] || "Crypto"}`,
@@ -68,6 +86,26 @@ export default function SettingsPage() {
       setSimulatedSession({ ...session, name: profileForm.name, email: profileForm.email });
       setSession(getSimulatedSession());
     }
+
+    // Save profile modifications to Supabase
+    fetch('/api/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: profileForm.name,
+        bio: profileForm.bio,
+      }),
+    }).then(async (res) => {
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        console.error('[Settings] Supabase save error:', res.status, body?.error);
+      } else {
+        console.log('[Settings] Profile saved to Supabase successfully ✓');
+      }
+    }).catch((err) => {
+      console.error('[Settings] Fetch error during save:', err);
+    });
+
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };

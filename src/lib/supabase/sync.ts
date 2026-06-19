@@ -5,6 +5,12 @@ export async function syncFromSupabase(): Promise<LocalDatabase | null> {
   if (typeof window === 'undefined') return null;
 
   try {
+    // Only sync when there is a valid auth session
+    const { data: { session: authSession } } = await supabase.auth.getSession();
+    if (!authSession) {
+      // No authenticated session — skip Supabase sync to avoid overwriting local mock data
+      return null;
+    }
     // Fetch all tables in parallel to optimize speed
     const [
       { data: profiles },
@@ -314,10 +320,27 @@ export async function syncFromSupabase(): Promise<LocalDatabase | null> {
       supportTickets: localTickets
     };
 
+    // Merge strategy: preserve local-only courses (created but not yet in Supabase)
+    // This prevents the race condition where a newly created course is wiped by the sync.
+    const existingRaw = localStorage.getItem('kuettu_db');
+    if (existingRaw) {
+      try {
+        const existingLocal: LocalDatabase = JSON.parse(existingRaw);
+        const supabaseCourseIds = new Set(localCourses.map((c: any) => c.id));
+        // Keep local-only courses (id not in Supabase response)
+        const localOnlyCourses = (existingLocal.courses || []).filter(
+          (c: any) => !supabaseCourseIds.has(c.id)
+        );
+        db.courses = [...localCourses, ...localOnlyCourses];
+      } catch {
+        // If parsing fails just use Supabase data
+      }
+    }
+
     localStorage.setItem('kuettu_db', JSON.stringify(db));
     // Trigger storage event to notify other windows/listeners
     window.dispatchEvent(new Event('storage'));
-    
+
     return db;
   } catch (error) {
     console.error('Error syncing from Supabase:', error);

@@ -31,9 +31,8 @@ export function Footer() {
       <div className="container mx-auto px-4 md:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-1">
-            <Link href="/" className="flex items-center space-x-2 mb-4">
-              <Image src="/logo.png" alt="ANSELLA" width={24} height={24} className="object-contain" />
-              <span className="font-bold text-lg">ANSELLA</span>
+            <Link href="/" className="flex items-center mb-4">
+              <Image src="/logo.png" alt="ANSELLA" width={96} height={28} className="object-contain h-7 w-auto" />
             </Link>
             <p className="text-sm text-muted-foreground mb-4">
               Formations certifiantes et outils d'apprentissage pour entrepreneurs africains.
