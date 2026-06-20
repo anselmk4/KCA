@@ -1,9 +1,10 @@
 "use client";
 
-import { Search, Bell, ChevronDown, Menu } from "lucide-react";
+import { Bell, ChevronDown, Menu, Settings, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { getSimulatedSession } from "@/lib/rbac";
+import Link from "next/link";
 
 interface DashboardHeaderProps {
   onMenuClick?: () => void;
@@ -11,13 +12,34 @@ interface DashboardHeaderProps {
 
 export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   const [session, setSession] = useState<any>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setSession(getSimulatedSession());
     const handler = () => setSession(getSimulatedSession());
     window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
+
+    const clickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", clickOutside);
+
+    return () => {
+      window.removeEventListener("storage", handler);
+      document.removeEventListener("mousedown", clickOutside);
+    };
   }, []);
+
+  const handleLogout = async () => {
+    const { supabase } = await import("@/lib/supabase/client");
+    const { clearSimulatedSession } = await import("@/lib/rbac");
+    await supabase.auth.signOut();
+    clearSimulatedSession();
+    window.location.href = "/login";
+  };
 
   const initials = session?.name
     ? session.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()
@@ -42,16 +64,6 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
       </div>
 
       <div className="flex items-center space-x-3 md:space-x-6">
-        {/* Search — hidden on small screens */}
-        <div className="relative hidden md:block">
-          <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input 
-            type="text" 
-            placeholder="Rechercher..." 
-            className="pl-9 pr-4 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-full text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-48 lg:w-64 transition-all"
-          />
-        </div>
-
         <div className="flex items-center space-x-3">
           <ThemeToggle />
 
@@ -60,15 +72,41 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-zinc-800" />
           </button>
           
-          <div className="flex items-center space-x-2 cursor-pointer pl-2 border-l border-zinc-200 dark:border-zinc-700">
-            <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-sm">
-              {initials}
+          <div ref={dropdownRef} className="relative">
+            <div 
+              onClick={() => setDropdownOpen(!dropdownOpen)} 
+              className="flex items-center space-x-2 cursor-pointer pl-2 border-l border-zinc-200 dark:border-zinc-700 select-none"
+            >
+              <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-sm">
+                {initials}
+              </div>
+              <div className="hidden md:block">
+                <p className="text-sm font-semibold text-zinc-900 dark:text-white leading-none">{session?.name?.split(" ")?.[0] || "Étudiant"}</p>
+                <p className="text-xs text-zinc-500 mt-1">Plan {session?.plan || "FREE"}</p>
+              </div>
+              <ChevronDown className="w-4 h-4 text-zinc-500 hidden md:block" />
             </div>
-            <div className="hidden md:block">
-              <p className="text-sm font-semibold text-zinc-900 dark:text-white leading-none">{session?.name?.split(" ")?.[0] || "Étudiant"}</p>
-              <p className="text-xs text-zinc-500 mt-1">Plan {session?.plan || "FREE"}</p>
-            </div>
-            <ChevronDown className="w-4 h-4 text-zinc-500 hidden md:block" />
+
+            {dropdownOpen && (
+              <div className="absolute right-0 top-12 w-56 bg-white dark:bg-zinc-850 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="px-4 py-2 border-b border-zinc-100 dark:border-zinc-800">
+                  <p className="text-sm font-bold text-zinc-900 dark:text-white truncate">{session?.name || "Étudiant"}</p>
+                  <p className="text-xxs text-zinc-400 truncate">{session?.email || "etudiant@example.com"}</p>
+                  <p className="text-xxs text-blue-600 dark:text-blue-400 font-bold mt-1">Plan {session?.plan || "FREE"}</p>
+                </div>
+                <Link href="/dashboard/settings" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                  <Settings className="w-4 h-4 text-zinc-400" />
+                  <span>Paramètres</span>
+                </Link>
+                <button 
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/10 transition-colors text-left border-t border-zinc-100 dark:border-zinc-800 cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Déconnexion</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

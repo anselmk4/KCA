@@ -30,7 +30,8 @@ export async function syncFromSupabase(): Promise<LocalDatabase | null> {
       { data: orderItems },
       { data: payouts },
       { data: tickets },
-      { data: replies }
+      { data: replies },
+      { data: categoriesData }
     ] = await Promise.all([
       supabase.from('profiles').select('*'),
       supabase.from('user_roles').select('*'),
@@ -49,7 +50,8 @@ export async function syncFromSupabase(): Promise<LocalDatabase | null> {
       supabase.from('order_items').select('*'),
       supabase.from('payouts').select('*'),
       supabase.from('support_tickets').select('*'),
-      supabase.from('support_ticket_replies').select('*')
+      supabase.from('support_ticket_replies').select('*'),
+      supabase.from('categories').select('*')
     ]);
 
     // Helpers to resolve names/roles
@@ -67,7 +69,10 @@ export async function syncFromSupabase(): Promise<LocalDatabase | null> {
       }
     });
 
-    const categoryMap = new Map<string, string>(); // courseId -> category name
+    const categoryMap = new Map<string, string>(); // categoryId -> category name
+    categoriesData?.forEach(cat => {
+      categoryMap.set(cat.id, cat.name);
+    });
     const courseMap = new Map(courses?.map(c => [c.id, c]) || []);
 
     // 1. Users
@@ -137,7 +142,7 @@ export async function syncFromSupabase(): Promise<LocalDatabase | null> {
         instructorName: instructor?.full_name || 'Prof. Kuettu',
         createdAt: c.created_at,
         rating: c.rating_avg || 0,
-        category: c.category_id || '', // Handled simply
+        category: categoryMap.get(c.category_id ?? '') || c.category_id || '',
         level,
         allowInstallments,
         installmentsCount
@@ -235,6 +240,8 @@ export async function syncFromSupabase(): Promise<LocalDatabase | null> {
     const localTransactions = (payments || []).map(pay => {
       const user = profileMap.get(pay.user_id);
       const courseId = orderItemsMap.get(pay.order_id) || '';
+      const course = courseMap.get(courseId);
+      const instructor = course ? profileMap.get(course.instructor_id) : null;
       
       let status: 'PAID' | 'FAILED' | 'PENDING' = 'PENDING';
       if (pay.status === 'PAID') status = 'PAID';
@@ -250,6 +257,8 @@ export async function syncFromSupabase(): Promise<LocalDatabase | null> {
         userName: user?.full_name || 'Étudiant',
         amount: pay.amount,
         courseId,
+        instructorId: course?.instructor_id || '',
+        instructorName: instructor?.full_name || '',
         date: pay.paid_at || pay.created_at,
         status,
         method

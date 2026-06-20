@@ -105,6 +105,8 @@ export type Transaction = {
   userName: string;
   amount: number;
   courseId: string;
+  instructorId: string;
+  instructorName: string;
   date: string;
   status: "PAID" | "FAILED" | "PENDING";
   method: "Carte" | "Mobile Money" | "PayPal";
@@ -396,6 +398,8 @@ const defaultDB: Database = {
       userName: "Jean Dupont",
       amount: 300,
       courseId: "blockchain",
+      instructorId: "u3",
+      instructorName: "Prof. Kuettu",
       date: new Date(Date.now() - 86400000 * 8).toISOString(),
       status: "PAID",
       method: "Mobile Money",
@@ -406,6 +410,8 @@ const defaultDB: Database = {
       userName: "Marie K.",
       amount: 1000,
       courseId: "ai",
+      instructorId: "u3",
+      instructorName: "Prof. Kuettu",
       date: new Date(Date.now() - 86400000 * 5).toISOString(),
       status: "PAID",
       method: "Carte",
@@ -556,10 +562,14 @@ export const addUser = (user: Omit<User, "id" | "joinedAt" | "status" | "role" |
   return newUser;
 };
 
-export const addTransaction = (tx: Omit<Transaction, "id" | "date">) => {
+export const addTransaction = (tx: Omit<Transaction, "id" | "date"> & { instructorId?: string; instructorName?: string }) => {
   const db = getDB();
+  // Auto-resolve instructor from the course if not provided
+  const course = db.courses.find(c => c.id === tx.courseId);
   const newTx: Transaction = {
     ...tx,
+    instructorId: tx.instructorId || course?.instructorId || "",
+    instructorName: tx.instructorName || course?.instructorName || "",
     id: generateUUID(),
     date: new Date().toISOString(),
   };

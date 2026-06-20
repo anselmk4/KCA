@@ -97,6 +97,8 @@ function PaymentContent() {
         userName: session.name,
         amount: currentPlanDetails.price,
         courseId: `plan_${plan.toLowerCase()}`,
+        instructorId: "",
+        instructorName: "Plateforme ANSELLA",
         status: "PAID",
         method: paymentMethodName
       });

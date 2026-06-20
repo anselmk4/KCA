@@ -187,6 +187,8 @@ export default function CoursePreviewPlayerPage() {
       userName: session.name,
       amount: amountToPay,
       courseId: courseId,
+      instructorId: course?.instructorId || "",
+      instructorName: course?.instructorName || "",
       status: "PAID",
       method: "Carte"
     });
