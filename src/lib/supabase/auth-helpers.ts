@@ -122,13 +122,33 @@ export async function ensureProfile(
       .single();
 
     if (targetRole) {
-      // Check if user already has any roles mapped to avoid double-mapping or resetting roles
+      // Check if user already has the target role
       const { data: existingRoles } = await supabase
         .from('user_roles')
         .select('role_id')
         .eq('user_id', userId);
 
-      if (!existingRoles || existingRoles.length === 0) {
+      const hasTargetRole = existingRoles?.some(r => r.role_id === targetRole.id);
+
+      if (!hasTargetRole) {
+        // If registering as INSTRUCTOR, remove any auto-created STUDENT role from trigger
+        if (roleName === 'INSTRUCTOR' || roleName === 'ADMIN' || roleName === 'SUPER_ADMIN') {
+          const { data: studentRole } = await supabase
+            .from('roles')
+            .select('id')
+            .eq('name', 'STUDENT')
+            .single();
+
+          if (studentRole && existingRoles?.some(r => r.role_id === studentRole.id)) {
+            await supabase
+              .from('user_roles')
+              .delete()
+              .eq('user_id', userId)
+              .eq('role_id', studentRole.id);
+          }
+        }
+
+        // Insert the target role
         const { error: roleError } = await supabase
           .from('user_roles')
           .upsert({ user_id: userId, role_id: targetRole.id }, { onConflict: 'user_id,role_id', ignoreDuplicates: true });
