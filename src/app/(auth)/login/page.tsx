@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { AlertCircle, ArrowRight, Loader2 } from "lucide-react";
+import { AlertCircle, ArrowRight, Loader2, Sparkles, BookOpen, ShieldCheck, Cpu, Coins } from "lucide-react";
 import { initDB } from "@/lib/db";
 import { loginWithEmail, fetchUserProfile } from "@/lib/supabase/auth-helpers";
 import { supabase } from "@/lib/supabase/client";
@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     initDB();
@@ -57,7 +58,6 @@ export default function LoginPage() {
     checkSession();
   }, [router]);
 
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -67,8 +67,24 @@ export default function LoginPage() {
       router.push(redirectTo);
     } catch (err: any) {
       setError(err.message || "Une erreur est survenue.");
-    } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError(null);
+    setGoogleLoading(true);
+    try {
+      const { error: authErr } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (authErr) throw authErr;
+    } catch (err: any) {
+      setError(err.message || "Une erreur est survenue avec Google Auth.");
+      setGoogleLoading(false);
     }
   };
 
@@ -82,110 +98,222 @@ export default function LoginPage() {
       router.push(redirectTo);
     } catch (err: any) {
       setError(err.message || "Une erreur est survenue.");
-    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-black p-4">
-      <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-zinc-200 dark:border-white/10 p-8">
-        <div className="flex flex-col items-center mb-8">
-          <Link href="/" className="flex items-center space-x-2 mb-6">
-            <Image src="/logo.png" alt="ANSELLA" width={40} height={40} className="object-contain" />
-            <span className="font-bold text-2xl text-zinc-900 dark:text-white">ANSELLA</span>
-          </Link>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Bienvenue</h1>
-          <p className="text-zinc-500 dark:text-zinc-400 text-center text-sm">
-            Connectez-vous à votre espace d'académie ou d'apprentissage.
-          </p>
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-white dark:bg-black font-sans">
+      
+      {/* LEFT PANEL: Marketing & Slogan (hidden on mobile) */}
+      <div className="hidden lg:flex lg:col-span-6 relative overflow-hidden bg-gradient-to-br from-zinc-900 via-zinc-950 to-black p-12 flex-col justify-between select-none">
+        {/* Abstract Glowing shapes */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px] -mr-40 -mt-40 animate-pulse duration-[6000ms]" />
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-teal-500/10 rounded-full blur-[120px] -ml-40 -mb-40 animate-pulse duration-[8000ms]" />
+        
+        {/* Header Branding */}
+        <div className="z-10 flex items-center space-x-3">
+          <div className="relative w-11 h-11 bg-white/5 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/10 shadow-lg">
+            <Image src="/logo.png" alt="ANSELLA" width={28} height={28} className="object-contain" />
+          </div>
+          <span className="font-extrabold text-2xl tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-zinc-400">
+            ANSELLA
+          </span>
         </div>
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-2xl flex items-start gap-3 text-red-600 text-sm animate-in fade-in">
-            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-            <span>{error}</span>
+        {/* Catchy advertisement and logo representation */}
+        <div className="z-10 max-w-md my-auto space-y-8">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/5 backdrop-blur-md border border-white/10 rounded-full text-zinc-350 text-xs font-semibold">
+            <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+            <span>LMS Premium de Nouvelle Génération</span>
           </div>
-        )}
 
-        <form onSubmit={handleLogin} className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
-              Adresse Email
-            </label>
-            <input
-              required
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="vous@exemple.com"
-              className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-zinc-900 dark:text-white"
-            />
+          <div className="space-y-4">
+            <h1 className="text-4xl font-extrabold tracking-tight text-white leading-tight">
+              Propulsez votre avenir dans la{" "}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-teal-400 to-emerald-400">
+                Blockchain & l'IA
+              </span>
+            </h1>
+            <p className="text-zinc-400 text-base leading-relaxed">
+              Formez-vous avec les meilleurs experts mondiaux. Débloquez des parcours certifiants, passez des quiz infalsifiables et obtenez des diplômes ancrés sur la blockchain.
+            </p>
           </div>
-          <div>
-            <div className="flex justify-between items-center mb-1.5">
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Mot de passe
-              </label>
-              <Link href="/forgot-password" className="text-xs text-blue-600 hover:text-blue-500 font-medium">
-                Oublié ?
-              </Link>
+
+          {/* Core Features list with visual feedback */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-3 text-sm text-zinc-300">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                <Coins className="w-4 h-4 text-blue-400" />
+              </div>
+              <span>Formations DeFi & Crypto de niveau professionnel</span>
             </div>
-            <input
-              required
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-zinc-900 dark:text-white"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 disabled:opacity-70"
-          >
-            {loading ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Connexion...</>
-            ) : (
-              <>Se connecter <ArrowRight className="w-4 h-4" /></>
-            )}
-          </button>
-        </form>
-
-        {/* Quick Logins */}
-        <div className="mt-8 pt-6 border-t border-zinc-150 dark:border-zinc-800">
-          <p className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-3 text-center">
-            Comptes de test
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => quickLogin("instructor@kuettu.com", "password123")}
-              className="py-2.5 px-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-zinc-700 dark:text-zinc-300 transition-all text-left disabled:opacity-50"
-            >
-              <p className="font-bold text-zinc-900 dark:text-white">Prof. Kuettu</p>
-              <p className="text-[10px] text-zinc-500 truncate">instructor@kuettu.com</p>
-            </button>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => quickLogin("jean@example.com", "password123")}
-              className="py-2.5 px-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-medium text-zinc-700 dark:text-zinc-300 transition-all text-left disabled:opacity-50"
-            >
-              <p className="font-bold text-zinc-900 dark:text-white">Jean Dupont</p>
-              <p className="text-[10px] text-zinc-500 truncate">jean@example.com</p>
-            </button>
+            <div className="flex items-center space-x-3 text-sm text-zinc-300">
+              <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
+                <Cpu className="w-4 h-4 text-purple-400" />
+              </div>
+              <span>Outils et agents d'Intelligence Artificielle appliqués</span>
+            </div>
+            <div className="flex items-center space-x-3 text-sm text-zinc-300">
+              <div className="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-4 h-4 text-teal-400" />
+              </div>
+              <span>Certificats d'études officiels et vérifiables</span>
+            </div>
           </div>
         </div>
 
-        <div className="mt-8 text-center text-sm text-zinc-600 dark:text-zinc-400">
-          Vous n'avez pas de compte ?{" "}
-          <Link href="/register" className="text-blue-600 hover:text-blue-500 font-semibold">
-            S'inscrire
-          </Link>
+        {/* Footer Brand Info */}
+        <div className="z-10 text-xs text-zinc-500">
+          © {new Date().getFullYear()} Ansella Inc. Tous droits réservés.
+        </div>
+      </div>
+
+      {/* RIGHT PANEL: Login Form */}
+      <div className="lg:col-span-6 flex items-center justify-center p-6 md:p-12 bg-zinc-50 dark:bg-zinc-950">
+        <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-zinc-200/80 dark:border-white/10 p-8 md:p-10 relative overflow-hidden transition-all">
+          
+          {/* Top Brand representing mobile view logo */}
+          <div className="flex flex-col items-center mb-8">
+            <Link href="/" className="lg:hidden flex items-center space-x-2 mb-6">
+              <Image src="/logo.png" alt="ANSELLA" width={36} height={36} className="object-contain" />
+              <span className="font-extrabold text-2xl text-zinc-900 dark:text-white tracking-wide">ANSELLA</span>
+            </Link>
+            <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Bienvenue sur Ansella</h2>
+            <p className="text-zinc-500 dark:text-zinc-400 text-center text-sm">
+              Connectez-vous à votre académie ou à votre espace apprenant.
+            </p>
+          </div>
+
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-2xl flex items-start gap-3 text-red-700 dark:text-red-400 text-sm animate-in fade-in">
+              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
+                Adresse Email
+              </label>
+              <input
+                required
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="vous@exemple.com"
+                className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                  Mot de passe
+                </label>
+                <Link href="/forgot-password" className="text-xs text-blue-600 hover:text-blue-500 font-medium">
+                  Mot de passe oublié ?
+                </Link>
+              </div>
+              <input
+                required
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || googleLoading}
+              className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer text-sm"
+            >
+              {loading ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Connexion en cours...</>
+              ) : (
+                <>Se connecter <ArrowRight className="w-4 h-4" /></>
+              )}
+            </button>
+          </form>
+
+          {/* Divider */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+              <div className="w-full border-t border-zinc-250 dark:border-zinc-800" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white dark:bg-zinc-900 px-3 text-zinc-400 dark:text-zinc-500 font-bold">Ou continuer avec</span>
+            </div>
+          </div>
+
+          {/* Google Login button */}
+          <button
+            type="button"
+            disabled={loading || googleLoading}
+            onClick={handleGoogleLogin}
+            className="w-full py-3 px-4 bg-white hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-bold rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-70 cursor-pointer text-sm"
+          >
+            {googleLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path
+                  fill="#EA4335"
+                  d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.47 15.01 1 12 1 7.21 1 3.19 3.78 1.28 7.82l3.86 3C6.07 7.78 8.81 5.04 12 5.04z"
+                />
+                <path
+                  fill="#4285F4"
+                  d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.92c2.2-2.03 3.67-5.02 3.67-8.65z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.14 14.82c-.25-.74-.39-1.53-.39-2.35s.14-1.61.39-2.35L1.28 7.12C.46 8.78 0 10.63 0 12.5s.46 3.72 1.28 5.38l3.86-3.06z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.92c-1.04.7-2.38 1.12-3.83 1.12-3.19 0-5.93-2.74-6.86-5.78l-3.86 3C3.19 20.22 7.21 23 12 23z"
+                />
+              </svg>
+            )}
+            <span>Se connecter avec Google</span>
+          </button>
+
+          {/* Quick test accounts */}
+          <div className="mt-8 pt-6 border-t border-zinc-150 dark:border-zinc-800">
+            <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-3 text-center">
+              Accès rapide démo
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={loading || googleLoading}
+                onClick={() => quickLogin("instructor@kuettu.com", "password123")}
+                className="py-2.5 px-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-350 transition-all text-left disabled:opacity-50 cursor-pointer"
+              >
+                <p className="font-bold text-zinc-900 dark:text-white">Prof. Kuettu</p>
+                <p className="text-[10px] text-zinc-500 truncate">Formateur</p>
+              </button>
+              <button
+                type="button"
+                disabled={loading || googleLoading}
+                onClick={() => quickLogin("jean@example.com", "password123")}
+                className="py-2.5 px-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-350 transition-all text-left disabled:opacity-50 cursor-pointer"
+              >
+                <p className="font-bold text-zinc-900 dark:text-white">Jean Dupont</p>
+                <p className="text-[10px] text-zinc-500 truncate">Apprenant</p>
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-8 text-center text-sm text-zinc-600 dark:text-zinc-400">
+            Nouveau sur la plateforme ?{" "}
+            <Link href="/register" className="text-blue-600 hover:text-blue-500 font-bold transition-colors">
+              Créer un compte
+            </Link>
+          </div>
         </div>
       </div>
     </div>

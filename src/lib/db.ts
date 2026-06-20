@@ -668,6 +668,8 @@ export const addCourse = (course: Partial<Course> & { title: string; price: numb
       description: newCourse.description,
       price: newCourse.price,
       createdAt: newCourse.createdAt,
+      category: newCourse.category,
+      level: newCourse.level,
     }),
   }).then(async (res) => {
     if (!res.ok) {

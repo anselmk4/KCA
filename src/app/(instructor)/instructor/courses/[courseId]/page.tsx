@@ -1024,13 +1024,21 @@ export default function CourseDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Thématique / Catégorie</label>
-                  <input
-                    type="text"
+                  <select
                     value={descForm.category}
                     onChange={e => setDescForm(prev => ({ ...prev, category: e.target.value }))}
-                    placeholder="Ex: Blockchain, DeFi, Trading, IA"
-                    className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm"
-                  />
+                    className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white"
+                  >
+                    <option value="">Sélectionnez une catégorie</option>
+                    <option value="Blockchain">Blockchain</option>
+                    <option value="Trading">Trading</option>
+                    <option value="Intelligence Artificielle">Intelligence Artificielle</option>
+                    <option value="Web3">Web3</option>
+                    <option value="DeFi">DeFi</option>
+                    <option value="NFT & Métavers">NFT & Métavers</option>
+                    <option value="Sécurité">Sécurité</option>
+                    <option value="Minage">Minage</option>
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Niveau cible</label>

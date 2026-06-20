@@ -20,6 +20,36 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
     const handler = () => setSession(getSimulatedSession());
     window.addEventListener("storage", handler);
 
+    const syncSession = async () => {
+      try {
+        const { supabase } = await import("@/lib/supabase/client");
+        const { fetchUserProfile } = await import("@/lib/supabase/auth-helpers");
+        const { setSimulatedSession: setSimSession } = await import("@/lib/rbac");
+        const { data: { session: activeSession } } = await supabase.auth.getSession();
+        
+        if (activeSession?.user) {
+          const localSession = getSimulatedSession();
+          if (!localSession || localSession.userId !== activeSession.user.id) {
+            const profile = await fetchUserProfile(activeSession.user.id);
+            if (profile) {
+              setSimSession({
+                userId: profile.id,
+                name: profile.full_name,
+                email: profile.email,
+                role: profile.role,
+                status: profile.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
+                plan: profile.plan,
+              });
+              setSession(getSimulatedSession());
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error in DashboardHeader syncSession:", err);
+      }
+    };
+    syncSession();
+
     const clickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);

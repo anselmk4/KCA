@@ -28,6 +28,21 @@ export default function DiscoverPage() {
     setEnrollments(db.enrollments || []);
   }, []);
 
+  const getCategoryLabel = (cat: string | undefined) => {
+    if (!cat) return "";
+    const map: Record<string, string> = {
+      'fb9c0236-be6a-4dca-aeaf-b477c88e00cd': 'Blockchain',
+      '009ac13c-d11d-4534-ac66-4c2721d2e4b0': 'Trading',
+      '989d3629-27ea-4f72-8c59-6f0d67e1560b': 'Intelligence Artificielle',
+      '835d8056-a165-4765-ad81-1269511a9c2e': 'Web3',
+      '14902f78-5882-4a0a-891a-88744fbdfc52': 'DeFi',
+      'b6460629-d489-41e2-bd86-cedbb1873f5a': 'NFT & Métavers',
+      'b5a88db2-1425-47cd-824f-99b909010ae7': 'Sécurité',
+      '945f9e8a-c181-4bc9-91a6-26188c46232c': 'Minage'
+    };
+    return map[cat] || cat;
+  };
+
   const categories = useMemo(() => {
     const list = [{ label: "Toutes", value: "all" }];
     const uniqueCategories = new Set<string>();
@@ -37,7 +52,7 @@ export default function DiscoverPage() {
       }
     });
     uniqueCategories.forEach(cat => {
-      list.push({ label: cat, value: cat });
+      list.push({ label: getCategoryLabel(cat), value: cat });
     });
     return list;
   }, [courses]);
@@ -137,7 +152,7 @@ export default function DiscoverPage() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                   <span className="absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-semibold bg-white/90 dark:bg-zinc-900/90 text-zinc-800 dark:text-zinc-200 backdrop-blur-sm border border-zinc-200/20">
-                    {course.category || "Formation"}
+                    {getCategoryLabel(course.category) || "Formation"}
                   </span>
                   <span className="absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-bold bg-blue-600 text-white shadow-lg">
                     ${course.price}

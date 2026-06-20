@@ -12,11 +12,31 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, title, slug, description, price, createdAt } = body;
+    const { id, title, slug, description, price, createdAt, category, level } = body;
 
     if (!title || !slug) {
       return NextResponse.json({ error: 'title et slug sont requis' }, { status: 400 });
     }
+
+    const categoryMap: Record<string, string> = {
+      'Blockchain': 'fb9c0236-be6a-4dca-aeaf-b477c88e00cd',
+      'Trading': '009ac13c-d11d-4534-ac66-4c2721d2e4b0',
+      'Intelligence Artificielle': '989d3629-27ea-4f72-8c59-6f0d67e1560b',
+      'Web3': '835d8056-a165-4765-ad81-1269511a9c2e',
+      'DeFi': '14902f78-5882-4a0a-891a-88744fbdfc52',
+      'NFT & Métavers': 'b6460629-d489-41e2-bd86-cedbb1873f5a',
+      'Sécurité': 'b5a88db2-1425-47cd-824f-99b909010ae7',
+      'Minage': '945f9e8a-c181-4bc9-91a6-26188c46232c'
+    };
+    const categoryId = categoryMap[category] || null;
+
+    const levelMap: Record<string, string> = {
+      'Débutant': 'BEGINNER',
+      'Intermédiaire': 'INTERMEDIATE',
+      'Avancé': 'ADVANCED',
+      'Expert': 'EXPERT',
+    };
+    const mappedLevel = (levelMap[level] || 'BEGINNER') as 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'EXPERT';
 
     const { data, error } = await supabase.from('courses').insert({
       id: id || undefined,
@@ -26,6 +46,8 @@ export async function POST(req: NextRequest) {
       price: price ?? 0,
       status: 'DRAFT',
       instructor_id: user.id,
+      category_id: categoryId,
+      level: mappedLevel,
       created_at: createdAt || new Date().toISOString(),
       updated_at: createdAt || new Date().toISOString(),
     }).select().single();
@@ -67,6 +89,19 @@ export async function PUT(req: NextRequest) {
     if (updates.slug !== undefined) sbUpdates.slug = updates.slug;
     if (updates.thumbnailUrl !== undefined) sbUpdates.thumbnail_url = updates.thumbnailUrl;
     if (updates.previewVideoUrl !== undefined) sbUpdates.preview_video_url = updates.previewVideoUrl;
+    if (updates.category !== undefined) {
+      const categoryMap: Record<string, string> = {
+        'Blockchain': 'fb9c0236-be6a-4dca-aeaf-b477c88e00cd',
+        'Trading': '009ac13c-d11d-4534-ac66-4c2721d2e4b0',
+        'Intelligence Artificielle': '989d3629-27ea-4f72-8c59-6f0d67e1560b',
+        'Web3': '835d8056-a165-4765-ad81-1269511a9c2e',
+        'DeFi': '14902f78-5882-4a0a-891a-88744fbdfc52',
+        'NFT & Métavers': 'b6460629-d489-41e2-bd86-cedbb1873f5a',
+        'Sécurité': 'b5a88db2-1425-47cd-824f-99b909010ae7',
+        'Minage': '945f9e8a-c181-4bc9-91a6-26188c46232c'
+      };
+      sbUpdates.category_id = categoryMap[updates.category] || null;
+    }
     if (updates.level !== undefined) {
       const levelMap: Record<string, string> = {
         'Débutant': 'BEGINNER',

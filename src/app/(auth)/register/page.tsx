@@ -4,12 +4,11 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { ArrowRight, ArrowLeft, CheckCircle2, BookOpen, Sparkles, User, ShieldCheck } from "lucide-react";
+import { ArrowRight, ArrowLeft, CheckCircle2, BookOpen, Sparkles, User, ShieldCheck, Cpu, Coins, Loader2 } from "lucide-react";
 import { initDB } from "@/lib/db";
 import { setSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
 import { ensureProfile, fetchUserProfile } from "@/lib/supabase/auth-helpers";
-
 
 function RegisterForm() {
   const router = useRouter();
@@ -32,6 +31,10 @@ function RegisterForm() {
   // Student specific fields
   const [studentLevel, setStudentLevel] = useState<string>("Débutant");
   const [interestCourse, setInterestCourse] = useState<string>("blockchain");
+
+  const [formError, setFormError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     initDB();
@@ -90,9 +93,6 @@ function RegisterForm() {
     }
   }, [searchParams, router]);
 
-  const [formError, setFormError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
   const handleNext = () => {
     setFormError(null);
     if (step === 1) {
@@ -102,11 +102,29 @@ function RegisterForm() {
     }
     setStep(step + 1);
   };
+  
   const handlePrev = () => {
     if (step === 1) {
       setRole(null); // Go back to role selection
     } else {
       setStep(step - 1);
+    }
+  };
+
+  const handleGoogleRegister = async () => {
+    setFormError(null);
+    setGoogleLoading(true);
+    try {
+      const { error: authErr } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (authErr) throw authErr;
+    } catch (err: any) {
+      setFormError(err.message || "Une erreur est survenue lors de l'authentification Google.");
+      setGoogleLoading(false);
     }
   };
 
@@ -151,29 +169,16 @@ function RegisterForm() {
         return;
       }
 
-      // 2. Ensure profile exists in public.profiles (trigger fallback)
-      await ensureProfile(sessionUser.id, email, name);
+      // 2. Ensure profile exists in public.profiles and set proper role
+      await ensureProfile(sessionUser.id, email, name, role || "STUDENT");
 
-      // 3. If INSTRUCTOR → assign INSTRUCTOR role in Supabase
+      // 3. Update additional fields depending on role
       if (role === "INSTRUCTOR") {
-        const { data: instructorRole } = await supabase
-          .from("roles")
-          .select("id")
-          .eq("name", "INSTRUCTOR")
-          .single();
-        if (instructorRole) {
-          await supabase.from("user_roles").upsert(
-            { user_id: sessionUser.id, role_id: instructorRole.id },
-            { onConflict: "user_id,role_id", ignoreDuplicates: true }
-          );
-        }
-        // Update plan in profile
         await supabase
           .from("profiles")
           .update({ plan: selectedPlan })
           .eq("id", sessionUser.id);
 
-        // Set session
         setSimulatedSession({
           userId: sessionUser.id,
           name,
@@ -189,7 +194,7 @@ function RegisterForm() {
 
         router.push("/instructor");
       } else {
-        // STUDENT — set session
+        // STUDENT
         setSimulatedSession({
           userId: sessionUser.id,
           name,
@@ -234,11 +239,11 @@ function RegisterForm() {
   };
 
   return (
-    <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-zinc-200 dark:border-white/10 p-8 relative overflow-hidden transition-all duration-300">
+    <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-zinc-200 dark:border-white/10 p-8 md:p-10 relative overflow-hidden transition-all duration-300">
       
       {/* Progress Bar */}
       {role !== null && (
-        <div className="absolute top-0 left-0 w-full h-1 bg-zinc-100 dark:bg-zinc-800">
+        <div className="absolute top-0 left-0 w-full h-1.5 bg-zinc-100 dark:bg-zinc-800">
           <div 
             className="h-full bg-blue-600 transition-all duration-300"
             style={{ width: `${(step / 2) * 100}%` }}
@@ -246,24 +251,25 @@ function RegisterForm() {
         </div>
       )}
 
-      <div className="flex flex-col items-center mb-8 mt-4">
-        <Link href="/" className="flex items-center space-x-2 mb-4">
-          <Image src="/logo.png" alt="ANSELLA" width={40} height={40} className="object-contain" />
-          <span className="font-bold text-2xl text-zinc-900 dark:text-white">ANSELLA</span>
+      {/* Header */}
+      <div className="flex flex-col items-center mb-8 mt-2">
+        <Link href="/" className="lg:hidden flex items-center space-x-2 mb-4">
+          <Image src="/logo.png" alt="ANSELLA" width={36} height={36} className="object-contain" />
+          <span className="font-extrabold text-2xl text-zinc-900 dark:text-white tracking-wide">ANSELLA</span>
         </Link>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2 text-center">
+        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2 text-center leading-snug">
           {role === null && "Choisissez votre profil"}
           {role === "INSTRUCTOR" && step === 1 && "Créer un compte Formateur"}
           {role === "INSTRUCTOR" && step === 2 && "Configurez votre Académie"}
           {role === "STUDENT" && step === 1 && "Créer un compte Apprenant"}
           {role === "STUDENT" && step === 2 && "Configurez vos préférences"}
         </h1>
-        <p className="text-zinc-500 dark:text-zinc-400 text-center text-sm">
-          {role === null && "Sélectionnez comment vous souhaitez utiliser la plateforme."}
+        <p className="text-zinc-500 dark:text-zinc-400 text-center text-xs leading-relaxed max-w-sm">
+          {role === null && "Sélectionnez la manière dont vous souhaitez utiliser notre LMS."}
           {role === "INSTRUCTOR" && step === 1 && "Lancer et monétisez votre école en ligne en quelques clics."}
-          {role === "INSTRUCTOR" && step === 2 && "Choisissez votre thématique et confirmez votre forfait."}
-          {role === "STUDENT" && step === 1 && "Accédez aux meilleures formations certifiantes sur le Web3 et l'IA."}
-          {role === "STUDENT" && step === 2 && "Dites-nous en plus sur vos objectifs pour personnaliser votre tableau de bord."}
+          {role === "INSTRUCTOR" && step === 2 && "Configurez vos préférences et confirmez votre forfait."}
+          {role === "STUDENT" && step === 1 && "Accédez aux meilleures formations certifiantes de haut niveau."}
+          {role === "STUDENT" && step === 2 && "Dites-nous en plus sur vos objectifs pour personnaliser votre espace."}
         </p>
       </div>
 
@@ -272,30 +278,30 @@ function RegisterForm() {
         <div className="space-y-4 animate-in fade-in duration-300">
           <div 
             onClick={() => setRole("STUDENT")}
-            className="group p-6 rounded-2xl border-2 border-zinc-200 dark:border-zinc-800 hover:border-blue-600 dark:hover:border-blue-500 bg-zinc-50/50 dark:bg-zinc-800/30 hover:bg-blue-50/10 dark:hover:bg-blue-900/5 cursor-pointer transition-all flex items-start gap-4"
+            className="group p-5 rounded-2xl border-2 border-zinc-200 dark:border-zinc-800 hover:border-blue-600 dark:hover:border-blue-500 bg-zinc-50/50 dark:bg-zinc-800/30 hover:bg-blue-50/10 dark:hover:bg-blue-900/5 cursor-pointer transition-all flex items-start gap-4"
           >
-            <div className="p-3 rounded-xl bg-blue-100 dark:bg-blue-900/20 text-blue-600 group-hover:scale-110 transition-transform">
+            <div className="p-3 rounded-xl bg-blue-100 dark:bg-blue-900/20 text-blue-600 group-hover:scale-105 transition-transform shrink-0">
               <BookOpen className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="font-bold text-zinc-900 dark:text-white text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+              <h3 className="font-bold text-zinc-900 dark:text-white text-base group-hover:text-blue-650 dark:group-hover:text-blue-400 transition-colors">
                 Je suis un Apprenant
               </h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
-                Je souhaite suivre des cours interactifs de haut niveau, passer des examens et obtenir des certifications blockchain.
+                Je souhaite suivre des cours interactifs, passer des examens et obtenir des certifications blockchain.
               </p>
             </div>
           </div>
 
           <div 
             onClick={() => setRole("INSTRUCTOR")}
-            className="group p-6 rounded-2xl border-2 border-zinc-200 dark:border-zinc-800 hover:border-blue-600 dark:hover:border-blue-500 bg-zinc-50/50 dark:bg-zinc-800/30 hover:bg-blue-50/10 dark:hover:bg-blue-900/5 cursor-pointer transition-all flex items-start gap-4"
+            className="group p-5 rounded-2xl border-2 border-zinc-200 dark:border-zinc-800 hover:border-blue-600 dark:hover:border-blue-500 bg-zinc-50/50 dark:bg-zinc-800/30 hover:bg-blue-50/10 dark:hover:bg-blue-900/5 cursor-pointer transition-all flex items-start gap-4"
           >
-            <div className="p-3 rounded-xl bg-purple-100 dark:bg-purple-900/20 text-purple-600 group-hover:scale-110 transition-transform">
+            <div className="p-3 rounded-xl bg-purple-100 dark:bg-purple-900/20 text-purple-600 group-hover:scale-105 transition-transform shrink-0">
               <Sparkles className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="font-bold text-zinc-900 dark:text-white text-lg group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+              <h3 className="font-bold text-zinc-900 dark:text-white text-base group-hover:text-purple-650 dark:group-hover:text-purple-400 transition-colors">
                 Je suis un Formateur / Enseignant
               </h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
@@ -304,84 +310,125 @@ function RegisterForm() {
             </div>
           </div>
 
-          <div className="pt-4 text-center text-sm text-zinc-600 dark:text-zinc-400">
+          <div className="pt-4 text-center text-sm text-zinc-650 dark:text-zinc-400">
             Vous avez déjà un compte ?{" "}
-            <Link href="/login" className="text-blue-600 hover:text-blue-500 font-semibold">
+            <Link href="/login" className="text-blue-600 hover:text-blue-500 font-bold transition-colors">
               Se connecter
             </Link>
           </div>
         </div>
       ) : (
         /* STEP 1 & 2: Form Content */
-        <form onSubmit={step === 2 ? handleComplete : (e) => { e.preventDefault(); handleNext(); }} className="space-y-5">
-          {/* Validation error banner */}
+        <form onSubmit={step === 2 ? handleComplete : (e) => { e.preventDefault(); handleNext(); }} className="space-y-4">
+          
           {formError && (
-            <div className="px-4 py-3 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 text-sm text-red-700 dark:text-red-400 font-medium">
+            <div className="px-4 py-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 text-xs text-red-700 dark:text-red-400 font-semibold rounded-xl animate-in fade-in">
               {formError}
             </div>
           )}
           
-          {/* STEP 1: Personal Info (Both Roles) */}
+          {/* STEP 1: Personal Info */}
           {step === 1 && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+            <div className="space-y-4 animate-in fade-in duration-300">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Nom complet</label>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Nom complet</label>
                 <input 
                   required 
                   type="text" 
                   value={name} 
                   onChange={e => setName(e.target.value)} 
                   placeholder={role === "INSTRUCTOR" ? "Prof. Jean Dupont" : "Jean Dupont"} 
-                  className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-zinc-900 dark:text-white" 
+                  className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white" 
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Adresse Email</label>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Adresse Email</label>
                 <input 
                   required 
                   type="email" 
                   value={email} 
                   onChange={e => setEmail(e.target.value)} 
                   placeholder="vous@exemple.com" 
-                  className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-zinc-900 dark:text-white" 
+                  className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white" 
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Mot de passe</label>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Mot de passe</label>
                 <input 
                   required 
                   type="password" 
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   minLength={8}
-                  placeholder="••••••••" 
-                  className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-zinc-900 dark:text-white" 
+                  placeholder="•••••••• (Min. 8 caractères)" 
+                  className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white" 
                 />
               </div>
+
+              {/* Google signup inside step 1 */}
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                  <div className="w-full border-t border-zinc-200 dark:border-zinc-800" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white dark:bg-zinc-900 px-3 text-zinc-400 font-bold">Ou utiliser</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={loading || googleLoading}
+                onClick={handleGoogleRegister}
+                className="w-full py-3 px-4 bg-white hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-bold rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-70 cursor-pointer text-xs"
+              >
+                {googleLoading ? (
+                  <Loader2 className="w-4.5 h-4.5 animate-spin" />
+                ) : (
+                  <svg className="w-4.5 h-4.5" viewBox="0 0 24 24">
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.47 15.01 1 12 1 7.21 1 3.19 3.78 1.28 7.82l3.86 3C6.07 7.78 8.81 5.04 12 5.04z"
+                    />
+                    <path
+                      fill="#4285F4"
+                      d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.92c2.2-2.03 3.67-5.02 3.67-8.65z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.14 14.82c-.25-.74-.39-1.53-.39-2.35s.14-1.61.39-2.35L1.28 7.12C.46 8.78 0 10.63 0 12.5s.46 3.72 1.28 5.38l3.86-3.06z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.92c-1.04.7-2.38 1.12-3.83 1.12-3.19 0-5.93-2.74-6.86-5.78l-3.86 3C3.19 20.22 7.21 23 12 23z"
+                    />
+                  </svg>
+                )}
+                <span>S'inscrire avec Google (Profil Apprenant)</span>
+              </button>
             </div>
           )}
 
           {/* STEP 2: Configuration (Role-Specific) */}
           {step === 2 && role === "INSTRUCTOR" && (
-            <div className="space-y-5 animate-in fade-in slide-in-from-right-4">
+            <div className="space-y-4 animate-in fade-in duration-300">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Nom de votre Académie</label>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Nom de votre Académie</label>
                 <input 
                   required 
                   type="text" 
                   value={academyName} 
                   onChange={e => setAcademyName(e.target.value)} 
                   placeholder="Ex: Blockchain Business School" 
-                  className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-zinc-900 dark:text-white" 
+                  className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white" 
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Thématique principale</label>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Thématique principale</label>
                 <select 
                   value={thematic}
                   onChange={e => setThematic(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-zinc-950 dark:text-white"
+                  className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-950 dark:text-white"
                 >
                   <option value="blockchain">Blockchain & Smart Contracts</option>
                   <option value="trading">Trading & Finance Décentralisée</option>
@@ -391,7 +438,7 @@ function RegisterForm() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">Sélectionnez votre forfait de démarrage</label>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2 uppercase tracking-wider">Choisissez votre forfait</label>
                 <div className="grid grid-cols-4 gap-2">
                   {[
                     { id: "FREE", name: "Free", price: "0$" },
@@ -402,31 +449,31 @@ function RegisterForm() {
                     <div 
                       key={plan.id}
                       onClick={() => setSelectedPlan(plan.id as "FREE" | "BASE" | "PRO" | "MAX")}
-                      className={`p-2.5 rounded-xl border-2 cursor-pointer flex flex-col items-center justify-center transition-all ${
+                      className={`p-2 rounded-xl border-2 cursor-pointer flex flex-col items-center justify-center transition-all ${
                         selectedPlan === plan.id 
                           ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-600 font-bold" 
-                          : "border-zinc-200 dark:border-zinc-800 hover:border-blue-300 text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                          : "border-zinc-200 dark:border-zinc-800 hover:border-blue-300 text-zinc-500 dark:text-zinc-400"
                       }`}
                     >
-                      <span className="text-xs font-semibold">{plan.name}</span>
-                      <span className="text-[10px] mt-1">{plan.price}/m</span>
-                      {selectedPlan === plan.id && <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 mt-1.5" />}
+                      <span className="text-[10px] font-semibold">{plan.name}</span>
+                      <span className="text-[9px] mt-0.5">{plan.price}/m</span>
+                      {selectedPlan === plan.id && <CheckCircle2 className="w-3 h-3 text-blue-600 mt-1" />}
                     </div>
                   ))}
                 </div>
-                <p className="text-zinc-400 text-xs mt-2 text-center">Aucune carte bancaire requise. Vous pourrez modifier votre abonnement ou payer plus tard.</p>
+                <p className="text-zinc-400 text-[10px] mt-2 text-center leading-relaxed">Aucune carte bancaire requise. Vous pouvez modifier votre abonnement ou payer plus tard.</p>
               </div>
             </div>
           )}
 
           {step === 2 && role === "STUDENT" && (
-            <div className="space-y-5 animate-in fade-in slide-in-from-right-4">
+            <div className="space-y-4 animate-in fade-in duration-300">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Votre niveau actuel</label>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Votre niveau actuel</label>
                 <select 
                   value={studentLevel}
                   onChange={e => setStudentLevel(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-zinc-950 dark:text-white"
+                  className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-950 dark:text-white"
                 >
                   <option value="Débutant">Débutant (Je découvre)</option>
                   <option value="Intermédiaire">Intermédiaire (J'ai quelques notions)</option>
@@ -435,11 +482,11 @@ function RegisterForm() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Cours d'intérêt principal</label>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Thématique d'intérêt</label>
                 <select 
                   value={interestCourse}
                   onChange={e => setInterestCourse(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 outline-none transition-all text-zinc-950 dark:text-white"
+                  className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-950 dark:text-white"
                 >
                   <option value="blockchain">Fondamentaux de la Blockchain</option>
                   <option value="trading">Crypto-monnaie & Trading</option>
@@ -448,32 +495,32 @@ function RegisterForm() {
                 </select>
               </div>
               
-              <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-2xl flex items-start gap-3">
-                <ShieldCheck className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                <p className="text-xs text-blue-800 dark:text-blue-300 leading-relaxed">
-                  L'inscription vous donne un accès immédiat à la version d'évaluation gratuite du cours choisi. Vous pourrez à tout moment débloquer l'accès complet et obtenir votre certificat vérifiable sur la blockchain.
+              <div className="p-4 bg-blue-50/50 dark:bg-blue-950/10 border border-blue-100 dark:border-blue-900/30 rounded-2xl flex items-start gap-3">
+                <ShieldCheck className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                <p className="text-xxs text-blue-800 dark:text-blue-300 leading-relaxed font-semibold">
+                  L'inscription vous donne un accès immédiat aux chapitres d'évaluation du cours choisi. Vous pourrez à tout moment débloquer l'accès complet et obtenir votre certificat vérifiable.
                 </p>
               </div>
             </div>
           )}
           
-          {/* Navigation Buttons */}
-          <div className="flex gap-3 pt-4">
+          {/* Stepper Buttons */}
+          <div className="flex gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
             <button 
               type="button" 
               onClick={handlePrev}
               disabled={loading}
-              className="px-4 py-3.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-semibold rounded-xl transition-colors disabled:opacity-50"
+              className="px-4 py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-bold rounded-xl transition-all disabled:opacity-50 cursor-pointer"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <button 
               type="submit"
-              disabled={loading}
-              className="flex-1 py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 disabled:opacity-70"
+              disabled={loading || googleLoading}
+              className="flex-1 py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer text-sm"
             >
-              {loading ? "Création du compte..." : (step === 2 ? "Finaliser et Accéder à mon Espace" : "Suivant")}
-              {!loading && step < 2 && <ArrowRight className="w-5 h-5" />}
+              {loading ? "Création du compte..." : (step === 2 ? "Finaliser et ouvrir mon Espace" : "Suivant")}
+              {!loading && step < 2 && <ArrowRight className="w-4 h-4" />}
             </button>
           </div>
         </form>
@@ -484,10 +531,79 @@ function RegisterForm() {
 
 export default function RegisterPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-black p-4">
-      <Suspense fallback={<div>Chargement...</div>}>
-        <RegisterForm />
-      </Suspense>
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-white dark:bg-black font-sans">
+      
+      {/* LEFT PANEL: Marketing & Slogan (hidden on mobile) */}
+      <div className="hidden lg:flex lg:col-span-6 relative overflow-hidden bg-gradient-to-br from-zinc-900 via-zinc-950 to-black p-12 flex-col justify-between select-none">
+        {/* Abstract Glowing shapes */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px] -mr-40 -mt-40 animate-pulse duration-[6000ms]" />
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-teal-500/10 rounded-full blur-[120px] -ml-40 -mb-40 animate-pulse duration-[8000ms]" />
+        
+        {/* Header Branding */}
+        <div className="z-10 flex items-center space-x-3">
+          <div className="relative w-11 h-11 bg-white/5 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/10 shadow-lg">
+            <Image src="/logo.png" alt="ANSELLA" width={28} height={28} className="object-contain" />
+          </div>
+          <span className="font-extrabold text-2xl tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-zinc-400">
+            ANSELLA
+          </span>
+        </div>
+
+        {/* Catchy advertisement and logo representation */}
+        <div className="z-10 max-w-md my-auto space-y-8">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/5 backdrop-blur-md border border-white/10 rounded-full text-zinc-350 text-xs font-semibold">
+            <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+            <span>LMS Premium de Nouvelle Génération</span>
+          </div>
+
+          <div className="space-y-4">
+            <h1 className="text-4xl font-extrabold tracking-tight text-white leading-tight">
+              Rejoignez l'académie leader en{" "}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-teal-400 to-emerald-400">
+                Web3 & IA
+              </span>
+            </h1>
+            <p className="text-zinc-400 text-base leading-relaxed">
+              Créez votre profil en quelques secondes pour acquérir des compétences concrètes et valorisables sur le marché.
+            </p>
+          </div>
+
+          {/* Features check list */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-3 text-sm text-zinc-300">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                <Coins className="w-4 h-4 text-blue-400" />
+              </div>
+              <span>Accès gratuit aux cours d'évaluation</span>
+            </div>
+            <div className="flex items-center space-x-3 text-sm text-zinc-300">
+              <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
+                <Cpu className="w-4 h-4 text-purple-400" />
+              </div>
+              <span>Quiz d'évaluation et de progression</span>
+            </div>
+            <div className="flex items-center space-x-3 text-sm text-zinc-300">
+              <div className="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-4 h-4 text-teal-400" />
+              </div>
+              <span>Diplômes et certifications infalsifiables</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Brand Info */}
+        <div className="z-10 text-xs text-zinc-500">
+          © {new Date().getFullYear()} Ansella Inc. Tous droits réservés.
+        </div>
+      </div>
+
+      {/* RIGHT PANEL: Registration Form Container */}
+      <div className="lg:col-span-6 flex items-center justify-center p-6 md:p-12 bg-zinc-50 dark:bg-zinc-950">
+        <Suspense fallback={<div className="text-zinc-500 dark:text-zinc-400 text-sm">Chargement...</div>}>
+          <RegisterForm />
+        </Suspense>
+      </div>
+
     </div>
   );
 }
