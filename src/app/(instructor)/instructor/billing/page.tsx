@@ -1,24 +1,166 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { getDB, saveDB, Database } from "@/lib/db";
 import { getSimulatedSession, setSimulatedSession, CurrentSession } from "@/lib/rbac";
-import { Check, CreditCard, Sparkles, Zap, Award, CheckCircle2, ShieldAlert } from "lucide-react";
+import { Check, CheckCircle2, ShieldAlert, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
 
 export default function BillingPage() {
   const router = useRouter();
   const [session, setSession] = useState<CurrentSession | null>(null);
-  const [db, setDb] = useState<Database | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [coursesCount, setCoursesCount] = useState(0);
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [currentPlan, setCurrentPlan] = useState<string>("FREE");
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    setSession(getSimulatedSession());
-    setDb(getDB());
-  }, []);
+  const loadBillingData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");
+        return;
+      }
 
-  if (!session || !db) {
+      // 1. Charger le profil de l'instructeur
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id, plan, role, full_name, email")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profile) {
+        const planStr = profile.plan || "FREE";
+        setCurrentPlan(planStr);
+        const updatedSession = {
+          userId: profile.id,
+          name: profile.full_name || "Instructeur",
+          email: profile.email || "",
+          role: profile.role || "INSTRUCTOR",
+          plan: planStr,
+        };
+        setSession(updatedSession);
+        setSimulatedSession(updatedSession);
+      }
+
+      // 2. Charger les cours
+      const { data: coursesData } = await supabase
+        .from("courses")
+        .select("id")
+        .eq("instructor_id", user.id);
+
+      const count = coursesData ? coursesData.length : 0;
+      setCoursesCount(count);
+
+      // 3. Charger les inscriptions uniques
+      if (coursesData && coursesData.length > 0) {
+        const courseIds = coursesData.map((c) => c.id);
+        const { data: enrollmentsData } = await supabase
+          .from("enrollments")
+          .select("student_id")
+          .in("course_id", courseIds);
+
+        const studentsSet = new Set(enrollmentsData?.map((e) => e.student_id));
+        setTotalStudents(studentsSet.size);
+      } else {
+        setTotalStudents(0);
+      }
+    } catch (err) {
+      console.error("Error loading billing details:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    loadBillingData();
+  }, [loadBillingData]);
+
+  const limits = {
+    FREE: { courses: 1, students: 15, fee: "50%" },
+    BASE: { courses: 3, students: 50, fee: "10%" },
+    PRO: { courses: 10, students: 200, fee: "5%" },
+    MAX: { courses: Infinity, students: Infinity, fee: "0%" },
+  };
+
+  const currentLimit = limits[currentPlan as keyof typeof limits] || limits.FREE;
+
+  // Progress percentages
+  const coursesPercent = currentLimit.courses === Infinity
+    ? 0
+    : Math.min((coursesCount / currentLimit.courses) * 100, 100);
+
+  const studentsPercent = currentLimit.students === Infinity
+    ? 0
+    : Math.min((totalStudents / currentLimit.students) * 100, 100);
+
+  const handleUpgradePlan = async (newPlan: "FREE" | "BASE" | "PRO" | "MAX") => {
+    if (newPlan === currentPlan) return;
+
+    if (newPlan === "BASE" || newPlan === "PRO" || newPlan === "MAX") {
+      router.push(`/instructor/billing/pay?plan=${newPlan}`);
+      return;
+    }
+
+    setActionLoading(true);
+    setSuccessMsg(null);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // 1. Mettre à jour le profil de l'instructeur dans Supabase
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ plan: newPlan })
+        .eq("id", user.id);
+
+      if (profileError) throw profileError;
+
+      // 2. Mettre en sommeil les cours excédentaires (Approche 1)
+      const { data: instructorCourses } = await supabase
+        .from("courses")
+        .select("id, status, created_at")
+        .eq("instructor_id", user.id)
+        .order("created_at", { ascending: true });
+
+      if (instructorCourses && instructorCourses.length > 1) {
+        // Garder le premier cours inchangé, repasser le reste en DRAFT
+        const coursesToDowngrade = instructorCourses
+          .slice(1)
+          .filter((c) => c.status === "PUBLISHED" || c.status === "REVIEW");
+
+        if (coursesToDowngrade.length > 0) {
+          const downgradeIds = coursesToDowngrade.map((c) => c.id);
+          const { error: downgradeError } = await supabase
+            .from("courses")
+            .update({ status: "DRAFT" })
+            .in("id", downgradeIds);
+
+          if (downgradeError) {
+            console.error("Error downgrading excess courses:", downgradeError);
+          }
+        }
+      }
+
+      setSuccessMsg(
+        `Votre abonnement a été rétrogradé avec succès au plan FREE. Vos cours excédentaires ont été automatiquement mis en sommeil (Brouillon) pour respecter la limite de 1 cours actif.`
+      );
+      await loadBillingData();
+
+      // Hide message after 6s
+      setTimeout(() => setSuccessMsg(null), 6000);
+    } catch (err: any) {
+      alert("Erreur lors de la mise à jour de l'abonnement : " + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  if (loading || !session) {
     return (
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="h-8 w-64 bg-zinc-200 dark:bg-zinc-800 rounded-lg animate-pulse" />
@@ -30,81 +172,19 @@ export default function BillingPage() {
     );
   }
 
-  // Calculate usage stats dynamically based on database
-  const myCourses = db.courses.filter(c => c.instructorId === (session?.userId ?? ""));
-  const myCourseIds = myCourses.map(c => c.id);
-  const myEnrollments = db.enrollments.filter(e => myCourseIds.includes(e.courseId));
-  const totalStudents = new Set(myEnrollments.map(e => e.studentId)).size;
-
-  const currentPlan = session.plan || "FREE";
-
-  const limits = {
-    FREE: { courses: 1, students: 15, fee: "50%" },
-    BASE: { courses: 3, students: 50, fee: "10%" },
-    PRO: { courses: 10, students: 200, fee: "5%" },
-    MAX: { courses: Infinity, students: Infinity, fee: "0%" }
-  };
-
-  const currentLimit = limits[currentPlan as keyof typeof limits] || limits.FREE;
-
-  // Progress percentages
-  const coursesPercent = currentLimit.courses === Infinity 
-    ? 0 
-    : Math.min((myCourses.length / currentLimit.courses) * 100, 100);
-
-  const studentsPercent = currentLimit.students === Infinity 
-    ? 0 
-    : Math.min((totalStudents / currentLimit.students) * 100, 100);
-
-  const handleUpgradePlan = (newPlan: "FREE" | "BASE" | "PRO" | "MAX") => {
-    if (newPlan === currentPlan) return;
-    
-    if (newPlan === "BASE" || newPlan === "PRO" || newPlan === "MAX") {
-      router.push(`/instructor/billing/pay?plan=${newPlan}`);
-      return;
-    }
-    
-    setLoading(true);
-    setSuccessMsg(null);
-
-    setTimeout(() => {
-      // Update local storage database
-      const database = getDB();
-      const updatedUsers = database.users.map(u => {
-        if (u.id === session?.userId) {
-          return { ...u, plan: newPlan };
-        }
-        return u;
-      });
-      database.users = updatedUsers;
-      saveDB(database);
-
-      // Update session state
-      const updatedSession = {
-        ...session,
-        plan: newPlan
-      };
-      setSimulatedSession(updatedSession);
-      setSession(updatedSession);
-      setDb(database);
-      setLoading(false);
-      setSuccessMsg(`Votre abonnement a été mis à jour avec succès au plan ${newPlan} !`);
-
-      // Hide message after 4s
-      setTimeout(() => setSuccessMsg(null), 4000);
-    }, 800);
-  };
-
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-1">
-          Gestion de l'Abonnement
-        </h1>
-        <p className="text-zinc-500 dark:text-zinc-400">
-          Suivez votre consommation de ressources et mettez à niveau votre forfait d'académie.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-1">
+            Gestion de l&apos;Abonnement
+          </h1>
+          <p className="text-zinc-500 dark:text-zinc-400 text-sm">
+            Suivez votre consommation de ressources et mettez à niveau votre forfait d&apos;académie.
+          </p>
+        </div>
+        {actionLoading && <Loader2 className="w-5 h-5 animate-spin text-teal-500" />}
       </div>
 
       {successMsg && (
@@ -126,7 +206,7 @@ export default function BillingPage() {
               </span>
             </div>
             <div className="flex items-baseline gap-2 mb-2">
-              <span className="text-3xl font-extrabold text-zinc-900 dark:text-white">{myCourses.length}</span>
+              <span className="text-3xl font-extrabold text-zinc-900 dark:text-white">{coursesCount}</span>
               <span className="text-zinc-400 text-sm">
                 / {currentLimit.courses === Infinity ? "Illimités" : `${currentLimit.courses} cours`}
               </span>
@@ -135,7 +215,7 @@ export default function BillingPage() {
           {currentLimit.courses !== Infinity ? (
             <div className="space-y-2 mt-4">
               <div className="w-full h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                <div 
+                <div
                   className={`h-full rounded-full transition-all duration-500 ${
                     coursesPercent >= 90 ? "bg-red-500" : coursesPercent >= 70 ? "bg-amber-500" : "bg-teal-500"
                   }`}
@@ -144,7 +224,7 @@ export default function BillingPage() {
               </div>
               <div className="flex justify-between text-xs text-zinc-400">
                 <span>{Math.round(coursesPercent)}% consommé</span>
-                <span>{currentLimit.courses - myCourses.length} restants</span>
+                <span>{Math.max(0, currentLimit.courses - coursesCount)} restants</span>
               </div>
             </div>
           ) : (
@@ -171,7 +251,7 @@ export default function BillingPage() {
           {currentLimit.students !== Infinity ? (
             <div className="space-y-2 mt-4">
               <div className="w-full h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                <div 
+                <div
                   className={`h-full rounded-full transition-all duration-500 ${
                     studentsPercent >= 90 ? "bg-red-500" : studentsPercent >= 70 ? "bg-amber-500" : "bg-teal-500"
                   }`}
@@ -180,7 +260,7 @@ export default function BillingPage() {
               </div>
               <div className="flex justify-between text-xs text-zinc-400">
                 <span>{Math.round(studentsPercent)}% consommé</span>
-                <span>{currentLimit.students - totalStudents} restants</span>
+                <span>{Math.max(0, currentLimit.students - totalStudents)} restants</span>
               </div>
             </div>
           ) : (
@@ -190,12 +270,14 @@ export default function BillingPage() {
       </div>
 
       {/* Warning banner for limit reached */}
-      {(currentPlan === "FREE" || currentPlan === "BASE") && (myCourses.length >= currentLimit.courses || totalStudents >= currentLimit.students) && (
-        <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl flex items-start gap-3 text-amber-800 dark:text-amber-400 text-sm font-medium">
+      {(currentPlan === "FREE" || currentPlan === "BASE") && (coursesCount >= currentLimit.courses || totalStudents >= currentLimit.students) && (
+        <div className="p-4 bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/30 rounded-2xl flex items-start gap-3 text-amber-800 dark:text-amber-400 text-sm font-medium">
           <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5 text-amber-500" />
           <div>
             <p className="font-bold">Quota de ressources épuisé</p>
-            <p className="text-xs mt-1 text-zinc-500 dark:text-zinc-400">Vous avez atteint les limites de votre forfait actuel ({currentPlan === "FREE" ? "Gratuit" : "Base"}). Pour ajouter de nouveaux cours ou accueillir plus d'élèves, veuillez mettre à niveau votre forfait.</p>
+            <p className="text-xs mt-1 text-zinc-500 dark:text-zinc-400 leading-relaxed">
+              Vous avez atteint les limites de votre forfait actuel ({currentPlan === "FREE" ? "Gratuit" : "Base"}). Pour ajouter de nouveaux cours ou accueillir plus d&apos;élèves, veuillez mettre à niveau votre forfait.
+            </p>
           </div>
         </div>
       )}
@@ -218,7 +300,7 @@ export default function BillingPage() {
             )}
             <div>
               <h3 className="font-bold text-lg text-zinc-900 dark:text-white">Plan Free</h3>
-              <p className="text-xs text-zinc-400 mt-1 min-h-[48px]">Pour tester votre académie auprès d'un premier panel.</p>
+              <p className="text-xs text-zinc-400 mt-1 min-h-[48px]">Pour tester votre académie auprès d&apos;un premier panel.</p>
               <div className="my-6">
                 <span className="text-3xl font-extrabold text-zinc-900 dark:text-white">0$</span>
                 <span className="text-zinc-400 text-sm ml-1">/ mois</span>
@@ -236,9 +318,9 @@ export default function BillingPage() {
               </ul>
             </div>
             <button 
-              disabled={currentPlan === "FREE" || loading}
+              disabled={currentPlan === "FREE" || actionLoading}
               onClick={() => handleUpgradePlan("FREE")}
-              className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${
+              className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 currentPlan === "FREE"
                   ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 cursor-default"
                   : "bg-zinc-800 hover:bg-zinc-700 text-white"
@@ -266,7 +348,7 @@ export default function BillingPage() {
               </div>
               <ul className="space-y-3 mb-6 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                 <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
-                  <Check className="w-4 h-4 text-teal-600" /> Jusqu'à 3 cours actifs
+                  <Check className="w-4 h-4 text-teal-600" /> Jusqu&apos;à 3 cours actifs
                 </li>
                 <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
                   <Check className="w-4 h-4 text-teal-600" /> 50 apprenants max
@@ -277,9 +359,9 @@ export default function BillingPage() {
               </ul>
             </div>
             <button 
-              disabled={currentPlan === "BASE" || loading}
+              disabled={currentPlan === "BASE" || actionLoading}
               onClick={() => handleUpgradePlan("BASE")}
-              className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${
+              className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 currentPlan === "BASE"
                   ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 cursor-default"
                   : "bg-teal-600 hover:bg-teal-500 text-white"
@@ -310,7 +392,7 @@ export default function BillingPage() {
               </div>
               <ul className="space-y-3 mb-6 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                 <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
-                  <Check className="w-4 h-4 text-teal-600" /> Jusqu'à 10 cours actifs
+                  <Check className="w-4 h-4 text-teal-600" /> Jusqu&apos;à 10 cours actifs
                 </li>
                 <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
                   <Check className="w-4 h-4 text-teal-600" /> 200 apprenants max
@@ -324,9 +406,9 @@ export default function BillingPage() {
               </ul>
             </div>
             <button 
-              disabled={currentPlan === "PRO" || loading}
+              disabled={currentPlan === "PRO" || actionLoading}
               onClick={() => handleUpgradePlan("PRO")}
-              className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${
+              className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 currentPlan === "PRO"
                   ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 cursor-default"
                   : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20"
@@ -347,7 +429,7 @@ export default function BillingPage() {
             )}
             <div>
               <h3 className="font-bold text-lg text-zinc-900 dark:text-white">Plan Max</h3>
-              <p className="text-xs text-zinc-400 mt-1 min-h-[48px]">Pour les écoles d'envergure exigeant une puissance illimitée.</p>
+              <p className="text-xs text-zinc-400 mt-1 min-h-[48px]">Pour les écoles d&apos;envergure exigeant une puissance illimitée.</p>
               <div className="my-6">
                 <span className="text-3xl font-extrabold text-zinc-900 dark:text-white">200$</span>
                 <span className="text-zinc-400 text-sm ml-1">/ mois</span>
@@ -368,9 +450,9 @@ export default function BillingPage() {
               </ul>
             </div>
             <button 
-              disabled={currentPlan === "MAX" || loading}
+              disabled={currentPlan === "MAX" || actionLoading}
               onClick={() => handleUpgradePlan("MAX")}
-              className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${
+              className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 currentPlan === "MAX"
                   ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 cursor-default"
                   : "bg-zinc-850 hover:bg-zinc-800 text-white"

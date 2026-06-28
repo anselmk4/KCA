@@ -50,17 +50,19 @@ export default function PaymentPage() {
     async function loadCourse() {
       setLoading(true);
       try {
-        const { data: currentCourse, error } = await supabase
+        const { data: rawCourse, error } = await supabase
           .from('courses')
-          .select('id, title, slug, description, price, status, instructor_id, category_id, level, short_description')
+          .select('*')
           .eq('id', courseId)
           .maybeSingle();
 
-        if (error || !currentCourse) {
+        if (error || !rawCourse) {
           console.error('[payment] Error fetching course from Supabase:', error?.message);
           setLoading(false);
           return;
         }
+
+        const currentCourse = rawCourse as any;
 
         // Récupérer le nom de l'instructeur
         const { data: profile } = await supabase
@@ -85,19 +87,8 @@ export default function PaymentPage() {
         else if (currentCourse.level === 'ADVANCED') level = 'Avancé';
         else if (currentCourse.level === 'EXPERT') level = 'Expert';
 
-        let allowInstallments = false;
-        let installmentsCount = 1;
-        if (currentCourse.short_description) {
-          try {
-            const parsed = JSON.parse(currentCourse.short_description);
-            if (parsed && typeof parsed === 'object') {
-              allowInstallments = !!parsed.allowInstallments;
-              installmentsCount = Number(parsed.installmentsCount) || 1;
-            }
-          } catch {
-            // Ignore
-          }
-        }
+        let allowInstallments = currentCourse.allow_installments || false;
+        let installmentsCount = currentCourse.installments_count || 1;
 
         setCourse({
           id: currentCourse.id,
