@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronLeft,
+  ChevronRight,
   ChevronDown,
   CheckSquare,
   Square,
@@ -386,6 +387,31 @@ export default function CourseLearnPage() {
   // ─── Helpers ─────────────────────────────────────────────────
   const generalQuizzes = useMemo(() => quizzes.filter(q => !q.sectionId), [quizzes]);
 
+  // Flat ordered list of all lessons for prev/next navigation
+  const orderedLessons = useMemo(() => {
+    return sections
+      .slice()
+      .sort((a, b) => a.order - b.order)
+      .flatMap((s) => lessons.filter((l) => l.sectionId === s.id).sort((a, b) => a.order - b.order));
+  }, [sections, lessons]);
+
+  const activeLessonIndex = useMemo(
+    () => (activeLesson ? orderedLessons.findIndex((l) => l.id === activeLesson.id) : -1),
+    [activeLesson, orderedLessons]
+  );
+
+  const prevLesson = activeLessonIndex > 0 ? orderedLessons[activeLessonIndex - 1] : null;
+  const nextLesson = activeLessonIndex >= 0 && activeLessonIndex < orderedLessons.length - 1
+    ? orderedLessons[activeLessonIndex + 1]
+    : null;
+
+  const goToLesson = (lesson: Lesson) => {
+    setActiveLesson(lesson);
+    setActiveQuiz(null);
+    setExpandedSections((prev) => ({ ...prev, [lesson.sectionId]: true }));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const activeQuizQuestions = useMemo(() => {
     if (!activeQuiz) return [];
     return questions.filter(q => q.quizId === activeQuiz.id);
@@ -757,6 +783,13 @@ export default function CourseLearnPage() {
               <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 dark:border-zinc-800 pb-4 mb-4">
                   <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      {activeLessonIndex >= 0 && (
+                        <span className="text-[10px] font-bold text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
+                          {activeLessonIndex + 1} / {orderedLessons.length}
+                        </span>
+                      )}
+                    </div>
                     <h2 className="text-xl font-bold text-zinc-900 dark:text-white">{activeLesson.title}</h2>
                     <div className="flex items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                       <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {activeLesson.durationMin} minutes</span>
@@ -766,7 +799,7 @@ export default function CourseLearnPage() {
                   <button
                     onClick={(e) => handleToggleComplete(activeLesson.id, e)}
                     disabled={togglingLesson === activeLesson.id}
-                    className={`px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 cursor-pointer border transition-all disabled:opacity-70 ${
+                    className={`shrink-0 px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 cursor-pointer border transition-all disabled:opacity-70 ${
                       completedLessons.has(activeLesson.id)
                         ? "bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400"
                         : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-zinc-400"
@@ -795,6 +828,51 @@ export default function CourseLearnPage() {
                       <p>Aucun contenu écrit pour cette leçon. Regardez la vidéo ci-dessus pour comprendre les concepts clés.</p>
                     )}
                   </div>
+                </div>
+
+                {/* Prev / Next navigation */}
+                <div className="flex items-center justify-between pt-6 mt-6 border-t border-zinc-100 dark:border-zinc-800 gap-4">
+                  <button
+                    onClick={() => prevLesson && goToLesson(prevLesson)}
+                    disabled={!prevLesson}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span className="hidden sm:inline">Leçon précédente</span>
+                    <span className="sm:hidden">Préc.</span>
+                  </button>
+
+                  <div className="text-center text-xs text-zinc-400 font-medium hidden sm:block">
+                    {prevLesson && <p className="truncate max-w-[140px] text-zinc-400">← {prevLesson.title}</p>}
+                  </div>
+
+                  {nextLesson ? (
+                    <button
+                      onClick={() => goToLesson(nextLesson)}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-all cursor-pointer shadow-md shadow-teal-500/10"
+                    >
+                      <span className="hidden sm:inline">Leçon suivante</span>
+                      <span className="sm:hidden">Suiv.</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  ) : generalQuizzes.length > 0 ? (
+                    <button
+                      onClick={() => { setActiveQuiz(generalQuizzes[0]); setActiveLesson(null); setQuizSubmitted(false); setSelectedAnswers({}); }}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all cursor-pointer shadow-md shadow-amber-500/10"
+                    >
+                      Passer le Quiz final
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => checkCertificate()}
+                      disabled={checkingCert}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all cursor-pointer shadow-md shadow-emerald-500/10 disabled:opacity-60"
+                    >
+                      {checkingCert ? <Loader2 className="w-4 h-4 animate-spin" /> : <Award className="w-4 h-4" />}
+                      Obtenir le Certificat
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
