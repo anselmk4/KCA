@@ -37,6 +37,46 @@ type Question = { id: string; quizId: string; text: string; choices: string[]; c
 type QuizAttempt = { id: string; quiz_id: string; score: number; passed: boolean; created_at: string };
 type LessonProgress = { lesson_id: string; completed: boolean; completed_at: string | null };
 
+function getVideoEmbedInfo(url: string) {
+  if (!url) return null;
+
+  // YouTube regex
+  const ytRegex = /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  const ytMatch = url.match(ytRegex);
+  if (ytMatch && ytMatch[1]) {
+    return {
+      type: "youtube",
+      embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}`,
+    };
+  }
+
+  // Vimeo regex
+  const vimeoRegex = /^(?:https?:\/\/)?(?:www\.)?(?:vimeo\.com\/|player\.vimeo\.com\/video\/)(\d+)/;
+  const vimeoMatch = url.match(vimeoRegex);
+  if (vimeoMatch && vimeoMatch[1]) {
+    return {
+      type: "vimeo",
+      embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}`,
+    };
+  }
+
+  // Dailymotion regex
+  const dmRegex = /^(?:https?:\/\/)?(?:www\.)?(?:dailymotion\.com\/(?:video|embed\/video)\/|dai\.ly\/)([a-zA-Z0-9]+)/;
+  const dmMatch = url.match(dmRegex);
+  if (dmMatch && dmMatch[1]) {
+    return {
+      type: "dailymotion",
+      embedUrl: `https://www.dailymotion.com/embed/video/${dmMatch[1]}`,
+    };
+  }
+
+  // Fallback to direct video file
+  return {
+    type: "direct",
+    embedUrl: url,
+  };
+}
+
 export default function CourseLearnPage() {
   const params = useParams();
   const router = useRouter();
@@ -417,24 +457,7 @@ export default function CourseLearnPage() {
     return questions.filter(q => q.quizId === activeQuiz.id);
   }, [activeQuiz, questions]);
 
-  const getEmbedVideoUrl = (url: string) => {
-    if (!url) return "";
-    if (url.includes("youtube.com/watch?v=")) {
-      const id = url.split("v=")[1]?.split("&")[0];
-      return `https://www.youtube.com/embed/${id}`;
-    }
-    if (url.includes("youtu.be/")) {
-      const id = url.split("youtu.be/")[1]?.split("?")[0];
-      return `https://www.youtube.com/embed/${id}`;
-    }
-    if (url.includes("vimeo.com/")) {
-      const id = url.split("vimeo.com/")[1]?.split("?")[0];
-      return `https://player.vimeo.com/video/${id}`;
-    }
-    return url;
-  };
 
-  const videoSrc = activeLesson ? getEmbedVideoUrl(activeLesson.videoUrl) : "";
 
   // ─── Loading / Auth states ────────────────────────────────────
   if (loading) {
@@ -764,15 +787,27 @@ export default function CourseLearnPage() {
             /* CASE B: Leçon active */
             <div className="space-y-6">
               <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-black shadow-lg">
-                {activeLesson.videoUrl ? (
-                  <iframe
-                    src={videoSrc}
-                    className="absolute inset-0 w-full h-full"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    title={activeLesson.title}
-                  />
-                ) : (
+                {activeLesson.videoUrl && (() => {
+                  const embedInfo = getVideoEmbedInfo(activeLesson.videoUrl);
+                  if (!embedInfo) return null;
+                  
+                  return embedInfo.type === "direct" ? (
+                    <video
+                      src={embedInfo.embedUrl}
+                      controls
+                      className="absolute inset-0 w-full h-full object-contain"
+                    />
+                  ) : (
+                    <iframe
+                      src={embedInfo.embedUrl}
+                      className="absolute inset-0 w-full h-full border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      title={activeLesson.title}
+                    />
+                  );
+                })()}
+                {!activeLesson.videoUrl && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 gap-2 bg-gradient-to-tr from-zinc-950 via-zinc-900 to-zinc-950">
                     <Play className="w-12 h-12 text-zinc-600 animate-pulse" />
                     <p className="text-xs font-semibold text-zinc-400">Aucune vidéo associée à cette leçon</p>

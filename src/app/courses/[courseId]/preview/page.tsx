@@ -73,6 +73,46 @@ type ContentType = {
   id: string;
 };
 
+function getVideoEmbedInfo(url: string) {
+  if (!url) return null;
+
+  // YouTube regex
+  const ytRegex = /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  const ytMatch = url.match(ytRegex);
+  if (ytMatch && ytMatch[1]) {
+    return {
+      type: "youtube",
+      embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}`,
+    };
+  }
+
+  // Vimeo regex
+  const vimeoRegex = /^(?:https?:\/\/)?(?:www\.)?(?:vimeo\.com\/|player\.vimeo\.com\/video\/)(\d+)/;
+  const vimeoMatch = url.match(vimeoRegex);
+  if (vimeoMatch && vimeoMatch[1]) {
+    return {
+      type: "vimeo",
+      embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}`,
+    };
+  }
+
+  // Dailymotion regex
+  const dmRegex = /^(?:https?:\/\/)?(?:www\.)?(?:dailymotion\.com\/(?:video|embed\/video)\/|dai\.ly\/)([a-zA-Z0-9]+)/;
+  const dmMatch = url.match(dmRegex);
+  if (dmMatch && dmMatch[1]) {
+    return {
+      type: "dailymotion",
+      embedUrl: `https://www.dailymotion.com/embed/video/${dmMatch[1]}`,
+    };
+  }
+
+  // Fallback to direct video file
+  return {
+    type: "direct",
+    embedUrl: url,
+  };
+}
+
 export default function CoursePreviewPlayerPage() {
   const params = useParams();
   const router = useRouter();
@@ -444,15 +484,29 @@ export default function CoursePreviewPlayerPage() {
               {activeLesson && (
                 <div className="space-y-6 flex-1 flex flex-col min-h-0">
                   {/* Video player card */}
-                  {activeLesson.videoUrl && (
-                    <div className="aspect-video bg-black rounded-3xl border border-zinc-200 dark:border-zinc-850 overflow-hidden relative shadow-lg shrink-0 max-w-4xl mx-auto w-full">
-                      <video
-                        src={activeLesson.videoUrl}
-                        controls
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
-                  )}
+                  {activeLesson.videoUrl && (() => {
+                    const embedInfo = getVideoEmbedInfo(activeLesson.videoUrl);
+                    if (!embedInfo) return null;
+
+                    return (
+                      <div className="aspect-video bg-black rounded-3xl border border-zinc-200 dark:border-zinc-850 overflow-hidden relative shadow-lg shrink-0 max-w-4xl mx-auto w-full">
+                        {embedInfo.type === "direct" ? (
+                          <video
+                            src={embedInfo.embedUrl}
+                            controls
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <iframe
+                            src={embedInfo.embedUrl}
+                            className="w-full h-full border-0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowFullScreen
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Title & metadata bar */}
                   <div className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-850 p-6 rounded-3xl space-y-3 shrink-0">
