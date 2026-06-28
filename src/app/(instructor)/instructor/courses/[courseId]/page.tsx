@@ -176,7 +176,6 @@ export default function CourseDetailPage() {
   const [priceSavedMessage, setPriceSavedMessage] = useState(false);
 
   // ─── Settings tab states ──────────────────────────────────
-  const [courseStatus, setCourseStatus] = useState<CourseStatus>("DRAFT");
   const [statusSavedMessage, setStatusSavedMessage] = useState(false);
 
   // ─── Load all data from Supabase ──────────────────────────
@@ -206,7 +205,6 @@ export default function CourseDetailPage() {
       setCoursePrice(String(courseData.price || 0));
       setAllowInstallments(Boolean(cd.allow_installments));
       setInstallmentsCount(Number(cd.installments_count) || 2);
-      setCourseStatus((courseData.status as CourseStatus) || "DRAFT");
 
       // Sections
       const { data: sectionsData } = await supabase
@@ -597,12 +595,26 @@ export default function CourseDetailPage() {
     } finally { setSaving(false); }
   };
 
-  const handleSaveStatus = async () => {
+  const handleRequestReview = async () => {
     setSaving(true);
     try {
       const { error } = await supabase
         .from("courses")
-        .update({ status: courseStatus, updated_at: new Date().toISOString() })
+        .update({ status: "REVIEW", updated_at: new Date().toISOString() })
+        .eq("id", courseId);
+      if (error) { alert("Erreur : " + error.message); return; }
+      setStatusSavedMessage(true);
+      setTimeout(() => setStatusSavedMessage(false), 3000);
+      await loadData();
+    } finally { setSaving(false); }
+  };
+
+  const handleCancelReview = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("courses")
+        .update({ status: "DRAFT", updated_at: new Date().toISOString() })
         .eq("id", courseId);
       if (error) { alert("Erreur : " + error.message); return; }
       setStatusSavedMessage(true);
@@ -1399,30 +1411,73 @@ export default function CourseDetailPage() {
                   </span>
                 )}
               </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2">Choisir le statut</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="space-y-6">
+                {/* Stepper de progression du processus */}
+                <div className="relative pt-4 pb-6">
+                  {/* Ligne grise en arrière-plan */}
+                  <div className="absolute top-1/2 left-6 right-6 h-0.5 bg-zinc-150 dark:bg-zinc-800 -translate-y-1/2" />
+                  
+                  {/* Ligne de progression colorée */}
+                  <div 
+                    className="absolute top-1/2 left-6 h-0.5 bg-teal-500 -translate-y-1/2 transition-all duration-500" 
+                    style={{
+                      width: course.status === "PUBLISHED" ? "calc(100% - 3rem)" : course.status === "REVIEW" ? "50%" : "0%"
+                    }}
+                  />
+
+                  {/* Étapes */}
+                  <div className="relative z-10 flex justify-between px-2">
                     {[
-                      { id: "DRAFT", label: "Brouillon", desc: "Non visible" },
-                      { id: "REVIEW", label: "En révision", desc: "En attente admin" },
-                      { id: "PUBLISHED", label: "Publié", desc: "En ligne" },
-                      { id: "ARCHIVED", label: "Archivé", desc: "Masqué" },
-                    ].map((opt) => {
-                      const selected = courseStatus === opt.id;
+                      { step: 1, label: "Brouillon", done: course.status === "REVIEW" || course.status === "PUBLISHED", isCurrent: course.status === "DRAFT" },
+                      { step: 2, label: "En révision", done: course.status === "PUBLISHED", isCurrent: course.status === "REVIEW" },
+                      { step: 3, label: "En ligne", done: course.status === "PUBLISHED", isCurrent: course.status === "PUBLISHED" }
+                    ].map((s) => {
                       return (
-                        <div key={opt.id} onClick={() => setCourseStatus(opt.id as CourseStatus)} className={`p-3 rounded-xl border-2 text-center cursor-pointer transition-all ${selected ? "border-teal-500 bg-teal-50/30 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400 font-bold" : "border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:border-zinc-300"}`}>
-                          <p className="text-xs font-bold">{opt.label}</p>
-                          <p className="text-[9px] text-zinc-400 mt-0.5 font-normal">{opt.desc}</p>
+                        <div key={s.step} className="flex flex-col items-center">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 text-xs font-bold transition-all duration-300 ${
+                            s.done
+                              ? "bg-teal-500 border-teal-500 text-zinc-950"
+                              : s.isCurrent
+                              ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-950 border-teal-500"
+                              : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400"
+                          }`}>
+                            {s.done ? "✓" : s.step}
+                          </div>
+                          <span className={`text-[10px] font-bold mt-2 ${s.isCurrent ? "text-teal-500" : "text-zinc-400 dark:text-zinc-500"}`}>{s.label}</span>
                         </div>
                       );
                     })}
                   </div>
                 </div>
+
+                {/* Résumé textuel */}
+                <div className="p-4 bg-zinc-50 dark:bg-zinc-850/60 rounded-xl border border-zinc-150 dark:border-zinc-800 space-y-2 text-xs">
+                  <h4 className="font-bold text-zinc-800 dark:text-zinc-200">
+                    Processus de validation :{" "}
+                    <span className="text-teal-500">
+                      {course.status === "PUBLISHED" ? "Approuvé & En ligne" : course.status === "REVIEW" ? "En attente d'examen" : course.status === "ARCHIVED" ? "Archivé" : "En cours d'édition"}
+                    </span>
+                  </h4>
+                  <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                    {course.status === "DRAFT" && "Votre formation est en mode Brouillon. Complétez son programme et ses tarifs, puis soumettez-la pour qu'un administrateur valide son contenu et la mette en ligne."}
+                    {course.status === "REVIEW" && "Votre formation a été soumise pour examen. L'équipe administrative étudie votre programme. Le cours sera mis en ligne dès validation."}
+                    {course.status === "PUBLISHED" && "Félicitations ! Votre cours a été validé par l'administration et est officiellement ouvert aux inscriptions."}
+                    {course.status === "ARCHIVED" && "Ce cours a été archivé et n'apparaît plus dans le catalogue public."}
+                  </p>
+                </div>
+
+                {/* Bouton d'action */}
                 <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex justify-end">
-                  <button onClick={handleSaveStatus} disabled={saving} className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50">
-                    Appliquer le statut
-                  </button>
+                  {course.status === "DRAFT" && (
+                    <button onClick={handleRequestReview} disabled={saving} className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50">
+                      Soumettre pour validation
+                    </button>
+                  )}
+                  {course.status === "REVIEW" && (
+                    <button onClick={handleCancelReview} disabled={saving} className="px-5 py-2.5 bg-zinc-200 dark:bg-zinc-850 hover:bg-zinc-300 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-250 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50">
+                      Annuler la demande de validation
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
