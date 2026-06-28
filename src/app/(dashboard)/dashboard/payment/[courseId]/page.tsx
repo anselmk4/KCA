@@ -4,8 +4,24 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, CreditCard, Smartphone, ShieldCheck, QrCode } from "lucide-react";
-import { getDB, saveDB, Course, Enrollment, Transaction, generateUUID } from "@/lib/db";
 import { supabase } from "@/lib/supabase/client";
+
+interface Course {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  price: number;
+  status: string;
+  instructorId: string;
+  instructorName: string;
+  createdAt: string;
+  rating: number;
+  category: string;
+  level: string;
+  allowInstallments: boolean;
+  installmentsCount: number;
+}
 
 type PaymentMethod = "momo" | "paypal" | "crypto";
 
@@ -152,7 +168,7 @@ export default function PaymentPage() {
 
       // 2. Écrire la transaction dans Supabase (non bloquant en cas d'erreur de politiques RLS sur les tables de commande)
       try {
-        const orderId = generateUUID();
+        const orderId = crypto.randomUUID();
         await supabase.from('orders').insert({
           id: orderId,
           user_id: user.id,
@@ -162,7 +178,7 @@ export default function PaymentPage() {
         } as any);
 
         await supabase.from('order_items').insert({
-          id: generateUUID(),
+          id: crypto.randomUUID(),
           order_id: orderId,
           course_id: course.id,
           unit_price: finalAmount,
@@ -175,7 +191,7 @@ export default function PaymentPage() {
         else if (method === 'crypto') payProvider = 'CRYPTO';
 
         await supabase.from('payments').insert({
-          id: generateUUID(),
+          id: crypto.randomUUID(),
           order_id: orderId,
           user_id: user.id,
           amount: finalAmount,
@@ -186,51 +202,6 @@ export default function PaymentPage() {
       } catch (receiptErr) {
         console.warn('[payment] Order/Payment receipt insert warning (non-blocking):', receiptErr);
       }
-
-      // 3. Mettre à jour la base locale pour compatibilité synchrone
-      const db = getDB();
-      const existingEnrollmentIdx = db.enrollments.findIndex(
-        e => e.studentId === user.id && e.courseId === course.id
-      );
-
-      const newEnrollment: Enrollment = {
-        id: existingEnrollmentIdx !== -1 ? db.enrollments[existingEnrollmentIdx].id : `e_${Date.now()}`,
-        studentId: user.id,
-        courseId: course.id,
-        progressPercent: existingEnrollmentIdx !== -1 ? db.enrollments[existingEnrollmentIdx].progressPercent : 0,
-        joinedAt: existingEnrollmentIdx !== -1 ? db.enrollments[existingEnrollmentIdx].joinedAt : new Date().toISOString(),
-        status: "ACTIVE"
-      };
-
-      if (existingEnrollmentIdx !== -1) {
-        db.enrollments[existingEnrollmentIdx] = newEnrollment;
-      } else {
-        db.enrollments.push(newEnrollment);
-      }
-
-      let payMethodLabel: Transaction["method"] = "Carte";
-      if (method === "momo") payMethodLabel = "Mobile Money";
-      else if (method === "paypal") payMethodLabel = "PayPal";
-
-      const newTransaction: Transaction = {
-        id: `tx_${Date.now()}`,
-        userId: user.id,
-        userName: user.email?.split('@')[0] || 'Étudiant',
-        amount: finalAmount,
-        courseId: course.id,
-        instructorId: course.instructorId,
-        instructorName: course.instructorName,
-        date: new Date().toISOString(),
-        status: "PAID",
-        method: payMethodLabel
-      };
-
-      db.transactions.push(newTransaction);
-      saveDB(db);
-
-      // Déclencher la synchronisation en arrière-plan
-      const { syncFromSupabase } = await import("@/lib/supabase/sync");
-      await syncFromSupabase();
 
 
       setSubmitting(false);

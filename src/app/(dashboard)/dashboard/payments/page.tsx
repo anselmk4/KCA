@@ -1,62 +1,164 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { CreditCard, Download, ArrowRight, ExternalLink, Calendar, Receipt, User } from "lucide-react";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { CreditCard, Download, ArrowRight, Calendar, Receipt, User, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { getDB, Transaction, Course, User as DBUser } from "@/lib/db";
-import { getSimulatedSession } from "@/lib/rbac";
+import { supabase } from "@/lib/supabase/client";
+
+// ─── Types ────────────────────────────────────────────────
+interface CourseData {
+  id: string;
+  title: string;
+  instructor_id: string;
+}
+
+interface ProfileData {
+  id: string;
+  full_name: string;
+}
+
+interface PaymentRow {
+  id: string;
+  order_id: string;
+  amount: number;
+  status: string;
+  provider: string;
+  paid_at: string;
+}
+
+interface OrderItemRow {
+  order_id: string;
+  course_id: string;
+}
+
+interface DisplayTransaction {
+  id: string;
+  courseId: string;
+  courseTitle: string;
+  instructorName: string;
+  amount: number;
+  method: string;
+  date: string;
+}
+
+const PROVIDER_MAP: Record<string, string> = {
+  STRIPE: "Stripe / Carte",
+  PAYPAL: "PayPal",
+  MOBILE_MONEY: "Mobile Money",
+  CRYPTO: "Cryptomonnaie",
+  MANUAL: "Validation manuelle",
+};
 
 export default function StudentPaymentsPage() {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [users, setUsers] = useState<DBUser[]>([]);
-  const [session, setSession] = useState<any>(null);
+  const [transactions, setTransactions] = useState<DisplayTransaction[]>([]);
+  const [userName, setUserName] = useState<string>("Apprenant");
+  const [userId, setUserId] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const db = getDB();
-    const currentSession = getSimulatedSession();
-    setSession(currentSession);
-    setCourses(db.courses || []);
-    setUsers(db.users || []);
+  const loadPaymentsData = useCallback(async () => {
+    setLoading(true);
+    try {
+      // 1. Get current logged in user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+      setUserId(user.id);
 
-    if (currentSession) {
-      // Filter transactions for this student with status PAID
-      const userTxs = (db.transactions || []).filter(
-        t => t.userId === currentSession.userId && t.status === "PAID"
-      );
+      // 2. Load User Profile to get their full name
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profile?.full_name) {
+        setUserName(profile.full_name);
+      }
+
+      // 3. Load user's PAID payments
+      const { data: paymentsData } = await supabase
+        .from("payments")
+        .select("id, order_id, amount, status, provider, paid_at")
+        .eq("user_id", user.id)
+        .eq("status", "PAID");
+
+      const payments = (paymentsData || []) as PaymentRow[];
+
+      if (payments.length === 0) {
+        setTransactions([]);
+        setLoading(false);
+        return;
+      }
+
+      const orderIds = payments.map((p) => p.order_id);
+
+      // 4. Load Order Items for these orders
+      const { data: itemsData } = await supabase
+        .from("order_items")
+        .select("order_id, course_id")
+        .in("order_id", orderIds);
+
+      const orderItems = (itemsData || []) as OrderItemRow[];
+      const courseIds = [...new Set(orderItems.map((item) => item.course_id))];
+
+      // 5. Load Courses
+      const { data: coursesData } = await supabase
+        .from("courses")
+        .select("id, title, instructor_id")
+        .in("id", courseIds);
+
+      const courses = (coursesData || []) as CourseData[];
+      const instructorIds = [...new Set(courses.map((c) => c.instructor_id).filter(Boolean))];
+
+      // 6. Load Instructors Profiles
+      const { data: instructorsData } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", instructorIds);
+
+      const instructors = (instructorsData || []) as ProfileData[];
+      const instructorMap = new Map(instructors.map((i) => [i.id, i.full_name]));
+      const courseMap = new Map(courses.map((c) => [c.id, c]));
+
+      // 7. Match and Build the UI rows
+      const mappedTxs: DisplayTransaction[] = payments.map((p) => {
+        // Find item
+        const item = orderItems.find((oi) => oi.order_id === p.order_id);
+        const course = item ? courseMap.get(item.course_id) : null;
+        const instructorName = course ? instructorMap.get(course.instructor_id) || "Formateur Kuettu" : "—";
+        const courseTitle = course ? course.title : "Formation Spécialisée";
+
+        return {
+          id: p.id,
+          courseId: course?.id || "",
+          courseTitle,
+          instructorName,
+          amount: p.amount || 0,
+          method: PROVIDER_MAP[p.provider] || p.provider || "Carte",
+          date: p.paid_at || new Date().toISOString(),
+        };
+      });
+
       // Sort by date descending
-      userTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      setTransactions(userTxs);
+      mappedTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setTransactions(mappedTxs);
+    } catch (err) {
+      console.error("[StudentPaymentsPage] Error loading data from Supabase:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    loadPaymentsData();
+  }, [loadPaymentsData]);
 
   const cumulativePaid = useMemo(() => {
     return transactions.reduce((sum, tx) => sum + tx.amount, 0);
   }, [transactions]);
 
-  const getCourseTitle = (courseId: string) => {
-    const course = courses.find(c => c.id === courseId);
-    return course ? course.title : "Formation Spécialisée";
-  };
-
-  const getInstructorName = (tx: Transaction) => {
-    // 1. Try from the transaction itself
-    if (tx.instructorName) return tx.instructorName;
-    // 2. Fallback: resolve from course
-    const course = courses.find(c => c.id === tx.courseId);
-    if (course?.instructorName) return course.instructorName;
-    // 3. Fallback: resolve user
-    if (tx.instructorId) {
-      const user = users.find(u => u.id === tx.instructorId);
-      if (user) return user.name;
-    }
-    return "—";
-  };
-
-  const downloadInvoice = (tx: Transaction, courseTitle: string) => {
-    const instructorName = getInstructorName(tx);
+  const downloadInvoice = (tx: DisplayTransaction) => {
     const invoiceHtml = `
       <!DOCTYPE html>
       <html>
@@ -70,13 +172,13 @@ export default function StudentPaymentsPage() {
           .invoice-box table td { padding: 5px; vertical-align: top; }
           .invoice-box table tr td:nth-child(2) { text-align: right; }
           .invoice-box table tr.top table td { padding-bottom: 20px; }
-          .invoice-box table tr.top table td.title { font-size: 32px; line-height: 32px; color: #1d4ed8; font-weight: bold; }
+          .invoice-box table tr.top table td.title { font-size: 32px; line-height: 32px; color: #0d9488; font-weight: bold; }
           .invoice-box table tr.information table td { padding-bottom: 40px; }
           .invoice-box table tr.heading td { background: #f4f4f5; border-bottom: 1px solid #e4e4e7; font-weight: bold; padding: 8px; }
           .invoice-box table tr.details td { padding-bottom: 20px; }
           .invoice-box table tr.item td { border-bottom: 1px solid #f4f4f5; padding: 10px 8px; }
           .invoice-box table tr.item.last td { border-bottom: none; }
-          .invoice-box table tr.total td:nth-child(2) { border-top: 2px solid #e4e4e7; font-weight: bold; padding-top: 10px; font-size: 18px; color: #1d4ed8; }
+          .invoice-box table tr.total td:nth-child(2) { border-top: 2px solid #e4e4e7; font-weight: bold; padding-top: 10px; font-size: 18px; color: #0d9488; }
           .badge { display: inline-block; padding: 4px 8px; background-color: #10b981; color: white; border-radius: 9999px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
         </style>
       </head>
@@ -107,10 +209,10 @@ export default function StudentPaymentsPage() {
                       support@ansella.app
                     </td>
                     <td>
-                      Client: ${tx.userName}<br>
-                      ID Client: ${tx.userId}<br>
-                      Formateur: ${instructorName}<br>
-                      Moyen de paiement: ${tx.method || 'Carte'}
+                      Client: ${userName}<br>
+                      ID Client: ${userId}<br>
+                      Formateur: ${tx.instructorName}<br>
+                      Moyen de paiement: ${tx.method}
                     </td>
                   </tr>
                 </table>
@@ -121,7 +223,7 @@ export default function StudentPaymentsPage() {
               <td>Prix</td>
             </tr>
             <tr class="item last">
-              <td>Accès complet à la formation : <strong>${courseTitle}</strong><br><small>Formateur : ${instructorName}</small></td>
+              <td>Accès complet à la formation : <strong>${tx.courseTitle}</strong><br><small>Formateur : ${tx.instructorName}</small></td>
               <td>$${tx.amount} USD</td>
             </tr>
             <tr class="total">
@@ -147,7 +249,7 @@ export default function StudentPaymentsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <Loader2 className="w-10 h-10 text-teal-600 animate-spin" />
       </div>
     );
   }
@@ -162,7 +264,7 @@ export default function StudentPaymentsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Left Column: Payments Table (2/3) */}
+        {/* Left Column: Payments Table */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
             <div className="p-5 border-b border-zinc-150 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/10">
@@ -173,7 +275,7 @@ export default function StudentPaymentsPage() {
               <div className="text-center py-16 text-zinc-500 dark:text-zinc-400 space-y-3">
                 <Receipt className="w-12 h-12 text-zinc-300 mx-auto" />
                 <p className="text-sm font-medium">Aucun paiement trouvé dans votre historique.</p>
-                <Link href="/dashboard/discover" className="inline-flex items-center gap-1.5 text-xs text-blue-600 font-bold hover:underline">
+                <Link href="/dashboard/discover" className="inline-flex items-center gap-1.5 text-xs text-teal-600 font-bold hover:underline">
                   Acheter un cours <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
@@ -191,46 +293,44 @@ export default function StudentPaymentsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-150 dark:divide-zinc-800 text-sm text-zinc-700 dark:text-zinc-300">
-                    {transactions.map((tx) => {
-                      const courseTitle = getCourseTitle(tx.courseId);
-                      const instructorName = getInstructorName(tx);
-                      return (
-                        <tr key={tx.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
-                          <td className="px-5 py-4 font-semibold text-zinc-900 dark:text-white max-w-[200px]">
-                            <p className="truncate">{courseTitle}</p>
-                          </td>
-                          <td className="px-5 py-4">
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center shrink-0">
-                                <User className="w-3 h-3 text-teal-600" />
-                              </div>
-                              <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate max-w-[120px]">{instructorName}</span>
+                    {transactions.map((tx) => (
+                      <tr key={tx.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
+                        <td className="px-5 py-4 font-semibold text-zinc-900 dark:text-white max-w-[200px]">
+                          <p className="truncate" title={tx.courseTitle}>{tx.courseTitle}</p>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center shrink-0">
+                              <User className="w-3 h-3 text-teal-600" />
                             </div>
-                          </td>
-                          <td className="px-5 py-4 text-xs text-zinc-500">
-                            {tx.method || "Carte"}
-                          </td>
-                          <td className="px-5 py-4 text-xs text-zinc-500 whitespace-nowrap">
-                            <span className="inline-flex items-center gap-1.5">
-                              <Calendar className="w-3.5 h-3.5 text-zinc-400" />
-                              {new Date(tx.date).toLocaleDateString("fr-FR")}
+                            <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate max-w-[120px]" title={tx.instructorName}>
+                              {tx.instructorName}
                             </span>
-                          </td>
-                          <td className="px-5 py-4 text-right font-extrabold text-zinc-900 dark:text-white">
-                            ${tx.amount}
-                          </td>
-                          <td className="px-5 py-4 text-center">
-                            <button
-                              onClick={() => downloadInvoice(tx, courseTitle)}
-                              className="inline-flex items-center justify-center p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors cursor-pointer"
-                              title="Télécharger la facture HTML"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-xs text-zinc-500">
+                          {tx.method}
+                        </td>
+                        <td className="px-5 py-4 text-xs text-zinc-500 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+                            {new Date(tx.date).toLocaleDateString("fr-FR")}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-right font-extrabold text-zinc-900 dark:text-white">
+                          ${tx.amount}
+                        </td>
+                        <td className="px-5 py-4 text-center">
+                          <button
+                            onClick={() => downloadInvoice(tx)}
+                            className="inline-flex items-center justify-center p-2 text-teal-600 hover:text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-900/20 rounded-lg transition-colors cursor-pointer"
+                            title="Télécharger la facture HTML"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -249,29 +349,25 @@ export default function StudentPaymentsPage() {
           </div>
         </div>
 
-        {/* Right Column: Cumulative Summary Card (1/3) */}
+        {/* Right Column: Cumulative Summary Card */}
         <div className="space-y-6">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 space-y-6">
             <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white uppercase tracking-wider">Cumul des paiements</h3>
             
             <div className="py-6 border-y border-zinc-100 dark:border-zinc-800 text-center space-y-2">
               <p className="text-sm font-semibold text-zinc-500">Montant total investi</p>
-              <p className="text-4xl font-black text-blue-600 dark:text-blue-400">${cumulativePaid} USD</p>
+              <p className="text-4xl font-black text-teal-600 dark:text-teal-400">${cumulativePaid} USD</p>
               <p className="text-xxs text-zinc-400">Cumul de tous vos règlements validés sur ANSELLA</p>
             </div>
 
             <div className="space-y-3.5 text-xs">
               <div className="flex justify-between text-zinc-500">
                 <span>Compte étudiant :</span>
-                <span className="font-bold text-zinc-700 dark:text-zinc-300">{session?.name || "Apprenant"}</span>
+                <span className="font-bold text-zinc-700 dark:text-zinc-300">{userName}</span>
               </div>
               <div className="flex justify-between text-zinc-500">
                 <span>Transactions :</span>
                 <span className="font-bold text-zinc-700 dark:text-zinc-300">{transactions.length}</span>
-              </div>
-              <div className="flex justify-between text-zinc-500">
-                <span>Plan actuel :</span>
-                <span className="font-bold text-blue-600">{session?.plan || "FREE"}</span>
               </div>
             </div>
 
