@@ -17,6 +17,8 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutTime, setLockoutTime] = useState(0);
 
   useEffect(() => {
     initDB();
@@ -58,8 +60,21 @@ export default function LoginPage() {
     checkSession();
   }, [router]);
 
+  useEffect(() => {
+    if (lockoutTime > 0) {
+      const timer = setTimeout(() => {
+        setLockoutTime(prev => prev - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [lockoutTime]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (lockoutTime > 0) {
+      setError(`Trop de tentatives. Veuillez patienter ${lockoutTime} secondes.`);
+      return;
+    }
     setError(null);
     setLoading(true);
     try {
@@ -68,6 +83,15 @@ export default function LoginPage() {
     } catch (err: any) {
       setError(err.message || "Une erreur est survenue.");
       setLoading(false);
+      setFailedAttempts(prev => {
+        const next = prev + 1;
+        if (next >= 5) {
+          setLockoutTime(60);
+          setError("Trop de tentatives infructueuses. Formulaire verrouillé pour 60 secondes.");
+          return 0;
+        }
+        return next;
+      });
     }
   };
 
@@ -89,6 +113,10 @@ export default function LoginPage() {
   };
 
   const quickLogin = async (testEmail: string, testPassword: string) => {
+    if (lockoutTime > 0) {
+      setError(`Trop de tentatives. Veuillez patienter ${lockoutTime} secondes.`);
+      return;
+    }
     setError(null);
     setLoading(true);
     setEmail(testEmail);
@@ -99,6 +127,15 @@ export default function LoginPage() {
     } catch (err: any) {
       setError(err.message || "Une erreur est survenue.");
       setLoading(false);
+      setFailedAttempts(prev => {
+        const next = prev + 1;
+        if (next >= 5) {
+          setLockoutTime(60);
+          setError("Trop de tentatives infructueuses. Formulaire verrouillé pour 60 secondes.");
+          return 0;
+        }
+        return next;
+      });
     }
   };
 
