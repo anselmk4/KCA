@@ -588,8 +588,7 @@ export default function CourseDetailPage() {
     try {
       const { error } = await supabase
         .from("courses")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update({ price: parseFloat(coursePrice) || 0, ...(({ allow_installments: allowInstallments, installments_count: installmentsCount }) as any), updated_at: new Date().toISOString() })
+        .update({ price: parseFloat(coursePrice) || 0, updated_at: new Date().toISOString() })
         .eq("id", courseId);
       if (error) { alert("Erreur : " + error.message); return; }
       setPriceSavedMessage(true);
