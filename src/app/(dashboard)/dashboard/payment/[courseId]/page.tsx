@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, CreditCard, Smartphone, ShieldCheck, QrCode } from "lucide-react";
-import { getDB, saveDB, Course, Enrollment, Transaction } from "@/lib/db";
-import { getSimulatedSession } from "@/lib/rbac";
+import { getDB, saveDB, Course, Enrollment, Transaction, generateUUID } from "@/lib/db";
+import { supabase } from "@/lib/supabase/client";
 
 type PaymentMethod = "momo" | "paypal" | "crypto";
 
@@ -31,50 +31,171 @@ export default function PaymentPage() {
   const [cryptoNetwork, setCryptoNetwork] = useState("trc20");
 
   useEffect(() => {
-    const db = getDB();
-    const currentCourse = db.courses.find(c => c.id === courseId);
-    if (!currentCourse) {
-      setLoading(false);
-      return;
-    }
-    setCourse(currentCourse);
-    setLoading(false);
+    async function loadCourse() {
+      setLoading(true);
+      try {
+        const { data: currentCourse, error } = await supabase
+          .from('courses')
+          .select('id, title, slug, description, price, status, instructor_id, category_id, level, short_description')
+          .eq('id', courseId)
+          .maybeSingle();
 
-    // Prefill user data if logged in
-    const session = getSimulatedSession();
-    if (session) {
-      setPaypalEmail(session.email);
+        if (error || !currentCourse) {
+          console.error('[payment] Error fetching course from Supabase:', error?.message);
+          setLoading(false);
+          return;
+        }
+
+        // Récupérer le nom de l'instructeur
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', currentCourse.instructor_id)
+          .maybeSingle();
+
+        // Récupérer le nom de la catégorie
+        let categoryName = 'Formation';
+        if (currentCourse.category_id) {
+          const { data: category } = await supabase
+            .from('categories')
+            .select('name')
+            .eq('id', currentCourse.category_id)
+            .maybeSingle();
+          if (category) categoryName = category.name;
+        }
+
+        let level = 'Débutant';
+        if (currentCourse.level === 'INTERMEDIATE') level = 'Intermédiaire';
+        else if (currentCourse.level === 'ADVANCED') level = 'Avancé';
+        else if (currentCourse.level === 'EXPERT') level = 'Expert';
+
+        let allowInstallments = false;
+        let installmentsCount = 1;
+        if (currentCourse.short_description) {
+          try {
+            const parsed = JSON.parse(currentCourse.short_description);
+            if (parsed && typeof parsed === 'object') {
+              allowInstallments = !!parsed.allowInstallments;
+              installmentsCount = Number(parsed.installmentsCount) || 1;
+            }
+          } catch {
+            // Ignore
+          }
+        }
+
+        setCourse({
+          id: currentCourse.id,
+          title: currentCourse.title,
+          slug: currentCourse.slug,
+          description: currentCourse.description || '',
+          price: currentCourse.price,
+          status: currentCourse.status as any,
+          instructorId: currentCourse.instructor_id,
+          instructorName: profile?.full_name || 'Prof. Kuettu',
+          createdAt: new Date().toISOString(),
+          rating: 0,
+          category: categoryName,
+          level,
+          allowInstallments,
+          installmentsCount
+        });
+      } catch (err) {
+        console.error('[payment] Unexpected error loading course from Supabase:', err);
+      } finally {
+        setLoading(false);
+      }
     }
+
+    loadCourse();
+
+    // Pré-remplir l'email utilisateur si connecté
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) {
+        setPaypalEmail(user.email);
+      }
+    });
   }, [courseId]);
 
   const finalAmount = course && payInstallment && course.allowInstallments
     ? Math.round(course.price / (course.installmentsCount || 1))
     : course ? course.price : 0;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!course) return;
 
     setSubmitting(true);
 
-    setTimeout(() => {
-      const db = getDB();
-      const session = getSimulatedSession();
-
-      if (!session) {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
         alert("Session introuvable. Veuillez vous connecter.");
         setSubmitting(false);
         return;
       }
 
-      // 1. Create or update enrollment
+      // 1. Écrire l'enrollment dans Supabase en tant qu'ACTIVE
+      const { error: enrollError } = await supabase
+        .from('enrollments')
+        .upsert({
+          student_id: user.id,
+          course_id: course.id,
+          progress_percent: 0,
+          status: 'ACTIVE',
+          enrolled_at: new Date().toISOString()
+        }, { onConflict: 'student_id,course_id' });
+
+      if (enrollError) {
+        console.error('[payment] Error writing enrollment to Supabase:', enrollError.message);
+        throw new Error("Impossible d'activer votre inscription dans la base de données. Veuillez réessayer.");
+      }
+
+      // 2. Écrire la transaction dans Supabase (non bloquant en cas d'erreur de politiques RLS sur les tables de commande)
+      try {
+        const orderId = generateUUID();
+        await supabase.from('orders').insert({
+          id: orderId,
+          user_id: user.id,
+          status: 'COMPLETED',
+          total_price: finalAmount,
+          created_at: new Date().toISOString()
+        } as any);
+
+        await supabase.from('order_items').insert({
+          id: generateUUID(),
+          order_id: orderId,
+          course_id: course.id,
+          unit_price: finalAmount,
+          final_price: finalAmount
+        } as any);
+
+        let payProvider: 'STRIPE' | 'PAYPAL' | 'MOBILE_MONEY' | 'CRYPTO' | 'MANUAL' = 'STRIPE';
+        if (method === 'momo') payProvider = 'MOBILE_MONEY';
+        else if (method === 'paypal') payProvider = 'PAYPAL';
+        else if (method === 'crypto') payProvider = 'CRYPTO';
+
+        await supabase.from('payments').insert({
+          id: generateUUID(),
+          order_id: orderId,
+          user_id: user.id,
+          amount: finalAmount,
+          status: 'PAID',
+          provider: payProvider,
+          paid_at: new Date().toISOString()
+        } as any);
+      } catch (receiptErr) {
+        console.warn('[payment] Order/Payment receipt insert warning (non-blocking):', receiptErr);
+      }
+
+      // 3. Mettre à jour la base locale pour compatibilité synchrone
+      const db = getDB();
       const existingEnrollmentIdx = db.enrollments.findIndex(
-        e => e.studentId === session.userId && e.courseId === course.id
+        e => e.studentId === user.id && e.courseId === course.id
       );
 
       const newEnrollment: Enrollment = {
         id: existingEnrollmentIdx !== -1 ? db.enrollments[existingEnrollmentIdx].id : `e_${Date.now()}`,
-        studentId: session.userId,
+        studentId: user.id,
         courseId: course.id,
         progressPercent: existingEnrollmentIdx !== -1 ? db.enrollments[existingEnrollmentIdx].progressPercent : 0,
         joinedAt: existingEnrollmentIdx !== -1 ? db.enrollments[existingEnrollmentIdx].joinedAt : new Date().toISOString(),
@@ -87,15 +208,14 @@ export default function PaymentPage() {
         db.enrollments.push(newEnrollment);
       }
 
-      // 2. Create transaction receipt
       let payMethodLabel: Transaction["method"] = "Carte";
       if (method === "momo") payMethodLabel = "Mobile Money";
       else if (method === "paypal") payMethodLabel = "PayPal";
 
       const newTransaction: Transaction = {
         id: `tx_${Date.now()}`,
-        userId: session.userId,
-        userName: session.name,
+        userId: user.id,
+        userName: user.email?.split('@')[0] || 'Étudiant',
         amount: finalAmount,
         courseId: course.id,
         instructorId: course.instructorId,
@@ -106,24 +226,21 @@ export default function PaymentPage() {
       };
 
       db.transactions.push(newTransaction);
-
-      // Save database locally
       saveDB(db);
 
-      // Trigger Supabase sync in background (if user wants)
-      fetch('/api/courses', {
-        method: 'POST', // Just to trigger/check connection in backend
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ping: true })
-      }).catch(() => {});
+      // Déclencher la synchronisation en arrière-plan
+      const { syncFromSupabase } = await import("@/lib/supabase/sync");
+      await syncFromSupabase();
 
-      // Dispatch event to refresh state across components
-      window.dispatchEvent(new Event("storage"));
 
       setSubmitting(false);
       alert(`Paiement de $${finalAmount} validé avec succès ! Votre formation est débloquée.`);
       router.push("/dashboard/courses");
-    }, 2000);
+    } catch (err: any) {
+      console.error('[payment] Unexpected error during checkout:', err);
+      alert(err.message || "Une erreur est survenue lors de la validation de votre paiement.");
+      setSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -295,13 +412,12 @@ export default function PaymentPage() {
                   </div>
                   <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-200/50 dark:border-zinc-800 space-y-3">
                     <p className="text-xs text-zinc-500 dark:text-zinc-400">Veuillez envoyer exactement <span className="font-bold text-zinc-900 dark:text-white">${finalAmount} USDT</span> à l'adresse ci-dessous :</p>
-                    <div className="bg-white dark:bg-zinc-900 p-3 rounded-lg border border-zinc-300 dark:border-zinc-700 select-all font-mono text-xs text-center break-all">
+                    <div className="bg-white dark:bg-zinc-900 p-3 rounded-lg border border-zinc-300 dark:border-zinc-700 select-all font-mono text-xs text-center break-all text-zinc-900 dark:text-white">
                       {cryptoNetwork === "trc20"
                         ? "TY7aB4n8W3rWq9s9J2tA1kPz5X9c2v3b4n"
                         : "0x7aB4n8W3rWq9s9J2tA1kPz5X9c2v3b4n8W3rWq9s"}
                     </div>
                     <div className="flex items-center justify-center pt-2">
-                      {/* SVG Mock QR Code */}
                       <svg className="w-32 h-32 text-zinc-800 dark:text-white border border-zinc-200 p-2 rounded bg-white" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M0 0h6v6H0zm2 2v2h2V2zm0 6h6v6H0zm2 2v2h2v-2zm0 6h6v6H0zm2 2v2h2v-2zm6-14h6v6H8zm2 2v2h2V2zm0 6h6v6H8zm2 2v2h2v-2zm6-10h6v6h-6zm2 2v2h2V2zm-4 8h2v2h-2zm2 2h2v2h-2zm-2 2h2v2h-2zm4-4h2v2h-2zm0 4h2v2h-2zm-4 4h2v2h-2zm2 2h2v2h-2zm4-4h2v2h-2z" />
                       </svg>
