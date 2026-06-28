@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Users, CreditCard, LogOut, ShieldAlert, LifeBuoy } from "lucide-react";
+import { LayoutDashboard, Users, CreditCard, LogOut, ShieldAlert, LifeBuoy, BookOpen, Coins, Settings } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { getSimulatedSession, canAccessRoute } from "@/lib/rbac";
 
@@ -23,8 +23,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const menuItems = [
     { icon: <LayoutDashboard className="w-5 h-5" />, label: "Vue d'ensemble", href: "/admin" },
     { icon: <Users className="w-5 h-5" />, label: "Utilisateurs", href: "/admin/users" },
+    { icon: <BookOpen className="w-5 h-5" />, label: "Validation Cours", href: "/admin/courses" },
     { icon: <CreditCard className="w-5 h-5" />, label: "Transactions", href: "/admin/transactions" },
+    { icon: <Coins className="w-5 h-5" />, label: "Commissions & Payouts", href: "/admin/payouts" },
     { icon: <LifeBuoy className="w-5 h-5" />, label: "Tickets Support", href: "/admin/support" },
+    { icon: <Settings className="w-5 h-5" />, label: "Configuration", href: "/admin/settings" },
   ];
 
   return (

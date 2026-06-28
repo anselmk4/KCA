@@ -1,0 +1,307 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase/client";
+import { getDB } from "@/lib/db";
+import { 
+  Coins, 
+  Check, 
+  X, 
+  DollarSign, 
+  Percent, 
+  Calendar, 
+  User, 
+  TrendingUp, 
+  AlertCircle 
+} from "lucide-react";
+
+interface AdminPayoutItem {
+  id: string;
+  instructorId: string;
+  instructorName: string;
+  amount: number;
+  status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED';
+  createdAt: string;
+}
+
+export default function AdminPayoutsPage() {
+  const [payouts, setPayouts] = useState<AdminPayoutItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [totalSales, setTotalSales] = useState(0);
+  const [commissionRate, setCommissionRate] = useState(20); // 20% platform commission by default
+  const [activeTab, setActiveTab] = useState<"ALL" | "PENDING" | "PAID">("PENDING");
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch payouts from Supabase
+      const { data: sbPayouts, error: payoutErr } = await supabase
+        .from('payouts')
+        .select('*');
+
+      if (payoutErr) throw payoutErr;
+
+      // 2. Fetch profiles for instructor names
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name');
+
+      const profileMap = new Map<string, string>();
+      profiles?.forEach(p => {
+        profileMap.set(p.id, p.full_name || 'Instructeur');
+      });
+
+      // 3. Fetch all orders / payments to calculate platform sales
+      const { data: paymentsData } = await supabase
+        .from('payments')
+        .select('amount, status')
+        .eq('status', 'PAID');
+
+      const salesSum = (paymentsData || []).reduce((acc, curr) => acc + (curr.amount || 0), 0);
+      setTotalSales(salesSum);
+
+      const items: AdminPayoutItem[] = (sbPayouts || []).map((p: any) => ({
+        id: p.id,
+        instructorId: p.instructor_id,
+        instructorName: profileMap.get(p.instructor_id) || 'Formateur Kuettu',
+        amount: p.amount || 0,
+        status: p.status || 'PENDING',
+        createdAt: p.created_at || new Date().toISOString(),
+      }));
+
+      setPayouts(items);
+    } catch (err: any) {
+      console.error('[AdminPayouts] Error loading from Supabase:', err);
+      // Fallback local db
+      const db = getDB();
+      const rev = db.transactions.reduce((acc, curr) => acc + curr.amount, 0);
+      setTotalSales(rev);
+      
+      // Fallback fake payouts
+      setPayouts([
+        {
+          id: 'p_1',
+          instructorId: 'u3',
+          instructorName: 'Prof. Kuettu',
+          amount: 150,
+          status: 'PENDING',
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'p_2',
+          instructorId: 'u3',
+          instructorName: 'Prof. Kuettu',
+          amount: 320,
+          status: 'PAID',
+          createdAt: new Date(Date.now() - 86400000 * 5).toISOString()
+        }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleUpdatePayoutStatus = async (payoutId: string, nextStatus: AdminPayoutItem['status']) => {
+    try {
+      const { error } = await supabase
+        .from('payouts')
+        .update({ status: nextStatus })
+        .eq('id', payoutId);
+
+      if (error) throw error;
+
+      setPayouts(prev => prev.map(p => p.id === payoutId ? { ...p, status: nextStatus } : p));
+      alert(`Demande de reversement mise à jour avec succès : ${nextStatus === 'PAID' ? 'Validée (Payée)' : 'Rejetée (Annulée)'}`);
+    } catch (err: any) {
+      console.error('Error updating payout status:', err.message);
+      alert('Erreur lors de la validation du reversement : ' + err.message);
+    }
+  };
+
+  const platformCommissions = (totalSales * commissionRate) / 100;
+  const instructorShare = totalSales - platformCommissions;
+
+  const filtered = payouts.filter(p => {
+    if (activeTab === "ALL") return true;
+    return p.status === activeTab;
+  });
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in">
+      <div>
+        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Commissions & Reversements</h1>
+        <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">
+          Suivez les commissions prélevées par la plateforme et versez les gains aux formateurs.
+        </p>
+      </div>
+
+      {/* Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Total Platform Revenue */}
+        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center gap-4">
+          <div className="p-4 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl text-emerald-600">
+            <DollarSign className="w-8 h-8" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Ventes globales (LMS)</p>
+            <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">{totalSales}$</h3>
+          </div>
+        </div>
+
+        {/* Platform Share */}
+        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center gap-4">
+          <div className="p-4 bg-red-100 dark:bg-red-900/30 rounded-xl text-red-600">
+            <Percent className="w-8 h-8" />
+          </div>
+          <div className="flex-1">
+            <div className="flex justify-between items-center">
+              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Commissions de la plateforme</p>
+              <span className="text-xs bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-lg font-bold">
+                {commissionRate}%
+              </span>
+            </div>
+            <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">{platformCommissions}$</h3>
+          </div>
+        </div>
+
+        {/* Instructors Share */}
+        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center gap-4">
+          <div className="p-4 bg-blue-100 dark:bg-blue-900/30 rounded-xl text-blue-600">
+            <TrendingUp className="w-8 h-8" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Part théorique des Formateurs</p>
+            <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">{instructorShare}$</h3>
+          </div>
+        </div>
+      </div>
+
+      {/* Adjust Commission Rate Card */}
+      <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h4 className="font-bold text-zinc-900 dark:text-white">Ajuster le taux de commission</h4>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">Définissez la commission prélevée par la plateforme sur chaque transaction.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            type="number"
+            min="0"
+            max="100"
+            value={commissionRate}
+            onChange={(e) => setCommissionRate(Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+            className="w-20 px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-center text-sm font-bold text-zinc-900 dark:text-white"
+          />
+          <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">% de commission</span>
+        </div>
+      </div>
+
+      {/* Payout Requests Title */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Demandes de Reversement</h3>
+          <div className="flex gap-2">
+            {(["PENDING", "PAID", "ALL"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                  activeTab === tab
+                    ? "bg-red-50 dark:bg-red-950/20 text-red-600 border-red-200 dark:border-red-900/30"
+                    : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                }`}
+              >
+                {tab === "PENDING" ? "En attente ⏳" : tab === "PAID" ? "Payés" : "Tous"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Requests Table */}
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+          {loading ? (
+            <div className="p-16 text-center space-y-4">
+              <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-zinc-500 dark:text-zinc-400 text-sm">Chargement des demandes de reversements...</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="p-16 text-center text-zinc-500 dark:text-zinc-400">
+              Aucune demande de reversement à afficher.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold">Formateur</th>
+                    <th className="px-6 py-4 font-semibold">Date de Demande</th>
+                    <th className="px-6 py-4 font-semibold">Montant à reverser</th>
+                    <th className="px-6 py-4 font-semibold">Statut</th>
+                    <th className="px-6 py-4 font-semibold text-right">Actions rapides</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-sm">
+                  {filtered.map((p) => (
+                    <tr key={p.id} className="text-zinc-900 dark:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+                      <td className="px-6 py-4 font-semibold flex items-center gap-2">
+                        <div className="w-8 h-8 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center text-zinc-500 text-xs font-bold">
+                          {p.instructorName.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <span>{p.instructorName}</span>
+                          <p className="text-[10px] text-zinc-400 font-mono">ID: {p.instructorId.slice(0, 8)}...</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-zinc-500 text-xs">
+                        {new Date(p.createdAt).toLocaleDateString()} at {new Date(p.createdAt).toLocaleTimeString()}
+                      </td>
+                      <td className="px-6 py-4 font-bold text-red-600">
+                        {p.amount}$
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          p.status === 'PAID'
+                            ? "bg-green-100 dark:bg-green-950/20 text-green-700 dark:text-green-400"
+                            : p.status === 'PENDING'
+                            ? "bg-amber-100 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400"
+                            : "bg-red-100 dark:bg-red-950/20 text-red-700 dark:text-red-400"
+                        }`}>
+                          {p.status === 'PAID' ? 'Validé' : p.status === 'PENDING' ? 'En attente' : 'Annulé/Réfusé'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {p.status === 'PENDING' ? (
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => handleUpdatePayoutStatus(p.id, 'PAID')}
+                              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                              title="Valider le reversement"
+                            >
+                              <Check className="w-3 h-3" /> Payer
+                            </button>
+                            <button
+                              onClick={() => handleUpdatePayoutStatus(p.id, 'CANCELLED')}
+                              className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                              title="Rejeter le reversement"
+                            >
+                              <X className="w-3 h-3" /> Refuser
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-zinc-400">Aucune action requise</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
