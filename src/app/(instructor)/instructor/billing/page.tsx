@@ -26,21 +26,25 @@ export default function BillingPage() {
       }
 
       // 1. Charger le profil de l'instructeur
-      const { data: profile } = await supabase
+      const { data: rawProfile } = await supabase
         .from("profiles")
-        .select("id, plan, role, full_name, email")
+        .select("id, plan, full_name, email")
         .eq("id", user.id)
         .maybeSingle();
+
+      const profile = rawProfile as any;
 
       if (profile) {
         const planStr = profile.plan || "FREE";
         setCurrentPlan(planStr);
+        const localSess = getSimulatedSession();
         const updatedSession = {
           userId: profile.id,
-          name: profile.full_name || "Instructeur",
-          email: profile.email || "",
-          role: profile.role || "INSTRUCTOR",
-          plan: planStr,
+          name: profile.full_name || localSess?.name || "Instructeur",
+          email: profile.email || localSess?.email || "",
+          role: (localSess?.role || "INSTRUCTOR") as any,
+          status: (localSess?.status || "ACTIVE") as any,
+          plan: planStr as any,
         };
         setSession(updatedSession);
         setSimulatedSession(updatedSession);

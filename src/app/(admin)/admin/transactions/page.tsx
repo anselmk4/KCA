@@ -71,7 +71,7 @@ export default function AdminTransactionsPage() {
         const courseId = orderItemMap.get(p.order_id) || "";
         const courseTitle = courseMap.get(courseId) || "Abonnement ou Autre";
         
-        let payMethod = p.provider || "STRIPE";
+        let payMethod: string = p.provider || "STRIPE";
         if (payMethod === "MOBILE_MONEY") payMethod = "MoMo";
 
         return {

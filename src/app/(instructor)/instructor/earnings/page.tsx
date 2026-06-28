@@ -59,23 +59,26 @@ export default function EarningsPage() {
       }
 
       // 1. Get profile and plan
-      const { data: profile } = await supabase
+      const { data: rawProfile } = await supabase
         .from("profiles")
-        .select("id, plan, role, full_name, email")
+        .select("id, plan, full_name, email")
         .eq("id", user.id)
         .maybeSingle();
 
+      const profile = rawProfile as any;
       const currentPlan = profile?.plan || "FREE";
       setInstructorPlan(currentPlan);
 
       // Sync local simulated session
       if (profile) {
+        const localSess = getSimulatedSession();
         const updatedSession = {
           userId: profile.id,
-          name: profile.full_name || "Instructeur",
-          email: profile.email || "",
-          role: profile.role || "INSTRUCTOR",
-          plan: currentPlan,
+          name: profile.full_name || localSess?.name || "Instructeur",
+          email: profile.email || localSess?.email || "",
+          role: (localSess?.role || "INSTRUCTOR") as any,
+          status: (localSess?.status || "ACTIVE") as any,
+          plan: currentPlan as any,
         };
         setSimulatedSession(updatedSession);
       }
@@ -147,7 +150,7 @@ export default function EarningsPage() {
         const course = courseMap.get(courseId);
         const studentName = profileMap.get(p.user_id) || "Étudiant";
         
-        let payMethod = p.provider || "STRIPE";
+        let payMethod: string = p.provider || "STRIPE";
         if (payMethod === "MOBILE_MONEY") payMethod = "MoMo";
         
         return {
