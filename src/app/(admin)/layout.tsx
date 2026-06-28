@@ -66,9 +66,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             href="/dashboard"
             className="flex items-center space-x-3 px-4 py-3 rounded-xl text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-all"
           >
-            <LogOut className="w-5 h-5" />
-            <span className="text-sm">Quitter l'Admin</span>
+            <LayoutDashboard className="w-5 h-5 text-zinc-400" />
+            <span className="text-sm">Espace Étudiant</span>
           </Link>
+          <button 
+            onClick={async () => {
+              const { supabase } = await import("@/lib/supabase/client");
+              await supabase.auth.signOut();
+              router.push("/login");
+            }}
+            className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all cursor-pointer text-left font-medium"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="text-sm">Se Déconnecter</span>
+          </button>
         </div>
       </aside>
       

@@ -14,7 +14,9 @@ import {
   DollarSign, 
   Layers, 
   User, 
-  FileText 
+  FileText,
+  Edit3,
+  Trash2
 } from "lucide-react";
 
 interface AdminCourseItem {
@@ -36,6 +38,52 @@ export default function AdminCoursesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"ALL" | "REVIEW" | "PUBLISHED" | "DRAFT">("REVIEW");
+  const [editingCourse, setEditingCourse] = useState<AdminCourseItem | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+
+  const handleEditCourseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCourse || !editingTitle.trim()) return;
+
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .update({ title: editingTitle.trim() })
+        .eq('id', editingCourse.id);
+      
+      if (error) throw error;
+      
+      setCourses(prev => prev.map(c => c.id === editingCourse.id ? { ...c, title: editingTitle.trim() } : c));
+      setEditingCourse(null);
+      setEditingTitle("");
+      alert("Titre du cours modifié avec succès !");
+    } catch (err: any) {
+      alert("Erreur lors de la modification du titre : " + err.message);
+    }
+  };
+
+  const handleDeleteCourse = async (courseId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer définitivement ce cours ? Cette action supprimera également toutes ses sections et leçons.")) return;
+    try {
+      // Supprimer de localStorage pour compatibilité locale synchrone
+      const { deleteCourse } = await import("@/lib/db");
+      deleteCourse(courseId);
+
+      // Supprimer de Supabase
+      const { error } = await supabase
+        .from('courses')
+        .delete()
+        .eq('id', courseId);
+      
+      if (error) throw error;
+      
+      setCourses(prev => prev.filter(c => c.id !== courseId));
+      alert("Cours supprimé avec succès !");
+    } catch (err: any) {
+      console.error("Error deleting course:", err.message);
+      alert("Erreur de suppression du cours : " + err.message);
+    }
+  };
 
   const fetchCourses = async () => {
     setLoading(true);
@@ -208,15 +256,35 @@ export default function AdminCoursesPage() {
                   <span className="px-2 py-0.5 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 rounded-lg text-[10px] font-bold uppercase">
                     {course.categoryName}
                   </span>
-                  <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border flex items-center gap-1 uppercase ${
-                    course.status === 'PUBLISHED'
-                      ? 'text-green-700 bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900/30'
-                      : course.status === 'REVIEW'
-                      ? 'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/30'
-                      : 'text-zinc-500 bg-zinc-50 border-zinc-200 dark:bg-zinc-800/40 dark:border-zinc-700'
-                  }`}>
-                    {course.status === 'PUBLISHED' ? 'Publié' : course.status === 'REVIEW' ? 'En révision' : 'Brouillon'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {/* Action buttons */}
+                    <button
+                      onClick={() => {
+                        setEditingCourse(course);
+                        setEditingTitle(course.title);
+                      }}
+                      className="p-1 text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+                      title="Modifier le titre"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCourse(course.id)}
+                      className="p-1 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
+                      title="Supprimer la formation"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border flex items-center gap-1 uppercase ${
+                      course.status === 'PUBLISHED'
+                        ? 'text-green-700 bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900/30'
+                        : course.status === 'REVIEW'
+                        ? 'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/30'
+                        : 'text-zinc-500 bg-zinc-50 border-zinc-200 dark:bg-zinc-800/40 dark:border-zinc-700'
+                    }`}>
+                      {course.status === 'PUBLISHED' ? 'Publié' : course.status === 'REVIEW' ? 'En révision' : 'Brouillon'}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Details */}
@@ -281,6 +349,41 @@ export default function AdminCoursesPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+      {/* Modal Edit Course Title */}
+      {editingCourse && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl max-w-md w-full overflow-hidden">
+            <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+              <h3 className="font-bold text-zinc-900 dark:text-white">Modifier le titre du cours</h3>
+              <button onClick={() => setEditingCourse(null)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleEditCourseSubmit} className="p-6 space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Titre de la formation</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Nouveau titre"
+                  value={editingTitle}
+                  onChange={(e) => setEditingTitle(e.target.value)}
+                  className="w-full px-4 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 text-zinc-900 dark:text-white"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={!editingTitle.trim()}
+                className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold text-sm transition-colors mt-6 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Check className="w-4 h-4" />
+                Enregistrer la modification
+              </button>
+            </form>
+          </div>
         </div>
       )}
     </div>
