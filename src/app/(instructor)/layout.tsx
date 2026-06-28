@@ -31,6 +31,7 @@ import { supabase } from "@/lib/supabase/client";
 const menuItems = [
   { icon: LayoutDashboard, label: "Tableau de bord", href: "/instructor" },
   { icon: BookOpen, label: "Mes cours", href: "/instructor/courses" },
+  { icon: Users, label: "Étudiants", href: "/instructor/students" },
   { icon: Video, label: "Sessions live", href: "/instructor/live" },
   { icon: BarChart3, label: "Analytique", href: "/instructor/analytics" },
   { icon: Wallet, label: "Revenus", href: "/instructor/earnings" },

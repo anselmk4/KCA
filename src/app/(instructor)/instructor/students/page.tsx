@@ -1,201 +1,508 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getDB, addUser, initDB, Database } from "@/lib/db";
-import { getSimulatedSession } from "@/lib/rbac";
+import { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
-  Users,
-  Mail,
-  Search,
-  UserPlus,
-  TrendingUp,
-  MoreHorizontal,
-  X,
-  CheckCircle2,
+  Users, Search, TrendingUp, BookOpen, Award, DollarSign,
+  ArrowRight, Filter, ChevronDown, Loader2, UserCheck,
+  AlertCircle, Clock, CheckCircle2, Circle
 } from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
+import { getSimulatedSession } from "@/lib/rbac";
+
+type StudentEnrollment = {
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+  courseId: string;
+  courseTitle: string;
+  coursePrice: number;
+  progressPercent: number;
+  enrollmentStatus: string;
+  enrolledAt: string;
+  paymentStatus: "PAID" | "PENDING" | "FAILED" | "none";
+  paymentAmount: number;
+  hasCertificate: boolean;
+};
+
+type GroupedStudent = {
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+  enrollments: StudentEnrollment[];
+  totalPaid: number;
+  avgProgress: number;
+  hasCertificate: boolean;
+  lastActivity: string;
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  ACTIVE: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  COMPLETED: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  AT_RISK: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  SUSPENDED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  INACTIVE: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
+};
+
+const PAYMENT_BADGE: Record<string, { label: string; cls: string }> = {
+  PAID: { label: "Payé", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" },
+  PENDING: { label: "En attente", cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
+  FAILED: { label: "Échoué", cls: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
+  none: { label: "Gratuit", cls: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400" },
+};
+
+function ProgressRing({ percent, size = 44 }: { percent: number; size?: number }) {
+  const r = (size - 6) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (percent / 100) * circ;
+  const color = percent >= 80 ? "#10b981" : percent >= 40 ? "#3b82f6" : "#f59e0b";
+  return (
+    <svg width={size} height={size} className="rotate-[-90deg]">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeWidth={3} className="text-zinc-100 dark:text-zinc-800" />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={3} strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" style={{ transition: "stroke-dashoffset 0.5s ease" }} />
+    </svg>
+  );
+}
 
 export default function StudentsPage() {
-  const [db, setDb] = useState<Database | null>(null);
-  const [session, setSession] = useState<any>(null);
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [enrollments, setEnrollments] = useState<StudentEnrollment[]>([]);
   const [search, setSearch] = useState("");
-  const [showInvite, setShowInvite] = useState(false);
-  const [inviteName, setInviteName] = useState("");
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterPayment, setFilterPayment] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    initDB();
-    setDb(getDB());
-    setSession(getSimulatedSession());
-  }, []);
+    const session = getSimulatedSession();
+    if (!session?.userId) { router.replace("/login"); return; }
+    fetchStudents(session.userId);
+  }, [router]);
 
-  if (!db || !session) return (
-    <div className="space-y-4">
-      {[...Array(5)].map((_, i) => (
-        <div key={i} className="h-16 bg-zinc-200 dark:bg-zinc-800 rounded-xl animate-pulse" />
-      ))}
+  async function fetchStudents(instructorId: string) {
+    setLoading(true);
+    try {
+      // 1. Get instructor's courses
+      const { data: courses } = await supabase
+        .from("courses")
+        .select("id, title, price")
+        .eq("instructor_id", instructorId);
+
+      if (!courses || courses.length === 0) { setLoading(false); return; }
+      const courseIds = courses.map(c => c.id);
+      const courseMap = new Map(courses.map(c => [c.id, c]));
+
+      // 2. Get enrollments for those courses
+      const { data: enrData } = await supabase
+        .from("enrollments")
+        .select("id, student_id, course_id, progress_percent, status, enrolled_at")
+        .in("course_id", courseIds);
+
+      if (!enrData || enrData.length === 0) { setLoading(false); return; }
+      const studentIds = [...new Set(enrData.map(e => e.student_id))];
+
+      // 3. Get student profiles
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", studentIds);
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      // 4. Get orders & payments for those courses
+      const { data: orderItems } = await supabase
+        .from("order_items")
+        .select("order_id, course_id")
+        .in("course_id", courseIds);
+      const orderIds = orderItems?.map(oi => oi.order_id) || [];
+      const orderItemMap = new Map(orderItems?.map(oi => [oi.order_id, oi.course_id]) || []);
+
+      let paymentMap = new Map<string, { status: string; amount: number; userId: string }>();
+      if (orderIds.length > 0) {
+        const { data: payments } = await supabase
+          .from("payments")
+          .select("order_id, status, amount, user_id")
+          .in("order_id", orderIds);
+        payments?.forEach(p => {
+          const courseId = orderItemMap.get(p.order_id);
+          if (courseId) {
+            paymentMap.set(`${p.user_id}_${courseId}`, { status: p.status, amount: p.amount, userId: p.user_id });
+          }
+        });
+      }
+
+      // 5. Get certificates
+      const { data: certs } = await supabase
+        .from("certificates")
+        .select("student_id, course_id")
+        .in("course_id", courseIds);
+      const certSet = new Set(certs?.map(c => `${c.student_id}_${c.course_id}`) || []);
+
+      // 6. Map everything
+      const rows: StudentEnrollment[] = enrData.map(e => {
+        const profile = profileMap.get(e.student_id);
+        const course = courseMap.get(e.course_id);
+        const pay = paymentMap.get(`${e.student_id}_${e.course_id}`);
+        return {
+          studentId: e.student_id,
+          studentName: profile?.full_name || "Étudiant",
+          studentEmail: profile?.email || "",
+          courseId: e.course_id,
+          courseTitle: course?.title || "Cours",
+          coursePrice: course?.price || 0,
+          progressPercent: e.progress_percent || 0,
+          enrollmentStatus: e.status || "ACTIVE",
+          enrolledAt: e.enrolled_at,
+          paymentStatus: (pay?.status as any) || "none",
+          paymentAmount: pay?.amount || 0,
+          hasCertificate: certSet.has(`${e.student_id}_${e.course_id}`),
+        };
+      });
+
+      setEnrollments(rows);
+    } catch (err) {
+      console.error("[students] fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Group by student
+  const grouped = useMemo<GroupedStudent[]>(() => {
+    const map = new Map<string, GroupedStudent>();
+    enrollments.forEach(e => {
+      if (!map.has(e.studentId)) {
+        map.set(e.studentId, {
+          studentId: e.studentId,
+          studentName: e.studentName,
+          studentEmail: e.studentEmail,
+          enrollments: [],
+          totalPaid: 0,
+          avgProgress: 0,
+          hasCertificate: false,
+          lastActivity: e.enrolledAt,
+        });
+      }
+      const g = map.get(e.studentId)!;
+      g.enrollments.push(e);
+      if (e.paymentStatus === "PAID") g.totalPaid += e.paymentAmount;
+      if (e.hasCertificate) g.hasCertificate = true;
+      if (new Date(e.enrolledAt) > new Date(g.lastActivity)) g.lastActivity = e.enrolledAt;
+    });
+    map.forEach(g => {
+      g.avgProgress = g.enrollments.length > 0
+        ? Math.round(g.enrollments.reduce((s, e) => s + e.progressPercent, 0) / g.enrollments.length)
+        : 0;
+    });
+    return Array.from(map.values());
+  }, [enrollments]);
+
+  // KPIs
+  const totalRevenue = grouped.reduce((s, g) => s + g.totalPaid, 0);
+  const avgProgress = grouped.length > 0 ? Math.round(grouped.reduce((s, g) => s + g.avgProgress, 0) / grouped.length) : 0;
+  const certifiedCount = grouped.filter(g => g.hasCertificate).length;
+  const atRiskCount = grouped.filter(g => g.avgProgress < 20 && g.enrollments.length > 0).length;
+
+  // Filtering
+  const filtered = useMemo(() => {
+    return grouped.filter(g => {
+      const q = search.toLowerCase();
+      const matchSearch = !q || g.studentName.toLowerCase().includes(q) || g.studentEmail.toLowerCase().includes(q);
+      const matchStatus = filterStatus === "all" || g.enrollments.some(e => e.enrollmentStatus === filterStatus);
+      const matchPayment = filterPayment === "all" || g.enrollments.some(e => e.paymentStatus === filterPayment);
+      return matchSearch && matchStatus && matchPayment;
+    });
+  }, [grouped, search, filterStatus, filterPayment]);
+
+  if (loading) return (
+    <div className="max-w-6xl mx-auto space-y-8">
+      <div className="h-8 w-48 bg-zinc-200 dark:bg-zinc-800 rounded-xl animate-pulse" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-zinc-200 dark:bg-zinc-800 rounded-2xl animate-pulse" />)}
+      </div>
+      <div className="space-y-3">
+        {[...Array(5)].map((_, i) => <div key={i} className="h-20 bg-zinc-200 dark:bg-zinc-800 rounded-2xl animate-pulse" />)}
+      </div>
     </div>
   );
 
-  const myCourseIds = db.courses.filter(c => c.instructorId === (session?.userId ?? "")).map(c => c.id);
-  const myEnrollments = db.enrollments.filter(e => myCourseIds.includes(e.courseId));
-  const enrolledStudentIds = [...new Set(myEnrollments.map(e => e.studentId))];
-  const students = db.users.filter(u => enrolledStudentIds.includes(u.id) && u.role === "STUDENT");
-
-  const filtered = students.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.email.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const handleInvite = (e: React.FormEvent) => {
-    e.preventDefault();
-    const existing = db.users.find(u => u.email === inviteEmail);
-    if (!existing) {
-      addUser({ name: inviteName, email: inviteEmail, role: "STUDENT", level: "Débutant", activeCourse: "", plan: "FREE" });
-      setDb(getDB());
-    }
-    setInviteSuccess(true);
-    setTimeout(() => {
-      setInviteSuccess(false);
-      setShowInvite(false);
-      setInviteName("");
-      setInviteEmail("");
-    }, 2500);
-  };
-
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in">
+    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
+          <div className="flex items-center gap-2 text-teal-600 dark:text-teal-400 mb-1">
+            <Users className="w-4 h-4" />
+            <span className="text-xs font-bold tracking-[0.2em] uppercase">Gestion</span>
+          </div>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Mes Étudiants</h1>
-          <p className="text-zinc-500 dark:text-zinc-400 mt-1">
-            {students.length} apprenant{students.length !== 1 ? "s" : ""} inscrit{students.length !== 1 ? "s" : ""} à vos cours.
+          <p className="text-zinc-500 dark:text-zinc-400 mt-1 text-sm">
+            {grouped.length} apprenant{grouped.length !== 1 ? "s" : ""} inscrits sur {[...new Set(enrollments.map(e => e.courseId))].length} cours
           </p>
         </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          {
+            label: "Total apprenants",
+            value: grouped.length,
+            icon: Users,
+            color: "text-teal-600 dark:text-teal-400",
+            bg: "bg-teal-50 dark:bg-teal-900/20",
+            border: "border-teal-100 dark:border-teal-900/30",
+          },
+          {
+            label: "Revenus générés",
+            value: `${totalRevenue.toLocaleString()} $`,
+            icon: DollarSign,
+            color: "text-emerald-600 dark:text-emerald-400",
+            bg: "bg-emerald-50 dark:bg-emerald-900/20",
+            border: "border-emerald-100 dark:border-emerald-900/30",
+          },
+          {
+            label: "Progression moy.",
+            value: `${avgProgress}%`,
+            icon: TrendingUp,
+            color: "text-blue-600 dark:text-blue-400",
+            bg: "bg-blue-50 dark:bg-blue-900/20",
+            border: "border-blue-100 dark:border-blue-900/30",
+          },
+          {
+            label: "Certifiés",
+            value: certifiedCount,
+            icon: Award,
+            color: "text-purple-600 dark:text-purple-400",
+            bg: "bg-purple-50 dark:bg-purple-900/20",
+            border: "border-purple-100 dark:border-purple-900/30",
+          },
+        ].map((kpi, i) => {
+          const Icon = kpi.icon;
+          return (
+            <div key={i} className={`bg-white dark:bg-zinc-900 rounded-2xl border ${kpi.border} p-5 shadow-sm flex items-start gap-4`}>
+              <div className={`p-2.5 rounded-xl ${kpi.bg}`}>
+                <Icon className={`w-5 h-5 ${kpi.color}`} />
+              </div>
+              <div>
+                <p className={`text-2xl font-extrabold ${kpi.color}`}>{kpi.value}</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{kpi.label}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Alert bar */}
+      {atRiskCount > 0 && (
+        <div className="flex items-center gap-3 px-5 py-3.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+          <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
+            <span className="font-bold">{atRiskCount} apprenant{atRiskCount > 1 ? "s" : ""}</span> n&apos;ont pas encore dépassé 20% de progression. Pensez à les relancer.
+          </p>
+        </div>
+      )}
+
+      {/* Search & Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+          <input
+            type="text"
+            placeholder="Rechercher un apprenant..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-11 pr-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40 transition-shadow"
+          />
+        </div>
         <button
-          onClick={() => setShowInvite(true)}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-500 text-white font-semibold rounded-xl transition-colors shadow-lg shadow-teal-500/20 text-sm"
+          onClick={() => setShowFilters(!showFilters)}
+          className={`inline-flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-all ${showFilters ? "bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800 text-teal-700 dark:text-teal-400" : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400"}`}
         >
-          <UserPlus className="w-4 h-4" />
-          Inviter un Étudiant
+          <Filter className="w-4 h-4" />
+          Filtres
+          <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? "rotate-180" : ""}`} />
         </button>
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Total inscrits", value: students.length, color: "text-teal-600", bg: "bg-teal-50 dark:bg-teal-900/20" },
-          { label: "Actifs cette semaine", value: Math.ceil(students.length * 0.7), color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-900/20" },
-          { label: "Certifiés", value: db.certificates.filter(c => myCourseIds.includes(c.courseId)).length, color: "text-purple-600", bg: "bg-purple-50 dark:bg-purple-900/20" },
-          { label: "Progression moy.", value: `${myEnrollments.length > 0 ? Math.round(myEnrollments.reduce((s, e) => s + e.progressPercent, 0) / myEnrollments.length) : 0}%`, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-900/20" },
-        ].map((stat, i) => (
-          <div key={i} className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-            <div className={`text-2xl font-extrabold ${stat.color} mb-1`}>{stat.value}</div>
-            <div className="text-xs text-zinc-500">{stat.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-        <input
-          type="text"
-          placeholder="Rechercher un étudiant..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="pl-9 pr-4 py-2.5 w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500 transition-all"
-        />
-      </div>
-
-      {/* Students table */}
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800">
-          <h2 className="font-semibold text-zinc-900 dark:text-white">Liste des Apprenants</h2>
-        </div>
-        {filtered.length === 0 ? (
-          <div className="py-16 text-center">
-            <Users className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
-            <p className="text-zinc-500 text-sm">Aucun étudiant trouvé.</p>
-            <button onClick={() => setShowInvite(true)} className="mt-4 text-teal-600 text-sm font-semibold hover:underline">
-              + Inviter un premier étudiant
-            </button>
-          </div>
-        ) : (
-          <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-            {filtered.map(student => {
-              const enr = myEnrollments.filter(e => e.studentId === student.id);
-              const avgProg = enr.length > 0 ? Math.round(enr.reduce((s, e) => s + e.progressPercent, 0) / enr.length) : 0;
-              const course = db.courses.find(c => c.id === enr[0]?.courseId);
-              return (
-                <div key={student.id} className="px-6 py-4 flex items-center gap-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-                  <div className="w-10 h-10 bg-teal-100 dark:bg-teal-900/30 rounded-full flex items-center justify-center text-teal-600 font-bold text-sm shrink-0">
-                    {(student.name || "").split(" ").map(n => n[0] || "").join("").slice(0, 2)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-zinc-900 dark:text-white text-sm truncate">{student.name}</p>
-                    <p className="text-xs text-zinc-400 truncate">{student.email}</p>
-                  </div>
-                  <div className="hidden md:block text-xs text-zinc-500 truncate max-w-[140px]">
-                    {course?.title || "—"}
-                  </div>
-                  <div className="hidden sm:flex items-center gap-2 w-28">
-                    <div className="flex-1 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-teal-500 rounded-full" style={{ width: `${avgProg}%` }} />
-                    </div>
-                    <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 w-8 text-right">{avgProg}%</span>
-                  </div>
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase shrink-0 ${
-                    student.status === "Actif"
-                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                      : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
-                  }`}>
-                    {student.status}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Invite Modal */}
-      {showInvite && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowInvite(false)}>
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Inviter un Étudiant</h2>
-              <button onClick={() => setShowInvite(false)} className="p-1 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            {inviteSuccess ? (
-              <div className="py-8 flex flex-col items-center gap-3">
-                <CheckCircle2 className="w-12 h-12 text-teal-500" />
-                <p className="font-semibold text-zinc-900 dark:text-white">Invitation envoyée !</p>
-                <p className="text-sm text-zinc-500">L'étudiant a été ajouté à votre liste.</p>
-              </div>
-            ) : (
-              <form onSubmit={handleInvite} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Nom complet</label>
-                  <input required type="text" value={inviteName} onChange={e => setInviteName(e.target.value)} placeholder="Jean Dupont" className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white border-transparent focus:ring-2 focus:ring-teal-500 outline-none" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Adresse Email</label>
-                  <input required type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="etudiant@exemple.com" className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white border-transparent focus:ring-2 focus:ring-teal-500 outline-none" />
-                </div>
-                <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-xl">
-                  <Mail className="w-4 h-4 text-blue-500 shrink-0" />
-                  <p className="text-xs text-blue-700 dark:text-blue-400">Un lien d'invitation sera simulé dans la plateforme.</p>
-                </div>
-                <button type="submit" className="w-full py-3 bg-teal-600 hover:bg-teal-500 text-white font-semibold rounded-xl transition-colors">
-                  Envoyer l'invitation
+      {showFilters && (
+        <div className="flex flex-wrap gap-4 p-4 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 animate-in fade-in duration-200">
+          <div>
+            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Statut</label>
+            <div className="flex flex-wrap gap-2">
+              {["all", "ACTIVE", "COMPLETED", "AT_RISK", "INACTIVE"].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setFilterStatus(s)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filterStatus === s ? "bg-teal-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"}`}
+                >
+                  {s === "all" ? "Tous" : s === "ACTIVE" ? "Actif" : s === "COMPLETED" ? "Complété" : s === "AT_RISK" ? "En difficulté" : "Inactif"}
                 </button>
-              </form>
-            )}
+              ))}
+            </div>
           </div>
+          <div>
+            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Paiement</label>
+            <div className="flex flex-wrap gap-2">
+              {["all", "PAID", "PENDING", "FAILED"].map(p => (
+                <button
+                  key={p}
+                  onClick={() => setFilterPayment(p)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filterPayment === p ? "bg-teal-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"}`}
+                >
+                  {p === "all" ? "Tous" : p === "PAID" ? "Payé" : p === "PENDING" ? "En attente" : "Échoué"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Students Grid */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-20 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
+          <Users className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
+          <p className="text-zinc-500 dark:text-zinc-400 font-medium">Aucun étudiant trouvé</p>
+          <p className="text-zinc-400 dark:text-zinc-600 text-sm mt-1">Publiez vos cours pour attirer vos premiers apprenants.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {/* Table Header */}
+          <div className="hidden lg:grid grid-cols-12 gap-4 px-6 py-2 text-xs font-bold text-zinc-400 uppercase tracking-wider">
+            <div className="col-span-3">Apprenant</div>
+            <div className="col-span-3">Cours inscrits</div>
+            <div className="col-span-2 text-center">Progression</div>
+            <div className="col-span-2 text-center">Paiement</div>
+            <div className="col-span-1 text-center">Certif.</div>
+            <div className="col-span-1 text-right">Action</div>
+          </div>
+
+          {filtered.map(student => {
+            const initials = student.studentName.split(" ").map(n => n[0] || "").join("").slice(0, 2).toUpperCase();
+            const primaryEnrollment = student.enrollments[0];
+            const payBadge = PAYMENT_BADGE[primaryEnrollment?.paymentStatus || "none"];
+            const isAtRisk = student.avgProgress < 20;
+
+            return (
+              <div
+                key={student.studentId}
+                className="group bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:border-teal-300 dark:hover:border-teal-700 hover:shadow-lg transition-all duration-200"
+              >
+                {/* Main row */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 px-6 py-5 items-center">
+                  {/* Student info */}
+                  <div className="col-span-3 flex items-center gap-3">
+                    <div className="relative shrink-0">
+                      <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm ${isAtRisk ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400"}`}>
+                        {initials}
+                      </div>
+                      {student.hasCertificate && (
+                        <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center">
+                          <Award className="w-2.5 h-2.5 text-white" />
+                        </span>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-zinc-900 dark:text-white text-sm truncate">{student.studentName}</p>
+                      <p className="text-xs text-zinc-400 truncate">{student.studentEmail}</p>
+                      <p className="text-[10px] text-zinc-400 mt-0.5 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Inscrit {new Date(student.lastActivity).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Courses */}
+                  <div className="col-span-3">
+                    <div className="space-y-1.5">
+                      {student.enrollments.slice(0, 2).map(e => (
+                        <div key={e.courseId} className="flex items-center gap-2">
+                          <BookOpen className="w-3 h-3 text-zinc-400 shrink-0" />
+                          <span className="text-xs text-zinc-600 dark:text-zinc-400 truncate">{e.courseTitle}</span>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${STATUS_COLORS[e.enrollmentStatus] || STATUS_COLORS.INACTIVE}`}>
+                            {e.enrollmentStatus === "ACTIVE" ? "Actif" : e.enrollmentStatus === "COMPLETED" ? "Terminé" : e.enrollmentStatus}
+                          </span>
+                        </div>
+                      ))}
+                      {student.enrollments.length > 2 && (
+                        <p className="text-[10px] text-zinc-400">+ {student.enrollments.length - 2} autre{student.enrollments.length - 2 > 1 ? "s" : ""}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Progress */}
+                  <div className="col-span-2 flex flex-col items-center gap-1">
+                    <div className="relative flex items-center justify-center">
+                      <ProgressRing percent={student.avgProgress} size={48} />
+                      <span className="absolute text-[10px] font-bold text-zinc-700 dark:text-zinc-300">
+                        {student.avgProgress}%
+                      </span>
+                    </div>
+                    {isAtRisk && (
+                      <span className="text-[9px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full">
+                        En retard
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Payment */}
+                  <div className="col-span-2 flex flex-col items-center gap-1.5">
+                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${payBadge.cls}`}>
+                      {payBadge.label}
+                    </span>
+                    {student.totalPaid > 0 && (
+                      <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        {student.totalPaid.toLocaleString()} $
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Certificate */}
+                  <div className="col-span-1 flex justify-center">
+                    {student.hasCertificate ? (
+                      <CheckCircle2 className="w-5 h-5 text-purple-500" />
+                    ) : (
+                      <Circle className="w-5 h-5 text-zinc-300 dark:text-zinc-700" />
+                    )}
+                  </div>
+
+                  {/* Action */}
+                  <div className="col-span-1 flex justify-end">
+                    <Link
+                      href={`/instructor/students/${student.studentId}`}
+                      className="inline-flex items-center gap-1 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold rounded-xl transition-all shadow-sm shadow-teal-500/20 group-hover:shadow-teal-500/30"
+                    >
+                      Détails
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Progress bars per course (expanded view) */}
+                {student.enrollments.length > 0 && (
+                  <div className="px-6 pb-4 pt-0">
+                    <div className="border-t border-zinc-100 dark:border-zinc-800 pt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {student.enrollments.map(e => (
+                        <div key={e.courseId} className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate max-w-[120px]">{e.courseTitle}</span>
+                            <span className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300">{e.progressPercent}%</span>
+                          </div>
+                          <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${e.progressPercent >= 80 ? "bg-emerald-500" : e.progressPercent >= 40 ? "bg-blue-500" : "bg-amber-400"}`}
+                              style={{ width: `${e.progressPercent}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

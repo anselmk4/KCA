@@ -20,7 +20,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     initDB();
-    
+
     const checkSession = async () => {
       try {
         const { data: { session: activeSession } } = await supabase.auth.getSession();
@@ -104,13 +104,13 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-white dark:bg-black font-sans">
-      
+
       {/* LEFT PANEL: Marketing & Slogan (hidden on mobile) */}
       <div className="hidden lg:flex lg:col-span-6 relative overflow-hidden bg-gradient-to-br from-zinc-900 via-zinc-950 to-black p-12 flex-col justify-between select-none">
         {/* Abstract Glowing shapes */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px] -mr-40 -mt-40 animate-pulse duration-[6000ms]" />
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-teal-500/10 rounded-full blur-[120px] -ml-40 -mb-40 animate-pulse duration-[8000ms]" />
-        
+
         {/* Header Branding */}
         <div className="z-10 flex items-center space-x-3">
           <div className="relative w-11 h-11 bg-white/5 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/10 shadow-lg">
@@ -130,9 +130,9 @@ export default function LoginPage() {
 
           <div className="space-y-4">
             <h1 className="text-4xl font-extrabold tracking-tight text-white leading-tight">
-              Propulsez votre avenir dans la{" "}
+              Gagnez de l'argent {" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-teal-400 to-emerald-400">
-                Blockchain & l'IA
+                en faisant ce que vous aimez
               </span>
             </h1>
             <p className="text-zinc-400 text-base leading-relaxed">
@@ -146,7 +146,7 @@ export default function LoginPage() {
               <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
                 <Coins className="w-4 h-4 text-blue-400" />
               </div>
-              <span>Formations DeFi & Crypto de niveau professionnel</span>
+              <span>Formations de niveau professionnel</span>
             </div>
             <div className="flex items-center space-x-3 text-sm text-zinc-300">
               <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
@@ -172,7 +172,7 @@ export default function LoginPage() {
       {/* RIGHT PANEL: Login Form */}
       <div className="lg:col-span-6 flex items-center justify-center p-6 md:p-12 bg-zinc-50 dark:bg-zinc-950">
         <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-zinc-200/80 dark:border-white/10 p-8 md:p-10 relative overflow-hidden transition-all">
-          
+
           {/* Top Brand representing mobile view logo */}
           <div className="flex flex-col items-center mb-8">
             <Link href="/" className="lg:hidden flex items-center space-x-2 mb-6">
@@ -281,32 +281,34 @@ export default function LoginPage() {
             <span>Se connecter avec Google</span>
           </button>
 
-          {/* Quick test accounts */}
-          <div className="mt-8 pt-6 border-t border-zinc-150 dark:border-zinc-800">
-            <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-3 text-center">
-              Accès rapide démo
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={loading || googleLoading}
-                onClick={() => quickLogin("instructor@kuettu.com", "password123")}
-                className="py-2.5 px-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-350 transition-all text-left disabled:opacity-50 cursor-pointer"
-              >
-                <p className="font-bold text-zinc-900 dark:text-white">Prof. Kuettu</p>
-                <p className="text-[10px] text-zinc-500 truncate">Formateur</p>
-              </button>
-              <button
-                type="button"
-                disabled={loading || googleLoading}
-                onClick={() => quickLogin("jean@example.com", "password123")}
-                className="py-2.5 px-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-350 transition-all text-left disabled:opacity-50 cursor-pointer"
-              >
-                <p className="font-bold text-zinc-900 dark:text-white">Jean Dupont</p>
-                <p className="text-[10px] text-zinc-500 truncate">Apprenant</p>
-              </button>
+          {/* Quick test accounts — affiché uniquement si NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS=true */}
+          {process.env.NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS === 'true' && (
+            <div className="mt-8 pt-6 border-t border-zinc-150 dark:border-zinc-800">
+              <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-3 text-center">
+                Accès rapide démo
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={loading || googleLoading}
+                  onClick={() => quickLogin("instructor@kuettu.com", "password123")}
+                  className="py-2.5 px-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-350 transition-all text-left disabled:opacity-50 cursor-pointer"
+                >
+                  <p className="font-bold text-zinc-900 dark:text-white">Prof. Kuettu</p>
+                  <p className="text-[10px] text-zinc-500 truncate">Formateur</p>
+                </button>
+                <button
+                  type="button"
+                  disabled={loading || googleLoading}
+                  onClick={() => quickLogin("jean@example.com", "password123")}
+                  className="py-2.5 px-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-350 transition-all text-left disabled:opacity-50 cursor-pointer"
+                >
+                  <p className="font-bold text-zinc-900 dark:text-white">Jean Dupont</p>
+                  <p className="text-[10px] text-zinc-500 truncate">Apprenant</p>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="mt-8 text-center text-sm text-zinc-600 dark:text-zinc-400">
             Nouveau sur la plateforme ?{" "}
