@@ -571,8 +571,6 @@ export default function CourseDetailPage() {
         .update({
           title: descForm.title,
           slug,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...(descForm.category ? { category: descForm.category } as any : {}),
           level: descForm.level as "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "EXPERT",
           description: descForm.description,
           updated_at: new Date().toISOString(),
