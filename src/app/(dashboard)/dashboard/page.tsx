@@ -26,7 +26,6 @@ interface Profile {
   id: string;
   full_name: string;
   email: string;
-  role: string;
 }
 
 interface CourseData {
@@ -59,12 +58,12 @@ interface CertificateData {
 function getCourseStyles(category: string) {
   const c = (category || "").toLowerCase();
   if (c.includes("blockchain") || c.includes("web3") || c.includes("nft"))
-    return { color: "text-blue-600", bgColor: "bg-blue-100 dark:bg-blue-900/30", barColor: "bg-blue-500", icon: <Bitcoin className="w-8 h-8 text-blue-600" /> };
+    return { color: "text-blue-600", bgColor: "bg-blue-100 dark:bg-blue-900/30", barColor: "bg-blue-500", borderHover: "hover:border-blue-400", icon: <Bitcoin className="w-8 h-8 text-blue-600" /> };
   if (c.includes("trading") || c.includes("defi") || c.includes("finance"))
-    return { color: "text-emerald-600", bgColor: "bg-emerald-100 dark:bg-emerald-900/30", barColor: "bg-emerald-500", icon: <TrendingUp className="w-8 h-8 text-emerald-600" /> };
+    return { color: "text-emerald-600", bgColor: "bg-emerald-100 dark:bg-emerald-900/30", barColor: "bg-emerald-500", borderHover: "hover:border-emerald-400", icon: <TrendingUp className="w-8 h-8 text-emerald-600" /> };
   if (c.includes("intelligence") || c.includes("ia") || c.includes("ai"))
-    return { color: "text-purple-600", bgColor: "bg-purple-100 dark:bg-purple-900/30", barColor: "bg-purple-500", icon: <BrainCircuit className="w-8 h-8 text-purple-600" /> };
-  return { color: "text-teal-600", bgColor: "bg-teal-100 dark:bg-teal-900/30", barColor: "bg-teal-500", icon: <Code2 className="w-8 h-8 text-teal-600" /> };
+    return { color: "text-purple-600", bgColor: "bg-purple-100 dark:bg-purple-900/30", barColor: "bg-purple-500", borderHover: "hover:border-purple-400", icon: <BrainCircuit className="w-8 h-8 text-purple-600" /> };
+  return { color: "text-teal-600", bgColor: "bg-teal-100 dark:bg-teal-900/30", barColor: "bg-teal-500", borderHover: "hover:border-teal-400", icon: <Code2 className="w-8 h-8 text-teal-600" /> };
 }
 
 export default function DashboardPage() {
@@ -84,18 +83,18 @@ export default function DashboardPage() {
       // Profile
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("*")
+        .select("id, full_name, email")
         .eq("id", user.id)
         .maybeSingle();
-      setProfile(profileData as Profile);
+      setProfile(profileData as unknown as Profile);
 
       // Enrollments with course data
       const { data: enrollData } = await supabase
         .from("enrollments")
-        .select("*, courses(*)")
+        .select("id, student_id, course_id, status, progress_percent, created_at, courses(id, title, category, level, price, status, description)")
         .eq("student_id", user.id);
 
-      const all = (enrollData || []) as EnrollmentData[];
+      const all = (enrollData || []) as unknown as EnrollmentData[];
       const active = all.filter((e) => e.status === "ACTIVE" && e.progress_percent < 100);
       const completed = all.filter((e) => e.progress_percent >= 100 || e.status === "COMPLETED");
       setActiveEnrollments(active);
@@ -112,9 +111,9 @@ export default function DashboardPage() {
       const enrolledIds = new Set(all.map((e) => e.course_id));
       const { data: coursesData } = await supabase
         .from("courses")
-        .select("*")
+        .select("id, title, category, level, price, status, description")
         .eq("status", "PUBLISHED");
-      const available = ((coursesData || []) as CourseData[]).filter((c) => !enrolledIds.has(c.id)).slice(0, 3);
+      const available = ((coursesData || []) as unknown as CourseData[]).filter((c) => !enrolledIds.has(c.id)).slice(0, 3);
       setAvailableCourses(available);
     } catch (err) {
       console.error("[DashboardPage] loadData error:", err);

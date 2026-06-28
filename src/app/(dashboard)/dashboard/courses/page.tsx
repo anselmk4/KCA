@@ -70,10 +70,10 @@ export default function MyCoursesPage() {
       // Enrollments with courses
       const { data: enrollData } = await supabase
         .from("enrollments")
-        .select("*, courses(*)")
+        .select("id, student_id, course_id, status, progress_percent, created_at, courses(id, title, category, level, price, status)")
         .eq("student_id", user.id);
 
-      const all = (enrollData || []) as EnrollmentData[];
+      const all = (enrollData || []) as unknown as EnrollmentData[];
 
       const active = all.filter((e) => e.status === "ACTIVE" && e.progress_percent < 100);
       const completed = all.filter((e) => e.progress_percent >= 100 || e.status === "COMPLETED");
@@ -85,10 +85,10 @@ export default function MyCoursesPage() {
       const enrolledIds = new Set(all.map((e) => e.course_id));
       const { data: coursesData } = await supabase
         .from("courses")
-        .select("*")
+        .select("id, title, category, level, price, status")
         .eq("status", "PUBLISHED");
 
-      const available = ((coursesData || []) as CourseData[]).filter((c) => !enrolledIds.has(c.id));
+      const available = ((coursesData || []) as unknown as CourseData[]).filter((c) => !enrolledIds.has(c.id));
       setAvailableCourses(available);
     } finally {
       setLoading(false);
