@@ -1,61 +1,106 @@
+"use client";
+
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { GraduationCap, Briefcase, Award, TrendingUp } from "lucide-react";
+import { motion, Variants } from "framer-motion";
 
 export default function CasesPage() {
   const cases = [
     {
-      icon: <GraduationCap className="h-10 w-10 text-blue-500" />,
+      icon: <GraduationCap className="h-6 w-6 text-teal-450" />,
       title: "Écoles & Universités",
-      desc: "Digitalisez vos cursus académiques. Offrez aux étudiants un accès permanent aux supports de cours, réalisez des contrôles continus en ligne et publiez les bulletins ou diplômes en un clic."
+      desc: "Digitalisez vos cursus académiques. Offrez aux étudiants un accès permanent aux supports de cours, réalisez des contrôles continus en ligne et publiez les bulletins ou diplômes en un clic.",
+      bgGlow: "group-hover:shadow-[0_0_25px_rgba(20,184,166,0.15)] group-hover:border-teal-500/50"
     },
     {
-      icon: <Briefcase className="h-10 w-10 text-emerald-500" />,
+      icon: <Briefcase className="h-6 w-6 text-emerald-450" />,
       title: "Entreprises & PME",
-      desc: "Formez vos collaborateurs sur site ou à distance. Structurez des parcours de formation internes pour l'onboarding, les règles de conformité ou le développement de compétences techniques."
+      desc: "Formez vos collaborateurs sur site ou à distance. Structurez des parcours de formation internes pour l'onboarding, les règles de conformité ou le développement de compétences techniques.",
+      bgGlow: "group-hover:shadow-[0_0_25px_rgba(16,185,129,0.15)] group-hover:border-emerald-500/50"
     },
     {
-      icon: <Award className="h-10 w-10 text-purple-500" />,
+      icon: <Award className="h-6 w-6 text-indigo-450" />,
       title: "Créateurs de Contenu & Influenceurs",
-      desc: "Monétisez votre audience grâce à votre savoir. Vendez des Masterclasses, créez des académies privées par abonnement mensuel et encaissez vos revenus directement par Mobile Money."
+      desc: "Monétisez votre audience grâce à votre savoir. Vendez des Masterclasses, créez des académies privées par abonnement mensuel et encaissez vos revenus directement par Mobile Money.",
+      bgGlow: "group-hover:shadow-[0_0_25px_rgba(99,102,241,0.15)] group-hover:border-indigo-500/50"
     },
     {
-      icon: <TrendingUp className="h-10 w-10 text-orange-500" />,
+      icon: <TrendingUp className="h-6 w-6 text-pink-450" />,
       title: "ONG & Formations Professionnelles",
-      desc: "Diffusez des programmes de formation certifiants à grand impact. Suivez en temps réel la progression des bénéficiaires et collectez des statistiques détaillées sur les taux de réussite."
+      desc: "Diffusez des programmes de formation certifiants à grand impact. Suivez en temps réel la progression des bénéficiaires et collectez des statistiques détaillées sur les taux de réussite.",
+      bgGlow: "group-hover:shadow-[0_0_25px_rgba(236,72,153,0.15)] group-hover:border-pink-500/50"
     }
   ];
 
-  return (
-    <div className="flex min-h-screen flex-col font-sans">
-      <Navbar />
-      <main className="flex-1 bg-zinc-50 dark:bg-black py-24">
-        <div className="container mx-auto px-4 md:px-8">
-          <div className="max-w-4xl mx-auto text-center mb-16">
-            <div className="inline-flex items-center rounded-full border border-blue-500/30 px-3 py-1 text-sm font-semibold mb-6 text-blue-400 bg-blue-950/50 backdrop-blur-sm">
-              Cas d'utilisation
-            </div>
-            <h1 className="text-4xl md:text-6xl font-extrabold mb-6 text-zinc-900 dark:text-white leading-tight">
-              Des solutions adaptées à chaque secteur d'activité.
-            </h1>
-            <p className="text-xl text-zinc-600 dark:text-zinc-400">
-              Découvrez comment ANSELLA est déployée pour propulser l'éducation, la formation professionnelle et la monétisation du savoir.
-            </p>
-          </div>
+  const containerVariants: Variants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.15 }
+    }
+  };
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+  const itemVariants: Variants = {
+    hidden: { opacity: 0, y: 25 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+  };
+
+  return (
+    <div className="flex min-h-screen flex-col font-sans bg-[#030712] text-white selection:bg-teal-500/30">
+      <Navbar />
+      <main className="flex-1 py-28 relative overflow-hidden">
+        {/* Decorative background blur lights */}
+        <div className="absolute top-10 left-10 w-96 h-96 bg-teal-500/5 rounded-full blur-[110px] pointer-events-none" />
+        <div className="absolute bottom-10 right-10 w-96 h-96 bg-indigo-500/5 rounded-full blur-[110px] pointer-events-none" />
+
+        <div className="container mx-auto px-4 md:px-8 relative z-10">
+          
+          {/* Header section with scroll reveal */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="max-w-4xl mx-auto text-center mb-20 space-y-4"
+          >
+            <span className="inline-flex items-center rounded-full border border-teal-500/20 px-3.5 py-1.5 text-xs font-bold text-teal-400 bg-teal-950/30 backdrop-blur-md">
+              Cas d&apos;utilisation
+            </span>
+            <h1 className="text-4xl md:text-6xl font-black mb-6 text-white leading-tight">
+              Des solutions adaptées à{" "}
+              <span className="bg-gradient-to-r from-teal-400 to-indigo-400 bg-clip-text text-transparent">chaque secteur d&apos;activité.</span>
+            </h1>
+            <p className="text-base text-zinc-400 max-w-2xl mx-auto leading-relaxed">
+              Découvrez comment ANSELLA est déployée pour propulser l&apos;éducation, la formation professionnelle et la monétisation du savoir.
+            </p>
+          </motion.div>
+
+          {/* Cards Grid */}
+          <motion.div 
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto"
+          >
             {cases.map((item, index) => (
-              <div key={index} className="bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-white/10 rounded-3xl p-8 hover:border-zinc-300 dark:hover:border-white/20 transition-all flex flex-col items-start gap-4">
-                <div className="p-3 bg-zinc-100 dark:bg-zinc-800 rounded-2xl">
+              <motion.div 
+                key={index} 
+                variants={itemVariants}
+                className={`group relative bg-zinc-950/40 backdrop-blur-md border border-zinc-850 rounded-3xl p-8 transition-all duration-350 flex flex-col items-start gap-5 overflow-hidden ${item.bgGlow}`}
+              >
+                {/* Glow backdrop inside the card on hover */}
+                <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
+                <div className="p-3 bg-zinc-900 rounded-2xl border border-zinc-800 group-hover:border-teal-500/30 transition-colors">
                   {item.icon}
                 </div>
-                <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">{item.title}</h2>
-                <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed text-sm md:text-base">
+                <h2 className="text-xl font-bold text-white group-hover:text-teal-400 transition-colors">{item.title}</h2>
+                <p className="text-zinc-400 leading-relaxed text-xs md:text-sm">
                   {item.desc}
                 </p>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </main>
       <Footer />

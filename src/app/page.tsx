@@ -14,7 +14,7 @@ import { LogoBanner } from "@/components/sections/LogoBanner";
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen flex-col font-sans">
+    <div className="flex min-h-screen flex-col font-sans bg-[#030712] text-white selection:bg-teal-500/30">
       <Navbar />
       <main className="flex-1">
         <Hero />

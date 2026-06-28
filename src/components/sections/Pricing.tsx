@@ -1,5 +1,9 @@
-import { Check } from "lucide-react";
+"use client";
+
+import { Check, Star } from "lucide-react";
 import Link from "next/link";
+import { motion, Variants } from "framer-motion";
+
 
 export function Pricing() {
   const plans = [
@@ -18,7 +22,8 @@ export function Pricing() {
       ],
       popular: false,
       buttonText: "Commencer gratuitement",
-      href: "/register?plan=free"
+      href: "/register?plan=free",
+      glowColor: "group-hover:shadow-[0_0_20px_rgba(20,184,166,0.15)] group-hover:border-teal-500/50"
     },
     {
       name: "Plan Base",
@@ -35,7 +40,8 @@ export function Pricing() {
       ],
       popular: false,
       buttonText: "Démarrer avec le Plan Base",
-      href: "/register?plan=base"
+      href: "/register?plan=base",
+      glowColor: "group-hover:shadow-[0_0_20px_rgba(99,102,241,0.15)] group-hover:border-indigo-500/50"
     },
     {
       name: "Plan Pro",
@@ -52,7 +58,8 @@ export function Pricing() {
       ],
       popular: true,
       buttonText: "Démarrer avec le Plan Pro",
-      href: "/register?plan=pro"
+      href: "/register?plan=pro",
+      glowColor: "shadow-[0_0_30px_rgba(20,184,166,0.1)] border-teal-500/80 bg-[#09101f]/60"
     },
     {
       name: "Plan Max",
@@ -69,66 +76,112 @@ export function Pricing() {
       ],
       popular: false,
       buttonText: "Activer le Plan Max",
-      href: "/register?plan=max"
+      href: "/register?plan=max",
+      glowColor: "group-hover:shadow-[0_0_20px_rgba(236,72,153,0.15)] group-hover:border-pink-500/50"
     }
   ];
 
+  const containerVariants: Variants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+
+  const itemVariants: Variants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+  };
+
+
   return (
-    <section id="pricing" className="py-24 bg-black text-white border-t border-white/10">
-      <div className="container mx-auto px-4 md:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold mb-6">Des Tarifs Transparents et Adaptés</h2>
-          <p className="text-lg text-zinc-400 max-w-2xl mx-auto">
+    <section id="pricing" className="py-32 bg-[#030712] text-white border-t border-zinc-900 relative overflow-hidden">
+      {/* Visual background lights */}
+      <div className="absolute top-1/4 left-10 w-96 h-96 bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-10 right-10 w-96 h-96 bg-teal-500/5 rounded-full blur-[100px] pointer-events-none" />
+
+      <div className="container mx-auto px-4 md:px-8 relative z-10 max-w-6xl">
+        
+        {/* Title & description */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-20 space-y-4"
+        >
+          <span className="text-xs font-bold text-teal-400 bg-teal-400/10 border border-teal-500/20 px-3.5 py-1 rounded-full uppercase tracking-widest">
+            Tarification
+          </span>
+          <h2 className="text-3xl md:text-5xl font-black tracking-tight text-white leading-tight">
+            Des Tarifs Transparents{" "}
+            <span className="bg-gradient-to-r from-teal-400 to-indigo-400 bg-clip-text text-transparent">et Adaptés</span>
+          </h2>
+          <p className="text-base text-zinc-400 max-w-2xl mx-auto leading-relaxed">
             Choisissez le forfait qui correspond au niveau de développement de votre académie. Annulez ou changez de plan à tout moment.
           </p>
-        </div>
+        </motion.div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+        {/* Plans list */}
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+        >
           {plans.map((plan, index) => (
-            <div 
+            <motion.div 
               key={index} 
-              className={`relative bg-zinc-900/50 backdrop-blur-sm rounded-3xl p-8 border flex flex-col h-full transition-all duration-300 hover:-translate-y-2 ${
+              variants={itemVariants}
+              className={`group relative rounded-3xl p-8 border flex flex-col h-full bg-zinc-950/40 backdrop-blur-md transition-all duration-300 ${
                 plan.popular 
-                  ? 'border-blue-500 shadow-[0_0_30px_rgba(37,99,235,0.15)]' 
-                  : 'border-white/10 hover:border-white/30'
+                  ? plan.glowColor
+                  : 'border-zinc-800/80 hover:bg-zinc-900/10 ' + plan.glowColor
               }`}
             >
               {plan.popular && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-1 text-sm font-bold rounded-full shadow-lg">
-                  Recommandé
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-teal-500 text-zinc-950 px-4 py-1 text-xxs font-black uppercase tracking-widest rounded-full shadow-lg flex items-center gap-1">
+                  <Star className="w-3 h-3 fill-zinc-950" /> Recommandé
                 </div>
               )}
-              <div className="mb-8 mt-4">
-                <h3 className="text-2xl font-bold mb-3">{plan.name}</h3>
-                <p className="text-zinc-400 text-sm min-h-[60px]">{plan.description}</p>
-              </div>
-              <div className="mb-8 pb-8 border-b border-white/10">
+
+              <div className="space-y-4 mb-8">
+                <h3 className="text-lg font-bold text-white group-hover:text-teal-400 transition-colors">{plan.name}</h3>
                 <div className="flex items-baseline">
-                  <span className="text-5xl font-extrabold text-white">{plan.price}</span>
-                  <span className="text-zinc-400 text-lg ml-2">{plan.unit}</span>
+                  <span className="text-4xl font-black text-white">{plan.price}</span>
+                  <span className="text-xs text-zinc-500 ml-1.5">{plan.unit}</span>
                 </div>
+                <p className="text-xs text-zinc-400 leading-relaxed min-h-[48px]">{plan.description}</p>
               </div>
-              <ul className="space-y-4 mb-8 flex-grow">
-                {plan.features.map((feature, idx) => (
-                  <li key={idx} className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
-                    <span className="text-sm text-zinc-300">{feature}</span>
+
+              {/* Action Button */}
+              <div className="mb-8">
+                <Link 
+                  href={plan.href}
+                  className={`block w-full py-3.5 px-4 text-center rounded-xl text-xs font-bold transition-all ${
+                    plan.popular
+                      ? "bg-teal-500 hover:bg-teal-400 text-zinc-950 shadow-md shadow-teal-500/20"
+                      : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 hover:border-zinc-700"
+                  }`}
+                >
+                  {plan.buttonText}
+                </Link>
+              </div>
+
+              {/* Features List */}
+              <ul className="space-y-3.5 mt-auto text-xs text-zinc-400">
+                {plan.features.map((feature, fIdx) => (
+                  <li key={fIdx} className="flex items-start gap-2.5">
+                    <Check className={`w-4 h-4 shrink-0 mt-0.5 ${plan.popular ? "text-teal-400" : "text-zinc-500"}`} />
+                    <span>{feature}</span>
                   </li>
                 ))}
               </ul>
-              <Link 
-                href={plan.href}
-                className={`w-full py-4 px-4 rounded-xl font-bold transition-all mt-auto text-center ${
-                  plan.popular 
-                    ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-lg shadow-blue-500/25' 
-                    : 'bg-zinc-800 text-white hover:bg-zinc-700'
-                }`}
-              >
-                {plan.buttonText}
-              </Link>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
   );
