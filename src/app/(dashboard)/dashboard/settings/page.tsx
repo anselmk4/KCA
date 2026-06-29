@@ -195,15 +195,31 @@ export default function StudentSettingsPage() {
                 <div>
                   <h2 className="font-bold text-base text-zinc-900 dark:text-white">Informations du profil</h2>
                   <p className="text-xs text-zinc-500">Mettez à jour vos informations publiques d&apos;apprenant.</p>
+                  <input
+                    type="file"
+                    id="student-avatar-upload"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 1.5 * 1024 * 1024) {
+                        alert("L'image est trop volumineuse. Veuillez choisir une image de moins de 1.5 Mo.");
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setAvatarUrl(reader.result as string);
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    className="hidden"
+                  />
                   <button
                     type="button"
-                    onClick={() => {
-                      const url = prompt("Entrez l'URL de votre photo de profil :");
-                      if (url !== null) setAvatarUrl(url);
-                    }}
+                    onClick={() => document.getElementById("student-avatar-upload")?.click()}
                     className="text-[10px] text-blue-600 hover:underline mt-1 font-semibold block text-left"
                   >
-                    Modifier la photo (URL)
+                    Modifier la photo
                   </button>
                 </div>
               </div>

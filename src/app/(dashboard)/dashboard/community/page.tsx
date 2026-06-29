@@ -37,6 +37,7 @@ export default function CommunityPage() {
   const [submitting, setSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [newComments, setNewComments] = useState<Record<string, string>>({});
+  const [dbError, setDbError] = useState<string | null>(null);
 
   useEffect(() => {
     loadCommunity();
@@ -49,11 +50,19 @@ export default function CommunityPage() {
       setCurrentUser(user);
 
       // Load all posts
-      const { data: postsData } = await db
+      const { data: postsData, error: postsError } = await db
         .from("community_posts")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(50);
+
+      if (postsError) {
+        console.error("Community query error:", postsError);
+        setDbError(postsError.message);
+        setPosts([]);
+        return;
+      }
+      setDbError(null);
 
       if (!postsData || postsData.length === 0) {
         setPosts([]);
@@ -124,7 +133,9 @@ export default function CommunityPage() {
       const { error } = await db
         .from("community_posts")
         .insert({ user_id: currentUser.id, content: newPost.trim() });
-      if (!error) {
+      if (error) {
+        alert("Erreur lors de la publication : " + error.message + "\nAssurez-vous d'avoir exécuté la migration SQL prisma/add-profile-columns.sql.");
+      } else {
         setNewPost("");
         await loadCommunity();
       }
@@ -142,11 +153,15 @@ export default function CommunityPage() {
   const handleSubmitComment = async (postId: string) => {
     const content = newComments[postId]?.trim();
     if (!content || !currentUser) return;
-    await db
+    const { error } = await db
       .from("community_comments")
       .insert({ post_id: postId, user_id: currentUser.id, content });
-    setNewComments(prev => ({ ...prev, [postId]: "" }));
-    await loadCommunity();
+    if (error) {
+      alert("Erreur lors de la publication du commentaire : " + error.message);
+    } else {
+      setNewComments(prev => ({ ...prev, [postId]: "" }));
+      await loadCommunity();
+    }
   };
 
   const toggleComments = (postId: string) => {
@@ -176,6 +191,19 @@ export default function CommunityPage() {
 
         {/* ─── Main Feed ─── */}
         <div className="lg:col-span-2 space-y-4">
+
+          {/* DB missing configuration warning */}
+          {dbError && (
+            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl p-5 text-amber-800 dark:text-amber-300 text-sm space-y-2">
+              <p className="font-bold">⚠️ Base de données non initialisée pour la communauté</p>
+              <p className="text-xs text-amber-700/80 dark:text-amber-400/80">
+                La table de la communauté ou les nouveaux champs de profil n'existent pas encore dans votre instance Supabase.
+              </p>
+              <p className="text-xs font-semibold">
+                Pour y remédier, copiez et exécutez le script SQL situé dans <code className="bg-amber-100 dark:bg-amber-900/40 px-1 py-0.5 rounded font-mono">prisma/add-profile-columns.sql</code> depuis l'éditeur SQL de votre Dashboard Supabase.
+              </p>
+            </div>
+          )}
 
           {/* New Post Composer */}
           {currentUser && (

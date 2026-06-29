@@ -121,6 +121,7 @@ export default function InstructorSettingsPage() {
         setTimeout(() => setSaved(false), 3000);
       } else {
         const body = await res.json().catch(() => ({}));
+        alert("Erreur lors de la sauvegarde : " + (body?.error || "Erreur serveur"));
         console.error("[Settings] Save error:", body?.error);
       }
     } finally {
@@ -128,9 +129,18 @@ export default function InstructorSettingsPage() {
     }
   };
 
-  const handleAvatarUrl = async () => {
-    const url = prompt("Entrez l'URL directe de votre photo de profil :");
-    if (url) setForm(f => ({ ...f, avatar_url: url }));
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 1.5 * 1024 * 1024) {
+      alert("L'image est trop volumineuse. Veuillez choisir une image de moins de 1.5 Mo.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setForm(f => ({ ...f, avatar_url: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const initials = form.name
@@ -190,7 +200,14 @@ export default function InstructorSettingsPage() {
                     {initials}
                   </div>
                 )}
-                <button type="button" onClick={handleAvatarUrl}
+                <input
+                  type="file"
+                  id="avatar-upload"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <button type="button" onClick={() => document.getElementById("avatar-upload")?.click()}
                   className="absolute bottom-0 right-0 p-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-full shadow-sm hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
                   <Camera className="w-3.5 h-3.5 text-zinc-500" />
                 </button>
@@ -198,7 +215,7 @@ export default function InstructorSettingsPage() {
               <div>
                 <p className="text-sm font-medium text-zinc-900 dark:text-white">{form.name}</p>
                 <p className="text-xs text-zinc-500 mt-0.5">{form.email}</p>
-                <button type="button" onClick={handleAvatarUrl}
+                <button type="button" onClick={() => document.getElementById("avatar-upload")?.click()}
                   className="mt-2 text-xs text-teal-600 hover:underline font-medium">
                   Changer la photo
                 </button>

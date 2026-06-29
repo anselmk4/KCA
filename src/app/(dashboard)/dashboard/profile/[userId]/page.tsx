@@ -160,11 +160,17 @@ export default function UserProfilePage() {
   };
 
   const loadPosts = async (viewerId?: string) => {
-    const { data: postsData } = await db
+    const { data: postsData, error: postsError } = await db
       .from("community_posts")
       .select("*")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
+
+    if (postsError) {
+      console.error("Error loading profile posts:", postsError);
+      setPosts([]);
+      return;
+    }
 
     if (!postsData || postsData.length === 0) { setPosts([]); return; }
 
@@ -215,7 +221,9 @@ export default function UserProfilePage() {
       const { error } = await db
         .from("community_posts")
         .insert({ user_id: currentUser.id, content: newPost.trim() });
-      if (!error) {
+      if (error) {
+        alert("Erreur lors de la publication : " + error.message + "\nAssurez-vous d'avoir exécuté la migration SQL prisma/add-profile-columns.sql.");
+      } else {
         setNewPost("");
         await loadPosts(currentUser.id);
       }
@@ -233,11 +241,15 @@ export default function UserProfilePage() {
   const handleSubmitComment = async (postId: string) => {
     const content = newComments[postId]?.trim();
     if (!content || !currentUser) return;
-    await db
+    const { error } = await db
       .from("community_comments")
       .insert({ post_id: postId, user_id: currentUser.id, content });
-    setNewComments(prev => ({ ...prev, [postId]: "" }));
-    await loadPosts(currentUser?.id);
+    if (error) {
+      alert("Erreur lors du commentaire : " + error.message);
+    } else {
+      setNewComments(prev => ({ ...prev, [postId]: "" }));
+      await loadPosts(currentUser?.id);
+    }
   };
 
   const toggleComments = (postId: string) => {
