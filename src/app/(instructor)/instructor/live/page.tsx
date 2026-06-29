@@ -24,6 +24,8 @@ interface Profile {
   id: string;
   full_name: string;
   email: string;
+  type: "student" | "instructor";
+  courseTitle?: string;
 }
 
 export default function LivePage() {
@@ -90,17 +92,99 @@ export default function LivePage() {
         }
       }
 
-      // 2. Fetch all profiles (to invite to private sessions)
-      const { data: profilesData, error: profilesErr } = await supabase
-        .from("profiles")
-        .select("id, full_name, email");
+      // 2. Build invite list for private sessions:
+      //    a) Students who have PAID for the instructor's courses
+      //    b) Other instructors (via user_roles)
+      const inviteList: Profile[] = [];
 
-      if (profilesErr) {
-        console.error("Error fetching profiles:", profilesErr.message);
-      } else {
-        // Exclude the current instructor from the invite list
-        setProfiles((profilesData || []).filter(p => p.id !== user.id));
+      // a) Get the instructor's courses
+      const { data: myCourses } = await supabase
+        .from("courses")
+        .select("id, title")
+        .eq("instructor_id", user.id);
+
+      if (myCourses && myCourses.length > 0) {
+        const myCourseIds = myCourses.map(c => c.id);
+        const courseMap = new Map(myCourses.map(c => [c.id, c.title]));
+
+        // Get order items for those courses
+        const { data: orderItems } = await supabase
+          .from("order_items")
+          .select("order_id, course_id")
+          .in("course_id", myCourseIds);
+
+        if (orderItems && orderItems.length > 0) {
+          const orderIds = orderItems.map(oi => oi.order_id);
+          const orderItemMap = new Map(orderItems.map(oi => [oi.order_id, oi.course_id]));
+
+          // Get only PAID payments
+          const { data: paidPayments } = await supabase
+            .from("payments")
+            .select("order_id, user_id")
+            .in("order_id", orderIds)
+            .eq("status", "PAID");
+
+          if (paidPayments && paidPayments.length > 0) {
+            // Collect unique student IDs and their courses
+            const studentCourseMap = new Map<string, string>();
+            paidPayments.forEach(p => {
+              const courseId = orderItemMap.get(p.order_id);
+              if (courseId && p.user_id !== user.id) {
+                studentCourseMap.set(p.user_id, courseId);
+              }
+            });
+
+            const studentIds = [...studentCourseMap.keys()];
+            if (studentIds.length > 0) {
+              const { data: studentProfiles } = await supabase
+                .from("profiles")
+                .select("id, full_name, email")
+                .in("id", studentIds);
+
+              studentProfiles?.forEach(p => {
+                const courseId = studentCourseMap.get(p.id) || "";
+                inviteList.push({
+                  id: p.id,
+                  full_name: p.full_name,
+                  email: p.email,
+                  type: "student",
+                  courseTitle: courseMap.get(courseId) || "Formation",
+                });
+              });
+            }
+          }
+        }
       }
+
+      // b) Get other instructors via user_roles → roles
+      const { data: instructorRoles } = await supabase
+        .from("user_roles")
+        .select("user_id, roles(name)");
+
+      const instructorIds = (instructorRoles || [])
+        .filter((ur: any) => ur.roles?.name === "INSTRUCTOR" && ur.user_id !== user.id)
+        .map((ur: any) => ur.user_id);
+
+      if (instructorIds.length > 0) {
+        const { data: instrProfiles } = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .in("id", instructorIds);
+
+        instrProfiles?.forEach(p => {
+          // Avoid duplicates if an instructor is also a student here
+          if (!inviteList.find(x => x.id === p.id)) {
+            inviteList.push({
+              id: p.id,
+              full_name: p.full_name,
+              email: p.email,
+              type: "instructor",
+            });
+          }
+        });
+      }
+
+      setProfiles(inviteList);
     } catch (err) {
       console.error("Unexpected error loading data:", err);
     } finally {
@@ -569,26 +653,39 @@ export default function LivePage() {
                       </div>
 
                       {/* Profiles List */}
-                      <div className="max-h-40 overflow-y-auto border border-zinc-200 dark:border-zinc-700/80 rounded-xl bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800/80">
+                      <div className="max-h-48 overflow-y-auto border border-zinc-200 dark:border-zinc-700/80 rounded-xl bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800/80">
                         {filteredProfiles.length === 0 ? (
-                          <p className="text-center py-4 text-xs text-zinc-400">Aucun utilisateur trouvé.</p>
+                          <div className="text-center py-5 px-3">
+                            <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Aucun invité disponible.</p>
+                            <p className="text-[10px] text-zinc-400 mt-1">Seuls les apprenants ayant payé vos cours et les autres formateurs s'affichent ici.</p>
+                          </div>
                         ) : (
                           filteredProfiles.map(p => {
                             const isSelected = selectedUserIds.includes(p.id);
                             return (
                               <label 
                                 key={p.id} 
-                                className="flex items-center gap-3 px-3 py-2 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800/40 cursor-pointer select-none"
+                                className="flex items-center gap-3 px-3 py-2.5 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800/40 cursor-pointer select-none"
                               >
                                 <input 
                                   type="checkbox"
                                   checked={isSelected}
                                   onChange={() => toggleUserSelection(p.id)}
-                                  className="rounded border-zinc-300 dark:border-zinc-700 text-teal-600 focus:ring-teal-500 h-3.5 w-3.5"
+                                  className="rounded border-zinc-300 dark:border-zinc-700 text-teal-600 focus:ring-teal-500 h-3.5 w-3.5 shrink-0"
                                 />
                                 <div className="flex-1 min-w-0">
-                                  <p className="font-bold text-zinc-800 dark:text-white truncate">{p.full_name || "Nom inconnu"}</p>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <p className="font-bold text-zinc-800 dark:text-white truncate">{p.full_name || "Nom inconnu"}</p>
+                                    {p.type === "instructor" ? (
+                                      <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 shrink-0">Formateur</span>
+                                    ) : (
+                                      <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 shrink-0">Apprenant</span>
+                                    )}
+                                  </div>
                                   <p className="text-[10px] text-zinc-400 truncate">{p.email}</p>
+                                  {p.type === "student" && p.courseTitle && (
+                                    <p className="text-[10px] text-teal-600 dark:text-teal-400 truncate mt-0.5">📚 {p.courseTitle}</p>
+                                  )}
                                 </div>
                               </label>
                             );
