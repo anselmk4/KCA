@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -14,7 +15,8 @@ import {
   X,
   LifeBuoy,
   Compass,
-  Video
+  Video,
+  UserCircle
 } from "lucide-react";
 import { clearSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
@@ -27,6 +29,13 @@ interface SidebarProps {
 export function Sidebar({ open = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id);
+    });
+  }, []);
 
   const menuItems = [
     { icon: <LayoutDashboard className="w-5 h-5" />, label: "Vue d'ensemble", href: "/dashboard" },
@@ -37,6 +46,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     { icon: <Award className="w-5 h-5" />, label: "Certificats", href: "/dashboard/certificates" },
     { icon: <Users className="w-5 h-5" />, label: "Communauté", href: "/dashboard/community" },
     { icon: <LifeBuoy className="w-5 h-5" />, label: "Support Technique", href: "/dashboard/support" },
+    ...(userId ? [{ icon: <UserCircle className="w-5 h-5" />, label: "Mon Profil", href: `/dashboard/profile/${userId}` }] : []),
   ];
 
   const handleLogout = async () => {

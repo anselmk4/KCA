@@ -15,7 +15,6 @@ import {
   MessageSquare,
   Settings,
   LogOut,
-
   CreditCard,
   Menu,
   X,
@@ -23,6 +22,8 @@ import {
   User,
   Lock,
   Bell,
+  UserCircle,
+  Users2,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { getSimulatedSession, setSimulatedSession, clearSimulatedSession } from "@/lib/rbac";
@@ -37,6 +38,7 @@ const menuItems = [
   { icon: Wallet, label: "Revenus", href: "/instructor/earnings" },
   { icon: CreditCard, label: "Abonnement", href: "/instructor/billing" },
   { icon: MessageSquare, label: "Messages", href: "/instructor/messages" },
+  { icon: Users2, label: "Communauté", href: "/instructor/community" },
   { icon: Settings, label: "Paramètres", href: "/instructor/settings" },
 ];
 
@@ -44,6 +46,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
   const pathname = usePathname();
   const router = useRouter();
   const [session, setSession] = useState<any>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [academyName, setAcademyName] = useState<string>("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -65,6 +68,12 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
       setAcademyName(localStorage.getItem("kuettu_academy_name") || "Mon Académie");
     };
     window.addEventListener("storage", handleStorage);
+
+    // Get Supabase userId for profile link
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id);
+    });
+
     return () => window.removeEventListener("storage", handleStorage);
   }, [router]);
 
@@ -153,6 +162,20 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
               </Link>
             );
           })}
+          {userId && (
+            <Link
+              href={`/dashboard/profile/${userId}`}
+              onClick={() => setSidebarOpen(false)}
+              className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
+                pathname === `/dashboard/profile/${userId}`
+                  ? "bg-teal-50 dark:bg-teal-900/20 text-teal-600 font-semibold"
+                  : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white"
+              }`}
+            >
+              <UserCircle className="w-5 h-5 shrink-0" />
+              <span className="text-sm">Mon Profil</span>
+            </Link>
+          )}
         </div>
 
         <div className="p-4 border-t border-zinc-100 dark:border-zinc-800">
@@ -244,6 +267,16 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
                       <User className="w-4 h-4 text-zinc-400" />
                       Mon Profil & Académie
                     </Link>
+                    {userId && (
+                      <Link
+                        href={`/dashboard/profile/${userId}`}
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+                      >
+                        <UserCircle className="w-4 h-4 text-zinc-400" />
+                        Voir mon profil public
+                      </Link>
+                    )}
                     <button
                       onClick={() => { setProfileOpen(false); setShowPasswordModal(true); }}
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"

@@ -4,8 +4,6 @@ import { createClient } from '@/lib/supabase/server';
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
-
-    // Verify auth session from cookie
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
@@ -32,19 +30,37 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const supabase = await createClient();
-
-    // Verify auth session from cookie
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
     }
 
     const body = await req.json();
-    const { name, bio } = body;
+
+    // All supported profile fields
+    const allowedFields: Record<string, string> = {
+      name: 'full_name',
+      bio: 'bio',
+      nationality: 'nationality',
+      website: 'website',
+      twitter: 'twitter',
+      linkedin: 'linkedin',
+      youtube: 'youtube',
+      instagram: 'instagram',
+      avatar_url: 'avatar_url',
+      specialty: 'specialty',
+      academy_name: 'academy_name',
+      academy_tagline: 'academy_tagline',
+      academic_background: 'academic_background',
+      certifications: 'certifications',
+    };
 
     const updates: Record<string, any> = {};
-    if (name !== undefined) updates.full_name = name;
-    if (bio !== undefined) updates.bio = bio;
+    for (const [bodyKey, dbCol] of Object.entries(allowedFields)) {
+      if (body[bodyKey] !== undefined) {
+        updates[dbCol] = body[bodyKey];
+      }
+    }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'Aucune donnée à mettre à jour' }, { status: 400 });

@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { User, Mail, Shield, Bell, CreditCard, Check, Settings, Phone, Globe, MapPin, KeyRound, Eye, EyeOff } from "lucide-react";
+import { User, Mail, Shield, Bell, CreditCard, Check, Settings, Phone, Globe, MapPin, KeyRound, Eye, EyeOff, Camera, Loader2 } from "lucide-react";
 import { getDB, saveDB } from "@/lib/db";
-import { getSimulatedSession } from "@/lib/rbac";
+import { getSimulatedSession, setSimulatedSession } from "@/lib/rbac";
 
 type SettingsTab = "profile" | "security" | "notifications" | "billing";
 
@@ -17,8 +17,12 @@ export default function StudentSettingsPage() {
   const [phone, setPhone] = useState("");
   const [level, setLevel] = useState("Débutant");
   const [bio, setBio] = useState("");
-  const [country, setCountry] = useState("Sénégal");
-  const [city, setCity] = useState("Dakar");
+  const [country, setCountry] = useState("");
+  const [city, setCity] = useState("");
+  const [nationality, setNationality] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
 
   // Password states
   const [currentPassword, setCurrentPassword] = useState("");
@@ -40,53 +44,59 @@ export default function StudentSettingsPage() {
     if (currentSession) {
       setFullName(currentSession.name || "");
       setEmail(currentSession.email || "");
-      
+
       const db = getDB();
       const user = db.users.find(u => u.id === currentSession.userId);
-      if (user) {
-        setLevel(user.level || "Débutant");
-      }
+      if (user) setLevel(user.level || "Débutant");
     }
 
-    const savedPhone = localStorage.getItem("kuettu_settings_phone") || "+221 77 123 45 67";
-    const savedBio = localStorage.getItem("kuettu_settings_bio") || "Apprenant passionné de Web3 et d'Intelligence Artificielle.";
-    const savedCountry = localStorage.getItem("kuettu_settings_country") || "Sénégal";
-    const savedCity = localStorage.getItem("kuettu_settings_city") || "Dakar";
-
-    setPhone(savedPhone);
-    setBio(savedBio);
-    setCountry(savedCountry);
-    setCity(savedCity);
+    // Load from Supabase
+    fetch("/api/profile").then(async (res) => {
+      if (res.ok) {
+        const { profile } = await res.json();
+        if (profile) {
+          setFullName(profile.full_name || "");
+          setEmail(profile.email || "");
+          setBio(profile.bio || "");
+          setNationality(profile.nationality || "");
+          setAvatarUrl(profile.avatar_url || "");
+          setCountry(profile.nationality || localStorage.getItem("kuettu_settings_country") || "");
+          setCity(localStorage.getItem("kuettu_settings_city") || "");
+          setPhone(localStorage.getItem("kuettu_settings_phone") || "");
+        }
+      }
+    }).catch(console.error);
   }, []);
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session) return;
+    setSavingProfile(true);
+    try {
+      // Save to Supabase
+      await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: fullName, bio, nationality, avatar_url: avatarUrl }),
+      });
 
-    // 1. Update localStorage cache
-    localStorage.setItem("kuettu_user_name", fullName);
-    localStorage.setItem("kuettu_user_level", level);
-    localStorage.setItem("kuettu_settings_phone", phone);
-    localStorage.setItem("kuettu_settings_bio", bio);
-    localStorage.setItem("kuettu_settings_country", country);
-    localStorage.setItem("kuettu_settings_city", city);
+      // Update local cache
+      localStorage.setItem("kuettu_user_name", fullName);
+      localStorage.setItem("kuettu_settings_phone", phone);
+      localStorage.setItem("kuettu_settings_country", country);
+      localStorage.setItem("kuettu_settings_city", city);
 
-    // 2. Update local DB
-    const db = getDB();
-    const userIdx = db.users.findIndex(u => u.id === session.userId);
-    if (userIdx !== -1) {
-      db.users[userIdx].name = fullName;
-      db.users[userIdx].level = level;
-      saveDB(db);
+      const db = getDB();
+      const userIdx = db.users.findIndex(u => u.id === session.userId);
+      if (userIdx !== -1) { db.users[userIdx].name = fullName; saveDB(db); }
+
+      setSimulatedSession({ ...session, name: fullName });
+      window.dispatchEvent(new Event("storage"));
+      setProfileSaved(true);
+      setTimeout(() => setProfileSaved(false), 3000);
+    } finally {
+      setSavingProfile(false);
     }
-
-    // Update simulated session in localStorage
-    const updatedSession = { ...session, name: fullName };
-    localStorage.setItem("kuettu_session", JSON.stringify(updatedSession));
-
-    // Dispatch storage event to update Header & Sidebar
-    window.dispatchEvent(new Event("storage"));
-    alert("Profil mis à jour avec succès !");
   };
 
   const handleSavePassword = (e: React.FormEvent) => {
@@ -175,12 +185,26 @@ export default function StudentSettingsPage() {
           {activeTab === "profile" && (
             <form onSubmit={handleSaveProfile}>
               <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/10 flex items-center gap-4">
-                <div className="w-14 h-14 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-extrabold text-xl shadow-sm">
-                  {currentInitials}
-                </div>
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" className="w-14 h-14 rounded-full object-cover shadow-sm shrink-0" />
+                ) : (
+                  <div className="w-14 h-14 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-extrabold text-xl shadow-sm shrink-0">
+                    {currentInitials}
+                  </div>
+                )}
                 <div>
                   <h2 className="font-bold text-base text-zinc-900 dark:text-white">Informations du profil</h2>
                   <p className="text-xs text-zinc-500">Mettez à jour vos informations publiques d&apos;apprenant.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = prompt("Entrez l'URL de votre photo de profil :");
+                      if (url !== null) setAvatarUrl(url);
+                    }}
+                    className="text-[10px] text-blue-600 hover:underline mt-1 font-semibold block text-left"
+                  >
+                    Modifier la photo (URL)
+                  </button>
                 </div>
               </div>
 
@@ -241,13 +265,17 @@ export default function StudentSettingsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Pays</label>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Pays / Nationalité</label>
                     <div className="relative">
                       <Globe className="w-4 h-4 absolute left-3 top-3.5 text-zinc-400" />
                       <input
                         type="text"
-                        value={country}
-                        onChange={e => setCountry(e.target.value)}
+                        value={nationality}
+                        onChange={e => {
+                          setNationality(e.target.value);
+                          setCountry(e.target.value);
+                        }}
+                        placeholder="ex: Sénégalais"
                         className="w-full pl-10 pr-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-800 text-sm text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all"
                       />
                     </div>
@@ -279,8 +307,12 @@ export default function StudentSettingsPage() {
                 </div>
               </div>
 
-              <div className="p-6 bg-zinc-50/50 dark:bg-zinc-800/10 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
-                <button type="submit" className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition-all shadow-md shadow-blue-500/10 cursor-pointer">
+              <div className="p-6 bg-zinc-50/50 dark:bg-zinc-800/10 border-t border-zinc-200 dark:border-zinc-800 flex justify-end items-center gap-3">
+                {profileSaved && (
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">✓ Modifications enregistrées</span>
+                )}
+                <button type="submit" disabled={savingProfile} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl text-sm transition-all shadow-md shadow-blue-500/10 cursor-pointer flex items-center gap-2">
+                  {savingProfile && <Loader2 className="w-4 h-4 animate-spin" />}
                   Sauvegarder le profil
                 </button>
               </div>

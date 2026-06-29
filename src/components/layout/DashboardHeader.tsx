@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, ChevronDown, Menu, Settings, LogOut } from "lucide-react";
+import { Bell, ChevronDown, Menu, Settings, LogOut, UserCircle } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { useEffect, useState, useRef } from "react";
 import { getSimulatedSession } from "@/lib/rbac";
@@ -8,10 +8,12 @@ import Link from "next/link";
 
 interface DashboardHeaderProps {
   onMenuClick?: () => void;
+  role?: "student" | "instructor";
 }
 
-export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
+export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHeaderProps) {
   const [session, setSession] = useState<any>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -28,6 +30,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
         const { data: { session: activeSession } } = await supabase.auth.getSession();
         
         if (activeSession?.user) {
+          setUserId(activeSession.user.id);
           const localSession = getSimulatedSession();
           if (!localSession || localSession.userId !== activeSession.user.id) {
             const profile = await fetchUserProfile(activeSession.user.id);
@@ -128,6 +131,12 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
                   <Settings className="w-4 h-4 text-zinc-400" />
                   <span>Paramètres</span>
                 </Link>
+                {userId && (
+                  <Link href={`/dashboard/profile/${userId}`} onClick={() => setDropdownOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                    <UserCircle className="w-4 h-4 text-zinc-400" />
+                    <span>Mon Profil</span>
+                  </Link>
+                )}
                 <button 
                   onClick={handleLogout}
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/10 transition-colors text-left border-t border-zinc-100 dark:border-zinc-800 cursor-pointer"
