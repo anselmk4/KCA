@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { 
   Video, Clock, Plus, Calendar, Users, Link2, X, CheckCircle2, 
-  Trash2, Shield, ShieldAlert, Search, Loader2, Sparkles 
+  Trash2, Shield, ShieldAlert, Search, Loader2, Sparkles, User
 } from "lucide-react";
 
 interface LiveSession {
@@ -29,6 +29,7 @@ interface Profile {
 export default function LivePage() {
   const [sessions, setSessions] = useState<LiveSession[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [hostMap, setHostMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -61,17 +62,32 @@ export default function LivePage() {
       if (!user) return;
       setCurrentUser(user);
 
-      // 1. Fetch live sessions created by this instructor
+      // 1. Fetch live sessions (RLS automatically filters public or created/invited by current user)
       const { data: sessionsData, error: sessionsErr } = await supabase
         .from("live_sessions")
         .select("*")
-        .eq("instructor_id", user.id)
         .order("scheduled_at", { ascending: true });
 
       if (sessionsErr) {
         console.error("Error fetching sessions:", sessionsErr.message);
       } else {
-        setSessions((sessionsData as LiveSession[]) || []);
+        const loadedSessions = (sessionsData as LiveSession[]) || [];
+        setSessions(loadedSessions);
+
+        // Fetch instructor names for all sessions
+        const hostIds = [...new Set(loadedSessions.map(s => s.instructor_id).filter(Boolean))];
+        if (hostIds.length > 0) {
+          const { data: hostProfiles } = await supabase
+            .from("profiles")
+            .select("id, full_name")
+            .in("id", hostIds);
+
+          const map: Record<string, string> = {};
+          hostProfiles?.forEach(p => {
+            map[p.id] = p.full_name;
+          });
+          setHostMap(map);
+        }
       }
 
       // 2. Fetch all profiles (to invite to private sessions)
@@ -117,7 +133,7 @@ export default function LivePage() {
         is_public: form.isPublic,
         instructor_id: currentUser.id,
         allowed_user_ids: form.isPublic ? [] : selectedUserIds,
-        course_id: null // nullable
+        course_id: null
       };
 
       const { error } = await supabase
@@ -225,7 +241,7 @@ export default function LivePage() {
             Sessions en Direct
           </h1>
           <p className="text-zinc-500 dark:text-zinc-400 mt-1">
-            {upcoming.length} session{upcoming.length !== 1 ? "s" : ""} programmée{upcoming.length !== 1 ? "s" : ""} à venir.
+            {upcoming.length} session{upcoming.length !== 1 ? "s" : ""} programmée{upcoming.length !== 1 ? "s" : ""} à venir (les vôtres ou celles où vous êtes invité).
           </p>
         </div>
         <button
@@ -252,54 +268,71 @@ export default function LivePage() {
           </div>
         ) : (
           <div className="grid gap-4">
-            {upcoming.map(s => (
-              <div key={s.id} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-md transition-shadow">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-xl text-teal-600 self-start shrink-0">
-                    <Video className="w-6 h-6 animate-pulse" />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-bold text-zinc-900 dark:text-white text-base leading-snug">{s.title}</p>
-                      {s.is_public ? (
-                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1 border border-emerald-500/10"><Shield className="w-2.5 h-2.5" /> Publique</span>
-                      ) : (
-                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center gap-1 border border-amber-500/10"><ShieldAlert className="w-2.5 h-2.5" /> Privée ({s.allowed_user_ids?.length || 0})</span>
+            {upcoming.map(s => {
+              const isOwner = s.instructor_id === currentUser?.id;
+              return (
+                <div key={s.id} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-xl text-teal-600 self-start shrink-0">
+                      <Video className="w-6 h-6 animate-pulse" />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-bold text-zinc-900 dark:text-white text-base leading-snug">{s.title}</p>
+                        {s.is_public ? (
+                          <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1 border border-emerald-500/10"><Shield className="w-2.5 h-2.5" /> Publique</span>
+                        ) : isOwner ? (
+                          <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center gap-1 border border-amber-500/10"><ShieldAlert className="w-2.5 h-2.5" /> Privée ({s.allowed_user_ids?.length || 0})</span>
+                        ) : (
+                          <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center gap-1 border border-blue-500/10"><ShieldAlert className="w-2.5 h-2.5" /> Invité (Privé)</span>
+                        )}
+                      </div>
+                      
+                      {/* Host Name display if invited */}
+                      {!isOwner && (
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+                          <User className="w-3.5 h-3.5 text-zinc-400" />
+                          Animé par : <span className="font-semibold text-zinc-700 dark:text-zinc-300">{hostMap[s.instructor_id] || "Formateur"}</span>
+                        </p>
                       )}
-                    </div>
-                    {s.description && (
-                      <p className="text-sm text-zinc-500 dark:text-zinc-400 line-clamp-2 max-w-xl">{s.description}</p>
-                    )}
-                    <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-zinc-500">
-                      <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-zinc-400" />{new Date(s.scheduled_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-zinc-400" />{s.duration_minutes} min</span>
-                      {getPlatformBadge(s.meeting_provider)}
+
+                      {s.description && (
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400 line-clamp-2 max-w-xl">{s.description}</p>
+                      )}
+                      
+                      <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-zinc-500">
+                        <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-zinc-400" />{new Date(s.scheduled_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                        <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-zinc-400" />{s.duration_minutes} min</span>
+                        {getPlatformBadge(s.meeting_provider)}
+                      </div>
                     </div>
                   </div>
+                  
+                  <div className="flex items-center gap-2 sm:self-center">
+                    {s.meeting_url && (
+                      <a 
+                        href={s.meeting_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold rounded-xl transition-colors shrink-0 shadow-sm"
+                      >
+                        <Link2 className="w-3.5 h-3.5" />
+                        Rejoindre
+                      </a>
+                    )}
+                    {isOwner && (
+                      <button 
+                        onClick={() => handleDelete(s.id)}
+                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl transition-all"
+                        title="Supprimer la session"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-                
-                <div className="flex items-center gap-2 sm:self-center">
-                  {s.meeting_url && (
-                    <a 
-                      href={s.meeting_url} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold rounded-xl transition-colors shrink-0 shadow-sm"
-                    >
-                      <Link2 className="w-3.5 h-3.5" />
-                      Rejoindre
-                    </a>
-                  )}
-                  <button 
-                    onClick={() => handleDelete(s.id)}
-                    className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl transition-all"
-                    title="Supprimer la session"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -312,33 +345,46 @@ export default function LivePage() {
             Sessions passées
           </h2>
           <div className="grid gap-4">
-            {past.map(s => (
-              <div key={s.id} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 opacity-60">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-zinc-100 dark:bg-zinc-800/80 rounded-xl text-zinc-400 self-start shrink-0">
-                    <Video className="w-6 h-6" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-semibold text-zinc-700 dark:text-zinc-300 text-base leading-snug">{s.title}</p>
-                    <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-zinc-500">
-                      <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{new Date(s.scheduled_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}</span>
-                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{s.duration_minutes} min</span>
-                      <span className="text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">{getPlatformBadge(s.meeting_provider)}</span>
+            {past.map(s => {
+              const isOwner = s.instructor_id === currentUser?.id;
+              return (
+                <div key={s.id} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 opacity-60">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-zinc-100 dark:bg-zinc-800/80 rounded-xl text-zinc-400 self-start shrink-0">
+                      <Video className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-semibold text-zinc-700 dark:text-zinc-300 text-base leading-snug">{s.title}</p>
+                      
+                      {!isOwner && (
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+                          <User className="w-3.5 h-3.5" />
+                          Animé par : <span className="font-semibold">{hostMap[s.instructor_id] || "Formateur"}</span>
+                        </p>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-zinc-500">
+                        <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{new Date(s.scheduled_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}</span>
+                        <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{s.duration_minutes} min</span>
+                        <span className="text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">{getPlatformBadge(s.meeting_provider)}</span>
+                      </div>
                     </div>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-[10px] font-bold uppercase rounded-lg">Terminée</span>
+                    {isOwner && (
+                      <button 
+                        onClick={() => handleDelete(s.id)}
+                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl transition-all"
+                        title="Supprimer la session"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-[10px] font-bold uppercase rounded-lg">Terminée</span>
-                  <button 
-                    onClick={() => handleDelete(s.id)}
-                    className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl transition-all"
-                    title="Supprimer la session"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
