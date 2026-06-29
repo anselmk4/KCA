@@ -484,3 +484,6 @@ END $$;
 SELECT tablename, policyname, cmd FROM pg_policies 
 WHERE schemaname = 'public'
 ORDER BY tablename, policyname;
+
+-- Reload PostgREST schema cache to instantly reflect column changes
+NOTIFY pgrst, 'reload schema';
