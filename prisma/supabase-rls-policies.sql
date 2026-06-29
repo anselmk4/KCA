@@ -406,6 +406,79 @@ ALTER TABLE IF EXISTS public.lesson_progress ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.quiz_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.certificates ENABLE ROW LEVEL SECURITY;
 
+-- ==================== LIVE_SESSIONS TABLE ====================
+-- Create live_sessions table if not exists
+CREATE TABLE IF NOT EXISTS public.live_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  scheduled_at TIMESTAMPTZ NOT NULL,
+  duration_minutes INTEGER NOT NULL DEFAULT 60,
+  platform TEXT NOT NULL, -- 'ANSELLA_LIVE', 'ZOOM', 'TEAMS', 'MEET'
+  link TEXT, -- URL externe (requis pour ZOOM, TEAMS, MEET)
+  is_public BOOLEAN NOT NULL DEFAULT true,
+  instructor_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  allowed_user_ids UUID[] DEFAULT '{}', -- IDs des apprenants/formateurs autorisés si privé
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Enable RLS on live_sessions
+ALTER TABLE IF EXISTS public.live_sessions ENABLE ROW LEVEL SECURITY;
+
+-- Select policy: users can read public lives, or private lives if they are the instructor or in the allowed list
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'live_sessions' AND policyname = 'Users can read eligible live sessions') THEN
+    CREATE POLICY "Users can read eligible live sessions"
+      ON public.live_sessions
+      FOR SELECT
+      TO authenticated
+      USING (
+        is_public = true 
+        OR auth.uid() = instructor_id 
+        OR auth.uid() = ANY(allowed_user_ids)
+      );
+  END IF;
+END $$;
+
+-- Insert policy: instructors can insert their own lives
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'live_sessions' AND policyname = 'Instructors can insert own live sessions') THEN
+    CREATE POLICY "Instructors can insert own live sessions"
+      ON public.live_sessions
+      FOR INSERT
+      TO authenticated
+      WITH CHECK (auth.uid() = instructor_id);
+  END IF;
+END $$;
+
+-- Update policy: instructors can update their own lives
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'live_sessions' AND policyname = 'Instructors can update own live sessions') THEN
+    CREATE POLICY "Instructors can update own live sessions"
+      ON public.live_sessions
+      FOR UPDATE
+      TO authenticated
+      USING (auth.uid() = instructor_id)
+      WITH CHECK (auth.uid() = instructor_id);
+  END IF;
+END $$;
+
+-- Delete policy: instructors can delete their own lives
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'live_sessions' AND policyname = 'Instructors can delete own live sessions') THEN
+    CREATE POLICY "Instructors can delete own live sessions"
+      ON public.live_sessions
+      FOR DELETE
+      TO authenticated
+      USING (auth.uid() = instructor_id);
+  END IF;
+END $$;
+
 -- ==================== VERIFY ====================
 -- List all policies for verification
 SELECT tablename, policyname, cmd FROM pg_policies 

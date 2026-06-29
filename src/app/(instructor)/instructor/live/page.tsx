@@ -1,174 +1,569 @@
 "use client";
 
-import { useState } from "react";
-import { Video, Clock, Plus, Calendar, Users, Link2, X, CheckCircle2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase/client";
+import { 
+  Video, Clock, Plus, Calendar, Users, Link2, X, CheckCircle2, 
+  Trash2, Shield, ShieldAlert, Search, Loader2, Sparkles 
+} from "lucide-react";
 
-const mockLiveSessions = [
-  {
-    id: "ls1",
-    title: "Introduction aux Smart Contracts – Q&A en direct",
-    date: new Date(Date.now() + 86400000 * 3).toISOString(),
-    duration: 90,
-    participants: 12,
-    platform: "Google Meet",
-    link: "https://meet.google.com/xxx-xxxx",
-    status: "upcoming"
-  },
-  {
-    id: "ls2",
-    title: "Workshop DeFi : Uniswap & Liquidity Pools",
-    date: new Date(Date.now() + 86400000 * 7).toISOString(),
-    duration: 120,
-    participants: 8,
-    platform: "Zoom",
-    link: "https://zoom.us/j/xxx",
-    status: "upcoming"
-  },
-  {
-    id: "ls3",
-    title: "Analyse Technique Avancée – Bitcoin & Altcoins",
-    date: new Date(Date.now() - 86400000 * 2).toISOString(),
-    duration: 60,
-    participants: 22,
-    platform: "Google Meet",
-    link: "",
-    status: "completed"
-  },
-];
+interface LiveSession {
+  id: string;
+  title: string;
+  description: string | null;
+  scheduled_at: string;
+  duration_minutes: number | null;
+  meeting_provider: string | null;
+  meeting_url: string | null;
+  is_public: boolean;
+  instructor_id: string;
+  allowed_user_ids: string[];
+}
+
+interface Profile {
+  id: string;
+  full_name: string;
+  email: string;
+}
 
 export default function LivePage() {
-  const [sessions, setSessions] = useState(mockLiveSessions);
+  const [sessions, setSessions] = useState<LiveSession[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ title: "", date: "", duration: "60", platform: "Google Meet", link: "" });
   const [created, setCreated] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-  const upcoming = sessions.filter(s => s.status === "upcoming");
-  const past = sessions.filter(s => s.status === "completed");
+  // Form State
+  const [form, setForm] = useState({
+    title: "",
+    description: "",
+    date: "",
+    duration: "60",
+    isPublic: true,
+    meeting_provider: "ANSELLA_LIVE",
+    meeting_url: ""
+  });
 
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSessions(prev => [...prev, {
-      id: `ls${Date.now()}`,
-      title: form.title,
-      date: new Date(form.date).toISOString(),
-      duration: parseInt(form.duration),
-      participants: 0,
-      platform: form.platform,
-      link: form.link,
-      status: "upcoming"
-    }]);
-    setCreated(true);
-    setTimeout(() => { setCreated(false); setShowCreate(false); setForm({ title: "", date: "", duration: "60", platform: "Google Meet", link: "" }); }, 2000);
+  // Selected User IDs for Private Live
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      setCurrentUser(user);
+
+      // 1. Fetch live sessions created by this instructor
+      const { data: sessionsData, error: sessionsErr } = await supabase
+        .from("live_sessions")
+        .select("*")
+        .eq("instructor_id", user.id)
+        .order("scheduled_at", { ascending: true });
+
+      if (sessionsErr) {
+        console.error("Error fetching sessions:", sessionsErr.message);
+      } else {
+        setSessions((sessionsData as LiveSession[]) || []);
+      }
+
+      // 2. Fetch all profiles (to invite to private sessions)
+      const { data: profilesData, error: profilesErr } = await supabase
+        .from("profiles")
+        .select("id, full_name, email");
+
+      if (profilesErr) {
+        console.error("Error fetching profiles:", profilesErr.message);
+      } else {
+        // Exclude the current instructor from the invite list
+        setProfiles((profilesData || []).filter(p => p.id !== user.id));
+      }
+    } catch (err) {
+      console.error("Unexpected error loading data:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    setSaving(true);
+
+    try {
+      const sessionId = crypto.randomUUID();
+      let liveLink = form.meeting_url;
+
+      // If Ansella Live, generate the custom Jitsi room URL
+      if (form.meeting_provider === "ANSELLA_LIVE") {
+        liveLink = `https://meet.jit.si/ansella-live-${sessionId}`;
+      }
+
+      const newSession = {
+        id: sessionId,
+        title: form.title,
+        description: form.description || null,
+        scheduled_at: new Date(form.date).toISOString(),
+        duration_minutes: parseInt(form.duration),
+        meeting_provider: form.meeting_provider,
+        meeting_url: liveLink || null,
+        is_public: form.isPublic,
+        instructor_id: currentUser.id,
+        allowed_user_ids: form.isPublic ? [] : selectedUserIds,
+        course_id: null // nullable
+      };
+
+      const { error } = await supabase
+        .from("live_sessions")
+        .insert(newSession);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setCreated(true);
+      setTimeout(() => {
+        setCreated(false);
+        setShowCreate(false);
+        // Reset form
+        setForm({
+          title: "",
+          description: "",
+          date: "",
+          duration: "60",
+          isPublic: true,
+          meeting_provider: "ANSELLA_LIVE",
+          meeting_url: ""
+        });
+        setSelectedUserIds([]);
+        setSearchTerm("");
+        loadData();
+      }, 2000);
+
+    } catch (err: any) {
+      alert("Erreur lors de la planification : " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Voulez-vous vraiment supprimer cette session live ?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("live_sessions")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setSessions(prev => prev.filter(s => s.id !== id));
+    } catch (err: any) {
+      alert("Erreur de suppression : " + err.message);
+    }
+  };
+
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUserIds(prev => 
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const filteredProfiles = profiles.filter(p => 
+    (p.full_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.email || "").toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const getPlatformBadge = (provider: string | null) => {
+    switch (provider) {
+      case "ANSELLA_LIVE":
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20 flex items-center gap-1"><Sparkles className="w-3 h-3 animate-pulse" /> Ansella Live</span>;
+      case "ZOOM":
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">Zoom</span>;
+      case "TEAMS":
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">Teams</span>;
+      case "MEET":
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20">Google Meet</span>;
+      default:
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-zinc-500/10 text-zinc-600 border border-zinc-500/20">{provider || "Inconnu"}</span>;
+    }
+  };
+
+  const isSessionPast = (dateStr: string) => {
+    return new Date(dateStr).getTime() < Date.now();
+  };
+
+  const upcoming = sessions.filter(s => !isSessionPast(s.scheduled_at));
+  const past = sessions.filter(s => isSessionPast(s.scheduled_at));
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
+        <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">Chargement des sessions live...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in">
+    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Sessions en Direct</h1>
-          <p className="text-zinc-500 dark:text-zinc-400 mt-1">{upcoming.length} session{upcoming.length !== 1 ? "s" : ""} à venir.</p>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+            <Video className="w-6 h-6 text-teal-600" />
+            Sessions en Direct
+          </h1>
+          <p className="text-zinc-500 dark:text-zinc-400 mt-1">
+            {upcoming.length} session{upcoming.length !== 1 ? "s" : ""} programmée{upcoming.length !== 1 ? "s" : ""} à venir.
+          </p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-500 text-white font-semibold rounded-xl transition-colors shadow-lg shadow-teal-500/20 text-sm"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-500 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-teal-600/20 text-sm"
         >
           <Plus className="w-4 h-4" />
           Planifier une session
         </button>
       </div>
 
-      {/* Upcoming */}
-      <div>
-        <h2 className="font-semibold text-zinc-900 dark:text-white mb-4">À venir</h2>
+      {/* Upcoming Sessions */}
+      <div className="space-y-4">
+        <h2 className="font-bold text-lg text-zinc-900 dark:text-white flex items-center gap-2">
+          <Calendar className="w-5 h-5 text-teal-600" />
+          Sessions à venir
+        </h2>
         {upcoming.length === 0 ? (
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-10 text-center">
-            <Video className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
-            <p className="text-zinc-500 text-sm">Aucune session planifiée. Créez votre première session en direct !</p>
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-12 text-center shadow-sm">
+            <Video className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
+            <p className="text-zinc-500 dark:text-zinc-400 text-sm max-w-sm mx-auto">
+              Aucune session en direct programmée. Créez-en une pour interagir avec vos apprenants !
+            </p>
           </div>
         ) : (
           <div className="grid gap-4">
             {upcoming.map(s => (
-              <div key={s.id} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-                <div className="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-xl self-start">
-                  <Video className="w-6 h-6 text-teal-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-zinc-900 dark:text-white">{s.title}</p>
-                  <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-zinc-500">
-                    <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{new Date(s.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-                    <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{s.duration} min</span>
-                    <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{s.participants} inscrits</span>
-                    <span className="font-medium text-teal-600">{s.platform}</span>
+              <div key={s.id} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-md transition-shadow">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-teal-50 dark:bg-teal-900/20 rounded-xl text-teal-600 self-start shrink-0">
+                    <Video className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-bold text-zinc-900 dark:text-white text-base leading-snug">{s.title}</p>
+                      {s.is_public ? (
+                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center gap-1 border border-emerald-500/10"><Shield className="w-2.5 h-2.5" /> Publique</span>
+                      ) : (
+                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center gap-1 border border-amber-500/10"><ShieldAlert className="w-2.5 h-2.5" /> Privée ({s.allowed_user_ids?.length || 0})</span>
+                      )}
+                    </div>
+                    {s.description && (
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400 line-clamp-2 max-w-xl">{s.description}</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-zinc-500">
+                      <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-zinc-400" />{new Date(s.scheduled_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-zinc-400" />{s.duration_minutes} min</span>
+                      {getPlatformBadge(s.meeting_provider)}
+                    </div>
                   </div>
                 </div>
-                {s.link && (
-                  <a href={s.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold rounded-xl transition-colors shrink-0">
-                    <Link2 className="w-3.5 h-3.5" />
-                    Rejoindre
-                  </a>
-                )}
+                
+                <div className="flex items-center gap-2 sm:self-center">
+                  {s.meeting_url && (
+                    <a 
+                      href={s.meeting_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold rounded-xl transition-colors shrink-0 shadow-sm"
+                    >
+                      <Link2 className="w-3.5 h-3.5" />
+                      Rejoindre
+                    </a>
+                  )}
+                  <button 
+                    onClick={() => handleDelete(s.id)}
+                    className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl transition-all"
+                    title="Supprimer la session"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Past */}
-      <div>
-        <h2 className="font-semibold text-zinc-900 dark:text-white mb-4">Sessions passées</h2>
-        <div className="grid gap-4">
-          {past.map(s => (
-            <div key={s.id} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center gap-4 opacity-70">
-              <div className="p-3 bg-zinc-100 dark:bg-zinc-800 rounded-xl self-start">
-                <Video className="w-6 h-6 text-zinc-400" />
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-zinc-900 dark:text-white">{s.title}</p>
-                <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-zinc-500">
-                  <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{new Date(s.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}</span>
-                  <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{s.duration} min</span>
-                  <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{s.participants} participants</span>
+      {/* Past Sessions */}
+      {past.length > 0 && (
+        <div className="space-y-4 pt-4">
+          <h2 className="font-bold text-lg text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-zinc-400" />
+            Sessions passées
+          </h2>
+          <div className="grid gap-4">
+            {past.map(s => (
+              <div key={s.id} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 opacity-60">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-zinc-100 dark:bg-zinc-800/80 rounded-xl text-zinc-400 self-start shrink-0">
+                    <Video className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-semibold text-zinc-700 dark:text-zinc-300 text-base leading-snug">{s.title}</p>
+                    <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-zinc-500">
+                      <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{new Date(s.scheduled_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}</span>
+                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{s.duration_minutes} min</span>
+                      <span className="text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">{getPlatformBadge(s.meeting_provider)}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-[10px] font-bold uppercase rounded-lg">Terminée</span>
+                  <button 
+                    onClick={() => handleDelete(s.id)}
+                    className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl transition-all"
+                    title="Supprimer la session"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-              <span className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-[10px] font-bold uppercase rounded-full shrink-0">Terminée</span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Create modal */}
+      {/* Create Modal */}
       {showCreate && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowCreate(false)}>
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowCreate(false)}>
+          <div 
+            className="bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Planifier une session live</h2>
-              <button onClick={() => setShowCreate(false)} className="p-1 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"><X className="w-5 h-5" /></button>
+              <div>
+                <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Planifier une session live</h2>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Renseignez les détails pour planifier le direct.</p>
+              </div>
+              <button 
+                onClick={() => setShowCreate(false)} 
+                className="p-2 rounded-xl text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
+
             {created ? (
-              <div className="py-8 flex flex-col items-center gap-3">
-                <CheckCircle2 className="w-12 h-12 text-teal-500" />
-                <p className="font-semibold text-zinc-900 dark:text-white">Session planifiée !</p>
+              <div className="py-12 flex flex-col items-center justify-center gap-4 text-center">
+                <div className="w-16 h-16 bg-teal-500/10 text-teal-600 rounded-full flex items-center justify-center shadow-inner">
+                  <CheckCircle2 className="w-10 h-10 animate-bounce" />
+                </div>
+                <div>
+                  <p className="font-bold text-zinc-900 dark:text-white text-lg">Session planifiée avec succès !</p>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Elle apparaîtra instantanément dans le calendrier des lives.</p>
+                </div>
               </div>
             ) : (
-              <form onSubmit={handleCreate} className="space-y-4">
-                {[
-                  { label: "Titre de la session", key: "title", type: "text", placeholder: "Workshop Blockchain..." },
-                  { label: "Date et heure", key: "date", type: "datetime-local", placeholder: "" },
-                  { label: "Lien de la réunion", key: "link", type: "url", placeholder: "https://meet.google.com/..." },
-                ].map(({ label, key, type, placeholder }) => (
-                  <div key={key}>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">{label}</label>
-                    <input required type={type} value={form[key as keyof typeof form]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} placeholder={placeholder} className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white border-transparent focus:ring-2 focus:ring-teal-500 outline-none" />
-                  </div>
-                ))}
+              <form onSubmit={handleCreate} className="space-y-5">
+                {/* Titre */}
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Durée (minutes)</label>
-                  <select value={form.duration} onChange={e => setForm(f => ({ ...f, duration: e.target.value }))} className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white border-transparent focus:ring-2 focus:ring-teal-500 outline-none">
-                    {["30", "45", "60", "90", "120"].map(d => <option key={d} value={d}>{d} min</option>)}
-                  </select>
+                  <label className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Titre de la session *</label>
+                  <input 
+                    required 
+                    type="text" 
+                    value={form.title} 
+                    onChange={e => setForm(f => ({ ...f, title: e.target.value }))} 
+                    placeholder="ex: Workshop Solidity - Déploiement Pratique" 
+                    className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none transition-all" 
+                  />
                 </div>
-                <button type="submit" className="w-full py-3 bg-teal-600 hover:bg-teal-500 text-white font-semibold rounded-xl transition-colors">Créer la session</button>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Description</label>
+                  <textarea 
+                    value={form.description} 
+                    onChange={e => setForm(f => ({ ...f, description: e.target.value }))} 
+                    placeholder="Saisissez les objectifs ou le programme de cette session..." 
+                    rows={2}
+                    className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none transition-all resize-none" 
+                  />
+                </div>
+
+                {/* Date & Durée */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Date et heure *</label>
+                    <input 
+                      required 
+                      type="datetime-local" 
+                      value={form.date} 
+                      onChange={e => setForm(f => ({ ...f, date: e.target.value }))} 
+                      className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none transition-all" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Durée</label>
+                    <select 
+                      value={form.duration} 
+                      onChange={e => setForm(f => ({ ...f, duration: e.target.value }))} 
+                      className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none transition-all"
+                    >
+                      {["30", "45", "60", "90", "120", "180"].map(d => (
+                        <option key={d} value={d}>{d} minutes</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Plateforme */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">Plateforme *</label>
+                    <select 
+                      value={form.meeting_provider} 
+                      onChange={e => setForm(f => ({ ...f, meeting_provider: e.target.value, meeting_url: e.target.value === "ANSELLA_LIVE" ? "" : f.meeting_url }))} 
+                      className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none transition-all"
+                    >
+                      <option value="ANSELLA_LIVE">Ansella Live (Jitsi - Gratuit)</option>
+                      <option value="ZOOM">Zoom</option>
+                      <option value="TEAMS">Microsoft Teams</option>
+                      <option value="MEET">Google Meet</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                      {form.meeting_provider === "ANSELLA_LIVE" ? "Lien de la réunion" : "Lien de la réunion *"}
+                    </label>
+                    {form.meeting_provider === "ANSELLA_LIVE" ? (
+                      <div className="w-full px-4 py-3 rounded-xl bg-teal-500/5 text-teal-600 dark:text-teal-400 border border-teal-500/20 text-xs font-semibold flex items-center gap-2 h-[46px]">
+                        <Sparkles className="w-4 h-4 shrink-0 text-teal-500" />
+                        Généré automatiquement par Jitsi Meet.
+                      </div>
+                    ) : (
+                      <input 
+                        required 
+                        type="url" 
+                        value={form.meeting_url} 
+                        onChange={e => setForm(f => ({ ...f, meeting_url: e.target.value }))} 
+                        placeholder="https://zoom.us/j/... ou Meet" 
+                        className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none transition-all" 
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Confidentialité (Public / Privé) */}
+                <div className="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-bold text-zinc-800 dark:text-white">Confidentialité</span>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">Qui peut rejoindre ce cours en direct ?</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, isPublic: true }))}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${form.isPublic ? "bg-teal-600 border-teal-600 text-white" : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700"}`}
+                      >
+                        Public
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, isPublic: false }))}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${!form.isPublic ? "bg-teal-600 border-teal-600 text-white" : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700"}`}
+                      >
+                        Privé
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Participant Selection for Private Lives */}
+                  {!form.isPublic && (
+                    <div className="space-y-3 pt-3 border-t border-zinc-200 dark:border-zinc-700/80 animate-in fade-in slide-in-from-top-2 duration-250">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                          Sélectionner les invités ({selectedUserIds.length})
+                        </span>
+                        {selectedUserIds.length > 0 && (
+                          <button 
+                            type="button" 
+                            onClick={() => setSelectedUserIds([])}
+                            className="text-[10px] text-zinc-400 hover:text-zinc-600 dark:hover:text-white underline font-semibold"
+                          >
+                            Tout décocher
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Search profile input */}
+                      <div className="relative">
+                        <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-3" />
+                        <input 
+                          type="text"
+                          value={searchTerm}
+                          onChange={e => setSearchTerm(e.target.value)}
+                          placeholder="Rechercher par nom ou email..."
+                          className="w-full pl-9 pr-4 py-2 text-xs rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
+                        />
+                      </div>
+
+                      {/* Profiles List */}
+                      <div className="max-h-40 overflow-y-auto border border-zinc-200 dark:border-zinc-700/80 rounded-xl bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800/80">
+                        {filteredProfiles.length === 0 ? (
+                          <p className="text-center py-4 text-xs text-zinc-400">Aucun utilisateur trouvé.</p>
+                        ) : (
+                          filteredProfiles.map(p => {
+                            const isSelected = selectedUserIds.includes(p.id);
+                            return (
+                              <label 
+                                key={p.id} 
+                                className="flex items-center gap-3 px-3 py-2 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800/40 cursor-pointer select-none"
+                              >
+                                <input 
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleUserSelection(p.id)}
+                                  className="rounded border-zinc-300 dark:border-zinc-700 text-teal-600 focus:ring-teal-500 h-3.5 w-3.5"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-bold text-zinc-800 dark:text-white truncate">{p.full_name || "Nom inconnu"}</p>
+                                  <p className="text-[10px] text-zinc-400 truncate">{p.email}</p>
+                                </div>
+                              </label>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={saving}
+                  className="w-full py-3.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white font-semibold rounded-xl transition-all text-sm shadow-md hover:shadow-teal-600/20 flex items-center justify-center gap-2"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Planification en cours...
+                    </>
+                  ) : (
+                    "Planifier la session"
+                  )}
+                </button>
               </form>
             )}
           </div>

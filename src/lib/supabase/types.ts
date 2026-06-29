@@ -736,7 +736,7 @@ export type Database = {
       }
       live_sessions: {
         Row: {
-          course_id: string
+          course_id: string | null
           created_at: string
           description: string | null
           duration_minutes: number | null
@@ -750,9 +750,11 @@ export type Database = {
           status: Database["public"]["Enums"]["session_status"]
           title: string
           updated_at: string
+          is_public: boolean
+          allowed_user_ids: string[]
         }
         Insert: {
-          course_id: string
+          course_id?: string | null
           created_at?: string
           description?: string | null
           duration_minutes?: number | null
@@ -766,9 +768,11 @@ export type Database = {
           status?: Database["public"]["Enums"]["session_status"]
           title: string
           updated_at?: string
+          is_public?: boolean
+          allowed_user_ids?: string[]
         }
         Update: {
-          course_id?: string
+          course_id?: string | null
           created_at?: string
           description?: string | null
           duration_minutes?: number | null
@@ -782,6 +786,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["session_status"]
           title?: string
           updated_at?: string
+          is_public?: boolean
+          allowed_user_ids?: string[]
         }
         Relationships: [
           {
