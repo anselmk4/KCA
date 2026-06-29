@@ -212,6 +212,9 @@ export default function AdminUsersPage() {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: newUser.email,
         password: newUser.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        }
       });
 
       if (authError) throw authError;

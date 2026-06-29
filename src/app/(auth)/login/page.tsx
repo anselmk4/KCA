@@ -149,13 +149,8 @@ export default function LoginPage() {
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-teal-500/10 rounded-full blur-[120px] -ml-40 -mb-40 animate-pulse duration-[8000ms]" />
 
         {/* Header Branding */}
-        <div className="z-10 flex items-center space-x-3">
-          <div className="relative w-11 h-11 bg-white/5 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/10 shadow-lg">
-            <Image src="/logo.png" alt="ANSELLA" width={28} height={28} className="object-contain" />
-          </div>
-          <span className="font-extrabold text-2xl tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-200 to-zinc-400">
-            ANSELLA
-          </span>
+        <div className="z-10 flex items-center">
+          <Image src="/logo.png" alt="ANSELLA Logo" width={160} height={48} className="object-contain h-10 w-auto" priority />
         </div>
 
         {/* Catchy advertisement and logo representation */}
@@ -212,9 +207,8 @@ export default function LoginPage() {
 
           {/* Top Brand representing mobile view logo */}
           <div className="flex flex-col items-center mb-8">
-            <Link href="/" className="lg:hidden flex items-center space-x-2 mb-6">
-              <Image src="/logo.png" alt="ANSELLA" width={36} height={36} className="object-contain" />
-              <span className="font-extrabold text-2xl text-zinc-900 dark:text-white tracking-wide">ANSELLA</span>
+            <Link href="/" className="lg:hidden flex items-center mb-6">
+              <Image src="/logo.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto" priority />
             </Link>
             <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Bienvenue sur Ansella</h2>
             <p className="text-zinc-500 dark:text-zinc-400 text-center text-sm">
