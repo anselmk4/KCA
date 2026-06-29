@@ -215,12 +215,15 @@ export default function LivePage() {
     }
   };
 
-  const isSessionPast = (dateStr: string) => {
-    return new Date(dateStr).getTime() < Date.now();
+  const isSessionPast = (session: LiveSession) => {
+    const start = new Date(session.scheduled_at).getTime();
+    const duration = session.duration_minutes || 60;
+    const end = start + (duration * 60000);
+    return Date.now() > end;
   };
 
-  const upcoming = sessions.filter(s => !isSessionPast(s.scheduled_at));
-  const past = sessions.filter(s => isSessionPast(s.scheduled_at));
+  const upcoming = sessions.filter(s => !isSessionPast(s));
+  const past = sessions.filter(s => isSessionPast(s));
 
   if (loading) {
     return (
