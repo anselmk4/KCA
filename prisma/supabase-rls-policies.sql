@@ -298,6 +298,98 @@ BEGIN
   END IF;
 END $$;
 
+-- Allow students to UPDATE their own enrollments (needed for progress and status changes)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'enrollments' AND policyname = 'Students can update own enrollments'
+  ) THEN
+    CREATE POLICY "Students can update own enrollments"
+      ON public.enrollments
+      FOR UPDATE
+      TO authenticated
+      USING (auth.uid() = student_id)
+      WITH CHECK (auth.uid() = student_id);
+  END IF;
+END $$;
+
+-- ==================== ORDERS & PAYMENTS & PROGRESS & CERTIFICATES ====================
+
+-- Allow users to SELECT and INSERT their own orders
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'orders' AND policyname = 'Users can select own orders') THEN
+    CREATE POLICY "Users can select own orders" ON public.orders FOR SELECT TO authenticated USING (auth.uid() = user_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'orders' AND policyname = 'Users can insert own orders') THEN
+    CREATE POLICY "Users can insert own orders" ON public.orders FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+  END IF;
+END $$;
+
+-- Allow users to SELECT and INSERT their own order items
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'order_items' AND policyname = 'Users can select own order items') THEN
+    CREATE POLICY "Users can select own order items" ON public.order_items FOR SELECT TO authenticated 
+      USING (EXISTS (SELECT 1 FROM public.orders WHERE orders.id = order_items.order_id AND orders.user_id = auth.uid()));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'order_items' AND policyname = 'Users can insert own order items') THEN
+    CREATE POLICY "Users can insert own order items" ON public.order_items FOR INSERT TO authenticated 
+      WITH CHECK (EXISTS (SELECT 1 FROM public.orders WHERE orders.id = order_items.order_id AND orders.user_id = auth.uid()));
+  END IF;
+END $$;
+
+-- Allow users to SELECT and INSERT their own payments
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'payments' AND policyname = 'Users can select own payments') THEN
+    CREATE POLICY "Users can select own payments" ON public.payments FOR SELECT TO authenticated USING (auth.uid() = user_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'payments' AND policyname = 'Users can insert own payments') THEN
+    CREATE POLICY "Users can insert own payments" ON public.payments FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+  END IF;
+END $$;
+
+-- Allow students to select, insert and update their own lesson progress
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'lesson_progress' AND policyname = 'Students can select own lesson progress') THEN
+    CREATE POLICY "Students can select own lesson progress" ON public.lesson_progress FOR SELECT TO authenticated
+      USING (EXISTS (SELECT 1 FROM public.enrollments WHERE enrollments.id = lesson_progress.enrollment_id AND enrollments.student_id = auth.uid()));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'lesson_progress' AND policyname = 'Students can insert own lesson progress') THEN
+    CREATE POLICY "Students can insert own lesson progress" ON public.lesson_progress FOR INSERT TO authenticated
+      WITH CHECK (EXISTS (SELECT 1 FROM public.enrollments WHERE enrollments.id = lesson_progress.enrollment_id AND enrollments.student_id = auth.uid()));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'lesson_progress' AND policyname = 'Students can update own lesson progress') THEN
+    CREATE POLICY "Students can update own lesson progress" ON public.lesson_progress FOR UPDATE TO authenticated
+      USING (EXISTS (SELECT 1 FROM public.enrollments WHERE enrollments.id = lesson_progress.enrollment_id AND enrollments.student_id = auth.uid()))
+      WITH CHECK (EXISTS (SELECT 1 FROM public.enrollments WHERE enrollments.id = lesson_progress.enrollment_id AND enrollments.student_id = auth.uid()));
+  END IF;
+END $$;
+
+-- Allow students to select and insert their own quiz attempts
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'quiz_attempts' AND policyname = 'Students can select own quiz attempts') THEN
+    CREATE POLICY "Students can select own quiz attempts" ON public.quiz_attempts FOR SELECT TO authenticated USING (auth.uid() = student_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'quiz_attempts' AND policyname = 'Students can insert own quiz attempts') THEN
+    CREATE POLICY "Students can insert own quiz attempts" ON public.quiz_attempts FOR INSERT TO authenticated WITH CHECK (auth.uid() = student_id);
+  END IF;
+END $$;
+
+-- Allow students to select and insert their own certificates
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'certificates' AND policyname = 'Students can select own certificates') THEN
+    CREATE POLICY "Students can select own certificates" ON public.certificates FOR SELECT TO authenticated USING (auth.uid() = student_id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'certificates' AND policyname = 'Students can insert own certificates') THEN
+    CREATE POLICY "Students can insert own certificates" ON public.certificates FOR INSERT TO authenticated WITH CHECK (auth.uid() = student_id);
+  END IF;
+END $$;
+
 -- ==================== ENABLE RLS ON ALL TABLES ====================
 ALTER TABLE IF EXISTS public.courses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.profiles ENABLE ROW LEVEL SECURITY;
@@ -307,6 +399,12 @@ ALTER TABLE IF EXISTS public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.enrollments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.course_sections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.lessons ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.lesson_progress ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.quiz_attempts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.certificates ENABLE ROW LEVEL SECURITY;
 
 -- ==================== VERIFY ====================
 -- List all policies for verification
