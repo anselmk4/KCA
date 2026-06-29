@@ -64,7 +64,8 @@ export default function DiscoverPage() {
         const { data: sbCourses, error: coursesError } = await supabase
           .from('courses')
           .select('id, title, slug, description, price, status, instructor_id, category_id, level, rating_avg, created_at')
-          .eq('status', 'PUBLISHED');
+          .eq('status', 'PUBLISHED')
+          .order('created_at', { ascending: false });
 
         if (coursesError) {
           console.error('[discover] Error fetching courses:', coursesError.message);

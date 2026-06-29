@@ -26,13 +26,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'courseId est requis' }, { status: 400 });
     }
 
-    // 1. Vérifier enrollment actif
+    // 1. Vérifier enrollment actif ou complété
     const { data: enrollment, error: enrollError } = await supabase
       .from('enrollments')
-      .select('id, progress_percent')
+      .select('id, progress_percent, status')
       .eq('student_id', user.id)
       .eq('course_id', courseId)
-      .eq('status', 'ACTIVE')
+      .in('status', ['ACTIVE', 'COMPLETED'])
       .maybeSingle();
 
     if (enrollError || !enrollment) {

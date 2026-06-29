@@ -80,6 +80,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
   const [loading, setLoading] = useState(true);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [hasCertificate, setHasCertificate] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -174,6 +175,15 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
           .eq("course_id", courseData.id)
           .maybeSingle();
         setIsEnrolled(!!enrollment);
+
+        // Check if certificate is unlocked
+        const { data: cert } = await supabase
+          .from("certificates")
+          .select("id")
+          .eq("student_id", user.id)
+          .eq("course_id", courseData.id)
+          .maybeSingle();
+        setHasCertificate(!!cert);
       }
     } finally {
       setLoading(false);
@@ -290,7 +300,15 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                 {course.price === 0 ? "Gratuit" : `$${course.price}`}
               </p>
 
-              {isEnrolled ? (
+              {hasCertificate ? (
+                <Link
+                  href="/dashboard/certificates"
+                  className="block w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 text-sm animate-pulse"
+                >
+                  <Award className="w-5 h-5 inline mr-2 animate-spin-slow" />
+                  Afficher certificat
+                </Link>
+              ) : isEnrolled ? (
                 <Link
                   href={`/dashboard/courses/${course.id}/learn`}
                   className="block w-full py-3.5 bg-teal-500 hover:bg-teal-400 text-white font-bold rounded-xl transition-all shadow-lg shadow-teal-500/20 text-sm"

@@ -11,7 +11,17 @@ import {
   Star,
   BookOpen,
   Clock,
+  CircleDollarSign,
+  BadgePercent,
+  Wallet,
 } from "lucide-react";
+
+const PLAN_COMMISSION_CONFIG: Record<string, { commissionRate: number; instructorShare: number }> = {
+  FREE: { commissionRate: 0.20, instructorShare: 0.80 },
+  BASE: { commissionRate: 0.10, instructorShare: 0.90 },
+  PRO: { commissionRate: 0.05, instructorShare: 0.95 },
+  MAX: { commissionRate: 0.00, instructorShare: 1.00 },
+};
 
 export default function AnalyticsPage() {
   const [db, setDb] = useState<Database | null>(null);
@@ -41,13 +51,21 @@ export default function AnalyticsPage() {
     ? Math.round(myEnrollments.reduce((s, e) => s + e.progressPercent, 0) / myEnrollments.length)
     : 0;
 
+  // Financial calculations from synchronized transactions
+  const myTransactions = (db.transactions || []).filter(t => t.instructorId === (session?.userId ?? "") && t.status === "PAID");
+  const instructorPlan = session?.plan || "FREE";
+  const planConfig = PLAN_COMMISSION_CONFIG[instructorPlan] || PLAN_COMMISSION_CONFIG.FREE;
+  const totalRevenue = myTransactions.reduce((acc, t) => acc + t.amount, 0);
+  const platformCommission = totalRevenue * planConfig.commissionRate;
+  const netRevenue = totalRevenue * planConfig.instructorShare;
+
   const kpis = [
+    { label: "Chiffre d'Affaires", value: `${totalRevenue.toFixed(2)}$`, icon: CircleDollarSign, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-900/20" },
+    { label: "Commission Site", value: `${platformCommission.toFixed(2)}$`, icon: BadgePercent, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-900/20" },
+    { label: "Revenu Net", value: `${netRevenue.toFixed(2)}$`, icon: Wallet, color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
     { label: "Apprenants total", value: totalStudents, icon: Users, color: "text-teal-600", bg: "bg-teal-50 dark:bg-teal-900/20" },
-    { label: "Cours publiés", value: myCourses.filter(c => c.status === "PUBLISHED").length, icon: BookOpen, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-900/20" },
-    { label: "Taux complétion", value: `${myEnrollments.length > 0 ? Math.round((completedCount / myEnrollments.length) * 100) : 0}%`, icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
-    { label: "Note moyenne", value: avgRating.toFixed(1), icon: Star, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-900/20" },
-    { label: "Vues estimées", value: `${(totalStudents * 4.2).toFixed(0)}`, icon: Eye, color: "text-purple-600", bg: "bg-purple-50 dark:bg-purple-900/20" },
-    { label: "Progression moy.", value: `${avgProgress}%`, icon: Clock, color: "text-rose-600", bg: "bg-rose-50 dark:bg-rose-900/20" },
+    { label: "Cours publiés", value: myCourses.filter(c => c.status === "PUBLISHED").length, icon: BookOpen, color: "text-zinc-600", bg: "bg-zinc-50 dark:bg-zinc-800/20" },
+    { label: "Taux complétion", value: `${myEnrollments.length > 0 ? Math.round((completedCount / myEnrollments.length) * 100) : 0}%`, icon: TrendingUp, color: "text-rose-600", bg: "bg-rose-50 dark:bg-rose-900/20" },
   ];
 
   // Simulated weekly data
@@ -58,8 +76,15 @@ export default function AnalyticsPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Analytique</h1>
-        <p className="text-zinc-500 dark:text-zinc-400 mt-1">Performances de vos cours sur les 30 derniers jours.</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Analytique</h1>
+            <p className="text-zinc-500 dark:text-zinc-400 mt-1">Performances de vos cours et commissions en temps réel.</p>
+          </div>
+          <span className="text-xxs font-bold uppercase tracking-wider bg-amber-500/10 text-amber-500 px-3 py-1.5 rounded-xl border border-amber-500/20">
+            Forfait : {instructorPlan}
+          </span>
+        </div>
       </div>
 
       {/* KPI grid */}
@@ -72,8 +97,8 @@ export default function AnalyticsPage() {
                 <Icon className={`w-5 h-5 ${kpi.color}`} />
               </div>
               <div>
-                <p className={`text-2xl font-extrabold ${kpi.color}`}>{kpi.value}</p>
-                <p className="text-xs text-zinc-500 mt-0.5">{kpi.label}</p>
+                <p className={`text-xl sm:text-2xl font-black ${kpi.color}`}>{kpi.value}</p>
+                <p className="text-xs text-zinc-500 mt-0.5 font-medium">{kpi.label}</p>
               </div>
             </div>
           );

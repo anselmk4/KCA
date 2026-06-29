@@ -59,6 +59,7 @@ export default function MyCoursesPage() {
   const [activeEnrollments, setActiveEnrollments] = useState<EnrollmentData[]>([]);
   const [completedEnrollments, setCompletedEnrollments] = useState<EnrollmentData[]>([]);
   const [availableCourses, setAvailableCourses] = useState<CourseData[]>([]);
+  const [userPlan, setUserPlan] = useState<string>("FREE");
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
@@ -66,6 +67,16 @@ export default function MyCoursesPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setLoading(false); return; }
+
+      // Get user plan
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("plan")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profile?.plan) {
+        setUserPlan(profile.plan);
+      }
 
       // Enrollments with courses
       const { data: enrollData } = await supabase
@@ -223,11 +234,17 @@ export default function MyCoursesPage() {
           <h3 className="text-base font-bold text-zinc-900 dark:text-white">Formations disponibles</h3>
 
           {availableCourses.length === 0 ? (
-            <div className="bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30 p-6 text-center space-y-3">
-              <Award className="w-10 h-10 text-emerald-600 mx-auto" />
-              <p className="text-sm font-bold text-zinc-900 dark:text-white">Bravo !</p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Vous êtes inscrit à toutes les formations disponibles.</p>
-            </div>
+            userPlan === "MAX" ? (
+              <div className="bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30 p-6 text-center space-y-3">
+                <Award className="w-10 h-10 text-emerald-600 mx-auto" />
+                <p className="text-sm font-bold text-zinc-900 dark:text-white">Bravo !</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">Vous êtes inscrit à toutes les formations disponibles.</p>
+              </div>
+            ) : (
+              <div className="bg-zinc-50 dark:bg-zinc-800/20 rounded-2xl border border-zinc-200/50 p-6 text-center">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Aucun autre cours disponible pour le moment.</p>
+              </div>
+            )
           ) : (
             <div className="space-y-3">
               {availableCourses.map((course) => {

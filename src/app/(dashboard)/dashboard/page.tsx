@@ -26,6 +26,7 @@ interface Profile {
   id: string;
   full_name: string;
   email: string;
+  plan?: string;
 }
 
 interface CourseData {
@@ -83,7 +84,7 @@ export default function DashboardPage() {
       // Profile
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("id, full_name, email")
+        .select("id, full_name, email, plan")
         .eq("id", user.id)
         .maybeSingle();
       setProfile(profileData as unknown as Profile);
@@ -369,11 +370,17 @@ export default function DashboardPage() {
               })}
             </div>
           ) : (
-            <div className="bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30 p-6 text-center space-y-3">
-              <Award className="w-10 h-10 text-emerald-600 mx-auto" />
-              <p className="text-sm font-bold text-zinc-900 dark:text-white">Félicitations !</p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Vous êtes inscrit à toutes nos formations disponibles.</p>
-            </div>
+            profile?.plan === "MAX" ? (
+              <div className="bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30 p-6 text-center space-y-3">
+                <Award className="w-10 h-10 text-emerald-600 mx-auto" />
+                <p className="text-sm font-bold text-zinc-900 dark:text-white">Félicitations !</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">Vous êtes inscrit à toutes nos formations disponibles.</p>
+              </div>
+            ) : (
+              <div className="bg-zinc-50 dark:bg-zinc-800/20 rounded-2xl border border-zinc-200/50 p-6 text-center">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Aucun autre cours recommandé pour le moment.</p>
+              </div>
+            )
           )}
 
           <Link

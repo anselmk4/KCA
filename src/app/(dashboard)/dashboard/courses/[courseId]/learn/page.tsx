@@ -766,7 +766,7 @@ export default function CourseLearnPage() {
                       ? "Ce test est validé et comptabilisé dans les critères de déblocage de votre certificat final."
                       : "Révisez les leçons de ce module et retentez votre chance."}
                   </p>
-                  <div className="flex justify-center gap-4 pt-4">
+                  <div className="flex justify-center gap-4 pt-4 flex-wrap">
                     <button
                       onClick={() => { setQuizSubmitted(false); setSelectedAnswers({}); }}
                       className="px-5 py-2.5 bg-white dark:bg-zinc-800 border rounded-xl text-xs font-bold hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors cursor-pointer flex items-center gap-1.5"
@@ -779,6 +779,14 @@ export default function CourseLearnPage() {
                     >
                       Retourner aux leçons
                     </button>
+                    {quizPassed && hasCertificate && (
+                      <Link
+                        href="/dashboard/certificates"
+                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-500/10 flex items-center gap-1.5 animate-pulse"
+                      >
+                        <Award className="w-3.5 h-3.5" /> Voir mon Certificat
+                      </Link>
+                    )}
                   </div>
                 </div>
               )}
@@ -786,34 +794,30 @@ export default function CourseLearnPage() {
           ) : activeLesson ? (
             /* CASE B: Leçon active */
             <div className="space-y-6">
-              <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-black shadow-lg">
-                {activeLesson.videoUrl && (() => {
-                  const embedInfo = getVideoEmbedInfo(activeLesson.videoUrl);
-                  if (!embedInfo) return null;
-                  
-                  return embedInfo.type === "direct" ? (
-                    <video
-                      src={embedInfo.embedUrl}
-                      controls
-                      className="absolute inset-0 w-full h-full object-contain"
-                    />
-                  ) : (
-                    <iframe
-                      src={embedInfo.embedUrl}
-                      className="absolute inset-0 w-full h-full border-0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      title={activeLesson.title}
-                    />
-                  );
-                })()}
-                {!activeLesson.videoUrl && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 gap-2 bg-gradient-to-tr from-zinc-950 via-zinc-900 to-zinc-950">
-                    <Play className="w-12 h-12 text-zinc-600 animate-pulse" />
-                    <p className="text-xs font-semibold text-zinc-400">Aucune vidéo associée à cette leçon</p>
-                  </div>
-                )}
-              </div>
+              {activeLesson.videoUrl && (
+                <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-black shadow-lg">
+                  {(() => {
+                    const embedInfo = getVideoEmbedInfo(activeLesson.videoUrl);
+                    if (!embedInfo) return null;
+                    
+                    return embedInfo.type === "direct" ? (
+                      <video
+                        src={embedInfo.embedUrl}
+                        controls
+                        className="absolute inset-0 w-full h-full object-contain"
+                      />
+                    ) : (
+                      <iframe
+                        src={embedInfo.embedUrl}
+                        className="absolute inset-0 w-full h-full border-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        title={activeLesson.title}
+                      />
+                    );
+                  })()}
+                </div>
+              )}
 
               <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 dark:border-zinc-800 pb-4 mb-4">
@@ -898,6 +902,14 @@ export default function CourseLearnPage() {
                       Passer le Quiz final
                       <ChevronRight className="w-4 h-4" />
                     </button>
+                  ) : hasCertificate ? (
+                    <Link
+                      href="/dashboard/certificates"
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all cursor-pointer shadow-md shadow-emerald-500/10"
+                    >
+                      <Award className="w-4 h-4 animate-pulse" />
+                      Voir le Certificat
+                    </Link>
                   ) : (
                     <button
                       onClick={() => checkCertificate()}
