@@ -10,6 +10,7 @@ import { Pricing } from "@/components/sections/Pricing";
 import { FAQ } from "@/components/sections/FAQ";
 import { CTA } from "@/components/sections/CTA";
 import { LogoBanner } from "@/components/sections/LogoBanner";
+import { PartnersMarquee } from "@/components/sections/PartnersMarquee";
 
 export default function Home() {
   return (
@@ -18,6 +19,7 @@ export default function Home() {
       <main className="flex-1">
         <Hero />
         <LogoBanner />
+        <PartnersMarquee />
         <ValueProposition />
         <WhyChooseUs />
         <FeaturesGrid />
