@@ -1,0 +1,282 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize a service role/admin client to bypass RLS when updating/inserting payments/orders on behalf of the system
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+export async function POST(req: NextRequest) {
+  console.log('[webhook-momo] Received callback request');
+  try {
+    // 1. Parse incoming payload
+    const body = await req.json();
+    console.log('[webhook-momo] Payload received:', JSON.stringify(body, null, 2));
+
+    // Extract reference and status (support both uppercase and lowercase keys)
+    const reference = body.reference || body.Reference || body.ref;
+    const transStatus = body.status || body.Status || body.Trans_Status || body.trans_status;
+
+    if (!reference) {
+      console.error('[webhook-momo] Missing reference in payload');
+      return NextResponse.json({ error: 'Missing reference' }, { status: 400 });
+    }
+
+    console.log(`[webhook-momo] Reference: ${reference}, Declared Status: ${transStatus}`);
+
+    // 2. Call Moko Afrika API to verify the transaction status (API Server-to-Server double check for security)
+    const mokoBaseUrl = process.env.MOKO_API_BASE_URL || 'https://paydrc.gofreshbakery.net';
+    const mokoGatewayUrl = `${mokoBaseUrl.replace(/\/$/, '')}/gateway`;
+
+    const verifyPayload = {
+      merchant_id: process.env.MOKO_MERCHANT_ID,
+      merchant_secrete: process.env.MOKO_MERCHANT_SECRET,
+      action: 'verify',
+      reference: reference
+    };
+
+    let isSuccess = false;
+    let finalVerifyStatus = '';
+
+    try {
+      console.log(`[webhook-momo] Querying Moko status for reference: ${reference}...`);
+      const verifyResponse = await fetch(mokoGatewayUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(verifyPayload),
+      });
+
+      const verifyText = await verifyResponse.text();
+      console.log('[webhook-momo] Verification API Response:', verifyText);
+
+      let verifyData: any = {};
+      try {
+        verifyData = JSON.parse(verifyText);
+      } catch {
+        verifyData = { message: verifyText };
+      }
+
+      finalVerifyStatus = verifyData.status || verifyData.Status || verifyData.Trans_Status || '';
+      
+      // Moko Afrika success statuses are typically 'Successful', 'Success', or equivalent
+      if (
+        verifyResponse.ok && 
+        (finalVerifyStatus.toLowerCase() === 'successful' || 
+         finalVerifyStatus.toLowerCase() === 'success' || 
+         finalVerifyStatus.toLowerCase() === 'approved')
+      ) {
+        isSuccess = true;
+      } else {
+        console.warn(`[webhook-momo] Verification failed. Status reported by Moko verify: ${finalVerifyStatus}`);
+      }
+
+    } catch (verifyErr: any) {
+      console.error('[webhook-momo] Error during server-to-server verification fetch:', verifyErr.message);
+      
+      // Fallback: If verification request failed but payload is trusted (e.g. signature or in local sandbox environment)
+      // or if sandbox status declared success, we check if we can trust it.
+      // However, for maximum security, we require verify API to succeed. In development/sandbox testing, if we want
+      // to bypass verify failures because the sandbox verify API is down, we check if the webhook payload says Successful.
+      if (process.env.NODE_ENV === 'development' && 
+          (transStatus?.toLowerCase() === 'successful' || transStatus?.toLowerCase() === 'success')) {
+        console.warn('[webhook-momo] Sandbox mode: Bypassing verify API failure due to local development environments');
+        isSuccess = true;
+        finalVerifyStatus = transStatus;
+      }
+    }
+
+    // 3. Process database updates based on verification results
+    if (isSuccess) {
+      console.log(`[webhook-momo] Transaction ${reference} is SUCCESSFUL. Updating database...`);
+
+      if (reference.startsWith('std_pay_')) {
+        // STUDENT COURSE PURCHASE
+        const paymentId = reference.replace('std_pay_', '');
+        console.log(`[webhook-momo] Processing student payment: ${paymentId}`);
+
+        // Fetch payment to get order details
+        const { data: payment, error: fetchErr } = await supabaseAdmin
+          .from('payments')
+          .select('order_id, user_id')
+          .eq('id', paymentId)
+          .maybeSingle();
+
+        if (fetchErr || !payment) {
+          console.error('[webhook-momo] Error finding payment or order:', fetchErr?.message || 'Payment not found');
+          return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
+        }
+
+        // Fetch order item to find course_id
+        const { data: orderItem } = await supabaseAdmin
+          .from('order_items')
+          .select('course_id')
+          .eq('order_id', payment.order_id)
+          .maybeSingle();
+
+        const courseId = orderItem?.course_id;
+
+        // Perform transactional update using admin client
+        // Update payment to PAID
+        const { error: payUpdateErr } = await supabaseAdmin
+          .from('payments')
+          .update({
+            status: 'PAID',
+            paid_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          } as any)
+          .eq('id', paymentId);
+
+        if (payUpdateErr) console.error('[webhook-momo] Payment update error:', payUpdateErr.message);
+
+        // Update order to COMPLETED
+        const { error: orderUpdateErr } = await supabaseAdmin
+          .from('orders')
+          .update({
+            status: 'COMPLETED',
+            updated_at: new Date().toISOString()
+          } as any)
+          .eq('id', payment.order_id);
+
+        if (orderUpdateErr) console.error('[webhook-momo] Order update error:', orderUpdateErr.message);
+
+        // Activate Enrollment
+        if (courseId) {
+          const { error: enrollUpdateErr } = await supabaseAdmin
+            .from('enrollments')
+            .update({
+              status: 'ACTIVE',
+              joined_at: new Date().toISOString()
+            } as any)
+            .eq('student_id', payment.user_id)
+            .eq('course_id', courseId);
+
+          if (enrollUpdateErr) {
+            console.error('[webhook-momo] Enrollment activation error:', enrollUpdateErr.message);
+            // Attempt inserts in case enrollment didn't exist
+            await supabaseAdmin.from('enrollments').upsert({
+              student_id: payment.user_id,
+              course_id: courseId,
+              progress_percent: 0,
+              status: 'ACTIVE',
+              enrolled_at: new Date().toISOString()
+            } as any);
+          }
+          console.log(`[webhook-momo] Student ${payment.user_id} successfully enrolled in course ${courseId}`);
+        }
+
+      } else if (reference.startsWith('ins_plan_')) {
+        // INSTRUCTOR PLAN SUBSCRIPTION
+        const paymentId = reference.replace('ins_plan_', '');
+        console.log(`[webhook-momo] Processing instructor subscription payment: ${paymentId}`);
+
+        // Fetch payment to get order & user details
+        const { data: payment, error: fetchErr } = await supabaseAdmin
+          .from('payments')
+          .select('order_id, user_id')
+          .eq('id', paymentId)
+          .maybeSingle();
+
+        if (fetchErr || !payment) {
+          console.error('[webhook-momo] Error finding payment:', fetchErr?.message || 'Payment not found');
+          return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
+        }
+
+        // Fetch order item to determine plan
+        const { data: orderItem } = await supabaseAdmin
+          .from('order_items')
+          .select('course_id')
+          .eq('order_id', payment.order_id)
+          .maybeSingle();
+
+        const courseIdStr = orderItem?.course_id || '';
+        let planName = 'BASE';
+        if (courseIdStr.includes('pro')) planName = 'PRO';
+        else if (courseIdStr.includes('max')) planName = 'MAX';
+
+        // Update payment to PAID
+        await supabaseAdmin
+          .from('payments')
+          .update({
+            status: 'PAID',
+            paid_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          } as any)
+          .eq('id', paymentId);
+
+        // Update order to COMPLETED
+        await supabaseAdmin
+          .from('orders')
+          .update({
+            status: 'COMPLETED',
+            updated_at: new Date().toISOString()
+          } as any)
+          .eq('id', payment.order_id);
+
+        // Update profile plan in Supabase
+        const { error: profileUpdateErr } = await supabaseAdmin
+          .from('profiles')
+          .update({
+            plan: planName
+          } as any)
+          .eq('id', payment.user_id);
+
+        if (profileUpdateErr) {
+          console.error('[webhook-momo] Profile plan update error:', profileUpdateErr.message);
+        } else {
+          console.log(`[webhook-momo] Instructor ${payment.user_id} profile plan successfully upgraded to ${planName}`);
+        }
+      }
+
+      return NextResponse.json({ success: true, message: 'Transaction processed successfully' }, { status: 200 });
+
+    } else {
+      // Transaction was not successful (e.g. Failed, Cancelled)
+      console.log(`[webhook-momo] Transaction ${reference} failed or is pending validation. Verification status: ${finalVerifyStatus}`);
+
+      const failureReason = finalVerifyStatus || 'Transaction échouée';
+
+      if (reference.startsWith('std_pay_') || reference.startsWith('ins_plan_')) {
+        const paymentId = reference.split('_').pop();
+
+        if (paymentId) {
+          // Update payment to FAILED
+          await supabaseAdmin
+            .from('payments')
+            .update({
+              status: 'FAILED',
+              failure_reason: failureReason,
+              updated_at: new Date().toISOString()
+            } as any)
+            .eq('id', paymentId);
+
+          // Get the payment to find order_id
+          const { data: payment } = await supabaseAdmin
+            .from('payments')
+            .select('order_id')
+            .eq('id', paymentId)
+            .maybeSingle();
+
+          if (payment) {
+            // Update order to CANCELLED
+            await supabaseAdmin
+              .from('orders')
+              .update({
+                status: 'CANCELLED',
+                updated_at: new Date().toISOString()
+              } as any)
+              .eq('id', payment.order_id);
+          }
+        }
+      }
+
+      return NextResponse.json({ success: false, status: finalVerifyStatus, message: 'Transaction was not successful' }, { status: 200 });
+    }
+
+  } catch (err: any) {
+    console.error('[webhook-momo] Critical error handling webhook:', err);
+    return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 });
+  }
+}

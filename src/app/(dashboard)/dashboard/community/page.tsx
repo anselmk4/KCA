@@ -257,7 +257,7 @@ export default function CommunityPage() {
                     )}
                     <div>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <a href={`/dashboard/profile/${post.user_id}`}
+                        <a href={`/profile/${post.user_id}`}
                           className="text-sm font-bold text-zinc-900 dark:text-white hover:text-teal-600 transition-colors">
                           {post.author_name}
                         </a>

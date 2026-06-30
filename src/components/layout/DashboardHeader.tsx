@@ -132,7 +132,7 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
                   <span>Paramètres</span>
                 </Link>
                 {userId && (
-                  <Link href={`/dashboard/profile/${userId}`} onClick={() => setDropdownOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                  <Link href={`/profile/${userId}`} onClick={() => setDropdownOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                     <UserCircle className="w-4 h-4 text-zinc-400" />
                     <span>Mon Profil</span>
                   </Link>

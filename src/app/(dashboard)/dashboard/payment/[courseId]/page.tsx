@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, CreditCard, Smartphone, ShieldCheck, QrCode } from "lucide-react";
+import { ChevronLeft, CreditCard, Smartphone, ShieldCheck, QrCode, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
 interface Course {
@@ -35,6 +35,9 @@ export default function PaymentPage() {
   const [payInstallment, setPayInstallment] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [showPendingState, setShowPendingState] = useState(false);
+  const [paymentId, setPaymentId] = useState("");
+  const [verifying, setVerifying] = useState(false);
 
   // MOMO state
   const [momoProvider, setMomoProvider] = useState("mpesa");
@@ -127,6 +130,34 @@ export default function PaymentPage() {
     ? Math.round(course.price / (course.installmentsCount || 1))
     : course ? course.price : 0;
 
+  const checkPaymentStatus = async () => {
+    if (!paymentId) return;
+    setVerifying(true);
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('status, failure_reason')
+        .eq('id', paymentId)
+        .maybeSingle();
+      
+      if (error) throw error;
+      if (data?.status === 'PAID') {
+        alert("Paiement validé avec succès ! Votre formation est débloquée.");
+        router.push("/dashboard/courses");
+      } else if (data?.status === 'FAILED') {
+        alert(`Le paiement a échoué : ${data.failure_reason || "Transaction refusée par l'opérateur."}`);
+        setShowPendingState(false);
+      } else {
+        alert("Paiement toujours en attente. Assurez-vous d'avoir validé l'opération en saisissant votre code PIN secret sur votre téléphone.");
+      }
+    } catch (err: any) {
+      console.error('[payment] Error checking status:', err);
+      alert("Erreur lors de la vérification du statut : " + (err.message || err));
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!course) return;
@@ -141,7 +172,38 @@ export default function PaymentPage() {
         return;
       }
 
-      // 1. Écrire l'enrollment dans Supabase en tant qu'ACTIVE
+      if (method === 'momo') {
+        try {
+          const response = await fetch('/api/payments/moko-initiate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              amount: finalAmount,
+              phoneNumber: momoPhone,
+              carrier: momoProvider,
+              type: 'STUDENT_COURSE',
+              itemId: course.id
+            }),
+          });
+
+          const resData = await response.json();
+          if (!response.ok) {
+            throw new Error(resData.error || "Une erreur est survenue lors de l'initiation du paiement.");
+          }
+
+          setPaymentId(resData.paymentId);
+          setShowPendingState(true);
+        } catch (momoErr: any) {
+          alert(momoErr.message || "Une erreur est survenue avec le service Mobile Money.");
+        } finally {
+          setSubmitting(false);
+        }
+        return;
+      }
+
+      // 1. Écrire l'enrollment dans Supabase en tant qu'ACTIVE (Pour PayPal et Crypto, simulation instantanée)
       const { error: enrollError } = await supabase
         .from('enrollments')
         .upsert({
@@ -157,7 +219,7 @@ export default function PaymentPage() {
         throw new Error("Impossible d'activer votre inscription dans la base de données. Veuillez réessayer.");
       }
 
-      // 2. Écrire la transaction dans Supabase (non bloquant en cas d'erreur de politiques RLS sur les tables de commande)
+      // 2. Écrire la transaction dans Supabase
       try {
         const orderId = crypto.randomUUID();
         await supabase.from('orders').insert({
@@ -177,8 +239,7 @@ export default function PaymentPage() {
         } as any);
 
         let payProvider: 'STRIPE' | 'PAYPAL' | 'MOBILE_MONEY' | 'CRYPTO' | 'MANUAL' = 'STRIPE';
-        if (method === 'momo') payProvider = 'MOBILE_MONEY';
-        else if (method === 'paypal') payProvider = 'PAYPAL';
+        if (method === 'paypal') payProvider = 'PAYPAL';
         else if (method === 'crypto') payProvider = 'CRYPTO';
 
         await supabase.from('payments').insert({
@@ -193,7 +254,6 @@ export default function PaymentPage() {
       } catch (receiptErr) {
         console.warn('[payment] Order/Payment receipt insert warning (non-blocking):', receiptErr);
       }
-
 
       setSubmitting(false);
       alert(`Paiement de $${finalAmount} validé avec succès ! Votre formation est débloquée.`);
@@ -221,6 +281,55 @@ export default function PaymentPage() {
         <Link href="/dashboard/discover" className="px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-xl">
           Retour au catalogue
         </Link>
+      </div>
+    );
+  }
+
+  if (showPendingState) {
+    return (
+      <div className="max-w-xl mx-auto py-12 px-6">
+        <div className="bg-white dark:bg-zinc-900 rounded-3xl p-8 border border-zinc-200 dark:border-zinc-800 shadow-xl text-center space-y-6 animate-in zoom-in-95">
+          <div className="w-16 h-16 bg-blue-100 dark:bg-blue-950/30 text-blue-600 rounded-full flex items-center justify-center mx-auto animate-pulse">
+            <Loader2 className="w-8 h-8 animate-spin" />
+          </div>
+          
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Validation du paiement en cours...</h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
+              Une demande d'approbation a été envoyée sur votre téléphone. Veuillez saisir votre code PIN secret pour confirmer le paiement de <span className="font-extrabold text-blue-600 dark:text-blue-400">${finalAmount} USD</span>.
+            </p>
+          </div>
+
+          <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl border border-zinc-150 dark:border-zinc-800 text-left text-xs space-y-2 text-zinc-500">
+            <p><strong>Opérateur :</strong> {momoProvider.toUpperCase()}</p>
+            <p><strong>Numéro :</strong> {momoPhone}</p>
+            <p><strong>Référence :</strong> {paymentId}</p>
+          </div>
+
+          <div className="space-y-3 pt-4">
+            <button
+              onClick={checkPaymentStatus}
+              disabled={verifying}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm cursor-pointer"
+            >
+              {verifying ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Vérification...</span>
+                </>
+              ) : (
+                <span>J'ai saisi mon code PIN</span>
+              )}
+            </button>
+            
+            <button
+              onClick={() => setShowPendingState(false)}
+              className="w-full py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-300 font-bold rounded-xl transition-all text-sm cursor-pointer"
+            >
+              Retour et changer de mode
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

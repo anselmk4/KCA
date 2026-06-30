@@ -46,7 +46,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     { icon: <Award className="w-5 h-5" />, label: "Certificats", href: "/dashboard/certificates" },
     { icon: <Users className="w-5 h-5" />, label: "Communauté", href: "/dashboard/community" },
     { icon: <LifeBuoy className="w-5 h-5" />, label: "Support Technique", href: "/dashboard/support" },
-    ...(userId ? [{ icon: <UserCircle className="w-5 h-5" />, label: "Mon Profil", href: `/dashboard/profile/${userId}` }] : []),
+    ...(userId ? [{ icon: <UserCircle className="w-5 h-5" />, label: "Mon Profil", href: `/profile/${userId}` }] : []),
   ];
 
   const handleLogout = async () => {

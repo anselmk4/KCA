@@ -23,6 +23,7 @@ import {
   Loader2 
 } from "lucide-react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase/client";
 
 type PaymentMethod = "mastercard" | "stripe" | "paypal" | "crypto" | "mobile_money";
 
@@ -34,6 +35,9 @@ function PaymentContent() {
   const [method, setMethod] = useState<PaymentMethod>("mastercard");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [showPendingState, setShowPendingState] = useState(false);
+  const [paymentId, setPaymentId] = useState("");
+  const [verifying, setVerifying] = useState(false);
 
   // Form Fields
   const [cardNumber, setCardNumber] = useState("");
@@ -67,13 +71,114 @@ function PaymentContent() {
 
   const currentPlanDetails = planDetails[plan];
 
-  const handlePaymentSubmit = (e: React.FormEvent) => {
+  const handlePaymentSuccess = () => {
+    if (!session) return;
+    const database = getDB();
+    
+    // 1. Update user plan in DB
+    const updatedUsers = database.users.map(u => {
+      if (u.id === session.userId) {
+        return { ...u, plan: plan };
+      }
+      return u;
+    });
+    database.users = updatedUsers;
+    saveDB(database);
+
+    // 2. Register simulation transaction
+    addTransaction({
+      userId: session.userId,
+      userName: session.name,
+      amount: currentPlanDetails.price,
+      courseId: `plan_${plan.toLowerCase()}`,
+      instructorId: "",
+      instructorName: "Plateforme ANSELLA",
+      status: "PAID",
+      method: "Mobile Money"
+    });
+
+    // 3. Update session
+    const updatedSession = {
+      ...session,
+      plan: plan
+    };
+    setSimulatedSession(updatedSession);
+    
+    setSuccess(true);
+
+    // Redirect after showing success screen
+    setTimeout(() => {
+      router.push("/instructor/billing");
+    }, 2000);
+  };
+
+  const checkPaymentStatus = async () => {
+    if (!paymentId) return;
+    setVerifying(true);
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('status, failure_reason')
+        .eq('id', paymentId)
+        .maybeSingle();
+      
+      if (error) throw error;
+      if (data?.status === 'PAID') {
+        alert("Paiement validé avec succès ! Votre abonnement est activé.");
+        setShowPendingState(false);
+        handlePaymentSuccess();
+      } else if (data?.status === 'FAILED') {
+        alert(`Le paiement a échoué : ${data.failure_reason || "Transaction refusée par l'opérateur."}`);
+        setShowPendingState(false);
+      } else {
+        alert("Paiement toujours en attente. Assurez-vous d'avoir validé la notification sur votre téléphone mobile.");
+      }
+    } catch (err: any) {
+      console.error('[instructor-pay] Status check error:', err);
+      alert("Erreur lors de la vérification : " + (err.message || err));
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session) return;
     
     setLoading(true);
 
-    // Simulate payment transaction validation
+    if (method === "mobile_money") {
+      try {
+        const response = await fetch('/api/payments/moko-initiate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            amount: currentPlanDetails.price,
+            phoneNumber: phone,
+            carrier: carrier,
+            type: 'INSTRUCTOR_PLAN',
+            itemId: plan
+          }),
+        });
+
+        const resData = await response.json();
+        if (!response.ok) {
+          throw new Error(resData.error || "Une erreur est survenue lors de l'initiation du paiement.");
+        }
+
+        setPaymentId(resData.paymentId);
+        setShowPendingState(true);
+      } catch (err: any) {
+        alert(err.message || "Une erreur est survenue lors de l'appel de la passerelle.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Simulate other payment methods (mastercard, stripe, paypal, crypto)
     setTimeout(() => {
       const database = getDB();
       
@@ -90,7 +195,8 @@ function PaymentContent() {
       // 2. Register simulation transaction
       const paymentMethodName = 
         method === "mastercard" ? "Carte" :
-        method === "mobile_money" ? "Mobile Money" : "PayPal";
+        method === "stripe" ? "Carte" :
+        method === "crypto" ? "Crypto" : "PayPal";
         
       addTransaction({
         userId: session.userId,
@@ -100,7 +206,7 @@ function PaymentContent() {
         instructorId: "",
         instructorName: "Plateforme ANSELLA",
         status: "PAID",
-        method: paymentMethodName
+        method: paymentMethodName as any
       });
 
       // 3. Update session
@@ -164,6 +270,48 @@ function PaymentContent() {
             </p>
           </div>
           <p className="text-xs text-zinc-400 animate-pulse">Redirection vers votre espace de facturation...</p>
+        </div>
+      ) : showPendingState ? (
+        /* Pending Mobile Money Screen */
+        <div className="bg-white dark:bg-zinc-900 rounded-3xl p-12 border border-zinc-200 dark:border-zinc-800 shadow-xl text-center space-y-6 max-w-xl mx-auto animate-in zoom-in-95">
+          <div className="w-20 h-20 bg-teal-100 dark:bg-teal-950/30 text-teal-600 rounded-full flex items-center justify-center mx-auto scale-110 transition-transform flex items-center justify-center">
+            <Loader2 className="w-12 h-12 animate-spin" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Validation Mobile Money...</h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
+              Une notification de validation PIN a été envoyée sur votre téléphone. Veuillez saisir votre code secret pour confirmer le paiement de <span className="font-bold text-teal-600">{currentPlanDetails.price}$</span> pour le plan <span className="font-bold">{plan}</span>.
+            </p>
+          </div>
+          
+          <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl border border-zinc-150 dark:border-zinc-800 text-left text-xs space-y-1.5 text-zinc-500 max-w-sm mx-auto">
+            <p><strong>Opérateur :</strong> {carrier.toUpperCase()}</p>
+            <p><strong>Téléphone :</strong> +243 {phone}</p>
+            <p><strong>ID Transaction :</strong> {paymentId}</p>
+          </div>
+
+          <div className="space-y-3 max-w-sm mx-auto pt-2">
+            <button
+              onClick={checkPaymentStatus}
+              disabled={verifying}
+              className="w-full py-3 bg-teal-600 hover:bg-teal-500 disabled:bg-teal-400 text-white font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm cursor-pointer"
+            >
+              {verifying ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Vérification du paiement...</span>
+                </>
+              ) : (
+                <span>J'ai saisi mon code PIN</span>
+              )}
+            </button>
+            <button
+              onClick={() => setShowPendingState(false)}
+              className="w-full py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-300 font-bold rounded-xl transition-all text-xs cursor-pointer"
+            >
+              Annuler et changer de mode
+            </button>
+          </div>
         </div>
       ) : (
         /* Payment Selection & Form */

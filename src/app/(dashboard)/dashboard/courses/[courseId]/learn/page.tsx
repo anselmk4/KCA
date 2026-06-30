@@ -280,7 +280,6 @@ export default function CourseLearnPage() {
       setExpandedSections(prev => ({ ...prev, [activeLesson.sectionId]: true }));
     }
   }, [activeLesson]);
-
   // ─── Completed lessons set (calculé depuis lessonProgress) ───
   const completedLessons = useMemo(
     () => new Set(lessonProgress.filter(p => p.completed).map(p => p.lesson_id)),
@@ -310,6 +309,12 @@ export default function CourseLearnPage() {
       setCheckingCert(false);
     }
   }, [courseId, hasCertificate, checkingCert]);
+
+  useEffect(() => {
+    if (progressPercent === 100 && !hasCertificate && !loading && userId) {
+      checkCertificate();
+    }
+  }, [progressPercent, hasCertificate, loading, userId, checkCertificate]);
 
   // ─── Toggle complétion d'une leçon → API Supabase ───────────
   const handleToggleComplete = async (lessonId: string, event: React.MouseEvent) => {

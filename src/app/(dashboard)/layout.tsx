@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { DashboardHeader } from "@/components/layout/DashboardHeader";
+import { getSimulatedSession } from "@/lib/rbac";
 
 export default function DashboardLayout({
   children,
@@ -10,6 +12,25 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const router = useRouter();
+  const [authorized, setAuthorized] = useState(false);
+
+  useEffect(() => {
+    const s = getSimulatedSession();
+    if (s.role !== "STUDENT") {
+      if (s.role === "INSTRUCTOR" || s.role === "TEACHING_ASSISTANT") {
+        router.replace("/instructor");
+      } else {
+        router.replace("/admin");
+      }
+      return;
+    }
+    setAuthorized(true);
+  }, [router]);
+
+  if (!authorized) {
+    return null; // Don't flash layout while checking role and redirecting
+  }
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black flex font-sans">

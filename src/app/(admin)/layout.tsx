@@ -16,7 +16,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     const session = getSimulatedSession();
     if (!ADMIN_ROLES.includes(session.role)) {
-      router.replace("/");
+      const isInstructor = ["INSTRUCTOR", "TEACHING_ASSISTANT"].includes(session.role);
+      router.replace(isInstructor ? "/instructor" : "/dashboard");
     }
   }, [router]);
 

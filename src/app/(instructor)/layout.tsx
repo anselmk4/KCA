@@ -58,7 +58,8 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
   useEffect(() => {
     const s = getSimulatedSession();
     if (s.role !== "INSTRUCTOR" && s.role !== "TEACHING_ASSISTANT") {
-      router.replace("/");
+      const isAdmin = ["SUPER_ADMIN", "ADMIN", "FINANCE_ADMIN", "ACADEMIC_ADMIN", "SUPPORT_AGENT"].includes(s.role);
+      router.replace(isAdmin ? "/admin" : "/dashboard");
       return;
     }
     setSession(s);
@@ -164,10 +165,10 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
           })}
           {userId && (
             <Link
-              href={`/dashboard/profile/${userId}`}
+              href={`/profile/${userId}`}
               onClick={() => setSidebarOpen(false)}
               className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-                pathname === `/dashboard/profile/${userId}`
+                pathname === `/profile/${userId}`
                   ? "bg-teal-50 dark:bg-teal-900/20 text-teal-600 font-semibold"
                   : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white"
               }`}
@@ -269,7 +270,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
                     </Link>
                     {userId && (
                       <Link
-                        href={`/dashboard/profile/${userId}`}
+                        href={`/profile/${userId}`}
                         onClick={() => setProfileOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                       >

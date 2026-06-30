@@ -22,7 +22,8 @@ import { supabase } from "@/lib/supabase/client";
 interface CourseData {
   id: string;
   title: string;
-  category: string;
+  category_id?: string;
+  categories?: { name: string } | null;
   level: string;
   price: number;
   status: string;
@@ -81,7 +82,7 @@ export default function MyCoursesPage() {
       // Enrollments with courses
       const { data: enrollData } = await supabase
         .from("enrollments")
-        .select("id, student_id, course_id, status, progress_percent, created_at, courses(id, title, category, level, price, status)")
+        .select("id, student_id, course_id, status, progress_percent, created_at, courses(id, title, category_id, level, price, status, categories(name))")
         .eq("student_id", user.id);
 
       const all = (enrollData || []) as unknown as EnrollmentData[];
@@ -96,7 +97,7 @@ export default function MyCoursesPage() {
       const enrolledIds = new Set(all.map((e) => e.course_id));
       const { data: coursesData } = await supabase
         .from("courses")
-        .select("id, title, category, level, price, status")
+        .select("id, title, category_id, level, price, status, categories(name)")
         .eq("status", "PUBLISHED");
 
       const available = ((coursesData || []) as unknown as CourseData[]).filter((c) => !enrolledIds.has(c.id));
@@ -151,12 +152,13 @@ export default function MyCoursesPage() {
                 {activeEnrollments.map((enr) => {
                   const course = enr.courses;
                   if (!course) return null;
-                  const styles = getCourseStyles(course.category);
+                  const catName = course.categories?.name || "Général";
+                  const styles = getCourseStyles(catName);
                   return (
                     <div key={enr.id} className={`bg-white dark:bg-zinc-900 rounded-2xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col h-full hover:shadow-md transition-all ${styles.borderHover}`}>
                       <div className="mb-5 flex justify-between items-start">
                         <div className={`w-13 h-13 ${styles.bgColor} rounded-2xl flex items-center justify-center`}>
-                          <CourseIcon category={course.category} className={`w-7 h-7 ${styles.color}`} />
+                          <CourseIcon category={catName} className={`w-7 h-7 ${styles.color}`} />
                         </div>
                         <span className="px-3 py-1 bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 text-[10px] font-bold uppercase tracking-wider rounded-full flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
@@ -165,7 +167,7 @@ export default function MyCoursesPage() {
                       </div>
 
                       <h2 className="text-base font-bold mb-1 text-zinc-900 dark:text-white line-clamp-2">{course.title}</h2>
-                      <p className="text-xs text-zinc-400 mb-5">{course.category || "Général"} · {course.level || "Tous niveaux"}</p>
+                      <p className="text-xs text-zinc-400 mb-5">{catName} · {course.level || "Tous niveaux"}</p>
 
                       <div className="mt-auto space-y-3">
                         <div className="flex justify-between text-sm font-semibold">
@@ -201,16 +203,17 @@ export default function MyCoursesPage() {
                 {completedEnrollments.map((enr) => {
                   const course = enr.courses;
                   if (!course) return null;
-                  const styles = getCourseStyles(course.category);
+                  const catName = course.categories?.name || "Général";
+                  const styles = getCourseStyles(catName);
                   return (
                     <div key={enr.id} className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className={`w-11 h-11 ${styles.bgColor} rounded-xl flex items-center justify-center shrink-0`}>
-                          <CourseIcon category={course.category} className={`w-5 h-5 ${styles.color}`} />
+                          <CourseIcon category={catName} className={`w-5 h-5 ${styles.color}`} />
                         </div>
                         <div className="min-w-0">
                           <h3 className="font-bold text-zinc-900 dark:text-white text-sm truncate">{course.title}</h3>
-                          <p className="text-[11px] text-zinc-400 mt-0.5">{course.category} · 100%</p>
+                          <p className="text-[11px] text-zinc-400 mt-0.5">{catName} · 100%</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
@@ -248,7 +251,8 @@ export default function MyCoursesPage() {
           ) : (
             <div className="space-y-3">
               {availableCourses.map((course) => {
-                const styles = getCourseStyles(course.category);
+                const catName = course.categories?.name || "Général";
+                const styles = getCourseStyles(catName);
                 return (
                   <Link
                     key={course.id}
@@ -257,11 +261,11 @@ export default function MyCoursesPage() {
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={`w-10 h-10 ${styles.bgColor} rounded-xl flex items-center justify-center shrink-0`}>
-                        <CourseIcon category={course.category} className={`w-5 h-5 ${styles.color}`} />
+                        <CourseIcon category={catName} className={`w-5 h-5 ${styles.color}`} />
                       </div>
                       <div className="min-w-0">
                         <h4 className="font-bold text-xs text-zinc-900 dark:text-white truncate">{course.title}</h4>
-                        <p className="text-[10px] text-zinc-400 mt-0.5">{course.price > 0 ? `$${course.price}` : "Gratuit"} · {course.category || "Général"}</p>
+                        <p className="text-[10px] text-zinc-400 mt-0.5">{course.price > 0 ? `$${course.price}` : "Gratuit"} · {catName}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
