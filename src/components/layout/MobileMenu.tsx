@@ -57,10 +57,10 @@ export function MobileMenu() {
             <Link href="/about" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
               À propos
             </Link>
-            <Link href="/#features" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
+            <Link href="/features" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
               Fonctionnalités
             </Link>
-            <Link href="/#templates" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
+            <Link href="/templates" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
               Modèle d'académie
             </Link>
             <Link href="/services" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
@@ -69,7 +69,7 @@ export function MobileMenu() {
             <Link href="/cases" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
               Cas d'utilisation
             </Link>
-            <Link href="/#pricing" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
+            <Link href="/pricing" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
               Tarifs
             </Link>
             <div className="flex flex-col gap-3 pt-4">

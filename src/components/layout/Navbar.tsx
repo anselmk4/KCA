@@ -58,10 +58,10 @@ export function Navbar() {
           <Link href="/about" className="transition-colors hover:text-foreground/80 text-foreground/60">
             À propos
           </Link>
-          <Link href="/#features" className="transition-colors hover:text-foreground/80 text-foreground/60">
+          <Link href="/features" className="transition-colors hover:text-foreground/80 text-foreground/60">
             Fonctionnalités
           </Link>
-          <Link href="/#templates" className="transition-colors hover:text-foreground/80 text-foreground/60">
+          <Link href="/templates" className="transition-colors hover:text-foreground/80 text-foreground/60">
             Modèle d'académie
           </Link>
           <Link href="/services" className="transition-colors hover:text-foreground/80 text-foreground/60">
@@ -70,7 +70,7 @@ export function Navbar() {
           <Link href="/cases" className="transition-colors hover:text-foreground/80 text-foreground/60">
             Cas d'utilisation
           </Link>
-          <Link href="/#pricing" className="transition-colors hover:text-foreground/80 text-foreground/60">
+          <Link href="/pricing" className="transition-colors hover:text-foreground/80 text-foreground/60">
             Tarifs
           </Link>
         </nav>

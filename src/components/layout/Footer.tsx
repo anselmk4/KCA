@@ -32,7 +32,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-1">
             <Link href="/" className="flex items-center mb-4">
-              <Image src="/logo.png" alt="ANSELLA" width={96} height={28} className="object-contain h-7 w-auto" />
+              <Image src="/logo.png" alt="ANSELLA" width={180} height={52} className="object-contain h-12 w-auto" />
             </Link>
             <p className="text-sm text-muted-foreground mb-4">
               Formations certifiantes et outils d'apprentissage pour entrepreneurs africains.
