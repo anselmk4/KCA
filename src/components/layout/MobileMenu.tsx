@@ -1,11 +1,45 @@
-"use client";
-
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
+import { getSimulatedSession } from "@/lib/rbac";
+import { supabase } from "@/lib/supabase/client";
 
 export function MobileMenu() {
   const [open, setOpen] = useState(false);
+  const [session, setSession] = useState<any>(null);
+
+  useEffect(() => {
+    setSession(getSimulatedSession());
+    
+    const checkAuth = async () => {
+      try {
+        const { data: { session: activeSession } } = await supabase.auth.getSession();
+        if (activeSession?.user) {
+          const localSession = getSimulatedSession();
+          if (localSession) {
+            setSession(localSession);
+          }
+        } else {
+          setSession(null);
+        }
+      } catch (err) {
+        console.error("Error in MobileMenu auth:", err);
+      }
+    };
+    checkAuth();
+  }, []);
+
+  const getDashboardLink = () => {
+    if (!session) return "/dashboard";
+    const r = session.role;
+    if (r === "SUPER_ADMIN" || r === "ADMIN" || r === "FINANCE_ADMIN" || r === "ACADEMIC_ADMIN" || r === "SUPPORT_AGENT") {
+      return "/admin";
+    }
+    if (r === "INSTRUCTOR" || r === "TEACHING_ASSISTANT") {
+      return "/instructor";
+    }
+    return "/dashboard";
+  };
 
   return (
     <div className="md:hidden">
@@ -39,12 +73,24 @@ export function MobileMenu() {
               Tarifs
             </Link>
             <div className="flex flex-col gap-3 pt-4">
-              <Link href="/login" onClick={() => setOpen(false)} className="text-center py-3 border border-zinc-200 dark:border-zinc-700 rounded-xl font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
-                Se connecter
-              </Link>
-              <Link href="/register" onClick={() => setOpen(false)} className="text-center py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors">
-                S'inscrire
-              </Link>
+              {session ? (
+                <Link 
+                  href={getDashboardLink()} 
+                  onClick={() => setOpen(false)} 
+                  className="text-center py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+                >
+                  Accéder au Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link href="/login" onClick={() => setOpen(false)} className="text-center py-3 border border-zinc-200 dark:border-zinc-700 rounded-xl font-semibold hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
+                    Se connecter
+                  </Link>
+                  <Link href="/register" onClick={() => setOpen(false)} className="text-center py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors">
+                    S'inscrire
+                  </Link>
+                </>
+              )}
             </div>
           </nav>
         </div>
