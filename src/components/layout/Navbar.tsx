@@ -7,21 +7,7 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { MobileMenu } from "@/components/layout/MobileMenu";
 import { getSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
-import { ChevronDown } from "lucide-react";
-import { 
-  MokoLogo, BinanceLogo, OKXLogo, McBuleliLogo, 
-  PECBLogo, KivutechLogo, AnadecLogo 
-} from "@/components/icons/PartnerLogos";
 
-const partners = [
-  { name: "Moko afrika (Freshpay)", desc: "Paiements locaux et solutions de facturation directes en RDC.", logo: <MokoLogo className="w-5 h-5" /> },
-  { name: "Binance", desc: "Leader mondial du Web3 et des technologies d'actifs numériques.", logo: <BinanceLogo className="w-5 h-5" /> },
-  { name: "OKX", desc: "Infrastructure de trading crypto et de finance décentralisée globale.", logo: <OKXLogo className="w-5 h-5 text-zinc-950 dark:text-white" /> },
-  { name: "McBuleli", desc: "Conseil en formation professionnelle et accréditations.", logo: <McBuleliLogo className="w-5 h-5" /> },
-  { name: "PECB", desc: "Organisme international de certification professionnelle de premier plan.", logo: <PECBLogo className="w-5 h-5" /> },
-  { name: "Kivutech", desc: "Accompagnement technologique et innovation à Goma, RDC.", logo: <KivutechLogo className="w-5 h-5" /> },
-  { name: "Anadec RDC", desc: "Agence Nationale pour l'Entrepreneuriat et le développement.", logo: <AnadecLogo className="w-5 h-5" /> }
-];
 
 export function Navbar() {
   const [session, setSession] = useState<any>(null);
@@ -85,29 +71,9 @@ export function Navbar() {
           <Link href="/cases" className="transition-colors hover:text-foreground/80 text-foreground/60">
             Cas d'utilisation
           </Link>
-          
-          <div className="relative group py-2">
-            <button className="flex items-center gap-1 transition-colors hover:text-foreground/80 text-foreground/60 focus:outline-none">
-              Partenaires
-              <ChevronDown className="w-3.5 h-3.5 transition-transform group-hover:rotate-180" />
-            </button>
-            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-80 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-              <div className="grid grid-cols-1 gap-2.5">
-                {partners.map((p, idx) => (
-                  <div key={idx} className="flex items-start gap-3 p-2 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                    <div className="shrink-0 w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-                      {p.logo}
-                    </div>
-                    <div className="text-left">
-                      <p className="text-xs font-bold text-zinc-900 dark:text-white leading-tight">{p.name}</p>
-                      <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 leading-relaxed">{p.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
+          <Link href="/partners" className="transition-colors hover:text-foreground/80 text-foreground/60">
+            Partenaires
+          </Link>
           <Link href="/pricing" className="transition-colors hover:text-foreground/80 text-foreground/60">
             Tarifs
           </Link>
