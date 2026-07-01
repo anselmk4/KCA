@@ -432,7 +432,7 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ value, onChange }) => 
             className="group relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-4 transition-all hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700"
           >
             {/* Block sorting / deletion toolbar */}
-            <div className="absolute right-4 top-4 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-zinc-900 shadow-sm border border-zinc-150 dark:border-zinc-800 rounded-xl p-1 z-10">
+            <div className="absolute right-2 top-2 sm:right-4 sm:top-4 flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity bg-white dark:bg-zinc-900 shadow-sm border border-zinc-150 dark:border-zinc-800 rounded-xl p-1 z-10">
               <button
                 type="button"
                 onClick={() => moveBlock(idx, "up")}

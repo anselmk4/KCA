@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getDB, initDB, Database } from "@/lib/db";
 import { getSimulatedSession } from "@/lib/rbac";
-import { MessageSquare, Send, Search } from "lucide-react";
+import { MessageSquare, Send, Search, ArrowLeft } from "lucide-react";
 
 interface Message {
   id: string;
@@ -30,6 +30,7 @@ export default function MessagesPage() {
   const [draft, setDraft] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [search, setSearch] = useState("");
+  const [mobileShowChat, setMobileShowChat] = useState(false);
 
   useEffect(() => {
     initDB();
@@ -92,7 +93,7 @@ export default function MessagesPage() {
 
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden flex h-[calc(100vh-220px)] min-h-[500px]">
         {/* Conversation list */}
-        <div className="w-64 lg:w-80 border-r border-zinc-100 dark:border-zinc-800 flex flex-col shrink-0">
+        <div className={`w-full lg:w-80 border-r border-zinc-100 dark:border-zinc-800 flex flex-col shrink-0 ${mobileShowChat ? "hidden lg:flex" : "flex"}`}>
           <div className="p-4 border-b border-zinc-100 dark:border-zinc-800">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
@@ -114,7 +115,7 @@ export default function MessagesPage() {
             ) : filteredConvs.map(c => (
               <button
                 key={c.userId}
-                onClick={() => setSelected(c.userId)}
+                onClick={() => { setSelected(c.userId); setMobileShowChat(true); }}
                 className={`w-full text-left px-4 py-3.5 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800 ${selected === c.userId ? "bg-teal-50 dark:bg-teal-900/10 border-r-2 border-teal-500" : ""}`}
               >
                 <div className="flex items-center gap-3">
@@ -140,10 +141,17 @@ export default function MessagesPage() {
         </div>
 
         {/* Chat area */}
-        <div className="flex-1 flex flex-col">
+        <div className={`flex-1 flex flex-col ${!mobileShowChat ? "hidden lg:flex" : "flex"}`}>
           {activeConv ? (
             <>
               <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setMobileShowChat(false)}
+                  className="lg:hidden p-2 -ml-2 rounded-xl text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
                 <div className="w-9 h-9 bg-teal-100 dark:bg-teal-900/30 rounded-full flex items-center justify-center text-teal-600 font-bold text-sm">
                   {activeConv.avatar}
                 </div>

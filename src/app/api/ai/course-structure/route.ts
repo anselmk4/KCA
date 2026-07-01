@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     if (course.instructor_id !== user.id) {
       // Check if admin
-      const { data: userRoles } = await supabaseAdmin
+      const { data: userRoles } = await supabase
         .from("user_roles")
         .select("roles(name)")
         .eq("user_id", user.id);

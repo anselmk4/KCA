@@ -389,7 +389,7 @@ export default function CoursePreviewPlayerPage() {
       {/* Main Container */}
       <div className="flex-1 flex min-h-0 relative overflow-hidden">
         {/* Left Sidebar */}
-        <aside className={`w-80 border-r border-zinc-200 dark:border-zinc-850 bg-white/50 dark:bg-zinc-900/20 shrink-0 flex flex-col min-h-0 transition-transform lg:translate-x-0 z-20 absolute lg:relative inset-y-0 left-0 ${
+        <aside className={`w-[280px] sm:w-80 border-r border-zinc-200 dark:border-zinc-850 bg-white/50 dark:bg-zinc-900/20 shrink-0 flex flex-col min-h-0 transition-transform lg:translate-x-0 z-20 absolute lg:relative inset-y-0 left-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}>
           <div className="p-4 border-b border-zinc-200 dark:border-zinc-850 bg-zinc-50 dark:bg-zinc-900/40 flex justify-between items-center">
@@ -477,7 +477,7 @@ export default function CoursePreviewPlayerPage() {
         )}
 
         {/* Right Content Viewport */}
-        <main className="flex-1 overflow-y-auto p-6 bg-zinc-50 dark:bg-zinc-950 flex flex-col min-h-0">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-zinc-50 dark:bg-zinc-950 flex flex-col min-h-0">
           {activeContent ? (
             <div className="space-y-6 flex-1 flex flex-col min-h-0">
               {/* LESSON PLAYER */}

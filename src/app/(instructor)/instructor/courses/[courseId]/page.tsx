@@ -118,6 +118,7 @@ export default function CourseDetailPage() {
   const [userId, setUserId] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<TabType>("programme");
+  const editorRef = useRef<HTMLDivElement>(null);
 
   // ─── Programme tab states ─────────────────────────────────
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
@@ -285,6 +286,13 @@ export default function CourseDetailPage() {
       }
     }
   }, [selectedLessonId, lessons]);
+
+  // Scroll to editor ref on mobile when selected lesson changes
+  useEffect(() => {
+    if (selectedLessonId && typeof window !== "undefined" && window.innerWidth < 1024 && editorRef.current) {
+      editorRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selectedLessonId]);
 
   // ─── Helpers ──────────────────────────────────────────────
   const getLessons = (sectionId: string) =>
@@ -1092,7 +1100,7 @@ export default function CourseDetailPage() {
             </div>
 
             {/* Right: Lesson editor panel */}
-            <div className="lg:col-span-7">
+            <div className="lg:col-span-7" ref={editorRef}>
               {selectedLessonId ? (
                 <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm space-y-5">
                   <div className="flex items-center justify-between pb-3 border-b border-zinc-150 dark:border-zinc-850">
