@@ -173,20 +173,14 @@ export type CurrentSession = {
 };
 
 // Helper to retrieve the current simulated session
-export function getSimulatedSession(): CurrentSession {
+export function getSimulatedSession(): CurrentSession | null {
   if (typeof window === "undefined") {
-    return {
-      userId: "u_student_1",
-      name: "Ansel Student",
-      email: "student@kuettu.com",
-      role: "STUDENT",
-      status: "ACTIVE",
-      plan: "FREE",
-    };
+    return null;
   }
 
   const saved = localStorage.getItem("kuettu_session");
   if (saved) {
+    if (saved === "logged_out") return null;
     try {
       return JSON.parse(saved);
     } catch {
@@ -194,17 +188,7 @@ export function getSimulatedSession(): CurrentSession {
     }
   }
 
-  // Fallback default student session
-  const defaultSession: CurrentSession = {
-    userId: "u1", // Matches default student from db.ts
-    name: "Jean Dupont",
-    email: "jean@example.com",
-    role: "STUDENT",
-    status: "ACTIVE",
-    plan: "FREE",
-  };
-  localStorage.setItem("kuettu_session", JSON.stringify(defaultSession));
-  return defaultSession;
+  return null;
 }
 
 // Helper to update the simulated session (facilitating dashboard testing)
@@ -221,7 +205,7 @@ export function setSimulatedSession(session: CurrentSession) {
 // Helper to clear the simulated session (proper logout)
 export function clearSimulatedSession() {
   if (typeof window !== "undefined") {
-    localStorage.removeItem("kuettu_session");
+    localStorage.setItem("kuettu_session", "logged_out");
     localStorage.removeItem("kuettu_user_name");
     localStorage.removeItem("kuettu_active_role");
     localStorage.removeItem("kuettu_academy_name");

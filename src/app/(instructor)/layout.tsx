@@ -24,6 +24,7 @@ import {
   Bell,
   UserCircle,
   Users2,
+  Ticket,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { getSimulatedSession, setSimulatedSession, clearSimulatedSession } from "@/lib/rbac";
@@ -32,6 +33,7 @@ import { supabase } from "@/lib/supabase/client";
 const menuItems = [
   { icon: LayoutDashboard, label: "Tableau de bord", href: "/instructor" },
   { icon: BookOpen, label: "Mes cours", href: "/instructor/courses" },
+  { icon: Ticket, label: "Codes promo / Coupons", href: "/instructor/coupons" },
   { icon: Users, label: "Étudiants", href: "/instructor/students" },
   { icon: Video, label: "Sessions live", href: "/instructor/live" },
   { icon: BarChart3, label: "Analytique", href: "/instructor/analytics" },
@@ -57,6 +59,10 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
 
   useEffect(() => {
     const s = getSimulatedSession();
+    if (!s) {
+      router.replace("/login");
+      return;
+    }
     if (s.role !== "INSTRUCTOR" && s.role !== "TEACHING_ASSISTANT") {
       const isAdmin = ["SUPER_ADMIN", "ADMIN", "FINANCE_ADMIN", "ACADEMIC_ADMIN", "SUPPORT_AGENT"].includes(s.role);
       router.replace(isAdmin ? "/admin" : "/dashboard");

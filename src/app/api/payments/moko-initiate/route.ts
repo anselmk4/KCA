@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Parse request body
     const body = await req.json();
-    const { amount, phoneNumber, carrier, type, itemId } = body;
+    const { amount, phoneNumber, carrier, type, itemId, couponId } = body;
 
     if (!amount || !phoneNumber || !carrier || !type || !itemId) {
       return NextResponse.json({ error: 'Paramètres manquants' }, { status: 400 });
@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
         user_id: user.id,
         status: 'PENDING',
         total_price: amount,
+        coupon_id: couponId || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       } as any);

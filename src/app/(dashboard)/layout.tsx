@@ -17,6 +17,10 @@ export default function DashboardLayout({
 
   useEffect(() => {
     const s = getSimulatedSession();
+    if (!s) {
+      router.replace("/login");
+      return;
+    }
     if (s.role !== "STUDENT") {
       if (s.role === "INSTRUCTOR" || s.role === "TEACHING_ASSISTANT") {
         router.replace("/instructor");

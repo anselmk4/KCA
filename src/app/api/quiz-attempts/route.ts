@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createNotification } from '@/lib/supabase/notifications-helper';
 
 /**
  * POST /api/quiz-attempts
@@ -94,6 +95,43 @@ export async function POST(req: NextRequest) {
     if (attemptError) {
       console.error('[API /quiz-attempts POST] Supabase error:', attemptError.message);
       return NextResponse.json({ error: attemptError.message }, { status: 400 });
+    }
+
+    if (passed) {
+      try {
+        const { data: courseData } = await supabase
+          .from('courses')
+          .select('title, instructor_id')
+          .eq('id', courseId)
+          .maybeSingle();
+
+        if (courseData?.instructor_id) {
+          const { data: studentProfile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          const { data: quizData } = await supabase
+            .from('quizzes')
+            .select('title')
+            .eq('id', quizId)
+            .maybeSingle();
+
+          const studentName = studentProfile?.full_name || 'Un apprenant';
+          const quizTitle = quizData?.title || 'le Quiz';
+
+          await createNotification({
+            userId: courseData.instructor_id,
+            title: "Quiz validé !",
+            message: `L'apprenant "${studentName}" a réussi "${quizTitle}" dans votre cours "${courseData.title}" avec un score de ${scorePercent}%.`,
+            type: "SUCCESS",
+            link: `/instructor/students`
+          });
+        }
+      } catch (err) {
+        console.error('[API quiz-attempts POST] Error sending notification:', err);
+      }
     }
 
     return NextResponse.json(

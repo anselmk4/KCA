@@ -19,6 +19,7 @@ import Link from "next/link";
 export default function InstructorDashboardPage() {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [academyName, setAcademyName] = useState("Kuettu Crypto Academy");
   const [myCourses, setMyCourses] = useState<any[]>([]);
   const [totalStudents, setTotalStudents] = useState(0);
   const [totalRevenue, setTotalRevenue] = useState(0);
@@ -31,15 +32,17 @@ export default function InstructorDashboardPage() {
   useEffect(() => {
     const activeSession = getSimulatedSession();
     setSession(activeSession);
+    setAcademyName(localStorage.getItem("kuettu_academy_name") || "Kuettu Crypto Academy");
     if (!activeSession) {
       setLoading(false);
       return;
     }
 
+    const instructorId = activeSession.userId;
+
     async function loadDashboardData() {
       setLoading(true);
       try {
-        const instructorId = activeSession.userId;
 
         // 1. Fetch courses owned by the instructor
         const { data: coursesData } = await supabase
@@ -177,13 +180,19 @@ export default function InstructorDashboardPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in">
       {/* Header */}
-      <div className="text-left">
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-1">
-          Bonjour, {instructorName} 👋
-        </h1>
-        <p className="text-zinc-500 dark:text-zinc-400">
-          Voici un aperçu de votre activité d'enseignement.
-        </p>
+      <div className="text-left flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-1">
+            Bonjour, {instructorName} 👋
+          </h1>
+          <p className="text-zinc-500 dark:text-zinc-400">
+            Voici un aperçu de votre activité d'enseignement.
+          </p>
+        </div>
+        <div className="bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-800/40 rounded-2xl px-5 py-3 text-right">
+          <span className="block text-xxs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-widest">Votre Académie</span>
+          <span className="text-sm font-black text-zinc-900 dark:text-white mt-0.5 block">{academyName}</span>
+        </div>
       </div>
 
       {/* KPI Grid */}

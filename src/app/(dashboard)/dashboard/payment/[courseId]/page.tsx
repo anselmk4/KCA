@@ -43,6 +43,70 @@ export default function PaymentPage() {
   const [momoProvider, setMomoProvider] = useState("mpesa");
   const [momoPhone, setMomoPhone] = useState("");
 
+  // Coupon state
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [couponError, setCouponError] = useState("");
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setApplyingCoupon(true);
+    setCouponError("");
+    try {
+      const { data, error } = await supabase
+        .from("coupons")
+        .select("*")
+        .eq("code", couponCode.trim().toUpperCase())
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (error || !data) {
+        setCouponError("Code promo invalide ou expiré.");
+        setAppliedCoupon(null);
+        return;
+      }
+
+      if (data.expires_at && new Date(data.expires_at) < new Date()) {
+        setCouponError("Ce code promo a expiré.");
+        setAppliedCoupon(null);
+        return;
+      }
+
+      if (data.starts_at && new Date(data.starts_at) > new Date()) {
+        setCouponError("Ce code promo n'est pas encore actif.");
+        setAppliedCoupon(null);
+        return;
+      }
+
+      if (data.max_uses !== null && data.current_uses !== null && data.current_uses >= data.max_uses) {
+        setCouponError("Ce code promo a atteint sa limite d'utilisation.");
+        setAppliedCoupon(null);
+        return;
+      }
+
+      if (data.applicable_course_id && data.applicable_course_id !== courseId) {
+        setCouponError("Ce code promo n'est pas applicable à cette formation.");
+        setAppliedCoupon(null);
+        return;
+      }
+
+      if (data.min_order_amount && course && course.price < data.min_order_amount) {
+        setCouponError(`Montant minimum d'achat requis : $${data.min_order_amount}`);
+        setAppliedCoupon(null);
+        return;
+      }
+
+      setAppliedCoupon(data);
+      setCouponError("");
+    } catch (err) {
+      console.error("Error applying coupon:", err);
+      setCouponError("Erreur lors de l'application du code promo.");
+    } finally {
+      setApplyingCoupon(false);
+    }
+  };
+
   // PayPal state
   const [paypalEmail, setPaypalEmail] = useState("");
 
@@ -130,6 +194,16 @@ export default function PaymentPage() {
     ? Math.round(course.price / (course.installmentsCount || 1))
     : course ? course.price : 0;
 
+  let discountedAmount = finalAmount;
+  if (appliedCoupon) {
+    if (appliedCoupon.discount_type === "PERCENTAGE") {
+      discountedAmount = Math.max(0, finalAmount - (finalAmount * (appliedCoupon.discount_value / 100)));
+    } else if (appliedCoupon.discount_type === "FIXED") {
+      discountedAmount = Math.max(0, finalAmount - appliedCoupon.discount_value);
+    }
+    discountedAmount = Math.round(discountedAmount);
+  }
+
   const checkPaymentStatus = async () => {
     if (!paymentId) return;
     setVerifying(true);
@@ -180,11 +254,12 @@ export default function PaymentPage() {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              amount: finalAmount,
+              amount: discountedAmount,
               phoneNumber: momoPhone,
               carrier: momoProvider,
               type: 'STUDENT_COURSE',
-              itemId: course.id
+              itemId: course.id,
+              couponId: appliedCoupon?.id || null
             }),
           });
 
@@ -226,7 +301,8 @@ export default function PaymentPage() {
           id: orderId,
           user_id: user.id,
           status: 'COMPLETED',
-          total_price: finalAmount,
+          total_price: discountedAmount,
+          coupon_id: appliedCoupon?.id || null,
           created_at: new Date().toISOString()
         } as any);
 
@@ -234,8 +310,8 @@ export default function PaymentPage() {
           id: crypto.randomUUID(),
           order_id: orderId,
           course_id: course.id,
-          unit_price: finalAmount,
-          final_price: finalAmount
+          unit_price: course.price,
+          final_price: discountedAmount
         } as any);
 
         let payProvider: 'STRIPE' | 'PAYPAL' | 'MOBILE_MONEY' | 'CRYPTO' | 'MANUAL' = 'STRIPE';
@@ -246,7 +322,7 @@ export default function PaymentPage() {
           id: crypto.randomUUID(),
           order_id: orderId,
           user_id: user.id,
-          amount: finalAmount,
+          amount: discountedAmount,
           status: 'PAID',
           provider: payProvider,
           paid_at: new Date().toISOString()
@@ -256,7 +332,7 @@ export default function PaymentPage() {
       }
 
       setSubmitting(false);
-      alert(`Paiement de $${finalAmount} validé avec succès ! Votre formation est débloquée.`);
+      alert(`Paiement de $${discountedAmount} validé avec succès ! Votre formation est débloquée.`);
       router.push("/dashboard/courses");
     } catch (err: any) {
       console.error('[payment] Unexpected error during checkout:', err);
@@ -544,7 +620,7 @@ export default function PaymentPage() {
                 ) : (
                   <>
                     <ShieldCheck className="w-5 h-5" />
-                    <span>Valider le paiement de ${finalAmount}</span>
+                    <span>Valider le paiement de ${discountedAmount}</span>
                   </>
                 )}
               </button>
@@ -573,6 +649,16 @@ export default function PaymentPage() {
                 <span className="text-zinc-500">Sous-total :</span>
                 <span className="font-semibold text-zinc-900 dark:text-white">${course.price}</span>
               </div>
+              {appliedCoupon && (
+                <div className="flex justify-between text-emerald-500 font-semibold text-xs">
+                  <span>Réduction ({appliedCoupon.code}) :</span>
+                  <span>
+                    -{appliedCoupon.discount_type === "PERCENTAGE" 
+                      ? `${appliedCoupon.discount_value}% (-$${Math.round(finalAmount * (appliedCoupon.discount_value / 100))})` 
+                      : `$${appliedCoupon.discount_value}`}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-zinc-500">Frais d'inscription :</span>
                 <span className="font-semibold text-green-500">Gratuit</span>
@@ -580,13 +666,59 @@ export default function PaymentPage() {
               {payInstallment && course.allowInstallments && (
                 <div className="flex justify-between text-xs text-zinc-500">
                   <span>Tranches restantes :</span>
-                  <span>{(course.installmentsCount || 1) - 1} x ${finalAmount}</span>
+                  <span>{(course.installmentsCount || 1) - 1} x ${discountedAmount}</span>
                 </div>
               )}
               <div className="flex justify-between border-t border-zinc-100 dark:border-zinc-800 pt-2 text-base font-bold">
                 <span className="text-zinc-950 dark:text-white">Aujourd'hui :</span>
-                <span className="text-blue-600 dark:text-blue-400">${finalAmount}</span>
+                <span className="text-blue-600 dark:text-blue-400">${discountedAmount}</span>
               </div>
+            </div>
+
+            {/* Code Promo Input */}
+            <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2">
+              <label className="block text-xxs font-extrabold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+                Code de réduction / Coupon
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Ex: PROMO10"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value)}
+                  disabled={!!appliedCoupon || applyingCoupon}
+                  className="flex-1 px-3 py-1.5 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-900 dark:text-white uppercase outline-none focus:ring-1 focus:ring-blue-500/40"
+                />
+                {appliedCoupon ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAppliedCoupon(null);
+                      setCouponCode("");
+                    }}
+                    className="px-3 py-1.5 text-xs font-bold bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Retirer
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={applyingCoupon || !couponCode.trim()}
+                    onClick={handleApplyCoupon}
+                    className="px-3 py-1.5 text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    {applyingCoupon ? "..." : "Appliquer"}
+                  </button>
+                )}
+              </div>
+              {couponError && (
+                <p className="text-[10px] text-red-500 font-semibold">{couponError}</p>
+              )}
+              {appliedCoupon && (
+                <p className="text-[10px] text-emerald-500 font-semibold">
+                  ✓ Code <strong>{appliedCoupon.code}</strong> appliqué !
+                </p>
+              )}
             </div>
 
             <div className="text-xxs text-zinc-400 text-center pt-2">

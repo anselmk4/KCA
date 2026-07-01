@@ -36,6 +36,7 @@ export default function MessagesPage() {
     const d = getDB();
     setDb(d);
     const s = getSimulatedSession();
+    if (!s) return;
     setSession(s);
 
     const myCourseIds = d.courses.filter(c => c.instructorId === s.userId).map(c => c.id);

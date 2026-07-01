@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createNotification } from '@/lib/supabase/notifications-helper';
 
 // Initialize admin client to bypass RLS restrictions on certificate creation and quiz queries
 const supabaseAdmin = createSupabaseClient(
@@ -169,6 +170,19 @@ export async function POST(req: NextRequest) {
       .from('enrollments')
       .update({ status: 'COMPLETED', progress_percent: 100 })
       .eq('id', enrollment.id);
+
+    // Notify the student that their certificate is available
+    try {
+      await createNotification({
+        userId: user.id,
+        title: "Certificat disponible !",
+        message: `Votre certificat pour la formation "${course.title}" a été généré avec succès.`,
+        type: "SUCCESS",
+        link: `/dashboard/certificates`
+      });
+    } catch (err) {
+      console.error('[API certificates POST] Error triggering notification:', err);
+    }
 
     return NextResponse.json(
       { certificate, eligible: true, alreadyIssued: false },

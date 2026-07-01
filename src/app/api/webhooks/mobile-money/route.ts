@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createNotification } from '@/lib/supabase/notifications-helper';
 
 // Initialize a service role/admin client to bypass RLS when updating/inserting payments/orders on behalf of the system
 const supabaseAdmin = createClient(
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
         // Fetch payment to get order details
         const { data: payment, error: fetchErr } = await supabaseAdmin
           .from('payments')
-          .select('order_id, user_id')
+          .select('order_id, user_id, amount')
           .eq('id', paymentId)
           .maybeSingle();
 
@@ -165,6 +166,47 @@ export async function POST(req: NextRequest) {
             } as any);
           }
           console.log(`[webhook-momo] Student ${payment.user_id} successfully enrolled in course ${courseId}`);
+
+          // Trigger notifications
+          try {
+            const { data: courseData } = await supabaseAdmin
+              .from('courses')
+              .select('title, instructor_id')
+              .eq('id', courseId)
+              .maybeSingle();
+
+            const courseTitle = courseData?.title || 'Formation';
+
+            // Student Notification
+            await createNotification({
+              userId: payment.user_id,
+              title: "Paiement validé !",
+              message: `Votre paiement de ${payment.amount}$ pour le cours "${courseTitle}" a été validé.`,
+              type: "SUCCESS",
+              link: `/dashboard/courses`
+            });
+
+            // Instructor Notification
+            if (courseData?.instructor_id) {
+              const { data: studentProfile } = await supabaseAdmin
+                .from('profiles')
+                .select('full_name')
+                .eq('id', payment.user_id)
+                .maybeSingle();
+
+              const studentName = studentProfile?.full_name || 'Un apprenant';
+
+              await createNotification({
+                userId: courseData.instructor_id,
+                title: "Nouvelle inscription !",
+                message: `"${studentName}" s'est inscrit à votre cours "${courseTitle}".`,
+                type: "SUCCESS",
+                link: `/instructor/students`
+              });
+            }
+          } catch (notifErr) {
+            console.error('[webhook-momo] Error triggering notifications:', notifErr);
+          }
         }
 
       } else if (reference.startsWith('ins_plan_')) {

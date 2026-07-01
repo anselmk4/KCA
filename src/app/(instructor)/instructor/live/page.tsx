@@ -228,6 +228,53 @@ export default function LivePage() {
         throw new Error(error.message);
       }
 
+      // Send notifications to invited guests
+      try {
+        if (selectedUserIds.length > 0) {
+          const { createNotification } = await import('@/lib/supabase/notifications-helper');
+          
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id')
+            .in('id', selectedUserIds);
+
+          const { data: userRolesData } = await supabase
+            .from('user_roles')
+            .select('user_id, roles(name)')
+            .in('user_id', selectedUserIds);
+
+          const roleMap = new Map<string, string>();
+          userRolesData?.forEach((ur: any) => {
+            if (ur.roles?.name) {
+              roleMap.set(ur.user_id, ur.roles.name);
+            }
+          });
+
+          for (const guest of (profilesData || [])) {
+            const guestRole = roleMap.get(guest.id) || 'STUDENT';
+            if (guestRole === 'INSTRUCTOR' || guestRole === 'TEACHING_ASSISTANT') {
+              await createNotification({
+                userId: guest.id,
+                title: "Invitation à un Live !",
+                message: `Vous êtes invité à participer au live "${form.title}" en direct.`,
+                type: "INFO",
+                link: `/instructor/live`
+              });
+            } else {
+              await createNotification({
+                userId: guest.id,
+                title: "Live programmé !",
+                message: `Un live a été programmé avec vous comme invité : "${form.title}".`,
+                type: "INFO",
+                link: `/dashboard/live`
+              });
+            }
+          }
+        }
+      } catch (notifErr) {
+        console.error("Error creating live session notifications:", notifErr);
+      }
+
       setCreated(true);
       setTimeout(() => {
         setCreated(false);

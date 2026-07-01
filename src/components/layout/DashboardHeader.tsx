@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, ChevronDown, Menu, Settings, LogOut, UserCircle } from "lucide-react";
+import { Bell, ChevronDown, Menu, Settings, LogOut, UserCircle, Info, CheckCircle, AlertTriangle, XCircle, Trash2 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { useEffect, useState, useRef } from "react";
 import { getSimulatedSession } from "@/lib/rbac";
@@ -17,6 +17,62 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Notifications State
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notificationsRef = useRef<HTMLDivElement>(null);
+
+  const fetchNotifications = async (uid: string) => {
+    try {
+      const { supabase } = await import("@/lib/supabase/client");
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("id, title, message, type, link, is_read, created_at")
+        .eq("user_id", uid)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (!error && data) {
+        setNotifications(data);
+      }
+    } catch (err) {
+      console.error("Error fetching notifications:", err);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    if (!userId) return;
+    try {
+      const { supabase } = await import("@/lib/supabase/client");
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("user_id", userId)
+        .eq("is_read", false);
+      if (!error) {
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      }
+    } catch (err) {
+      console.error("Error marking notifications read:", err);
+    }
+  };
+
+  const handleNotificationClick = async (notif: any) => {
+    try {
+      const { supabase } = await import("@/lib/supabase/client");
+      await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("id", notif.id);
+      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+      setNotificationsOpen(false);
+      if (notif.link) {
+        window.location.href = notif.link;
+      }
+    } catch (err) {
+      console.error("Error clicking notification:", err);
+    }
+  };
+
   useEffect(() => {
     setSession(getSimulatedSession());
     const handler = () => setSession(getSimulatedSession());
@@ -31,6 +87,8 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
         
         if (activeSession?.user) {
           setUserId(activeSession.user.id);
+          fetchNotifications(activeSession.user.id);
+          
           const localSession = getSimulatedSession();
           if (!localSession || localSession.userId !== activeSession.user.id) {
             const profile = await fetchUserProfile(activeSession.user.id);
@@ -56,6 +114,9 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
     const clickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);
+      }
+      if (notificationsRef.current && !notificationsRef.current.contains(e.target as Node)) {
+        setNotificationsOpen(false);
       }
     };
     document.addEventListener("mousedown", clickOutside);
@@ -100,53 +161,127 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
         <div className="flex items-center space-x-3">
           <ThemeToggle />
 
-          <button className="relative p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-full hover:bg-zinc-50 text-zinc-600 dark:text-zinc-300">
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-zinc-800" />
-          </button>
-          
-          <div ref={dropdownRef} className="relative">
-            <div 
-              onClick={() => setDropdownOpen(!dropdownOpen)} 
-              className="flex items-center space-x-2 cursor-pointer pl-2 border-l border-zinc-200 dark:border-zinc-700 select-none"
-            >
-              <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-sm">
-                {initials}
-              </div>
-              <div className="hidden md:block">
-                <p className="text-sm font-semibold text-zinc-900 dark:text-white leading-none">{session?.name?.split(" ")?.[0] || "Étudiant"}</p>
-                <p className="text-xs text-zinc-500 mt-1">Plan {session?.plan || "FREE"}</p>
-              </div>
-              <ChevronDown className="w-4 h-4 text-zinc-500 hidden md:block" />
-            </div>
-
-            {dropdownOpen && (
-              <div className="absolute right-0 top-12 w-56 bg-white dark:bg-zinc-850 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                <div className="px-4 py-2 border-b border-zinc-100 dark:border-zinc-800">
-                  <p className="text-sm font-bold text-zinc-900 dark:text-white truncate">{session?.name || "Étudiant"}</p>
-                  <p className="text-xxs text-zinc-400 truncate">{session?.email || "etudiant@example.com"}</p>
-                  <p className="text-xxs text-blue-600 dark:text-blue-400 font-bold mt-1">Plan {session?.plan || "FREE"}</p>
-                </div>
-                <Link href="/dashboard/settings" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                  <Settings className="w-4 h-4 text-zinc-400" />
-                  <span>Paramètres</span>
-                </Link>
-                {userId && (
-                  <Link href={`/profile/${userId}`} onClick={() => setDropdownOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                    <UserCircle className="w-4 h-4 text-zinc-400" />
-                    <span>Mon Profil</span>
-                  </Link>
+          {/* Notifications Dropdown */}
+          {userId && (
+            <div ref={notificationsRef} className="relative">
+              <button 
+                onClick={() => {
+                  setNotificationsOpen(!notificationsOpen);
+                  if (userId) fetchNotifications(userId);
+                }}
+                className="relative p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-full hover:bg-zinc-50 text-zinc-600 dark:text-zinc-300 cursor-pointer"
+              >
+                <Bell className="w-4 h-4" />
+                {notifications.filter(n => !n.is_read).length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center border border-white dark:border-zinc-800 animate-pulse">
+                    {notifications.filter(n => !n.is_read).length}
+                  </span>
                 )}
-                <button 
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/10 transition-colors text-left border-t border-zinc-100 dark:border-zinc-800 cursor-pointer"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span>Déconnexion</span>
-                </button>
+              </button>
+
+              {notificationsOpen && (
+                <div className="absolute right-0 top-12 w-80 bg-white dark:bg-zinc-900 dark:border-zinc-800 rounded-xl border border-zinc-200 shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                  <div className="px-4 py-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                    <p className="text-sm font-bold text-zinc-900 dark:text-white">Notifications</p>
+                    {notifications.filter(n => !n.is_read).length > 0 && (
+                      <button 
+                        onClick={handleMarkAllRead}
+                        className="text-xxs text-teal-600 hover:text-teal-500 dark:text-teal-400 font-semibold cursor-pointer"
+                      >
+                        Tout lu
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-64 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {notifications.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-xs text-zinc-400">
+                        Aucune notification
+                      </div>
+                    ) : (
+                      notifications.map((n) => {
+                        let IconComponent = Info;
+                        let iconColor = "text-blue-500 bg-blue-50 dark:bg-blue-900/10";
+                        if (n.type === "SUCCESS") {
+                          IconComponent = CheckCircle;
+                          iconColor = "text-emerald-500 bg-emerald-50 dark:bg-emerald-900/10";
+                        } else if (n.type === "WARNING") {
+                          IconComponent = AlertTriangle;
+                          iconColor = "text-amber-500 bg-amber-50 dark:bg-amber-900/10";
+                        } else if (n.type === "ERROR") {
+                          IconComponent = XCircle;
+                          iconColor = "text-red-500 bg-red-50 dark:bg-red-900/10";
+                        }
+
+                        return (
+                          <div 
+                            key={n.id}
+                            onClick={() => handleNotificationClick(n)}
+                            className={`px-4 py-3 flex gap-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors ${
+                              !n.is_read ? "bg-teal-50/20 dark:bg-teal-900/5 font-medium" : ""
+                            }`}
+                          >
+                            <div className={`p-1.5 rounded-lg shrink-0 h-7 w-7 flex items-center justify-center ${iconColor}`}>
+                              <IconComponent className="w-4 h-4" />
+                            </div>
+                            <div className="space-y-0.5 min-w-0">
+                              <p className="text-xs font-semibold text-zinc-950 dark:text-white truncate">{n.title}</p>
+                              <p className="text-xxs text-zinc-500 line-clamp-2">{n.message}</p>
+                              <p className="text-[10px] text-zinc-400 mt-1">{new Date(n.created_at).toLocaleDateString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {session ? (
+            <div ref={dropdownRef} className="relative">
+              <div 
+                onClick={() => setDropdownOpen(!dropdownOpen)} 
+                className="flex items-center space-x-2 cursor-pointer pl-2 border-l border-zinc-200 dark:border-zinc-700 select-none"
+              >
+                <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-sm">
+                  {initials}
+                </div>
+                <div className="hidden md:block">
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-white leading-none">{session?.name?.split(" ")?.[0] || "Étudiant"}</p>
+                  <p className="text-xs text-zinc-500 mt-1">Plan {session?.plan || "FREE"}</p>
+                </div>
+                <ChevronDown className="w-4 h-4 text-zinc-500 hidden md:block" />
               </div>
-            )}
-          </div>
+
+              {dropdownOpen && (
+                <div className="absolute right-0 top-12 w-56 bg-white dark:bg-zinc-850 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                  <div className="px-4 py-2 border-b border-zinc-100 dark:border-zinc-800">
+                    <p className="text-sm font-bold text-zinc-900 dark:text-white truncate">{session?.name || "Étudiant"}</p>
+                    <p className="text-xxs text-zinc-400 truncate">{session?.email || "etudiant@example.com"}</p>
+                    <p className="text-xxs text-blue-600 dark:text-blue-400 font-bold mt-1">Plan {session?.plan || "FREE"}</p>
+                  </div>
+                  <Link href="/dashboard/settings" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                    <Settings className="w-4 h-4 text-zinc-400" />
+                    <span>Paramètres</span>
+                  </Link>
+                  {userId && (
+                    <Link href={`/profile/${userId}`} onClick={() => setDropdownOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                      <UserCircle className="w-4 h-4 text-zinc-400" />
+                      <span>Mon Profil</span>
+                    </Link>
+                  )}
+                  <button 
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/10 transition-colors text-left border-t border-zinc-100 dark:border-zinc-800 cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Déconnexion</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
     </header>

@@ -173,6 +173,23 @@ export default function AdminCoursesPage() {
 
       if (error) throw error;
 
+      // Trigger notification for the instructor
+      const course = courses.find(c => c.id === courseId);
+      if (course && course.instructorId && nextStatus === 'PUBLISHED') {
+        try {
+          const { createNotification } = await import('@/lib/supabase/notifications-helper');
+          await createNotification({
+            userId: course.instructorId,
+            title: "Cours publié !",
+            message: `Votre cours "${course.title}" a été validé et publié par l'administrateur.`,
+            type: "SUCCESS",
+            link: `/instructor/courses`
+          });
+        } catch (notifErr) {
+          console.error('Error triggering course publication notification:', notifErr);
+        }
+      }
+
       setCourses(prev => prev.map(c => c.id === courseId ? { ...c, status: nextStatus } : c));
       alert(`Statut du cours mis à jour avec succès vers : ${nextStatus === 'PUBLISHED' ? 'Publié' : (nextStatus === 'DRAFT' ? 'Renvoyé en Brouillon' : 'Archivé')}`);
     } catch (err: any) {

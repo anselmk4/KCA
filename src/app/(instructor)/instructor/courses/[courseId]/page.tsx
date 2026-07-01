@@ -668,6 +668,21 @@ export default function CourseDetailPage() {
         created_at: new Date().toISOString(),
       });
       if (error) { setInviteError("Erreur : " + error.message); return; }
+
+      // Send notifications to the invited student
+      try {
+        const { createNotification } = await import('@/lib/supabase/notifications-helper');
+        await createNotification({
+          userId: inviteFound.id,
+          title: "Invitation à un cours !",
+          message: `Le formateur vous a invité à rejoindre le cours "${course?.title || 'Formation'}".`,
+          type: "INFO",
+          link: `/dashboard/courses`
+        });
+      } catch (notifErr) {
+        console.error("Error creating student invite notification:", notifErr);
+      }
+
       setInviteSuccess(true);
       setTimeout(() => {
         setInviteSuccess(false);

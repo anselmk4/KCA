@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createNotification } from '@/lib/supabase/notifications-helper';
 
 /**
  * POST /api/progress
@@ -110,6 +111,55 @@ export async function POST(req: NextRequest) {
       .from('enrollments')
       .update({ progress_percent: progressPercent })
       .eq('id', enrollment.id);
+
+    // 5. Trigger notifications for validating chapter or course completion
+    if (completed) {
+      try {
+        const { data: courseData } = await supabase
+          .from('courses')
+          .select('title, instructor_id')
+          .eq('id', courseId)
+          .maybeSingle();
+
+        if (courseData?.instructor_id) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          const studentName = profile?.full_name || 'Un apprenant';
+          const courseTitle = courseData.title || 'Formation';
+
+          if (progressPercent >= 100) {
+            await createNotification({
+              userId: courseData.instructor_id,
+              title: "Cours complété !",
+              message: `Félicitations ! L'apprenant "${studentName}" a complété à 100% votre cours "${courseTitle}".`,
+              type: "SUCCESS",
+              link: `/instructor/students`
+            });
+          } else {
+            const { data: lessonData } = await supabase
+              .from('lessons')
+              .select('title')
+              .eq('id', lessonId)
+              .maybeSingle();
+
+            const lessonTitle = lessonData?.title || 'un chapitre';
+            await createNotification({
+              userId: courseData.instructor_id,
+              title: "Chapitre validé !",
+              message: `L'apprenant "${studentName}" a validé la leçon "${lessonTitle}" dans votre cours "${courseTitle}".`,
+              type: "INFO",
+              link: `/instructor/students`
+            });
+          }
+        }
+      } catch (err) {
+        console.error('[API progress POST] Error sending notifications:', err);
+      }
+    }
 
     return NextResponse.json(
       { progress, progressPercent },

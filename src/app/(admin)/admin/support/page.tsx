@@ -57,7 +57,7 @@ export default function AdminSupportPage() {
 
   const activeTicket = db.supportTickets.find((t) => t.id === selectedId);
 
-  const handleSendReply = (e: React.FormEvent) => {
+  const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!draft.trim() || !selectedId) return;
 
@@ -66,6 +66,24 @@ export default function AdminSupportPage() {
       senderName: "Support Admin",
       message: draft.trim(),
     });
+
+    // Send notifications to the user
+    try {
+      const updated = getDB();
+      const ticket = updated.supportTickets.find((t: any) => t.id === selectedId);
+      if (ticket && ticket.userId) {
+        const { createNotification } = await import('@/lib/supabase/notifications-helper');
+        await createNotification({
+          userId: ticket.userId,
+          title: "Support technique !",
+          message: `Le support technique a répondu à votre ticket : "${ticket.subject}".`,
+          type: "INFO",
+          link: `/dashboard/support`
+        });
+      }
+    } catch (err) {
+      console.error("Error creating support response notification:", err);
+    }
 
     setDb(getDB());
     setDraft("");
