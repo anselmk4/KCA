@@ -58,114 +58,18 @@ export default function EarningsPage() {
         return;
       }
 
-      // 1. Get profile and plan
-      const { data: rawProfile } = await supabase
-        .from("profiles")
-        .select("id, plan, full_name, email")
-        .eq("id", user.id)
-        .maybeSingle();
+      // Load data from RLS-bypassed server API
+      const res = await fetch("/api/instructor/earnings");
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || "Une erreur est survenue.");
+      }
 
-      const profile = rawProfile as any;
-      const currentPlan = profile?.plan || "FREE";
+      const currentPlan = data.plan || "FREE";
       setInstructorPlan(currentPlan);
 
-      // Sync local simulated session
-      if (profile) {
-        const localSess = getSimulatedSession();
-        const updatedSession = {
-          userId: profile.id,
-          name: profile.full_name || localSess?.name || "Instructeur",
-          email: profile.email || localSess?.email || "",
-          role: (localSess?.role || "INSTRUCTOR") as any,
-          status: (localSess?.status || "ACTIVE") as any,
-          plan: currentPlan as any,
-        };
-        setSimulatedSession(updatedSession);
-      }
-
-      // 2. Get instructor's courses
-      const { data: courses } = await supabase
-        .from("courses")
-        .select("id, title, price")
-        .eq("instructor_id", user.id);
-
-      if (!courses || courses.length === 0) {
-        setTransactions([]);
-        setTotalRevenue(0);
-        setPendingRevenue(0);
-        setUniqueStudentsCount(0);
-        setLoading(false);
-        return;
-      }
-
-      const courseIds = courses.map((c) => c.id);
-      const courseMap = new Map(courses.map((c) => [c.id, c]));
-
-      // 3. Get order items for those courses
-      const { data: orderItems } = await supabase
-        .from("order_items")
-        .select("order_id, course_id")
-        .in("course_id", courseIds);
-
-      if (!orderItems || orderItems.length === 0) {
-        setTransactions([]);
-        setTotalRevenue(0);
-        setPendingRevenue(0);
-        setUniqueStudentsCount(0);
-        setLoading(false);
-        return;
-      }
-
-      const orderIds = orderItems.map((oi) => oi.order_id);
-      const orderItemMap = new Map(orderItems.map((oi) => [oi.order_id, oi.course_id]));
-
-      // 4. Get payments
-      const { data: payments } = await supabase
-        .from("payments")
-        .select("id, order_id, amount, status, paid_at, user_id, provider")
-        .in("order_id", orderIds);
-
-      if (!payments || payments.length === 0) {
-        setTransactions([]);
-        setTotalRevenue(0);
-        setPendingRevenue(0);
-        setUniqueStudentsCount(0);
-        setLoading(false);
-        return;
-      }
-
-      const studentIds = [...new Set(payments.map((p) => p.user_id))];
-
-      // 5. Get student names
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", studentIds);
-
-      const profileMap = new Map(profiles?.map((p) => [p.id, p.full_name]) || []);
-
-      // 6. Map payments to LocalTransactions
-      const mappedTransactions: LocalTransaction[] = payments.map((p) => {
-        const courseId = orderItemMap.get(p.order_id) || "";
-        const course = courseMap.get(courseId);
-        const studentName = profileMap.get(p.user_id) || "Étudiant";
-        
-        let payMethod: string = p.provider || "STRIPE";
-        if (payMethod === "MOBILE_MONEY") payMethod = "MoMo";
-        
-        return {
-          id: p.id,
-          orderId: p.order_id,
-          courseId,
-          courseTitle: course?.title || "Formation",
-          userId: p.user_id,
-          studentName,
-          amount: p.amount || 0,
-          method: payMethod,
-          date: p.paid_at || new Date().toISOString(),
-          status: p.status || "PAID",
-        };
-      });
+      const mappedTransactions: LocalTransaction[] = data.transactions || [];
 
       // Calculate totals
       const paidTx = mappedTransactions.filter((t) => normalizeStatus(t.status) === "PAID");

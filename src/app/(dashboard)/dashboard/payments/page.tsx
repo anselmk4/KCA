@@ -76,75 +76,16 @@ export default function StudentPaymentsPage() {
         setUserName(profile.full_name);
       }
 
-      // 3. Load user's PAID payments
-      const { data: paymentsData } = await supabase
-        .from("payments")
-        .select("id, order_id, amount, status, provider, paid_at")
-        .eq("user_id", user.id)
-        .eq("status", "PAID");
-
-      const payments = (paymentsData || []) as PaymentRow[];
-
-      if (payments.length === 0) {
+      // 3. Load user's PAID payments from API route to bypass RLS issues
+      const res = await fetch("/api/payments");
+      const data = await res.json();
+      if (res.ok && data.transactions) {
+        setTransactions(data.transactions);
+      } else {
         setTransactions([]);
-        setLoading(false);
-        return;
       }
-
-      const orderIds = payments.map((p) => p.order_id);
-
-      // 4. Load Order Items for these orders
-      const { data: itemsData } = await supabase
-        .from("order_items")
-        .select("order_id, course_id")
-        .in("order_id", orderIds);
-
-      const orderItems = (itemsData || []) as OrderItemRow[];
-      const courseIds = [...new Set(orderItems.map((item) => item.course_id))];
-
-      // 5. Load Courses
-      const { data: coursesData } = await supabase
-        .from("courses")
-        .select("id, title, instructor_id")
-        .in("id", courseIds);
-
-      const courses = (coursesData || []) as CourseData[];
-      const instructorIds = [...new Set(courses.map((c) => c.instructor_id).filter(Boolean))];
-
-      // 6. Load Instructors Profiles
-      const { data: instructorsData } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", instructorIds);
-
-      const instructors = (instructorsData || []) as ProfileData[];
-      const instructorMap = new Map(instructors.map((i) => [i.id, i.full_name]));
-      const courseMap = new Map(courses.map((c) => [c.id, c]));
-
-      // 7. Match and Build the UI rows
-      const mappedTxs: DisplayTransaction[] = payments.map((p) => {
-        // Find item
-        const item = orderItems.find((oi) => oi.order_id === p.order_id);
-        const course = item ? courseMap.get(item.course_id) : null;
-        const instructorName = course ? instructorMap.get(course.instructor_id) || "Formateur Kuettu" : "—";
-        const courseTitle = course ? course.title : "Formation Spécialisée";
-
-        return {
-          id: p.id,
-          courseId: course?.id || "",
-          courseTitle,
-          instructorName,
-          amount: p.amount || 0,
-          method: PROVIDER_MAP[p.provider] || p.provider || "Carte",
-          date: p.paid_at || new Date().toISOString(),
-        };
-      });
-
-      // Sort by date descending
-      mappedTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      setTransactions(mappedTxs);
     } catch (err) {
-      console.error("[StudentPaymentsPage] Error loading data from Supabase:", err);
+      console.error("[StudentPaymentsPage] Error loading data from API:", err);
     } finally {
       setLoading(false);
     }
