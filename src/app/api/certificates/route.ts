@@ -21,6 +21,7 @@ const supabaseAdmin = createSupabaseClient(
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
+    const activeClient = process.env.SUPABASE_SERVICE_ROLE_KEY ? supabaseAdmin : supabase;
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
@@ -34,8 +35,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'courseId est requis' }, { status: 400 });
     }
 
-    // 1. Vérifier enrollment actif ou complété (utiliser admin client filtré par user.id pour éviter les soucis RLS)
-    const { data: enrollment, error: enrollError } = await supabaseAdmin
+    // 1. Vérifier enrollment actif ou complété
+    const { data: enrollment, error: enrollError } = await activeClient
       .from('enrollments')
       .select('id, progress_percent, status')
       .eq('student_id', user.id)
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Vérifier que le cours existe et est publié
-    const { data: course, error: courseError } = await supabaseAdmin
+    const { data: course, error: courseError } = await activeClient
       .from('courses')
       .select('id, title, status')
       .eq('id', courseId)
@@ -62,20 +63,20 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Calculer total des leçons du cours
-    const { data: sections } = await supabaseAdmin
+    const { data: sections } = await activeClient
       .from('course_sections')
       .select('id')
       .eq('course_id', courseId);
 
     const sectionIds = (sections || []).map(s => s.id);
 
-    const { count: totalLessons } = await supabaseAdmin
+    const { count: totalLessons } = await activeClient
       .from('lessons')
       .select('*', { count: 'exact', head: true })
       .in('section_id', sectionIds.length > 0 ? sectionIds : ['__none__']);
 
     // 4. Vérifier leçons complétées
-    const { count: completedLessons } = await supabaseAdmin
+    const { count: completedLessons } = await activeClient
       .from('lesson_progress')
       .select('*', { count: 'exact', head: true })
       .eq('enrollment_id', enrollment.id)
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. Vérifier tous les quiz du cours passés
-    const { data: quizzes } = await supabaseAdmin
+    const { data: quizzes } = await activeClient
       .from('quizzes')
       .select('id, pass_percentage, title')
       .eq('course_id', courseId);
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
     if (quizzes && quizzes.length > 0) {
       for (const quiz of quizzes) {
         const passThreshold = quiz.pass_percentage || 80;
-        const { data: passedAttempts } = await supabaseAdmin
+        const { data: passedAttempts } = await activeClient
           .from('quiz_attempts')
           .select('id')
           .eq('student_id', user.id)
@@ -131,7 +132,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 6. Vérifier si un certificat existe déjà
-    const { data: existingCert } = await supabaseAdmin
+    const { data: existingCert } = await activeClient
       .from('certificates')
       .select('id, code, issued_at')
       .eq('student_id', user.id)
@@ -145,10 +146,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 7. Générer un code unique et créer le certificat avec l'admin client pour contourner RLS
+    // 7. Générer un code unique et créer le certificat
     const code = `CERT-${courseId.slice(0, 6).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
 
-    const { data: certificate, error: certError } = await supabaseAdmin
+    const { data: certificate, error: certError } = await activeClient
       .from('certificates')
       .insert({
         student_id: user.id,
@@ -166,7 +167,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 8. Marquer l'enrollment comme COMPLETED
-    await supabaseAdmin
+    await activeClient
       .from('enrollments')
       .update({ status: 'COMPLETED', progress_percent: 100 })
       .eq('id', enrollment.id);

@@ -183,6 +183,30 @@ export default function CertificatesPage() {
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [genError, setGenError] = useState<string | null>(null);
+
+  const handleGenerateCertificate = async (courseId: string) => {
+    setGeneratingId(courseId);
+    setGenError(null);
+    try {
+      const res = await fetch("/api/certificates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Impossible de générer le certificat.");
+      }
+      await loadData();
+    } catch (err: any) {
+      setGenError(err.message);
+      alert(err.message);
+    } finally {
+      setGeneratingId(null);
+    }
+  };
 
   // ── Charger depuis Supabase ─────────────────────────────
   const loadData = useCallback(async () => {
@@ -287,9 +311,74 @@ export default function CertificatesPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in">
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Mes Certificats</h1>
-        <p className="text-zinc-500 dark:text-zinc-400">Vos accomplissements et diplômes obtenus sur ANSELLA.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Mes Certificats</h1>
+          <p className="text-zinc-500 dark:text-zinc-400">Vos accomplissements et diplômes obtenus sur ANSELLA.</p>
+        </div>
+      </div>
+
+      {/* ── Certificate Template Showcase ───────────────── */}
+      <div className="bg-zinc-900 text-white rounded-3xl p-6 md:p-8 border border-zinc-800 shadow-xl overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl -z-10" />
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+          <div className="md:col-span-7 space-y-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5" /> Modèle Officiel
+            </div>
+            <h2 className="text-xl md:text-2xl font-black tracking-tight leading-tight">
+              Aperçu du Modèle de Certificat ANSELLA
+            </h2>
+            <p className="text-zinc-400 text-sm max-w-lg leading-relaxed">
+              Voici à quoi ressemblera votre certificat officiel une fois vos formations complétées à 100%. 
+              Chaque certificat est unique, infalsifiable, et comprend un code de vérification unique ainsi qu'un lien de partage.
+            </p>
+            <div className="flex flex-wrap gap-4 text-xs font-semibold text-zinc-400 pt-2">
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-teal-500" /> Signature de l'Instructeur
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-teal-500" /> Code de vérification unique
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-teal-500" /> Export PNG Haute Résolution
+              </div>
+            </div>
+          </div>
+
+          <div className="md:col-span-5 flex justify-center">
+            {/* Template Preview Visual */}
+            <div className="w-full max-w-[340px] bg-gradient-to-br from-zinc-800 to-zinc-950 p-1.5 rounded-2xl border border-zinc-700 shadow-2xl relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/10 via-transparent to-blue-500/10 opacity-60 pointer-events-none" />
+              {/* Gold border */}
+              <div className="border border-amber-500/30 rounded-xl p-4 flex flex-col items-center justify-center text-center bg-zinc-950/90 relative">
+                {/* Ornaments */}
+                <div className="absolute top-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-amber-500/60" />
+                <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-500/60" />
+                <div className="absolute bottom-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-amber-500/60" />
+                <div className="absolute bottom-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-500/60" />
+
+                <div className="w-8 h-8 bg-amber-500/10 rounded-full flex items-center justify-center mb-2">
+                  <Award className="w-5 h-5 text-amber-500" />
+                </div>
+                <p className="font-serif text-[8px] text-zinc-500 uppercase tracking-[0.2em] leading-none">Certificat d&apos;Accomplissement</p>
+                
+                <h4 className="font-bold text-white text-xs mt-1.5 line-clamp-1">Nom de la Formation</h4>
+                
+                <div className="mt-2 flex items-center gap-1.5">
+                  <div className="w-6 h-[0.5px] bg-amber-500/40" />
+                  <p className="text-[9px] text-zinc-300 font-semibold truncate max-w-[100px]">{userName}</p>
+                  <div className="w-6 h-[0.5px] bg-amber-500/40" />
+                </div>
+                
+                <p className="text-[7px] text-zinc-650 mt-1 font-mono">CODE: CERT-XXXX-XXXXXX</p>
+                <div className="mt-2 text-[7px] bg-teal-500/10 text-teal-400 px-2 py-0.5 rounded border border-teal-500/20 font-bold uppercase tracking-wider">
+                  Modèle de Démonstration
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ── Certificats obtenus ──────────────────────────── */}
@@ -393,21 +482,35 @@ export default function CertificatesPage() {
                 className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col group"
               >
                 <div className="h-52 bg-zinc-100 dark:bg-zinc-800 relative flex items-center justify-center border-b border-zinc-200 dark:border-zinc-700">
-                  <div className="w-3/4 h-3/4 bg-white dark:bg-zinc-900 shadow-lg border-4 border-zinc-200 dark:border-zinc-700 p-4 flex flex-col items-center justify-center opacity-40 grayscale transition-all group-hover:opacity-60">
-                    <Award className="w-10 h-10 text-zinc-400 mb-2" />
+                  <div className={`w-3/4 h-3/4 bg-white dark:bg-zinc-900 shadow-lg border-4 border-zinc-200 dark:border-zinc-700 p-4 flex flex-col items-center justify-center transition-all ${
+                    enrollment.progress_percent >= 100 
+                      ? "opacity-100 border-emerald-500/40" 
+                      : "opacity-40 grayscale group-hover:opacity-60"
+                  }`}>
+                    <Award className={`w-10 h-10 mb-2 ${enrollment.progress_percent >= 100 ? "text-emerald-500" : "text-zinc-400"}`} />
                     <p className="font-serif text-xs text-zinc-400 uppercase tracking-widest text-center">Certificat d&apos;Accomplissement</p>
                     <p className="font-bold text-zinc-500 mt-1 text-center text-xs line-clamp-2">{enrollment.courseTitle}</p>
                   </div>
-                  <div className="absolute inset-0 bg-black/5 dark:bg-black/40 backdrop-blur-[2px] flex items-center justify-center">
-                    <div className="bg-white dark:bg-zinc-900 p-3 rounded-full shadow-xl">
-                      <Lock className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
+                  {enrollment.progress_percent < 100 ? (
+                    <div className="absolute inset-0 bg-black/5 dark:bg-black/40 backdrop-blur-[2px] flex items-center justify-center">
+                      <div className="bg-white dark:bg-zinc-900 p-3 rounded-full shadow-xl">
+                        <Lock className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="absolute inset-0 bg-emerald-500/5 dark:bg-emerald-950/10 backdrop-blur-[1px] flex items-center justify-center">
+                      <div className="bg-emerald-500 text-white p-3 rounded-full shadow-xl animate-bounce">
+                        <Sparkles className="w-6 h-6" />
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="p-6 flex flex-col flex-1">
                   <h2 className="text-base font-bold text-zinc-900 dark:text-white mb-1 line-clamp-1">{enrollment.courseTitle}</h2>
                   <p className="text-zinc-500 dark:text-zinc-400 text-xs mb-4">
-                    Complétez 100% des leçons et validez tous les quiz ≥ 80% pour déverrouiller ce certificat.
+                    {enrollment.progress_percent >= 100 
+                      ? "Félicitations ! Votre progression est complète." 
+                      : "Complétez 100% des leçons et validez tous les quiz ≥ 80% pour déverrouiller ce certificat."}
                   </p>
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-xs font-semibold">
@@ -421,12 +524,41 @@ export default function CertificatesPage() {
                       />
                     </div>
                   </div>
-                  <Link
-                    href={`/dashboard/courses/${enrollment.course_id}/learn`}
-                    className="mt-auto w-full py-3 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs rounded-xl transition-colors text-center block"
-                  >
-                    Continuer le cours →
-                  </Link>
+                  
+                  {enrollment.progress_percent >= 100 ? (
+                    <div className="space-y-4 mt-auto">
+                      <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 rounded-2xl flex items-center gap-3">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                        <p className="text-xs font-bold text-emerald-800 dark:text-emerald-400">
+                          Formation complétée à 100% ! Votre certificat est prêt.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleGenerateCertificate(enrollment.course_id)}
+                        disabled={generatingId === enrollment.course_id}
+                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-colors text-center flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-emerald-500/10"
+                      >
+                        {generatingId === enrollment.course_id ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Génération en cours...
+                          </>
+                        ) : (
+                          <>
+                            <Award className="w-4 h-4" />
+                            Obtenir mon certificat
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <Link
+                      href={`/dashboard/courses/${enrollment.course_id}/learn`}
+                      className="mt-auto w-full py-3 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs rounded-xl transition-colors text-center block"
+                    >
+                      Continuer le cours →
+                    </Link>
+                  )}
                 </div>
               </div>
             ))}
