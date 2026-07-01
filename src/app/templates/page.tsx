@@ -162,7 +162,7 @@ export default function TemplatesPage() {
                       <div className="pt-4 border-t border-zinc-900 mt-auto flex items-center justify-between text-xs">
                         <span className="text-zinc-500">{getLevelLabel(course.level)}</span>
                         <span className="font-black text-teal-400 text-sm">
-                          {course.price > 0 ? `${course.price.toLocaleString()} FCFA` : "Gratuit"}
+                          {course.price > 0 ? `${course.price.toLocaleString()}$` : "Gratuit"}
                         </span>
                       </div>
 

@@ -196,7 +196,7 @@ export default function InstructorDashboardPage() {
           <div className="text-left">
             <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Revenus totaux</p>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">
-              {totalRevenue.toLocaleString()} FCFA
+              {totalRevenue.toLocaleString()}$
             </h3>
           </div>
         </div>
@@ -238,7 +238,7 @@ export default function InstructorDashboardPage() {
           <div className="text-left">
             <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Paiements en attente</p>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">
-              {pendingPayouts.toLocaleString()} FCFA
+              {pendingPayouts.toLocaleString()}$
             </h3>
           </div>
         </div>
@@ -277,7 +277,7 @@ export default function InstructorDashboardPage() {
                         <Users className="w-3 h-3" /> {stat.enrollCount} inscrit{stat.enrollCount > 1 ? "s" : ""}
                       </span>
                       <span className="text-xs text-zinc-500 flex items-center gap-1">
-                        <DollarSign className="w-3 h-3" /> {stat.revenue.toLocaleString()} FCFA
+                        <DollarSign className="w-3 h-3" /> {stat.revenue.toLocaleString()}$
                       </span>
                     </div>
                   </div>

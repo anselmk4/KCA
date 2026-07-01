@@ -434,7 +434,7 @@ export default function UserProfilePage() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold text-teal-600">{c.price > 0 ? `${c.price.toLocaleString()} FCFA` : "Gratuit"}</p>
+                      <p className="text-sm font-bold text-teal-600">{c.price > 0 ? `${c.price.toLocaleString()}$` : "Gratuit"}</p>
                     </div>
                   </Link>
                 ))}

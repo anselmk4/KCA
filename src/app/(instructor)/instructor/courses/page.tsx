@@ -341,7 +341,7 @@ export default function InstructorCoursesPage() {
                       {statusLabels[course.status]}
                     </span>
                     <span className="text-sm font-bold text-zinc-900 dark:text-white">
-                      {course.price > 0 ? `${course.price.toLocaleString()} FCFA` : "Gratuit"}
+                      {course.price > 0 ? `${course.price.toLocaleString()}$` : "Gratuit"}
                     </span>
                   </div>
 
@@ -361,7 +361,7 @@ export default function InstructorCoursesPage() {
                       <BookOpen className="w-3.5 h-3.5" /> {sectionCount} sect. · {lessonCount} leçons
                     </span>
                     <span className="flex items-center gap-1">
-                      <DollarSign className="w-3.5 h-3.5" /> {revenue.toLocaleString()} FCFA
+                      <DollarSign className="w-3.5 h-3.5" /> {revenue.toLocaleString()}$
                     </span>
                   </div>
 
