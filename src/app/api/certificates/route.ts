@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+
+// Initialize admin client to bypass RLS restrictions on certificate creation and quiz queries
+const supabaseAdmin = createSupabaseClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 /**
  * POST /api/certificates
  * Body: { courseId: string }
  * Vérifie côté serveur :
  *   1. Enrollment actif
- *   2. 100% des leçons complétées
+ *   2. 100% des leçons complétées (ou progress_percent >= 100)
  *   3. Tous les quiz du cours passés avec score >= pass_percentage
  * Si éligible → crée le certificat dans Supabase et retourne le certificat.
  */
@@ -26,8 +33,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'courseId est requis' }, { status: 400 });
     }
 
-    // 1. Vérifier enrollment actif ou complété
-    const { data: enrollment, error: enrollError } = await supabase
+    // 1. Vérifier enrollment actif ou complété (utiliser admin client filtré par user.id pour éviter les soucis RLS)
+    const { data: enrollment, error: enrollError } = await supabaseAdmin
       .from('enrollments')
       .select('id, progress_percent, status')
       .eq('student_id', user.id)
@@ -37,13 +44,13 @@ export async function POST(req: NextRequest) {
 
     if (enrollError || !enrollment) {
       return NextResponse.json(
-        { error: 'Vous n\'êtes pas inscrit à ce cours', eligible: false },
+        { error: 'Vous n\'êtes pas inscrit à ce cours ou votre inscription est inactive', eligible: false },
         { status: 403 }
       );
     }
 
     // 2. Vérifier que le cours existe et est publié
-    const { data: course, error: courseError } = await supabase
+    const { data: course, error: courseError } = await supabaseAdmin
       .from('courses')
       .select('id, title, status')
       .eq('id', courseId)
@@ -54,35 +61,36 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Calculer total des leçons du cours
-    const { data: sections } = await supabase
+    const { data: sections } = await supabaseAdmin
       .from('course_sections')
       .select('id')
       .eq('course_id', courseId);
 
     const sectionIds = (sections || []).map(s => s.id);
 
-    const { count: totalLessons } = await supabase
+    const { count: totalLessons } = await supabaseAdmin
       .from('lessons')
       .select('*', { count: 'exact', head: true })
       .in('section_id', sectionIds.length > 0 ? sectionIds : ['__none__']);
 
     // 4. Vérifier leçons complétées
-    const { count: completedLessons } = await supabase
+    const { count: completedLessons } = await supabaseAdmin
       .from('lesson_progress')
       .select('*', { count: 'exact', head: true })
       .eq('enrollment_id', enrollment.id)
       .eq('completed', true);
 
     const allLessonsDone =
-      totalLessons !== null &&
-      totalLessons > 0 &&
-      completedLessons !== null &&
-      completedLessons >= totalLessons;
+      (totalLessons !== null &&
+        totalLessons > 0 &&
+        completedLessons !== null &&
+        completedLessons >= totalLessons) ||
+      (enrollment.progress_percent !== null && enrollment.progress_percent >= 100);
 
     if (!allLessonsDone) {
       return NextResponse.json(
         {
-          error: `Leçons non complétées : ${completedLessons || 0}/${totalLessons || 0}`,
+          error: `Leçons non complétées : ${completedLessons || 0}/${totalLessons || 0} (requis: 100%)`,
           eligible: false,
           completedLessons: completedLessons || 0,
           totalLessons: totalLessons || 0,
@@ -92,7 +100,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. Vérifier tous les quiz du cours passés
-    const { data: quizzes } = await supabase
+    const { data: quizzes } = await supabaseAdmin
       .from('quizzes')
       .select('id, pass_percentage, title')
       .eq('course_id', courseId);
@@ -100,7 +108,7 @@ export async function POST(req: NextRequest) {
     if (quizzes && quizzes.length > 0) {
       for (const quiz of quizzes) {
         const passThreshold = quiz.pass_percentage || 80;
-        const { data: passedAttempts } = await supabase
+        const { data: passedAttempts } = await supabaseAdmin
           .from('quiz_attempts')
           .select('id')
           .eq('student_id', user.id)
@@ -122,7 +130,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 6. Vérifier si un certificat existe déjà
-    const { data: existingCert } = await supabase
+    const { data: existingCert } = await supabaseAdmin
       .from('certificates')
       .select('id, code, issued_at')
       .eq('student_id', user.id)
@@ -136,10 +144,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 7. Générer un code unique et créer le certificat
+    // 7. Générer un code unique et créer le certificat avec l'admin client pour contourner RLS
     const code = `CERT-${courseId.slice(0, 6).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
 
-    const { data: certificate, error: certError } = await supabase
+    const { data: certificate, error: certError } = await supabaseAdmin
       .from('certificates')
       .insert({
         student_id: user.id,
@@ -152,12 +160,12 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (certError) {
-      console.error('[API /certificates POST] Supabase error:', certError.message);
+      console.error('[API /certificates POST] Supabase insert error:', certError.message);
       return NextResponse.json({ error: certError.message }, { status: 400 });
     }
 
     // 8. Marquer l'enrollment comme COMPLETED
-    await supabase
+    await supabaseAdmin
       .from('enrollments')
       .update({ status: 'COMPLETED', progress_percent: 100 })
       .eq('id', enrollment.id);

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getDB, Database } from "@/lib/db";
 import { getSimulatedSession } from "@/lib/rbac";
+import { supabase } from "@/lib/supabase/client";
 import {
   BookOpen,
   Users,
@@ -12,19 +12,152 @@ import {
   Star,
   Clock,
   ArrowUpRight,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 
 export default function InstructorDashboardPage() {
-  const [db, setDb] = useState<Database | null>(null);
   const [session, setSession] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [myCourses, setMyCourses] = useState<any[]>([]);
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [pendingPayouts, setPendingPayouts] = useState(0);
+  const [avgProgress, setAvgProgress] = useState(0);
+  const [myEnrollments, setMyEnrollments] = useState<any[]>([]);
+  const [recentEnrollments, setRecentEnrollments] = useState<any[]>([]);
+  const [courseStats, setCourseStats] = useState<Record<string, { enrollCount: number; revenue: number }>>({});
 
   useEffect(() => {
-    setDb(getDB());
-    setSession(getSimulatedSession());
+    const activeSession = getSimulatedSession();
+    setSession(activeSession);
+    if (!activeSession) {
+      setLoading(false);
+      return;
+    }
+
+    async function loadDashboardData() {
+      setLoading(true);
+      try {
+        const instructorId = activeSession.userId;
+
+        // 1. Fetch courses owned by the instructor
+        const { data: coursesData } = await supabase
+          .from("courses")
+          .select("id, title, status, price, level")
+          .eq("instructor_id", instructorId);
+
+        const coursesList = coursesData || [];
+        setMyCourses(coursesList);
+
+        if (coursesList.length === 0) {
+          setLoading(false);
+          return;
+        }
+
+        const courseIds = coursesList.map((c: any) => c.id);
+
+        // 2. Fetch enrollments for these courses, including student profiles
+        const { data: enrollData } = await (supabase as any)
+          .from("enrollments")
+          .select(`
+            id, 
+            student_id, 
+            course_id, 
+            progress_percent, 
+            joined_at, 
+            profiles(id, full_name, email, avatar_url)
+          `)
+          .in("course_id", courseIds);
+
+        const enrollList = enrollData || [];
+        setMyEnrollments(enrollList);
+
+        // Calculate total students (unique student IDs)
+        const uniqueStudentIds = new Set(enrollList.map((e: any) => e.student_id));
+        setTotalStudents(uniqueStudentIds.size);
+
+        // Calculate average progress
+        const totalProgress = enrollList.reduce((sum: number, e: any) => sum + (e.progress_percent || 0), 0);
+        const avg = enrollList.length > 0 ? Math.round(totalProgress / enrollList.length) : 0;
+        setAvgProgress(avg);
+
+        // 3. Fetch transactions/payments
+        // Retrieve order items matching instructor courses
+        const { data: orderItems } = await (supabase as any)
+          .from("order_items")
+          .select("order_id, course_id, unit_price")
+          .in("course_id", courseIds);
+
+        const orderItemList = orderItems || [];
+        const orderIds = orderItemList.map((oi: any) => oi.order_id);
+
+        let paymentsList: any[] = [];
+        if (orderIds.length > 0) {
+          const { data: paymentsData } = await supabase
+            .from("payments")
+            .select("id, amount, status, paid_at, order_id")
+            .eq("status", "PAID")
+            .in("order_id", orderIds);
+          paymentsList = paymentsData || [];
+        }
+
+        const revenueSum = paymentsList.reduce((sum: number, p: any) => sum + p.amount, 0);
+        setTotalRevenue(revenueSum);
+
+        // 4. Fetch pending payouts
+        const { data: payoutsData } = await supabase
+          .from("payouts")
+          .select("amount")
+          .eq("instructor_id", instructorId)
+          .eq("status", "PENDING");
+
+        const pendingSum = (payoutsData || []).reduce((sum: number, p: any) => sum + p.amount, 0);
+        setPendingPayouts(pendingSum);
+
+        // 5. Calculate per-course enrollments and revenue
+        const stats: Record<string, { enrollCount: number; revenue: number }> = {};
+        coursesList.forEach((c: any) => {
+          const courseEnrolls = enrollList.filter((e: any) => e.course_id === c.id);
+          // Find orders for this course
+          const courseOrderIds = orderItemList
+            .filter((oi: any) => oi.course_id === c.id)
+            .map((oi: any) => oi.order_id);
+          const courseRevenueSum = paymentsList
+            .filter((p: any) => courseOrderIds.includes(p.order_id))
+            .reduce((sum: number, p: any) => sum + p.amount, 0);
+
+          stats[c.id] = {
+            enrollCount: courseEnrolls.length,
+            revenue: courseRevenueSum
+          };
+        });
+        setCourseStats(stats);
+
+        // 6. Map recent enrollments
+        const sortedEnrolls = [...enrollList]
+          .sort((a: any, b: any) => new Date(b.joined_at).getTime() - new Date(a.joined_at).getTime())
+          .slice(0, 5)
+          .map((enr: any) => ({
+            id: enr.id,
+            studentName: enr.profiles?.full_name || "Étudiant",
+            studentInit: enr.profiles?.full_name?.charAt(0) || "?",
+            courseTitle: coursesList.find((c: any) => c.id === enr.course_id)?.title || "Cours",
+            joinedAt: enr.joined_at
+          }));
+        setRecentEnrollments(sortedEnrolls);
+
+      } catch (err) {
+        console.error("Error loading instructor dashboard:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadDashboardData();
   }, []);
 
-  if (!db || !session) {
+  if (loading || !session) {
     return (
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="h-8 w-64 bg-zinc-200 dark:bg-zinc-800 rounded-lg animate-pulse" />
@@ -37,40 +170,14 @@ export default function InstructorDashboardPage() {
     );
   }
 
-  const instructorId = session?.userId ?? "";
   const instructorName = session?.name ?? "";
-
-  // Instructor-specific data
-  const myCourses = db.courses.filter((c) => c.instructorId === instructorId);
   const publishedCourses = myCourses.filter((c) => c.status === "PUBLISHED");
   const draftCourses = myCourses.filter((c) => c.status === "DRAFT");
-
-  const myCourseIds = myCourses.map((c) => c.id);
-  const myEnrollments = db.enrollments.filter((e) => myCourseIds.includes(e.courseId));
-  const totalStudents = new Set(myEnrollments.map((e) => e.studentId)).size;
-
-  const myTransactions = db.transactions.filter(
-    (t) => myCourseIds.includes(t.courseId) && t.status === "PAID"
-  );
-  const totalRevenue = myTransactions.reduce((sum, t) => sum + t.amount, 0);
-  const pendingPayouts = db.payouts
-    .filter((p) => p.instructorId === instructorId && p.status === "PENDING")
-    .reduce((sum, p) => sum + p.amount, 0);
-
-  const avgProgress =
-    myEnrollments.length > 0
-      ? Math.round(myEnrollments.reduce((sum, e) => sum + e.progressPercent, 0) / myEnrollments.length)
-      : 0;
-
-  // Recent enrollments
-  const recentEnrollments = myEnrollments
-    .sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime())
-    .slice(0, 5);
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in">
       {/* Header */}
-      <div>
+      <div className="text-left">
         <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-1">
           Bonjour, {instructorName} 👋
         </h1>
@@ -86,10 +193,10 @@ export default function InstructorDashboardPage() {
           <div className="p-4 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl text-emerald-600">
             <DollarSign className="w-8 h-8" />
           </div>
-          <div>
+          <div className="text-left">
             <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Revenus totaux</p>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">
-              {totalRevenue.toLocaleString()}$
+              {totalRevenue.toLocaleString()} FCFA
             </h3>
           </div>
         </div>
@@ -99,7 +206,7 @@ export default function InstructorDashboardPage() {
           <div className="p-4 bg-blue-100 dark:bg-blue-900/30 rounded-xl text-blue-600">
             <Users className="w-8 h-8" />
           </div>
-          <div>
+          <div className="text-left">
             <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Étudiants inscrits</p>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">{totalStudents}</h3>
           </div>
@@ -110,7 +217,7 @@ export default function InstructorDashboardPage() {
           <div className="p-4 bg-purple-100 dark:bg-purple-900/30 rounded-xl text-purple-600">
             <BookOpen className="w-8 h-8" />
           </div>
-          <div>
+          <div className="text-left">
             <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Cours publiés</p>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">
               {publishedCourses.length}
@@ -128,10 +235,10 @@ export default function InstructorDashboardPage() {
           <div className="p-4 bg-amber-100 dark:bg-amber-900/30 rounded-xl text-amber-600">
             <Wallet className="w-8 h-8" />
           </div>
-          <div>
+          <div className="text-left">
             <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Paiements en attente</p>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">
-              {pendingPayouts.toLocaleString()}$
+              {pendingPayouts.toLocaleString()} FCFA
             </h3>
           </div>
         </div>
@@ -155,25 +262,22 @@ export default function InstructorDashboardPage() {
               <div className="p-8 text-center text-zinc-500">Aucun cours créé.</div>
             )}
             {myCourses.slice(0, 4).map((course) => {
-              const enrollCount = db.enrollments.filter((e) => e.courseId === course.id).length;
-              const courseRevenue = db.transactions
-                .filter((t) => t.courseId === course.id && t.status === "PAID")
-                .reduce((s, t) => s + t.amount, 0);
+              const stat = courseStats[course.id] || { enrollCount: 0, revenue: 0 };
               return (
                 <div
                   key={course.id}
                   className="px-6 py-4 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors"
                 >
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 text-left">
                     <h3 className="text-sm font-medium text-zinc-900 dark:text-white truncate">
                       {course.title}
                     </h3>
                     <div className="flex items-center gap-3 mt-1">
                       <span className="text-xs text-zinc-500 flex items-center gap-1">
-                        <Users className="w-3 h-3" /> {enrollCount} inscrit{enrollCount > 1 ? "s" : ""}
+                        <Users className="w-3 h-3" /> {stat.enrollCount} inscrit{stat.enrollCount > 1 ? "s" : ""}
                       </span>
                       <span className="text-xs text-zinc-500 flex items-center gap-1">
-                        <DollarSign className="w-3 h-3" /> {courseRevenue.toLocaleString()}$
+                        <DollarSign className="w-3 h-3" /> {stat.revenue.toLocaleString()} FCFA
                       </span>
                     </div>
                   </div>
@@ -199,7 +303,7 @@ export default function InstructorDashboardPage() {
         {/* Quick Stats / Activity */}
         <div className="space-y-6">
           {/* Avg Progress */}
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 text-left">
             <h3 className="text-sm font-semibold text-zinc-900 dark:text-white mb-4">
               Progression moyenne
             </h3>
@@ -236,7 +340,7 @@ export default function InstructorDashboardPage() {
           </div>
 
           {/* Recent Enrollments */}
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 text-left">
             <h3 className="text-sm font-semibold text-zinc-900 dark:text-white mb-4">
               Inscriptions récentes
             </h3>
@@ -244,26 +348,22 @@ export default function InstructorDashboardPage() {
               <p className="text-sm text-zinc-500">Aucune inscription récente.</p>
             )}
             <div className="space-y-3">
-              {recentEnrollments.map((enr) => {
-                const student = db.users.find((u) => u.id === enr.studentId);
-                const course = db.courses.find((c) => c.id === enr.courseId);
-                return (
-                  <div key={enr.id} className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-teal-100 dark:bg-teal-900/30 rounded-full flex items-center justify-center text-teal-600 text-xs font-bold">
-                      {student?.name?.charAt(0) || "?"}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">
-                        {student?.name || "Étudiant"}
-                      </p>
-                      <p className="text-xs text-zinc-500 truncate">{course?.title}</p>
-                    </div>
-                    <span className="text-xs text-zinc-400">
-                      {new Date(enr.joinedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
-                    </span>
+              {recentEnrollments.map((enr) => (
+                <div key={enr.id} className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-teal-100 dark:bg-teal-900/30 rounded-full flex items-center justify-center text-teal-600 text-xs font-bold shrink-0">
+                    {enr.studentInit}
                   </div>
-                );
-              })}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">
+                      {enr.studentName}
+                    </p>
+                    <p className="text-xs text-zinc-500 truncate">{enr.courseTitle}</p>
+                  </div>
+                  <span className="text-xs text-zinc-400 shrink-0">
+                    {new Date(enr.joinedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

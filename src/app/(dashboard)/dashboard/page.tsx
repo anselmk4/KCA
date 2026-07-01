@@ -90,12 +90,19 @@ export default function DashboardPage() {
       setProfile(profileData as unknown as Profile);
 
       // Enrollments with course data
-      const { data: enrollData } = await supabase
+      const { data: enrollData } = await (supabase as any)
         .from("enrollments")
-        .select("id, student_id, course_id, status, progress_percent, created_at, courses(id, title, category, level, price, status, description)")
+        .select("id, student_id, course_id, status, progress_percent, created_at, courses(id, title, category_id, level, price, status, description, categories(name))")
         .eq("student_id", user.id);
 
-      const all = (enrollData || []) as unknown as EnrollmentData[];
+      const all = (enrollData || []).map((e: any) => ({
+        ...e,
+        courses: e.courses ? {
+          ...e.courses,
+          category: e.courses.categories?.name || "Général"
+        } : undefined
+      })) as unknown as EnrollmentData[];
+
       const active = all.filter((e) => e.status === "ACTIVE" && e.progress_percent < 100);
       const completed = all.filter((e) => e.progress_percent >= 100 || e.status === "COMPLETED");
       setActiveEnrollments(active);
@@ -110,11 +117,15 @@ export default function DashboardPage() {
 
       // Available published courses not yet enrolled
       const enrolledIds = new Set(all.map((e) => e.course_id));
-      const { data: coursesData } = await supabase
+      const { data: coursesData } = await (supabase as any)
         .from("courses")
-        .select("id, title, category, level, price, status, description")
+        .select("id, title, category_id, level, price, status, description, categories(name)")
         .eq("status", "PUBLISHED");
-      const available = ((coursesData || []) as unknown as CourseData[]).filter((c) => !enrolledIds.has(c.id)).slice(0, 3);
+
+      const available = ((coursesData || []).map((c: any) => ({
+        ...c,
+        category: c.categories?.name || "Général"
+      })) as unknown as CourseData[]).filter((c) => !enrolledIds.has(c.id)).slice(0, 3);
       setAvailableCourses(available);
     } catch (err) {
       console.error("[DashboardPage] loadData error:", err);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   BookOpen,
   Plus,
@@ -15,8 +15,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import Link from "next/link";
-import { deleteCourse, addCourse, getDB, Database } from "@/lib/db";
 import { getSimulatedSession } from "@/lib/rbac";
+import { supabase } from "@/lib/supabase/client";
 
 type StatusFilter = "ALL" | "DRAFT" | "REVIEW" | "PUBLISHED" | "ARCHIVED";
 
@@ -35,8 +35,9 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function InstructorCoursesPage() {
-  const [db, setDb] = useState<Database | null>(null);
   const [session, setSession] = useState<any>(null);
+  const [myCourses, setMyCourses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -47,19 +48,189 @@ export default function InstructorCoursesPage() {
   const [newPrice, setNewPrice] = useState("");
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    setDb(getDB());
-    setSession(getSimulatedSession());
+  // Stats / counts
+  const [enrollCounts, setEnrollCounts] = useState<Record<string, number>>({});
+  const [revenueStats, setRevenueStats] = useState<Record<string, number>>({});
+  const [sectionCounts, setSectionCounts] = useState<Record<string, number>>({});
+  const [lessonCounts, setLessonCounts] = useState<Record<string, number>>({});
+
+  const loadDashboardData = useCallback(async () => {
+    const activeSession = getSimulatedSession();
+    if (!activeSession) return;
+
+    try {
+      const instructorId = activeSession.userId;
+
+      // 1. Fetch courses owned by the instructor
+      const { data: coursesData } = await supabase
+        .from("courses")
+        .select("id, title, description, status, price, level")
+        .eq("instructor_id", instructorId);
+
+      const coursesList = coursesData || [];
+      setMyCourses(coursesList);
+
+      if (coursesList.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      const courseIds = coursesList.map((c: any) => c.id);
+
+      // 2. Fetch enrollments
+      const { data: enrollData } = await supabase
+        .from("enrollments")
+        .select("id, course_id")
+        .in("course_id", courseIds);
+      const enrollList = enrollData || [];
+
+      // 3. Fetch order items & payments
+      const { data: orderItems } = await (supabase as any)
+        .from("order_items")
+        .select("order_id, course_id")
+        .in("course_id", courseIds);
+      const orderItemList = orderItems || [];
+      const orderIds = orderItemList.map((oi: any) => oi.order_id);
+
+      let paymentsList: any[] = [];
+      if (orderIds.length > 0) {
+        const { data: paymentsData } = await supabase
+          .from("payments")
+          .select("amount, order_id")
+          .eq("status", "PAID")
+          .in("order_id", orderIds);
+        paymentsList = paymentsData || [];
+      }
+
+      // 4. Fetch sections & lessons
+      const { data: sectionsData } = await supabase
+        .from("course_sections")
+        .select("id, course_id")
+        .in("course_id", courseIds);
+      const sectionsList = sectionsData || [];
+
+      const sectionIds = sectionsList.map((s: any) => s.id);
+      let lessonsList: any[] = [];
+      if (sectionIds.length > 0) {
+        const { data: lessonsData } = await supabase
+          .from("lessons")
+          .select("id, section_id")
+          .in("section_id", sectionIds);
+        lessonsList = lessonsData || [];
+      }
+
+      // Calculate stats for each course
+      const ec: Record<string, number> = {};
+      const rev: Record<string, number> = {};
+      const sc: Record<string, number> = {};
+      const lc: Record<string, number> = {};
+
+      coursesList.forEach((c: any) => {
+        ec[c.id] = enrollList.filter((e: any) => e.course_id === c.id).length;
+        
+        const courseOrderIds = orderItemList
+          .filter((oi: any) => oi.course_id === c.id)
+          .map((oi: any) => oi.order_id);
+        rev[c.id] = paymentsList
+          .filter((p: any) => courseOrderIds.includes(p.order_id))
+          .reduce((sum: number, p: any) => sum + p.amount, 0);
+
+        const courseSecs = sectionsList.filter((s: any) => s.course_id === c.id);
+        sc[c.id] = courseSecs.length;
+
+        const courseSecIds = courseSecs.map((s: any) => s.id);
+        lc[c.id] = lessonsList.filter((l: any) => courseSecIds.includes(l.section_id)).length;
+      });
+
+      setEnrollCounts(ec);
+      setRevenueStats(rev);
+      setSectionCounts(sc);
+      setLessonCounts(lc);
+
+    } catch (err) {
+      console.error("Error loading courses:", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const handleDelete = (courseId: string) => {
+  useEffect(() => {
+    const activeSession = getSimulatedSession();
+    setSession(activeSession);
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  const handleDelete = async (courseId: string) => {
     if (confirm("Êtes‑vous sûr de vouloir supprimer ce cours ? Cette action est irréversible et supprimera tout son contenu (sections, leçons, quiz).")) {
-      deleteCourse(courseId);
-      setDb(getDB());
+      const { error } = await supabase
+        .from("courses")
+        .delete()
+        .eq("id", courseId);
+
+      if (error) {
+        console.error("Error deleting course:", error);
+        alert("Erreur lors de la suppression: " + error.message);
+      } else {
+        await loadDashboardData();
+      }
     }
   };
 
-  if (!db || !session) {
+  const handleNewCourseClick = () => {
+    const planLimits = {
+      FREE: 1,
+      BASE: 3,
+      PRO: 10,
+      MAX: Infinity,
+    };
+    const currentPlan = session?.plan || "FREE";
+    const limit = planLimits[currentPlan as keyof typeof planLimits] || 1;
+
+    if (myCourses.length >= limit) {
+      setLimitMessage(
+        `Votre abonnement actuel (${currentPlan}) vous limite à un maximum de ${limit} cours actif(s). Vous possédez déjà ${myCourses.length} cours.`
+      );
+      setShowLimitModal(true);
+    } else {
+      setShowCreateModal(true);
+    }
+  };
+
+  const handleCreate = async () => {
+    if (!newTitle.trim()) return;
+    setCreating(true);
+    const slug = newTitle
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+
+    const instructorId = session?.userId || "u3";
+
+    const { error } = await supabase
+      .from("courses")
+      .insert({
+        title: newTitle.trim(),
+        slug,
+        description: newDescription.trim() || "Nouveau cours en préparation.",
+        price: parseFloat(newPrice) || 0,
+        instructor_id: instructorId,
+        status: "DRAFT"
+      });
+
+    if (error) {
+      console.error("Error creating course:", error);
+      alert("Erreur lors de la création du cours: " + error.message);
+    } else {
+      await loadDashboardData();
+      setNewTitle("");
+      setNewDescription("");
+      setNewPrice("");
+      setShowCreateModal(false);
+    }
+    setCreating(false);
+  };
+
+  if (loading || !session) {
     return (
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="h-8 w-64 bg-zinc-200 dark:bg-zinc-800 rounded-lg animate-pulse" />
@@ -75,63 +246,17 @@ export default function InstructorCoursesPage() {
     );
   }
 
-  const instructorId = session.userId || "u3";
-  const myCourses = db.courses.filter((c) => c.instructorId === instructorId);
-
   const filtered = myCourses.filter((c) => {
     const matchSearch = c.title.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "ALL" || c.status === statusFilter;
     return matchSearch && matchStatus;
   });
 
-  const handleNewCourseClick = () => {
-    const planLimits = {
-      FREE: 1,
-      BASE: 3,
-      PRO: 10,
-      MAX: Infinity,
-    };
-    const currentPlan = session.plan || "FREE";
-    const limit = planLimits[currentPlan as keyof typeof planLimits] || 1;
-
-    if (myCourses.length >= limit) {
-      setLimitMessage(
-        `Votre abonnement actuel (${currentPlan}) vous limite à un maximum de ${limit} cours actif(s). Vous possédez déjà ${myCourses.length} cours.`
-      );
-      setShowLimitModal(true);
-    } else {
-      setShowCreateModal(true);
-    }
-  };
-
-  const handleCreate = () => {
-    if (!newTitle.trim()) return;
-    setCreating(true);
-    const slug = newTitle
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
-    addCourse({
-      title: newTitle.trim(),
-      slug,
-      description: newDescription.trim() || "Nouveau cours en préparation.",
-      price: parseFloat(newPrice) || 0,
-      instructorId: instructorId,
-      instructorName: session.name || "Prof. Kuettu",
-    });
-    setDb(getDB());
-    setNewTitle("");
-    setNewDescription("");
-    setNewPrice("");
-    setShowCreateModal(false);
-    setCreating(false);
-  };
-
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
+        <div className="text-left">
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Mes Cours</h1>
           <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">
             {myCourses.length} cours · {myCourses.filter((c) => c.status === "PUBLISHED").length} publiés
@@ -198,14 +323,10 @@ export default function InstructorCoursesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((course) => {
-            const enrollCount = db.enrollments.filter((e) => e.courseId === course.id).length;
-            const revenue = db.transactions
-              .filter((tx) => tx.courseId === course.id && tx.status === "PAID")
-              .reduce((sum, tx) => sum + tx.amount, 0);
-            const sectionCount = db.sections.filter((s) => s.courseId === course.id).length;
-            const lessonCount = db.sections
-              .filter((s) => s.courseId === course.id)
-              .flatMap((s) => db.lessons.filter((l) => l.sectionId === s.id)).length;
+            const enrollCount = enrollCounts[course.id] || 0;
+            const revenue = revenueStats[course.id] || 0;
+            const sectionCount = sectionCounts[course.id] || 0;
+            const lessonCount = lessonCounts[course.id] || 0;
 
             return (
               <div
@@ -220,14 +341,14 @@ export default function InstructorCoursesPage() {
                       {statusLabels[course.status]}
                     </span>
                     <span className="text-sm font-bold text-zinc-900 dark:text-white">
-                      {course.price > 0 ? `${course.price}$` : "Gratuit"}
+                      {course.price > 0 ? `${course.price.toLocaleString()} FCFA` : "Gratuit"}
                     </span>
                   </div>
 
-                  <h3 className="text-base font-bold text-zinc-900 dark:text-white mb-2 line-clamp-2">
+                  <h3 className="text-base font-bold text-zinc-900 dark:text-white mb-2 line-clamp-2 text-left">
                     {course.title}
                   </h3>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400 line-clamp-2 mb-4">
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 line-clamp-2 mb-4 text-left">
                     {course.description}
                   </p>
 
@@ -240,7 +361,7 @@ export default function InstructorCoursesPage() {
                       <BookOpen className="w-3.5 h-3.5" /> {sectionCount} sect. · {lessonCount} leçons
                     </span>
                     <span className="flex items-center gap-1">
-                      <DollarSign className="w-3.5 h-3.5" /> {revenue.toLocaleString()}$
+                      <DollarSign className="w-3.5 h-3.5" /> {revenue.toLocaleString()} FCFA
                     </span>
                   </div>
 
@@ -254,7 +375,7 @@ export default function InstructorCoursesPage() {
                       Gérer le cours
                     </Link>
                     <Link
-                      href={`/courses/${course.id}/preview`}
+                      href={`/courses/${course.id}`}
                       className="px-3 py-2 bg-zinc-50 dark:bg-zinc-800 text-zinc-500 rounded-lg text-xs font-medium hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
                     >
                       <Eye className="w-3.5 h-3.5" />
