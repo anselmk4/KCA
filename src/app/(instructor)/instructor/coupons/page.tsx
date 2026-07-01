@@ -82,28 +82,23 @@ export default function InstructorCouponsPage() {
 
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const response = await fetch("/api/coupons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: form.code.trim().toUpperCase(),
+          description: form.description.trim() || null,
+          discount_type: form.discountType,
+          discount_value: parseFloat(form.discountValue),
+          applicable_course_id: form.applicableCourseId === "all" ? null : form.applicableCourseId,
+          max_uses: form.maxUses ? parseInt(form.maxUses) : null,
+          expires_at: form.expiryDate ? new Date(form.expiryDate).toISOString() : null
+        })
+      });
 
-      const newCoupon = {
-        code: form.code.trim().toUpperCase(),
-        description: form.description.trim() || null,
-        discount_type: form.discountType,
-        discount_value: parseFloat(form.discountValue),
-        applicable_course_id: form.applicableCourseId === "all" ? null : form.applicableCourseId,
-        max_uses: form.maxUses ? parseInt(form.maxUses) : null,
-        current_uses: 0,
-        expires_at: form.expiryDate ? new Date(form.expiryDate).toISOString() : null,
-        is_active: true,
-        created_by: user.id
-      };
-
-      const { error } = await supabase
-        .from("coupons")
-        .insert(newCoupon);
-
-      if (error) {
-        throw error;
+      if (!response.ok) {
+        const resData = await response.json();
+        throw new Error(resData.error || "Une erreur est survenue lors de la création.");
       }
 
       setShowCreateModal(false);
@@ -129,12 +124,16 @@ export default function InstructorCouponsPage() {
   const handleToggleActive = async (id: string, currentStatus: boolean | null) => {
     const nextStatus = currentStatus === null ? false : !currentStatus;
     try {
-      const { error } = await supabase
-        .from("coupons")
-        .update({ is_active: nextStatus })
-        .eq("id", id);
+      const response = await fetch("/api/coupons", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, is_active: nextStatus })
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const resData = await response.json();
+        throw new Error(resData.error || "Impossible de mettre à jour le statut.");
+      }
       setCoupons(prev => prev.map(c => c.id === id ? { ...c, is_active: nextStatus } : c));
     } catch (err: any) {
       console.error("Error toggling coupon status:", err.message);
@@ -145,12 +144,14 @@ export default function InstructorCouponsPage() {
     if (!confirm("Voulez-vous vraiment supprimer ce coupon de réduction ?")) return;
 
     try {
-      const { error } = await supabase
-        .from("coupons")
-        .delete()
-        .eq("id", id);
+      const response = await fetch(`/api/coupons?id=${id}`, {
+        method: "DELETE"
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const resData = await response.json();
+        throw new Error(resData.error || "Impossible de supprimer le coupon.");
+      }
       setCoupons(prev => prev.filter(c => c.id !== id));
     } catch (err: any) {
       alert("Erreur lors de la suppression : " + err.message);
