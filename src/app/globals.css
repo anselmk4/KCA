@@ -57,6 +57,11 @@
   --color-zinc-750: #333338;
   --color-zinc-850: #202023;
   --color-zinc-905: #111113;
+  --color-red-650: #be123c;
+  --color-red-750: #9f1239;
+  --color-amber-650: #d97706;
+  --color-emerald-650: #059669;
+  --color-blue-650: #2563eb;
 }
 
 :root {

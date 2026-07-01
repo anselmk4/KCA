@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Users, CreditCard, LogOut, ShieldAlert, LifeBuoy, BookOpen, Coins, Settings, Ticket, Activity } from "lucide-react";
+import { LayoutDashboard, Users, CreditCard, LogOut, ShieldAlert, LifeBuoy, BookOpen, Coins, Settings, Ticket, Activity, Menu, X } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { getSimulatedSession, canAccessRoute } from "@/lib/rbac";
 
@@ -12,6 +12,7 @@ const ADMIN_ROLES = ["SUPER_ADMIN", "ADMIN", "FINANCE_ADMIN", "ACADEMIC_ADMIN", 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const session = getSimulatedSession();
@@ -39,13 +40,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black flex font-sans">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Admin Sidebar */}
-      <aside className="w-64 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 h-screen flex flex-col fixed left-0 top-0">
-        <div className="h-16 flex items-center px-6 border-b border-zinc-100 dark:border-zinc-800">
-          <Link href="/" className="flex items-center space-x-2">
-            <ShieldAlert className="h-6 w-6 text-red-600" />
+      <aside className={`w-64 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 h-screen flex flex-col fixed left-0 top-0 z-40 transition-transform duration-300
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+        <div className="h-16 flex items-center justify-between px-6 border-b border-zinc-100 dark:border-zinc-800">
+          <Link href="/" className="flex items-center space-x-2" onClick={() => setSidebarOpen(false)}>
+            <ShieldAlert className="h-6 w-6 text-red-650" />
             <span className="font-bold text-lg text-zinc-900 dark:text-white">Admin Kuettu</span>
           </Link>
+          <button className="lg:hidden p-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded" onClick={() => setSidebarOpen(false)}>
+            <X className="w-5 h-5" />
+          </button>
         </div>
         
         <div className="flex-1 py-6 px-4 flex flex-col gap-1 overflow-y-auto">
@@ -55,6 +68,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link 
                 key={index} 
                 href={item.href}
+                onClick={() => setSidebarOpen(false)}
                 className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
                   active 
                     ? "bg-red-50 dark:bg-red-900/20 text-red-600 font-semibold" 
@@ -71,6 +85,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 flex flex-col gap-1">
           <Link 
             href="/dashboard"
+            onClick={() => setSidebarOpen(false)}
             className="flex items-center space-x-3 px-4 py-3 rounded-xl text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-all"
           >
             <LayoutDashboard className="w-5 h-5 text-zinc-400" />
@@ -91,10 +106,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
       
       {/* Main Content Wrapper */}
-      <div className="flex-1 ml-64 flex flex-col min-h-screen">
-        <header className="h-16 bg-white dark:bg-zinc-900 flex items-center justify-between px-8 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10">
-          <div className="flex items-center text-sm font-semibold text-red-600">
-            Mode Administrateur
+      <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
+        <header className="h-16 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 md:px-8 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10">
+          <div className="flex items-center gap-3">
+            <button
+              className="lg:hidden p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="flex items-center text-sm font-semibold text-red-650">
+              Mode Administrateur
+            </div>
           </div>
           <div className="flex items-center space-x-4">
             <ThemeToggle />
@@ -105,7 +128,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </header>
         
         {/* Page Content */}
-        <main className="flex-1 p-8 overflow-auto">
+        <main className="flex-1 p-4 md:p-8 overflow-auto">
           {children}
         </main>
       </div>

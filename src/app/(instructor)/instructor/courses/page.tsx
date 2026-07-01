@@ -375,7 +375,7 @@ export default function InstructorCoursesPage() {
                       Gérer le cours
                     </Link>
                     <Link
-                      href={`/courses/${course.id}`}
+                      href={`/dashboard/discover/${course.id}`}
                       className="px-3 py-2 bg-zinc-50 dark:bg-zinc-800 text-zinc-500 rounded-lg text-xs font-medium hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
                     >
                       Aperçu du cours
