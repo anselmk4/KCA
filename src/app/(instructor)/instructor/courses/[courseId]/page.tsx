@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import RichEditor from "@/components/editor/RichEditor";
+import { BlockEditor } from "@/components/editor/BlockEditor";
 
 // ─── Types locaux ─────────────────────────────────────────
 type CourseStatus = "DRAFT" | "REVIEW" | "PUBLISHED" | "ARCHIVED";
@@ -132,6 +133,12 @@ export default function CourseDetailPage() {
   const [newQuizTitleInline, setNewQuizTitleInline] = useState("");
   const [activeMenuSectionId, setActiveMenuSectionId] = useState<string | null>(null);
   const [lessonSavedMessage, setLessonSavedMessage] = useState(false);
+
+  // AI Structure generator states
+  const [showAiStructureModal, setShowAiStructureModal] = useState(false);
+  const [aiStructurePrompt, setAiStructurePrompt] = useState("");
+  const [numChaptersAi, setNumChaptersAi] = useState("3");
+  const [generatingStructure, setGeneratingStructure] = useState(false);
 
   // ─── Lesson form (right panel) ────────────────────────────
   const [lessonForm, setLessonForm] = useState({
@@ -367,6 +374,37 @@ export default function CourseDetailPage() {
       ]);
       await loadData();
     } finally { setSaving(false); }
+  };
+
+  const handleGenerateStructureAi = async () => {
+    if (!aiStructurePrompt.trim()) return;
+    setGeneratingStructure(true);
+    try {
+      const res = await fetch("/api/ai/course-structure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId,
+          prompt: aiStructurePrompt.trim(),
+          numChapters: Number(numChaptersAi) || 3
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Erreur de génération.");
+      }
+
+      setShowAiStructureModal(false);
+      setAiStructurePrompt("");
+      // Reload curriculum data
+      loadData();
+      alert("Structure de formation générée par l'IA avec succès !");
+    } catch (err: any) {
+      alert("Erreur lors de la génération de la structure : " + err.message);
+    } finally {
+      setGeneratingStructure(false);
+    }
   };
 
   // ─── LESSON CRUD ──────────────────────────────────────────
@@ -834,6 +872,14 @@ export default function CourseDetailPage() {
                   <span className="text-xs text-zinc-400">{sections.length} chapitre{sections.length > 1 ? "s" : ""}</span>
                 </div>
 
+                <button
+                  type="button"
+                  onClick={() => setShowAiStructureModal(true)}
+                  className="w-full py-2.5 bg-teal-50 hover:bg-teal-100/80 dark:bg-teal-950/20 dark:hover:bg-teal-900/30 text-teal-650 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-teal-200/50 dark:border-teal-900/50 transition-all cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" /> Générer la structure avec l'IA
+                </button>
+
                 <div className="space-y-3">
                   {sections.map((section, idx) => {
                     const sectionLessons = getLessons(section.id);
@@ -1092,8 +1138,8 @@ export default function CourseDetailPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2">Contenu textuel (WYSIWYG)</label>
-                    <RichEditor value={lessonForm.content} onChange={(html) => setLessonForm((p) => ({ ...p, content: html }))} placeholder="Détaillez le cours, insérez du code, des explications..." />
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2">Contenu de la Leçon (Éditeur de Blocs)</label>
+                    <BlockEditor value={lessonForm.content} onChange={(html) => setLessonForm((p) => ({ ...p, content: html }))} />
                   </div>
                 </div>
               ) : (
@@ -1105,6 +1151,73 @@ export default function CourseDetailPage() {
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* AI Structure Generator Modal */}
+        {showAiStructureModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl w-full max-w-lg p-6 space-y-4 animate-in zoom-in-95 duration-200">
+              <div className="flex items-center gap-2.5 text-teal-650 font-bold text-lg">
+                <Sparkles className="w-5 h-5" />
+                <h3>Générer la Structure avec l'IA</h3>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Sujet ou description du cours</label>
+                  <textarea
+                    value={aiStructurePrompt}
+                    onChange={(e) => setAiStructurePrompt(e.target.value)}
+                    rows={4}
+                    placeholder="Ex: Formation complète sur React 19 et Next.js App Router, incluant les Server Actions et l'intégration de Supabase."
+                    className="w-full px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs placeholder-zinc-400 focus:ring-1 focus:ring-teal-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Nombre de chapitres (sections) à générer</label>
+                  <select
+                    value={numChaptersAi}
+                    onChange={(e) => setNumChaptersAi(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs text-zinc-750 dark:text-zinc-300 font-medium"
+                  >
+                    <option value="2">2 chapitres</option>
+                    <option value="3">3 chapitres</option>
+                    <option value="4">4 chapitres</option>
+                    <option value="5">5 chapitres</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowAiStructureModal(false); setAiStructurePrompt(""); }}
+                  className="px-4 py-2 text-zinc-500 hover:text-zinc-700 text-xs font-semibold"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGenerateStructureAi}
+                  disabled={generatingStructure || !aiStructurePrompt.trim()}
+                  className="px-5 py-2.5 bg-teal-650 hover:bg-teal-750 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                >
+                  {generatingStructure ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Génération en cours...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Générer le programme
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         )}
