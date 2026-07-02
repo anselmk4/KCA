@@ -12,21 +12,21 @@ export function WhyChooseUs() {
   ];
 
   return (
-    <section className="py-24 bg-zinc-950 text-white">
+    <section className="py-24 bg-transparent text-zinc-900 dark:text-white">
       <div className="container mx-auto px-4 md:px-8">
         <div className="flex flex-col lg:flex-row items-center gap-16">
           <div className="lg:w-1/2">
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 leading-tight">
               Pourquoi choisir ANSELLA ?
             </h2>
-            <p className="text-lg text-zinc-400 mb-10">
+            <p className="text-lg text-zinc-650 dark:text-zinc-400 mb-10">
               Nous combinons une technologie de pointe et une connaissance approfondie des marchés locaux pour vous aider à développer votre activité d'enseignement en ligne en toute sérénité.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {reasons.map((reason, index) => (
                 <div key={index} className="flex items-start gap-3">
                   <CheckCircle2 className="h-6 w-6 text-blue-500 shrink-0 mt-0.5" />
-                  <span className="font-medium text-zinc-300">{reason}</span>
+                  <span className="font-medium text-zinc-750 dark:text-zinc-300">{reason}</span>
                 </div>
               ))}
             </div>

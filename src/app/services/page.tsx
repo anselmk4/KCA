@@ -47,7 +47,7 @@ export default function ServicesPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col font-sans bg-[#030712] text-white selection:bg-teal-500/30">
+    <div className="flex min-h-screen flex-col font-sans bg-gradient-to-br from-slate-100 via-teal-50/50 to-blue-50/70 dark:from-zinc-900 dark:via-zinc-950 dark:to-black text-zinc-900 dark:text-white selection:bg-teal-500/30">
       <Navbar />
       <main className="flex-1 py-28 relative overflow-hidden">
         {/* Decorative background glows */}

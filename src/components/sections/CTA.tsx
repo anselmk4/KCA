@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 
 export function CTA() {
   return (
-    <section className="relative py-32 overflow-hidden bg-[#030712] text-white border-t border-zinc-900">
+    <section className="relative py-32 overflow-hidden bg-transparent text-zinc-900 dark:text-white border-t border-zinc-200 dark:border-zinc-900">
       {/* Immersive background decoration */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-gradient-to-tr from-teal-500/10 to-indigo-500/10 blur-[130px] opacity-80" />
@@ -31,7 +31,7 @@ export function CTA() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-3xl md:text-5xl lg:text-6xl font-black mb-6 tracking-tight max-w-4xl mx-auto leading-tight"
+          className="text-3xl md:text-5xl lg:text-6xl font-black mb-6 tracking-tight max-w-4xl mx-auto leading-tight text-zinc-900 dark:text-white"
         >
           N’attendez plus pour créer votre formation en ligne{" "}
           <span className="bg-gradient-to-r from-teal-400 to-indigo-400 bg-clip-text text-transparent">simplement.</span>
@@ -42,7 +42,7 @@ export function CTA() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.15 }}
-          className="text-lg md:text-xl text-zinc-400 mb-10 max-w-2xl mx-auto leading-relaxed"
+          className="text-lg md:text-xl text-zinc-650 dark:text-zinc-400 mb-10 max-w-2xl mx-auto leading-relaxed"
         >
           Partagez & valorisez votre expertise auprès de ceux qui en ont besoin !
         </motion.p>
