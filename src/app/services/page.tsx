@@ -8,25 +8,25 @@ import { motion, Variants } from "framer-motion";
 export default function ServicesPage() {
   const services = [
     {
-      icon: <BookOpen className="h-6 w-6 text-teal-400" />,
+      icon: <BookOpen className="h-6 w-6 text-teal-600 dark:text-teal-400" />,
       title: "Hébergement & LMS Clé en Main",
       desc: "Déployez votre académie en ligne en 5 minutes. Profitez de nos lecteurs vidéos hautement sécurisés, de nos systèmes de leçons interactives et du suivi de progression de vos élèves.",
       bgGlow: "group-hover:shadow-[0_0_25px_rgba(20,184,166,0.15)] group-hover:border-teal-500/50"
     },
     {
-      icon: <Landmark className="h-6 w-6 text-emerald-400" />,
+      icon: <Landmark className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />,
       title: "Paiements Mobiles Sécurisés",
       desc: "Pas besoin de comptes bancaires compliqués ou de passerelles inaccessibles. Encaissez vos élèves par Airtel Money, M-Pesa, Orange Money ou carte de crédit directement dans toute la RDC.",
       bgGlow: "group-hover:shadow-[0_0_25px_rgba(16,185,129,0.15)] group-hover:border-emerald-500/50"
     },
     {
-      icon: <ShieldCheck className="h-6 w-6 text-indigo-450" />,
+      icon: <ShieldCheck className="h-6 w-6 text-indigo-650 dark:text-indigo-400" />,
       title: "Quiz & Certificats Automatisés",
       desc: "Validez les acquis de vos étudiants grâce à notre créateur de quiz et générez automatiquement des certificats numériques infalsifiables et téléchargeables en PDF.",
       bgGlow: "group-hover:shadow-[0_0_25px_rgba(99,102,241,0.15)] group-hover:border-indigo-500/50"
     },
     {
-      icon: <MessageCircle className="h-6 w-6 text-pink-400" />,
+      icon: <MessageCircle className="h-6 w-6 text-pink-500 dark:text-pink-400" />,
       title: "Accompagnement & Conseil",
       desc: "Notre équipe vous aide à structurer vos modules de formation, à enregistrer vos vidéos et à optimiser vos tunnels de vente pour maximiser vos revenus en Afrique centrale.",
       bgGlow: "group-hover:shadow-[0_0_25px_rgba(236,72,153,0.15)] group-hover:border-pink-500/50"
@@ -63,14 +63,14 @@ export default function ServicesPage() {
             transition={{ duration: 0.6 }}
             className="max-w-4xl mx-auto text-center mb-20 space-y-4"
           >
-            <span className="inline-flex items-center rounded-full border border-teal-500/20 px-3.5 py-1.5 text-xs font-bold text-teal-400 bg-teal-950/30 backdrop-blur-md">
+            <span className="inline-flex items-center rounded-full border border-teal-500/20 px-3.5 py-1.5 text-xs font-bold text-teal-500 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/30 backdrop-blur-md">
               Nos Services
             </span>
-            <h1 className="text-4xl md:text-6xl font-black mb-6 text-white leading-tight">
+            <h1 className="text-4xl md:text-6xl font-black mb-6 text-zinc-900 dark:text-white leading-tight">
               Tout pour créer et monétiser vos{" "}
-              <span className="bg-gradient-to-r from-teal-400 to-indigo-400 bg-clip-text text-transparent">formations en Afrique.</span>
+              <span className="bg-gradient-to-r from-teal-500 via-teal-450 to-indigo-500 dark:from-teal-400 dark:to-indigo-400 bg-clip-text text-transparent">formations en Afrique.</span>
             </h1>
-            <p className="text-base text-zinc-400 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-base text-zinc-650 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed">
               Des technologies de pointe et un accompagnement local pour propulser votre académie en ligne.
             </p>
           </motion.div>
@@ -86,16 +86,16 @@ export default function ServicesPage() {
               <motion.div 
                 key={index} 
                 variants={itemVariants}
-                className={`group relative bg-zinc-950/40 backdrop-blur-md border border-zinc-850 rounded-3xl p-8 transition-all duration-350 flex flex-col items-start gap-5 overflow-hidden ${service.bgGlow}`}
+                className={`group relative bg-white/40 dark:bg-zinc-950/40 backdrop-blur-md border border-zinc-200 dark:border-zinc-850 rounded-3xl p-8 transition-all duration-300 flex flex-col items-start gap-5 overflow-hidden text-left ${service.bgGlow}`}
               >
                 {/* Glow backdrop inside the card on hover */}
                 <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
-                <div className="p-3 bg-zinc-900 rounded-2xl border border-zinc-800 group-hover:border-teal-500/30 transition-colors">
+                <div className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 group-hover:border-teal-500/30 transition-colors">
                   {service.icon}
                 </div>
-                <h2 className="text-xl font-bold text-white group-hover:text-teal-400 transition-colors">{service.title}</h2>
-                <p className="text-zinc-400 leading-relaxed text-xs md:text-sm">
+                <h2 className="text-xl font-bold text-zinc-900 dark:text-white group-hover:text-teal-400 transition-colors">{service.title}</h2>
+                <p className="text-zinc-650 dark:text-zinc-400 leading-relaxed text-xs md:text-sm">
                   {service.desc}
                 </p>
               </motion.div>

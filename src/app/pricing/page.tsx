@@ -105,19 +105,18 @@ export default function PricingPage() {
         <div className="absolute bottom-10 left-10 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-[150px] pointer-events-none" />
 
         <div className="container mx-auto px-4 md:px-8 max-w-6xl space-y-24 relative z-10">
-          
           {/* Title Header */}
           <div className="text-center max-w-3xl mx-auto space-y-6">
             <span className="text-xs font-bold text-teal-400 bg-teal-400/10 border border-teal-500/20 px-3.5 py-1 rounded-full uppercase tracking-widest">
               Tarification
             </span>
-            <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-[1.1] text-white">
+            <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-[1.1] text-zinc-900 dark:text-white">
               Forfaits simples,{" "}
-              <span className="bg-gradient-to-r from-teal-400 via-emerald-400 to-indigo-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-teal-500 via-teal-450 to-indigo-500 dark:from-teal-400 dark:to-indigo-400 bg-clip-text text-transparent">
                 sans mauvaise surprise.
               </span>
             </h1>
-            <p className="text-lg text-zinc-400">
+            <p className="text-lg text-zinc-650 dark:text-zinc-400">
               Choisissez le plan parfait pour le niveau de développement de votre académie.
             </p>
           </div>
@@ -127,10 +126,10 @@ export default function PricingPage() {
             {plans.map((plan, index) => (
               <div 
                 key={index} 
-                className={`group relative rounded-3xl p-8 border flex flex-col h-full bg-zinc-950/40 backdrop-blur-md transition-all duration-300 ${
+                className={`group relative rounded-3xl p-8 border flex flex-col h-full bg-white/40 dark:bg-zinc-950/40 backdrop-blur-md transition-all duration-300 ${
                   plan.popular 
-                    ? "shadow-[0_0_30px_rgba(20,184,166,0.1)] border-teal-500/80 bg-[#09101f]/60" 
-                    : "border-zinc-800/85 hover:border-zinc-700/80 hover:bg-zinc-900/10"
+                    ? "shadow-[0_0_30px_rgba(20,184,166,0.1)] border-teal-500/80 bg-teal-50/10 dark:bg-[#09101f]/60" 
+                    : "border-zinc-200 dark:border-zinc-800/85 hover:border-zinc-300 dark:hover:border-zinc-700/80 hover:bg-zinc-50/20 dark:hover:bg-zinc-900/10"
                 }`}
               >
                 {plan.popular && (
@@ -140,12 +139,12 @@ export default function PricingPage() {
                 )}
 
                 <div className="space-y-4 mb-8 text-left">
-                  <h3 className="text-lg font-bold text-white group-hover:text-teal-450 transition-colors">{plan.name}</h3>
+                  <h3 className="text-lg font-bold text-zinc-900 dark:text-white group-hover:text-teal-500 dark:group-hover:text-teal-450 transition-colors">{plan.name}</h3>
                   <div className="flex items-baseline">
-                    <span className="text-4xl font-black text-white">{plan.price}</span>
+                    <span className="text-4xl font-black text-zinc-900 dark:text-white">{plan.price}</span>
                     <span className="text-xs text-zinc-500 ml-1.5">{plan.unit}</span>
                   </div>
-                  <p className="text-xs text-zinc-400 leading-relaxed min-h-[48px]">{plan.description}</p>
+                  <p className="text-xs text-zinc-650 dark:text-zinc-400 leading-relaxed min-h-[48px]">{plan.description}</p>
                 </div>
 
                 <div className="mb-8">
@@ -153,18 +152,18 @@ export default function PricingPage() {
                     href={plan.href}
                     className={`block w-full py-3.5 px-4 text-center rounded-xl text-xs font-bold transition-all ${
                       plan.popular
-                        ? "bg-teal-50 hover:bg-teal-400 text-zinc-950 shadow-md shadow-teal-500/20"
-                        : "bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 hover:border-zinc-700"
+                        ? "bg-teal-500 hover:bg-teal-450 text-zinc-950 shadow-md shadow-teal-500/20"
+                        : "bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white border border-zinc-250 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
                     }`}
                   >
                     {plan.buttonText}
                   </Link>
                 </div>
 
-                <ul className="space-y-3.5 mt-auto text-xs text-zinc-400 text-left">
+                <ul className="space-y-3.5 mt-auto text-xs text-zinc-600 dark:text-zinc-400 text-left">
                   {plan.features.map((feature, fIdx) => (
                     <li key={fIdx} className="flex items-start gap-2.5">
-                      <Check className={`w-4 h-4 shrink-0 mt-0.5 ${plan.popular ? "text-teal-400" : "text-zinc-500"}`} />
+                      <Check className={`w-4 h-4 shrink-0 mt-0.5 ${plan.popular ? "text-teal-500 dark:text-teal-400" : "text-zinc-500"}`} />
                       <span>{feature}</span>
                     </li>
                   ))}
@@ -174,37 +173,36 @@ export default function PricingPage() {
           </div>
 
           {/* Secure Payment Badges */}
-          <div className="border border-zinc-800 rounded-3xl p-8 bg-zinc-950/20 max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-around gap-6 text-sm text-zinc-400">
+          <div className="border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 bg-white/40 dark:bg-zinc-950/20 max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-around gap-6 text-sm text-zinc-650 dark:text-zinc-400">
             <div className="flex items-center gap-3">
-              <ShieldCheck className="w-6 h-6 text-teal-400" />
+              <ShieldCheck className="w-6 h-6 text-teal-500 dark:text-teal-400" />
               <span>Garantie de sécurité RDC/Afrique</span>
             </div>
             <div className="flex items-center gap-3">
-              <CreditCard className="w-6 h-6 text-teal-400" />
+              <CreditCard className="w-6 h-6 text-teal-500 dark:text-teal-400" />
               <span>Abonnement mensuel flexible</span>
             </div>
             <div className="flex items-center gap-3">
-              <Sparkles className="w-6 h-6 text-teal-400" />
+              <Sparkles className="w-6 h-6 text-teal-500 dark:text-teal-400" />
               <span>Retraits Mobile Money directs</span>
             </div>
           </div>
 
           {/* FAQ Section */}
           <div className="max-w-3xl mx-auto space-y-8 pt-8">
-            <h2 className="text-2xl md:text-3xl font-bold text-center">Foire Aux Questions</h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-center text-zinc-900 dark:text-white">Foire Aux Questions</h2>
             <div className="grid grid-cols-1 gap-6 text-left">
               {faqs.map((faq, idx) => (
-                <div key={idx} className="bg-zinc-950/30 border border-zinc-800/80 rounded-2xl p-6 space-y-2">
-                  <h3 className="font-semibold text-white flex items-center gap-2">
-                    <HelpCircle className="w-4 h-4 text-teal-400 shrink-0" />
+                <div key={idx} className="bg-white/40 dark:bg-zinc-950/30 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-6 space-y-2">
+                  <h3 className="font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
+                    <HelpCircle className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
                     {faq.q}
                   </h3>
-                  <p className="text-sm text-zinc-400 leading-relaxed pl-6">{faq.a}</p>
+                  <p className="text-sm text-zinc-650 dark:text-zinc-400 leading-relaxed pl-6">{faq.a}</p>
                 </div>
               ))}
             </div>
           </div>
-
         </div>
       </main>
 

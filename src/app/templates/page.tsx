@@ -126,27 +126,27 @@ export default function TemplatesPage() {
             <span className="text-xs font-bold text-teal-400 bg-teal-400/10 border border-teal-500/20 px-3.5 py-1 rounded-full uppercase tracking-widest">
               Modèles d&apos;Académies
             </span>
-            <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-[1.1] text-white">
+            <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-[1.1] text-zinc-900 dark:text-white">
               Éducation active &{" "}
-              <span className="bg-gradient-to-r from-teal-400 via-emerald-400 to-indigo-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-teal-500 via-teal-450 to-indigo-500 dark:from-teal-400 dark:to-indigo-400 bg-clip-text text-transparent">
                 modèles d&apos;apprentissage.
               </span>
             </h1>
-            <p className="text-lg text-zinc-400 leading-relaxed">
+            <p className="text-lg text-zinc-650 dark:text-zinc-400 leading-relaxed">
               Explorez nos académies virtuelles propulsées par Supabase. Découvrez des cours certifiants et apprenez des meilleurs experts africains.
             </p>
           </div>
 
           {/* Courses Section (Supabase data) */}
           <div className="space-y-10">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-zinc-800 pb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-4">
               <div className="text-left">
                 <h2 className="text-2xl font-bold flex items-center gap-2">
                   <Flame className="w-5 h-5 text-teal-400" /> Formations à la une
                 </h2>
-                <p className="text-xs text-zinc-500 mt-1">Découvrez les cours récemment publiés par nos formateurs agréés.</p>
+                <p className="text-xs text-zinc-550 dark:text-zinc-500 mt-1">Découvrez les cours récemment publiés par nos formateurs agréés.</p>
               </div>
-              <Link href="/courses" className="inline-flex items-center gap-1.5 text-sm text-teal-400 hover:underline">
+              <Link href="/courses" className="inline-flex items-center gap-1.5 text-sm text-teal-500 dark:text-teal-400 hover:underline">
                 Voir tout le catalogue <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
@@ -157,15 +157,15 @@ export default function TemplatesPage() {
                 <p className="text-xs text-zinc-500">Chargement des cours depuis Supabase...</p>
               </div>
             ) : courses.length === 0 ? (
-              <div className="border border-dashed border-zinc-800 rounded-3xl p-16 text-center space-y-4">
-                <BookOpen className="w-12 h-12 text-zinc-600 mx-auto" />
+              <div className="border border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl p-16 text-center space-y-4">
+                <BookOpen className="w-12 h-12 text-zinc-400 dark:text-zinc-600 mx-auto" />
                 <p className="text-sm text-zinc-500">Aucun cours publié pour le moment.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {courses.map((course) => (
-                  <div key={course.id} className="bg-zinc-950/40 border border-zinc-800/80 rounded-2xl overflow-hidden hover:border-zinc-700/80 transition-all flex flex-col h-full group">
-                    <div className="relative aspect-video bg-zinc-900 overflow-hidden shrink-0">
+                  <div key={course.id} className="bg-white/40 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl overflow-hidden hover:border-zinc-350 dark:hover:border-zinc-700/80 transition-all flex flex-col h-full group">
+                    <div className="relative aspect-video bg-zinc-100 dark:bg-zinc-900 overflow-hidden shrink-0">
                       {course.thumbnail_url ? (
                         <img 
                           src={course.thumbnail_url} 
@@ -173,33 +173,33 @@ export default function TemplatesPage() {
                           className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-teal-950/10 text-teal-500 font-bold text-xl">
+                        <div className="w-full h-full flex items-center justify-center bg-teal-950/5 dark:bg-teal-950/10 text-teal-600 dark:text-teal-500 font-bold text-xl">
                           Ansella Education
                         </div>
                       )}
-                      <span className="absolute top-3 left-3 bg-zinc-950/80 backdrop-blur px-2.5 py-1 rounded-xl text-[10px] font-bold text-teal-400 border border-zinc-800">
+                      <span className="absolute top-3 left-3 bg-white/80 dark:bg-zinc-950/80 backdrop-blur px-2.5 py-1 rounded-xl text-[10px] font-bold text-teal-650 dark:text-teal-400 border border-zinc-250 dark:border-zinc-800">
                         {course.categories?.name || "Général"}
                       </span>
                     </div>
                     
                     <div className="p-5 flex flex-col flex-1 text-left space-y-4">
                       <div className="space-y-2">
-                        <h3 className="font-bold text-sm text-white group-hover:text-teal-400 transition-colors line-clamp-1">{course.title}</h3>
-                        <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed min-h-[36px]">
+                        <h3 className="font-bold text-sm text-zinc-900 dark:text-white group-hover:text-teal-500 dark:group-hover:text-teal-400 transition-colors line-clamp-1">{course.title}</h3>
+                        <p className="text-xs text-zinc-600 dark:text-zinc-500 line-clamp-2 leading-relaxed min-h-[36px]">
                           {course.short_description || "Aucune description courte disponible pour ce cours."}
                         </p>
                       </div>
 
-                      <div className="pt-4 border-t border-zinc-900 mt-auto flex items-center justify-between text-xs">
-                        <span className="text-zinc-500">{getLevelLabel(course.level)}</span>
-                        <span className="font-black text-teal-400 text-sm">
+                      <div className="pt-4 border-t border-zinc-200 dark:border-zinc-900 mt-auto flex items-center justify-between text-xs">
+                        <span className="text-zinc-550 dark:text-zinc-500">{getLevelLabel(course.level)}</span>
+                        <span className="font-black text-teal-500 dark:text-teal-400 text-sm">
                           {course.price > 0 ? `${course.price.toLocaleString()}$` : "Gratuit"}
                         </span>
                       </div>
 
                       <Link 
                         href={`/courses/${course.id}`}
-                        className="w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white font-bold rounded-xl text-center text-xs transition-colors block border border-zinc-800 hover:border-zinc-700 mt-2"
+                        className="w-full py-2.5 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-white font-bold rounded-xl text-center text-xs transition-colors block border border-zinc-200 dark:border-zinc-805 hover:border-zinc-300 dark:hover:border-zinc-700 mt-2"
                       >
                         En savoir plus
                       </Link>
@@ -212,14 +212,14 @@ export default function TemplatesPage() {
 
           {/* Instructors Section */}
           <div className="space-y-10">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-zinc-800 pb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-4">
               <div className="text-left">
                 <h2 className="text-2xl font-bold flex items-center gap-2">
                   <Users className="w-5 h-5 text-teal-400" /> Formateurs Ansella
                 </h2>
-                <p className="text-xs text-zinc-500 mt-1">Apprenez auprès des professionnels et experts reconnus en RDC.</p>
+                <p className="text-xs text-zinc-550 dark:text-zinc-500 mt-1">Apprenez auprès des professionnels et experts reconnus en RDC.</p>
               </div>
-              <Link href="/instructors" className="inline-flex items-center gap-1.5 text-sm text-teal-400 hover:underline">
+              <Link href="/instructors" className="inline-flex items-center gap-1.5 text-sm text-teal-500 dark:text-teal-400 hover:underline">
                 Voir tous les formateurs <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
@@ -229,13 +229,13 @@ export default function TemplatesPage() {
                 <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
               </div>
             ) : instructors.length === 0 ? (
-              <div className="border border-dashed border-zinc-800 rounded-3xl p-16 text-center text-sm text-zinc-500">
+              <div className="border border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl p-16 text-center text-sm text-zinc-500">
                 Aucun formateur disponible pour le moment.
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {instructors.map((inst) => (
-                  <div key={inst.id} className="bg-zinc-950/40 border border-zinc-800/80 rounded-2xl p-6 flex flex-col items-center hover:border-zinc-700/80 transition-all text-center">
+                  <div key={inst.id} className="bg-white/40 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-6 flex flex-col items-center hover:border-zinc-350 dark:hover:border-zinc-700/80 transition-all text-center">
                     {inst.avatar_url ? (
                       <img 
                         src={inst.avatar_url} 
@@ -243,23 +243,23 @@ export default function TemplatesPage() {
                         className="w-20 h-20 rounded-full object-cover border-2 border-teal-500/20 shadow-md mb-4 shrink-0"
                       />
                     ) : (
-                      <div className="w-20 h-20 rounded-full bg-teal-950/20 flex items-center justify-center text-teal-500 font-bold text-2xl mb-4 shrink-0">
+                      <div className="w-20 h-20 rounded-full bg-teal-500/10 dark:bg-teal-950/20 flex items-center justify-center text-teal-500 font-bold text-2xl mb-4 shrink-0">
                         {initials(inst.full_name)}
                       </div>
                     )}
                     
-                    <h3 className="font-bold text-sm text-white mb-1 truncate max-w-full">{inst.full_name}</h3>
-                    <p className="text-xxs text-teal-400 font-medium mb-3">{inst.specialty || "Formateur"}</p>
+                    <h3 className="font-bold text-sm text-zinc-900 dark:text-white mb-1 truncate max-w-full">{inst.full_name}</h3>
+                    <p className="text-xxs text-teal-500 dark:text-teal-400 font-medium mb-3">{inst.specialty || "Formateur"}</p>
                     {inst.academy_name && (
-                      <p className="text-xxs text-zinc-500 mb-4">{inst.academy_name}</p>
+                      <p className="text-xxs text-zinc-650 dark:text-zinc-500 mb-4">{inst.academy_name}</p>
                     )}
-                    <p className="text-xs text-zinc-400 line-clamp-3 mb-6 min-h-[54px] leading-relaxed">
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400 line-clamp-3 mb-6 min-h-[54px] leading-relaxed">
                       {inst.bio || "Aucune biographie disponible pour ce formateur."}
                     </p>
                     
                     <Link 
                       href={`/profile/${inst.id}`}
-                      className="w-full py-2 bg-teal-600 hover:bg-teal-500 text-zinc-950 font-bold rounded-xl text-xs transition-colors mt-auto block text-center"
+                      className="w-full py-2.5 bg-teal-500 hover:bg-teal-400 text-zinc-950 font-bold rounded-xl text-xs transition-colors mt-auto block text-center shadow-sm"
                     >
                       Voir le profil public
                     </Link>
