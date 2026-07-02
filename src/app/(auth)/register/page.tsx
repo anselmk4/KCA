@@ -536,10 +536,10 @@ export default function RegisterPage() {
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-white dark:bg-black font-sans">
       
       {/* LEFT PANEL: Marketing & Slogan (hidden on mobile) */}
-      <div className="hidden lg:flex lg:col-span-6 relative overflow-hidden bg-gradient-to-br from-zinc-900 via-zinc-950 to-black p-12 flex-col justify-between select-none">
+      <div className="hidden lg:flex lg:col-span-6 relative overflow-hidden bg-gradient-to-br from-slate-100 via-teal-50/50 to-blue-50/70 dark:from-zinc-900 dark:via-zinc-950 dark:to-black p-12 flex-col justify-between select-none border-r border-zinc-200 dark:border-zinc-850">
         {/* Abstract Glowing shapes */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px] -mr-40 -mt-40 animate-pulse duration-[6000ms]" />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-teal-500/10 rounded-full blur-[120px] -ml-40 -mb-40 animate-pulse duration-[8000ms]" />
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/10 dark:bg-blue-600/5 rounded-full blur-[120px] -mr-40 -mt-40 animate-pulse duration-[6000ms]" />
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-teal-500/10 dark:bg-teal-500/5 rounded-full blur-[120px] -ml-40 -mb-40 animate-pulse duration-[8000ms]" />
         
         {/* Header Branding */}
         <div className="z-10 flex items-center">
@@ -548,40 +548,40 @@ export default function RegisterPage() {
 
         {/* Catchy advertisement and logo representation */}
         <div className="z-10 max-w-md my-auto space-y-8">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/5 backdrop-blur-md border border-white/10 rounded-full text-zinc-350 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-zinc-200/50 dark:bg-white/5 backdrop-blur-md border border-zinc-300/40 dark:border-white/10 rounded-full text-zinc-700 dark:text-zinc-300 text-xs font-bold">
+            <Sparkles className="w-3.5 h-3.5 text-blue-500" />
             <span>LMS Premium de Nouvelle Génération</span>
           </div>
 
           <div className="space-y-4">
-            <h1 className="text-4xl font-extrabold tracking-tight text-white leading-tight">
+            <h1 className="text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white leading-tight">
               Rejoignez l'académie leader en{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-teal-400 to-emerald-400">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-teal-500 to-emerald-500 dark:from-blue-400 dark:via-teal-400 dark:to-emerald-400">
                 Web3 & IA
               </span>
             </h1>
-            <p className="text-zinc-400 text-base leading-relaxed">
+            <p className="text-zinc-650 dark:text-zinc-400 text-base leading-relaxed font-medium">
               Créez votre profil en quelques secondes pour acquérir des compétences concrètes et valorisables sur le marché.
             </p>
           </div>
 
           {/* Features check list */}
           <div className="space-y-4">
-            <div className="flex items-center space-x-3 text-sm text-zinc-300">
+            <div className="flex items-center space-x-3 text-sm text-zinc-700 dark:text-zinc-350 font-semibold">
               <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-                <Coins className="w-4 h-4 text-blue-400" />
+                <Coins className="w-4 h-4 text-blue-600 dark:text-blue-450" />
               </div>
               <span>Accès gratuit aux cours d'évaluation</span>
             </div>
-            <div className="flex items-center space-x-3 text-sm text-zinc-300">
+            <div className="flex items-center space-x-3 text-sm text-zinc-700 dark:text-zinc-350 font-semibold">
               <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
-                <Cpu className="w-4 h-4 text-purple-400" />
+                <Cpu className="w-4 h-4 text-purple-600 dark:text-purple-450" />
               </div>
               <span>Quiz d'évaluation et de progression</span>
             </div>
-            <div className="flex items-center space-x-3 text-sm text-zinc-300">
+            <div className="flex items-center space-x-3 text-sm text-zinc-700 dark:text-zinc-350 font-semibold">
               <div className="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-4 h-4 text-teal-400" />
+                <ShieldCheck className="w-4 h-4 text-teal-600 dark:text-teal-450" />
               </div>
               <span>Diplômes et certifications infalsifiables</span>
             </div>
@@ -589,7 +589,7 @@ export default function RegisterPage() {
         </div>
 
         {/* Footer Brand Info */}
-        <div className="z-10 text-xs text-zinc-500">
+        <div className="z-10 text-xs text-zinc-450 dark:text-zinc-500">
           © {new Date().getFullYear()} Ansella Inc. Tous droits réservés.
         </div>
       </div>
