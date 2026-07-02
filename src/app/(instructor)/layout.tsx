@@ -29,6 +29,7 @@ import {
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { getSimulatedSession, setSimulatedSession, clearSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
+import { OnboardingTour } from "@/components/layout/OnboardingTour";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Tableau de bord", href: "/instructor" },
@@ -375,6 +376,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
           </div>
         </div>
       )}
+      <OnboardingTour />
     </div>
   );
 }

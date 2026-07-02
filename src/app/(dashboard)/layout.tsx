@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { DashboardHeader } from "@/components/layout/DashboardHeader";
 import { getSimulatedSession } from "@/lib/rbac";
+import { OnboardingTour } from "@/components/layout/OnboardingTour";
 
 export default function DashboardLayout({
   children,
@@ -58,6 +59,7 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
+      <OnboardingTour />
     </div>
   );
 }

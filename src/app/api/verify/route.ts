@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+
+// Initialize admin client to bypass RLS restrictions for public certificate verification
+const supabaseAdmin = createSupabaseClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 /**
  * GET /api/verify?code=CERT-XXXXXX-YYYY
@@ -8,7 +14,6 @@ import { createClient } from '@/lib/supabase/server';
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
     const { searchParams } = new URL(req.url);
     const code = searchParams.get('code');
 
@@ -16,7 +21,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'code est requis', valid: false }, { status: 400 });
     }
 
-    const { data: cert, error } = await supabase
+    // Query certificates table using admin client to bypass RLS
+    const { data: cert, error } = await supabaseAdmin
       .from('certificates')
       .select(`
         id,
@@ -25,7 +31,6 @@ export async function GET(req: NextRequest) {
         status,
         student_id,
         course_id,
-        profiles!student_id(full_name, email),
         courses!course_id(title, level, instructor_id)
       `)
       .eq('code', code)
@@ -43,15 +48,33 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ valid: false, message: 'Ce certificat a été révoqué.' }, { status: 200 });
     }
 
-    // Récupérer le nom de l'instructeur
-    let instructorName = 'Instructeur ANSELLA';
-    if ((cert.courses as any)?.instructor_id) {
-      const { data: instructor } = await supabase
+    // Récupérer le nom de l'étudiant
+    let studentName = 'Apprenant';
+    if (cert.student_id) {
+      const { data: student } = await supabaseAdmin
         .from('profiles')
         .select('full_name')
-        .eq('id', (cert.courses as any).instructor_id)
+        .eq('id', cert.student_id)
         .maybeSingle();
-      if (instructor) instructorName = instructor.full_name;
+      if (student) studentName = student.full_name;
+    }
+
+    // Récupérer le nom de l'instructeur et de l'académie
+    let instructorName = 'Instructeur ANSELLA';
+    let academyName = 'ANSELLA ACADEMY';
+    const instructorId = (cert.courses as any)?.instructor_id;
+    if (instructorId) {
+      const { data: instructor } = await supabaseAdmin
+        .from('profiles')
+        .select('full_name, academy_name')
+        .eq('id', instructorId)
+        .maybeSingle();
+      if (instructor) {
+        instructorName = instructor.full_name;
+        if (instructor.academy_name) {
+          academyName = instructor.academy_name;
+        }
+      }
     }
 
     return NextResponse.json({
@@ -60,13 +83,15 @@ export async function GET(req: NextRequest) {
         code: cert.code,
         issuedAt: cert.issued_at,
         status: cert.status,
-        studentName: (cert.profiles as any)?.full_name || 'Apprenant',
+        studentName,
         courseTitle: (cert.courses as any)?.title || 'Formation',
         courseLevel: (cert.courses as any)?.level || '',
         instructorName,
+        academyName,
       },
     }, { status: 200 });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Erreur interne', valid: false }, { status: 500 });
   }
 }
+

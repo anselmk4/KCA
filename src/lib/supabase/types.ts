@@ -1147,6 +1147,17 @@ export type Database = {
           timezone: string | null
           two_factor_enabled: boolean | null
           updated_at: string
+          nationality: string | null
+          website: string | null
+          twitter: string | null
+          linkedin: string | null
+          youtube: string | null
+          instagram: string | null
+          specialty: string | null
+          academy_name: string | null
+          academy_tagline: string | null
+          academic_background: string | null
+          certifications: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -1165,6 +1176,17 @@ export type Database = {
           timezone?: string | null
           two_factor_enabled?: boolean | null
           updated_at?: string
+          nationality?: string | null
+          website?: string | null
+          twitter?: string | null
+          linkedin?: string | null
+          youtube?: string | null
+          instagram?: string | null
+          specialty?: string | null
+          academy_name?: string | null
+          academy_tagline?: string | null
+          academic_background?: string | null
+          certifications?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -1183,6 +1205,17 @@ export type Database = {
           timezone?: string | null
           two_factor_enabled?: boolean | null
           updated_at?: string
+          nationality?: string | null
+          website?: string | null
+          twitter?: string | null
+          linkedin?: string | null
+          youtube?: string | null
+          instagram?: string | null
+          specialty?: string | null
+          academy_name?: string | null
+          academy_tagline?: string | null
+          academic_background?: string | null
+          certifications?: string | null
         }
         Relationships: []
       }

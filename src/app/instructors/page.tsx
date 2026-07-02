@@ -25,14 +25,44 @@ export default function InstructorsPage() {
   useEffect(() => {
     async function loadInstructors() {
       try {
-        const { data: profilesData } = await (supabase as any)
-          .from("profiles")
-          .select("id, full_name, bio, specialty, avatar_url, academy_name, nationality, website")
-          .not("specialty", "is", null)
-          .order("full_name", { ascending: true });
+        const { data: roleData } = await supabase
+          .from("roles")
+          .select("id")
+          .eq("name", "INSTRUCTOR")
+          .maybeSingle();
+
+        let instructorIds: string[] = [];
+        if (roleData) {
+          const { data: userRoles } = await supabase
+            .from("user_roles")
+            .select("user_id")
+            .eq("role_id", roleData.id);
+          if (userRoles) {
+            instructorIds = userRoles.map(ur => ur.user_id);
+          }
+        }
+
+        let profilesData = null;
+        if (instructorIds.length > 0) {
+          const { data } = await supabase
+            .from("profiles")
+            .select("id, full_name, bio, specialty, avatar_url, academy_name, nationality, website")
+            .in("id", instructorIds)
+            .order("full_name", { ascending: true });
+          profilesData = data;
+        }
+
+        if (!profilesData || profilesData.length === 0) {
+          const { data } = await supabase
+            .from("profiles")
+            .select("id, full_name, bio, specialty, avatar_url, academy_name, nationality, website")
+            .not("full_name", "is", null)
+            .order("full_name", { ascending: true });
+          profilesData = data?.filter(p => p.specialty || p.academy_name) || null;
+        }
 
         if (profilesData) {
-          setInstructors(profilesData as any);
+          setInstructors(profilesData as Instructor[]);
         }
       } catch (err) {
         console.error("Error loading instructors list:", err);

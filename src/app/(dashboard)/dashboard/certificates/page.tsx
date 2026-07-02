@@ -16,6 +16,7 @@ type CertRow = {
   issued_at: string;
   courseTitle?: string;
   instructorName?: string;
+  academyName?: string;
 };
 
 type EnrollmentRow = {
@@ -33,63 +34,79 @@ async function downloadCertificatePDF(cert: CertRow, studentName: string) {
   canvas.height = 1123;
   const ctx = canvas.getContext("2d")!;
 
-  // Background gradient
+  // Light premium ivory/cream background
   const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  grad.addColorStop(0, "#0f172a");
-  grad.addColorStop(1, "#1e3a5f");
+  grad.addColorStop(0, "#FCFBF9");
+  grad.addColorStop(1, "#F3EFEA");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Gold border
-  ctx.strokeStyle = "#d4af37";
+  // Muted gold borders
+  ctx.strokeStyle = "#C5A85C";
   ctx.lineWidth = 12;
   ctx.strokeRect(36, 36, canvas.width - 72, canvas.height - 72);
-  ctx.strokeStyle = "#d4af3766";
+  ctx.strokeStyle = "#C5A85C4D";
   ctx.lineWidth = 3;
   ctx.strokeRect(56, 56, canvas.width - 112, canvas.height - 112);
 
   // Corner ornaments
-  const ornamentSize = 60;
-  const corners = [[76, 76], [canvas.width - 76, 76], [76, canvas.height - 76], [canvas.width - 76, canvas.height - 76]];
-  ctx.fillStyle = "#d4af37";
+  const corners = [
+    [76, 76],
+    [canvas.width - 76, 76],
+    [76, canvas.height - 76],
+    [canvas.width - 76, canvas.height - 76]
+  ];
+  ctx.fillStyle = "#C5A85C";
   corners.forEach(([x, y]) => {
     ctx.beginPath();
     ctx.arc(x, y, 10, 0, Math.PI * 2);
     ctx.fill();
   });
 
-  // Academy header
-  ctx.fillStyle = "#d4af37";
-  ctx.font = "bold 42px Georgia, serif";
+  // Load and render Ansella Logo in top left
+  const logo = new window.Image();
+  logo.src = "/logo.png";
+  await new Promise((resolve) => {
+    logo.onload = resolve;
+    logo.onerror = resolve;
+  });
+  if (logo.complete && logo.naturalWidth > 0) {
+    ctx.drawImage(logo, 100, 90, 160, 48);
+  }
+
+  // Dynamic Academy header based on enrollment/instructor
+  ctx.fillStyle = "#1e293b"; // Slate-800
+  ctx.font = "bold 40px Georgia, serif";
   ctx.textAlign = "center";
-  ctx.fillText("ANSELLA CRYPTO ACADEMY", canvas.width / 2, 160);
+  const academyHeader = (cert.academyName || "ANSELLA ACADEMY").toUpperCase();
+  ctx.fillText(academyHeader, canvas.width / 2, 170);
 
   // Divider
-  ctx.strokeStyle = "#d4af37";
+  ctx.strokeStyle = "#C5A85C";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(canvas.width / 2 - 300, 185);
-  ctx.lineTo(canvas.width / 2 + 300, 185);
+  ctx.moveTo(canvas.width / 2 - 300, 195);
+  ctx.lineTo(canvas.width / 2 + 300, 195);
   ctx.stroke();
 
   // Certificate of Completion
-  ctx.fillStyle = "#94a3b8";
+  ctx.fillStyle = "#475569"; // Slate-600
   ctx.font = "italic 28px Georgia, serif";
-  ctx.fillText("Certificat d'Accomplissement", canvas.width / 2, 240);
+  ctx.fillText("Certificat d'Accomplissement", canvas.width / 2, 250);
 
   // "Décerné à"
-  ctx.fillStyle = "#64748b";
+  ctx.fillStyle = "#64748b"; // Slate-500
   ctx.font = "22px Arial, sans-serif";
-  ctx.fillText("Décerné à", canvas.width / 2, 310);
+  ctx.fillText("Décerné à", canvas.width / 2, 320);
 
-  // Student name
-  ctx.fillStyle = "#ffffff";
+  // Student name in Charcoal
+  ctx.fillStyle = "#0f172a"; // Deep Charcoal
   ctx.font = "bold 72px Georgia, serif";
   ctx.fillText(studentName, canvas.width / 2, 420);
 
   // Underline
   const nameWidth = ctx.measureText(studentName).width;
-  ctx.strokeStyle = "#d4af37";
+  ctx.strokeStyle = "#C5A85C";
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(canvas.width / 2 - nameWidth / 2, 440);
@@ -97,12 +114,12 @@ async function downloadCertificatePDF(cert: CertRow, studentName: string) {
   ctx.stroke();
 
   // "pour avoir complété avec succès"
-  ctx.fillStyle = "#94a3b8";
+  ctx.fillStyle = "#475569";
   ctx.font = "24px Arial, sans-serif";
   ctx.fillText("pour avoir complété avec succès la formation", canvas.width / 2, 510);
 
-  // Course title
-  ctx.fillStyle = "#60a5fa";
+  // Course title in elegant Deep Teal/Charcoal
+  ctx.fillStyle = "#0f766e"; // Deep Teal
   ctx.font = "bold 48px Georgia, serif";
   const title = cert.courseTitle || "Formation ANSELLA";
   // Word-wrap long titles
@@ -124,7 +141,7 @@ async function downloadCertificatePDF(cert: CertRow, studentName: string) {
 
   // Instructor
   if (cert.instructorName) {
-    ctx.fillStyle = "#64748b";
+    ctx.fillStyle = "#475569";
     ctx.font = "20px Arial, sans-serif";
     ctx.fillText(`Instructeur : ${cert.instructorName}`, canvas.width / 2, y + 70);
   }
@@ -141,23 +158,22 @@ async function downloadCertificatePDF(cert: CertRow, studentName: string) {
   ctx.font = "bold 18px monospace";
   ctx.fillText(`Code de vérification : ${cert.code}`, canvas.width / 2, canvas.height - 160);
 
-  ctx.fillStyle = "#1e3a5f";
+  ctx.fillStyle = "#2563eb"; // Royal Blue link
   ctx.font = "16px Arial, sans-serif";
   ctx.fillText(`Vérifiez ce certificat sur : ${window.location.origin}/verify/${cert.code}`, canvas.width / 2, canvas.height - 120);
 
   // Footer seal
-  ctx.fillStyle = "#d4af37";
+  ctx.fillStyle = "#C5A85C";
   ctx.beginPath();
   ctx.arc(canvas.width / 2, canvas.height - 60, 20, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = "#0f172a";
+  ctx.fillStyle = "#ffffff";
   ctx.font = "bold 14px Arial";
   ctx.fillText("✓", canvas.width / 2, canvas.height - 54);
 
   // Export
   canvas.toBlob((blob) => {
     if (!blob) return;
-    // Convert PNG to PDF-like download (image saved as PDF name)
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -169,10 +185,10 @@ async function downloadCertificatePDF(cert: CertRow, studentName: string) {
 
 // ─── Component ────────────────────────────────────────────
 const CERT_COLORS = [
-  { border: "border-blue-500/20", bg: "bg-gradient-to-br from-blue-600 to-indigo-700" },
-  { border: "border-emerald-500/20", bg: "bg-gradient-to-br from-emerald-600 to-teal-700" },
-  { border: "border-purple-500/20", bg: "bg-gradient-to-br from-purple-600 to-violet-700" },
-  { border: "border-orange-500/20", bg: "bg-gradient-to-br from-orange-600 to-red-700" },
+  { border: "border-blue-200/60", bg: "bg-gradient-to-br from-blue-50 to-indigo-100/50" },
+  { border: "border-emerald-200/60", bg: "bg-gradient-to-br from-emerald-50 to-teal-100/50" },
+  { border: "border-purple-200/60", bg: "bg-gradient-to-br from-purple-50 to-violet-100/50" },
+  { border: "border-orange-200/60", bg: "bg-gradient-to-br from-orange-50 to-red-100/50" },
 ];
 
 export default function CertificatesPage() {
@@ -234,16 +250,20 @@ export default function CertificatesPage() {
       const courseIds = certsRaw.map(c => c.course_id);
       const { data: courses } = await supabase
         .from("courses")
-        .select("id, title, instructor_id, profiles!instructor_id(full_name)")
+        .select("id, title, instructor_id, profiles!instructor_id(full_name, academy_name)")
         .in("id", courseIds);
 
       const courseMap = new Map((courses || []).map(c => [c.id, c]));
       setEarnedCerts(
-        certsRaw.map(c => ({
-          ...c,
-          courseTitle: courseMap.get(c.course_id)?.title || "Formation",
-          instructorName: (courseMap.get(c.course_id) as any)?.profiles?.full_name || "Instructeur",
-        }))
+        certsRaw.map(c => {
+          const course = courseMap.get(c.course_id);
+          return {
+            ...c,
+            courseTitle: course?.title || "Formation",
+            instructorName: (course as any)?.profiles?.full_name || "Instructeur",
+            academyName: (course as any)?.profiles?.academy_name || "ANSELLA ACADEMY",
+          };
+        })
       );
     } else {
       setEarnedCerts([]);
@@ -405,8 +425,9 @@ export default function CertificatesPage() {
                       <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mb-3">
                         <Award className="w-7 h-7 text-amber-600" />
                       </div>
-                      <p className="font-serif text-xs text-zinc-400 uppercase tracking-[0.2em]">Certificat d&apos;Accomplissement</p>
-                      <p className="font-bold text-zinc-900 dark:text-white mt-2 text-sm leading-tight line-clamp-2">{cert.courseTitle}</p>
+                      <p className="font-serif text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-[0.25em] mb-1">{cert.academyName || "ANSELLA ACADEMY"}</p>
+                      <p className="font-serif text-[9px] text-zinc-400 uppercase tracking-widest leading-none mb-2">Certificat d&apos;Accomplissement</p>
+                      <p className="font-bold text-zinc-900 dark:text-white mt-1 text-sm leading-tight line-clamp-2">{cert.courseTitle}</p>
                       <div className="mt-3 flex items-center gap-2">
                         <div className="w-12 h-[1px] bg-amber-400" />
                         <p className="text-xs text-zinc-500 font-semibold truncate max-w-[120px]">{userName}</p>

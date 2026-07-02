@@ -16,6 +16,7 @@ type CertInfo = {
   courseTitle: string;
   courseLevel: string;
   instructorName: string;
+  academyName?: string;
 };
 
 type VerifyResult =
@@ -76,12 +77,15 @@ export default function VerifyClient({ code }: { code: string }) {
             {/* Détails du certificat */}
             <div className="bg-zinc-800/60 backdrop-blur-sm border border-zinc-700/50 rounded-3xl overflow-hidden">
               {/* Visuel miniature */}
-              <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 flex items-center justify-center">
-                <div className="w-full max-w-sm bg-white/95 rounded-xl p-6 text-center shadow-2xl">
+              <div className="bg-gradient-to-br from-slate-100 to-zinc-200 border-b border-zinc-200/50 p-8 flex items-center justify-center">
+                <div className="w-full max-w-sm bg-white/95 rounded-xl p-6 text-center shadow-2xl border border-zinc-200/50">
                   <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
                     <Award className="w-6 h-6 text-amber-600" />
                   </div>
-                  <p className="text-xs text-zinc-400 uppercase tracking-[0.2em] font-serif mb-1">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] font-serif mb-1">
+                    {result.certificate.academyName || "ANSELLA ACADEMY"}
+                  </p>
+                  <p className="text-[9px] text-zinc-405 uppercase tracking-wider mb-2 font-mono">
                     Certificat d&apos;Accomplissement
                   </p>
                   <p className="text-sm font-bold text-zinc-900 line-clamp-2 mb-2">
@@ -92,7 +96,7 @@ export default function VerifyClient({ code }: { code: string }) {
                     <span className="text-xs text-zinc-500 font-semibold">{result.certificate.studentName}</span>
                     <div className="w-12 h-[1px] bg-amber-400" />
                   </div>
-                  <p className="text-[10px] text-zinc-400 font-mono mt-2">{result.certificate.code}</p>
+                  <p className="text-[9px] text-zinc-450 font-mono mt-2">{result.certificate.code}</p>
                 </div>
               </div>
 
@@ -102,7 +106,8 @@ export default function VerifyClient({ code }: { code: string }) {
                   {[
                     { icon: User, label: "Diplômé", value: result.certificate.studentName },
                     { icon: BookOpen, label: "Formation", value: result.certificate.courseTitle },
-                    { icon: GraduationCap, label: "Instructeur", value: result.certificate.instructorName },
+                    { icon: GraduationCap, label: "Académie", value: result.certificate.academyName || "ANSELLA ACADEMY" },
+                    { icon: User, label: "Instructeur", value: result.certificate.instructorName },
                     { icon: Calendar, label: "Date d'émission", value: issuedDate! },
                   ].map(({ icon: Icon, label, value }) => (
                     <div key={label} className="flex items-start gap-3 p-3 bg-zinc-900/50 rounded-xl border border-zinc-700/40">
@@ -169,8 +174,8 @@ export default function VerifyClient({ code }: { code: string }) {
         )}
 
         {/* Footer */}
-        <p className="text-center text-zinc-600 text-xs mt-8">
-          © {new Date().getFullYear()} ANSELLA Crypto Academy · Certificats vérifiables
+        <p className="text-center text-zinc-650 text-[11px] mt-8">
+          © {new Date().getFullYear()} ANSELLA · Certificats d&apos;études vérifiables
         </p>
       </div>
     </div>

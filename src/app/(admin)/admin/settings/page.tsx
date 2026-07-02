@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 export default function AdminSettingsPage() {
-  const [platformName, setPlatformName] = useState("Kuettu Crypto Academy");
+  const [platformName, setPlatformName] = useState("ANSELLA");
   const [supportEmail, setSupportEmail] = useState("support@kuettu.com");
   const [commissionRate, setCommissionRate] = useState(20);
   const [enableWeb3, setEnableWeb3] = useState(true);

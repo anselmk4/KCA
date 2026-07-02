@@ -168,7 +168,7 @@ export default function LoginPage() {
               </span>
             </h1>
             <p className="text-zinc-650 dark:text-zinc-400 text-base leading-relaxed font-medium">
-              Formez-vous avec les meilleurs experts mondiaux. Débloquez des parcours certifiants, passez des quiz infalsifiables et obtenez des diplômes ancrés sur la blockchain.
+              Formez-vous avec les meilleurs experts mondiaux. Débloquez des parcours certifiants, passez des quiz d'évaluation et obtenez des certificats officiels et vérifiables en ligne.
             </p>
           </div>
 

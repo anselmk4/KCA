@@ -187,8 +187,8 @@ export default function CourseDetailPage() {
   const [statusSavedMessage, setStatusSavedMessage] = useState(false);
 
   // ─── Load all data from Supabase ──────────────────────────
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
@@ -201,7 +201,10 @@ export default function CourseDetailPage() {
         .eq("id", courseId)
         .maybeSingle();
 
-      if (!courseData) { setLoading(false); return; }
+      if (!courseData) {
+        if (!silent) setLoading(false);
+        return;
+      }
       setCourse(courseData as unknown as CourseData);
       const cd = courseData as unknown as Record<string, unknown>;
       setDescForm({
@@ -265,7 +268,7 @@ export default function CourseDetailPage() {
     } catch (err) {
       console.error("[CourseBuilder] loadData error:", err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [courseId, router]);
 
@@ -322,7 +325,7 @@ export default function CourseDetailPage() {
       if (res.ok) {
         setNewSectionTitle("");
         setShowNewSection(false);
-        await loadData();
+        await loadData(true);
       } else {
         const err = await res.json();
         alert("Erreur : " + err.error);
@@ -342,7 +345,7 @@ export default function CourseDetailPage() {
       if (res.ok) {
         setEditingSectionId(null);
         setEditingSectionTitle("");
-        await loadData();
+        await loadData(true);
       } else {
         const err = await res.json();
         alert("Erreur : " + err.error);
@@ -357,7 +360,7 @@ export default function CourseDetailPage() {
     try {
       const res = await fetch(`/api/sections?id=${sectId}`, { method: "DELETE" });
       if (res.ok) {
-        await loadData();
+        await loadData(true);
       } else {
         const err = await res.json();
         alert("Erreur : " + err.error);
@@ -380,7 +383,7 @@ export default function CourseDetailPage() {
         fetch("/api/sections", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: current.id, order: target.sort_order }) }),
         fetch("/api/sections", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: target.id, order: current.sort_order }) }),
       ]);
-      await loadData();
+      await loadData(true);
     } finally { setSaving(false); }
   };
 
@@ -405,8 +408,8 @@ export default function CourseDetailPage() {
 
       setShowAiStructureModal(false);
       setAiStructurePrompt("");
-      // Reload curriculum data
-      loadData();
+      // Reload curriculum data silently
+      loadData(true);
       alert("Structure de formation générée par l'IA avec succès !");
     } catch (err: any) {
       alert("Erreur lors de la génération de la structure : " + err.message);
@@ -438,7 +441,7 @@ export default function CourseDetailPage() {
         setNewLessonTitle("");
         setNewLessonDuration("15");
         setAddingLessonToSection(null);
-        await loadData();
+        await loadData(true);
       } else {
         const err = await res.json();
         alert("Erreur : " + err.error);
@@ -465,7 +468,7 @@ export default function CourseDetailPage() {
       if (res.ok) {
         setLessonSavedMessage(true);
         setTimeout(() => setLessonSavedMessage(false), 3000);
-        await loadData();
+        await loadData(true);
       } else {
         const err = await res.json();
         alert("Erreur : " + err.error);
@@ -481,7 +484,7 @@ export default function CourseDetailPage() {
       const res = await fetch(`/api/lessons?id=${lessonId}`, { method: "DELETE" });
       if (res.ok) {
         if (selectedLessonId === lessonId) setSelectedLessonId(null);
-        await loadData();
+        await loadData(true);
       } else {
         const err = await res.json();
         alert("Erreur : " + err.error);
@@ -504,7 +507,7 @@ export default function CourseDetailPage() {
         fetch("/api/lessons", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: current.id, order: target.sort_order }) }),
         fetch("/api/lessons", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: target.id, order: current.sort_order }) }),
       ]);
-      await loadData();
+      await loadData(true);
     } finally { setSaving(false); }
   };
 
@@ -521,7 +524,7 @@ export default function CourseDetailPage() {
       if (res.ok) {
         setNewQuizTitleInline("");
         setAddingQuizToSection(null);
-        await loadData();
+        await loadData(true);
       } else {
         const err = await res.json();
         alert("Erreur : " + err.error);
@@ -542,7 +545,7 @@ export default function CourseDetailPage() {
         setNewQuizTitle("");
         setNewQuizPassPercent("70");
         setShowCreateQuizModal(false);
-        await loadData();
+        await loadData(true);
       } else {
         const err = await res.json();
         alert("Erreur : " + err.error);
@@ -557,7 +560,7 @@ export default function CourseDetailPage() {
       const res = await fetch(`/api/quizzes?id=${quizId}`, { method: "DELETE" });
       if (res.ok) {
         if (selectedQuizId === quizId) setSelectedQuizId(null);
-        await loadData();
+        await loadData(true);
       } else {
         const err = await res.json();
         alert("Erreur : " + err.error);
@@ -585,7 +588,7 @@ export default function CourseDetailPage() {
         setNewQChoices(["", "", "", ""]);
         setNewQCorrect("0");
         setShowAddQuestionModal(false);
-        await loadData();
+        await loadData(true);
       } else {
         const err = await res.json();
         alert("Erreur : " + err.error);
@@ -598,7 +601,7 @@ export default function CourseDetailPage() {
     setSaving(true);
     try {
       const res = await fetch(`/api/questions?id=${questionId}`, { method: "DELETE" });
-      if (res.ok) { await loadData(); }
+      if (res.ok) { await loadData(true); }
       else { const err = await res.json(); alert("Erreur : " + err.error); }
     } finally { setSaving(false); }
   };
@@ -621,9 +624,15 @@ export default function CourseDetailPage() {
         })
         .eq("id", courseId);
       if (error) { alert("Erreur : " + error.message); return; }
+      setDescForm({
+        title: descForm.title,
+        category: descForm.category,
+        level: descForm.level,
+        description: descForm.description,
+      });
       setDescSavedMessage(true);
       setTimeout(() => setDescSavedMessage(false), 3000);
-      await loadData();
+      await loadData(true);
     } finally { setSaving(false); }
   };
 
@@ -637,7 +646,7 @@ export default function CourseDetailPage() {
       if (error) { alert("Erreur : " + error.message); return; }
       setPriceSavedMessage(true);
       setTimeout(() => setPriceSavedMessage(false), 3000);
-      await loadData();
+      await loadData(true);
     } finally { setSaving(false); }
   };
 
@@ -651,7 +660,7 @@ export default function CourseDetailPage() {
       if (error) { alert("Erreur : " + error.message); return; }
       setStatusSavedMessage(true);
       setTimeout(() => setStatusSavedMessage(false), 3000);
-      await loadData();
+      await loadData(true);
     } finally { setSaving(false); }
   };
 
@@ -665,7 +674,7 @@ export default function CourseDetailPage() {
       if (error) { alert("Erreur : " + error.message); return; }
       setStatusSavedMessage(true);
       setTimeout(() => setStatusSavedMessage(false), 3000);
-      await loadData();
+      await loadData(true);
     } finally { setSaving(false); }
   };
 
@@ -735,7 +744,7 @@ export default function CourseDetailPage() {
         setShowInviteModal(false);
         setInviteEmail("");
         setInviteFound(null);
-        loadData();
+        loadData(true);
       }, 2000);
     } finally { setSaving(false); }
   };
@@ -791,7 +800,7 @@ export default function CourseDetailPage() {
           <ArrowLeft className="w-4 h-4" /> Retour à la liste
         </Link>
         <div className="flex items-center gap-2">
-          <button onClick={loadData} className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-white cursor-pointer" title="Actualiser">
+          <button onClick={() => loadData(true)} className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-white cursor-pointer" title="Actualiser">
             <RefreshCw className="w-4 h-4" />
           </button>
           <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 dark:bg-teal-950/20 dark:text-teal-400 dark:border-teal-900/50">

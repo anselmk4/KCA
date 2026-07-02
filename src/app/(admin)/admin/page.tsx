@@ -28,7 +28,7 @@ export default function AdminDashboardPage() {
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in">
       <div>
         <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Vue d'ensemble Admin</h1>
-        <p className="text-zinc-500 dark:text-zinc-400">Suivez les performances de Kuettu Crypto Academy.</p>
+        <p className="text-zinc-500 dark:text-zinc-400">Suivez les performances de la plateforme ANSELLA.</p>
       </div>
 
       {/* KPIs Grid */}

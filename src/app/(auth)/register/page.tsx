@@ -290,7 +290,7 @@ function RegisterForm() {
                 Je suis un Apprenant
               </h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
-                Je souhaite suivre des cours interactifs, passer des examens et obtenir des certifications blockchain.
+                Je souhaite suivre des cours interactifs, passer des examens et obtenir des certifications professionnelles.
               </p>
             </div>
           </div>
@@ -420,7 +420,7 @@ function RegisterForm() {
                   type="text" 
                   value={academyName} 
                   onChange={e => setAcademyName(e.target.value)} 
-                  placeholder="Ex: Blockchain Business School" 
+                  placeholder="Ex: École de Commerce de Kinshasa" 
                   className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white" 
                 />
               </div>
@@ -432,10 +432,10 @@ function RegisterForm() {
                   onChange={e => setThematic(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-950 dark:text-white"
                 >
-                  <option value="blockchain">Blockchain & Smart Contracts</option>
-                  <option value="trading">Trading & Finance Décentralisée</option>
-                  <option value="ai">Intelligence Artificielle</option>
-                  <option value="web3">Développement Web3 (Full-stack)</option>
+                  <option value="tech">Technologies & Informatique</option>
+                  <option value="business">Management & Entrepreneuriat</option>
+                  <option value="design">Design & Arts Graphiques</option>
+                  <option value="languages">Langues & Communication</option>
                 </select>
               </div>
 
@@ -490,10 +490,10 @@ function RegisterForm() {
                   onChange={e => setInterestCourse(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-950 dark:text-white"
                 >
-                  <option value="blockchain">Fondamentaux de la Blockchain</option>
-                  <option value="trading">Crypto-monnaie & Trading</option>
-                  <option value="ai">Intelligence Artificielle & Automatisation</option>
-                  <option value="web3">Développement Web3 complet</option>
+                  <option value="tech">Informatique & Programmation</option>
+                  <option value="business">Marketing & Vente</option>
+                  <option value="design">Design UI/UX & Création</option>
+                  <option value="languages">Gestion de Projet & Management</option>
                 </select>
               </div>
               
@@ -555,9 +555,9 @@ export default function RegisterPage() {
 
           <div className="space-y-4">
             <h1 className="text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white leading-tight">
-              Rejoignez l'académie leader en{" "}
+              Développez vos compétences avec{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-teal-500 to-emerald-500 dark:from-blue-400 dark:via-teal-400 dark:to-emerald-400">
-                Web3 & IA
+                Ansella
               </span>
             </h1>
             <p className="text-zinc-650 dark:text-zinc-400 text-base leading-relaxed font-medium">
