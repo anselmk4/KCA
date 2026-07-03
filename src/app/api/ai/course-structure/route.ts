@@ -51,40 +51,68 @@ export async function POST(req: NextRequest) {
 
     const geminiKey = process.env.GEMINI_API_KEY;
     if (geminiKey) {
-      // Execute call to Gemini API
       try {
-        const genPrompt = `Génère une structure de formation en français au format JSON pour le sujet suivant: "${prompt}".
-Génère exactement ${numChapters || 3} chapitres.
-Chaque chapitre doit avoir un titre et une liste de leçons avec un titre et une durée estimée en minutes (entre 5 et 30 minutes).
-Retourne uniquement le tableau JSON brut, sans balises de code markdown comme \`\`\`json, sans explications.
-Exemple:
-[
-  {
-    "title": "Nom du chapitre",
-    "lessons": [
-      { "title": "Nom de la leçon", "duration_minutes": 15 }
-    ]
-  }
-]`;
+        const systemInstructionText = `Tu es un concepteur pédagogique de formation expert. Ton objectif est de concevoir une structure de cours équilibrée et cohérente en français sous forme d'un tableau JSON d'objets chapitres.`;
+
+        const userPromptText = `Génère une structure de formation en français pour le sujet suivant : "${prompt}".
+Tu dois générer exactement ${numChapters || 3} chapitres.
+Chaque chapitre doit avoir un titre pertinent et une liste de leçons avec un titre clair et une durée estimée en minutes (comprise entre 5 et 30 minutes).`;
 
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: genPrompt }] }]
+            contents: [{ parts: [{ text: userPromptText }] }],
+            systemInstruction: {
+              parts: [{ text: systemInstructionText }]
+            },
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "ARRAY",
+                description: "Tableau contenant la structure des chapitres du cours",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    title: {
+                      type: "STRING",
+                      description: "Titre du chapitre"
+                    },
+                    lessons: {
+                      type: "ARRAY",
+                      description: "Liste des leçons contenues dans ce chapitre",
+                      items: {
+                        type: "OBJECT",
+                        properties: {
+                          title: {
+                            type: "STRING",
+                            description: "Titre de la leçon"
+                          },
+                          duration_minutes: {
+                            type: "INTEGER",
+                            description: "Durée estimée de la leçon en minutes (entre 5 et 30)"
+                          }
+                        },
+                        required: ["title", "duration_minutes"]
+                      }
+                    }
+                  },
+                  required: ["title", "lessons"]
+                }
+              },
+              temperature: 0.2
+            }
           })
         });
 
         if (!response.ok) {
-          throw new Error(`Gemini API returned status ${response.status}`);
+          const errText = await response.text();
+          throw new Error(`Gemini API returned status ${response.status}: ${errText}`);
         }
 
         const resData = await response.json();
         const textResult = resData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        
-        // Clean markdown backticks if returned
-        const jsonString = textResult.replace(/```json/g, "").replace(/```/g, "").trim();
-        structure = JSON.parse(jsonString);
+        structure = JSON.parse(textResult.trim());
       } catch (err: any) {
         console.error("Gemini API call failed, falling back to simulated generation:", err);
       }
