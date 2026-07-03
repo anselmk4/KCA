@@ -293,16 +293,25 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ value, onChange }) => 
   const [generatingAi, setGeneratingAi] = useState(false);
   const [fileUploadingBlockId, setFileUploadingBlockId] = useState<string | null>(null);
 
-  // Load blocks from HTML value on mount / change
+  // Track the last HTML we serialized internally so we can skip re-parsing
+  // when the parent echoes the same value back (avoids focus/scroll resets)
+  const lastEmittedRef = useRef<string>("");
+
+  // Load blocks from HTML value only when the value is externally driven
+  // (e.g. initial load or lesson switch) — not when we just emitted it ourselves
   useEffect(() => {
+    if (value === lastEmittedRef.current) return;
+    lastEmittedRef.current = value;
     const parsed = parseHtmlToBlocks(value);
     setBlocks(parsed);
   }, [value]);
 
   // Sync back to parent when blocks change
   const handleBlocksChange = (newBlocks: Block[]) => {
+    const html = serializeBlocksToHtml(newBlocks);
+    lastEmittedRef.current = html;
     setBlocks(newBlocks);
-    onChange(serializeBlocksToHtml(newBlocks));
+    onChange(html);
   };
 
   const addBlock = (type: BlockType) => {
