@@ -85,27 +85,17 @@ export default function InstructorDashboardPage() {
         const avg = enrollList.length > 0 ? Math.round(totalProgress / enrollList.length) : 0;
         setAvgProgress(avg);
 
-        // 3. Fetch transactions/payments
-        // Retrieve order items matching instructor courses
-        const { data: orderItems } = await (supabase as any)
-          .from("order_items")
-          .select("order_id, course_id, unit_price")
-          .in("course_id", courseIds);
-
-        const orderItemList = orderItems || [];
-        const orderIds = orderItemList.map((oi: any) => oi.order_id);
-
-        let paymentsList: any[] = [];
-        if (orderIds.length > 0) {
-          const { data: paymentsData } = await supabase
-            .from("payments")
-            .select("id, amount, status, paid_at, order_id")
-            .eq("status", "PAID")
-            .in("order_id", orderIds);
-          paymentsList = paymentsData || [];
+        // 3. Fetch transactions/payments via RLS-bypassing API
+        const earningsRes = await fetch("/api/instructor/earnings");
+        if (!earningsRes.ok) {
+          throw new Error("Erreur de chargement des transactions");
         }
+        const earningsData = await earningsRes.json();
+        const paymentsList = earningsData.transactions || [];
 
-        const revenueSum = paymentsList.reduce((sum: number, p: any) => sum + p.amount, 0);
+        const revenueSum = paymentsList
+          .filter((p: any) => p.status === "PAID")
+          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
         setTotalRevenue(revenueSum);
 
         // 4. Fetch pending payouts
@@ -122,13 +112,9 @@ export default function InstructorDashboardPage() {
         const stats: Record<string, { enrollCount: number; revenue: number }> = {};
         coursesList.forEach((c: any) => {
           const courseEnrolls = enrollList.filter((e: any) => e.course_id === c.id);
-          // Find orders for this course
-          const courseOrderIds = orderItemList
-            .filter((oi: any) => oi.course_id === c.id)
-            .map((oi: any) => oi.order_id);
           const courseRevenueSum = paymentsList
-            .filter((p: any) => courseOrderIds.includes(p.order_id))
-            .reduce((sum: number, p: any) => sum + p.amount, 0);
+            .filter((p: any) => p.courseId === c.id && p.status === "PAID")
+            .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
           stats[c.id] = {
             enrollCount: courseEnrolls.length,

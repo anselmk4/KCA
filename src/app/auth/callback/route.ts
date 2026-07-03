@@ -62,11 +62,15 @@ export async function GET(request: Request) {
         else if (roleNames.includes('INSTRUCTOR')) role = 'INSTRUCTOR';
         else if (roleNames.includes('TEACHING_ASSISTANT')) role = 'TEACHING_ASSISTANT';
 
-        let targetRedirect = '/dashboard';
-        if (['SUPER_ADMIN', 'ADMIN', 'FINANCE_ADMIN', 'ACADEMIC_ADMIN', 'SUPPORT_AGENT'].includes(role)) {
-          targetRedirect = '/admin';
-        } else if (['INSTRUCTOR', 'TEACHING_ASSISTANT'].includes(role)) {
-          targetRedirect = '/instructor';
+        let targetRedirect = next;
+        if (next !== '/auth/confirmed') {
+          if (['SUPER_ADMIN', 'ADMIN', 'FINANCE_ADMIN', 'ACADEMIC_ADMIN', 'SUPPORT_AGENT'].includes(role)) {
+            targetRedirect = '/admin';
+          } else if (['INSTRUCTOR', 'TEACHING_ASSISTANT'].includes(role)) {
+            targetRedirect = '/instructor';
+          } else {
+            targetRedirect = '/dashboard';
+          }
         }
 
         return NextResponse.redirect(`${origin}${targetRedirect}`);

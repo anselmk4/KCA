@@ -27,6 +27,7 @@ function RegisterForm() {
   const [academyName, setAcademyName] = useState<string>("");
   const [thematic, setThematic] = useState<string>("blockchain");
   const [selectedPlan, setSelectedPlan] = useState<"FREE" | "BASE" | "PRO" | "MAX">("FREE");
+  const [bio, setBio] = useState<string>("");
 
   // Student specific fields
   const [studentLevel, setStudentLevel] = useState<string>("Débutant");
@@ -140,7 +141,7 @@ function RegisterForm() {
         password,
         options: { 
           data: { full_name: name },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/auth/confirmed`,
         }
       });
 
@@ -179,7 +180,11 @@ function RegisterForm() {
       if (role === "INSTRUCTOR") {
         await supabase
           .from("profiles")
-          .update({ plan: selectedPlan })
+          .update({ 
+            plan: "FREE",
+            academy_name: academyName || "Mon Académie",
+            bio: bio
+          })
           .eq("id", sessionUser.id);
 
         setSimulatedSession({
@@ -188,16 +193,25 @@ function RegisterForm() {
           email,
           role: "INSTRUCTOR",
           status: "ACTIVE",
-          plan: selectedPlan
+          plan: "FREE"
         });
 
         localStorage.setItem("kuettu_academy_name", academyName || "Mon Académie");
-        localStorage.setItem("kuettu_academy_thematic", thematic);
         localStorage.setItem("kuettu_user_name", name);
 
         router.push("/instructor");
       } else {
         // STUDENT
+        const levelMap: Record<string, "BEGINNER" | "INTERMEDIATE" | "ADVANCED"> = {
+          "Débutant": "BEGINNER",
+          "Intermédiaire": "INTERMEDIATE",
+          "Avancé": "ADVANCED"
+        };
+        await supabase
+          .from("profiles")
+          .update({ level: levelMap[studentLevel] || "BEGINNER" })
+          .eq("id", sessionUser.id);
+
         setSimulatedSession({
           userId: sessionUser.id,
           name,
@@ -426,44 +440,15 @@ function RegisterForm() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Thématique principale</label>
-                <select 
-                  value={thematic}
-                  onChange={e => setThematic(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-950 dark:text-white"
-                >
-                  <option value="tech">Technologies & Informatique</option>
-                  <option value="business">Management & Entrepreneuriat</option>
-                  <option value="design">Design & Arts Graphiques</option>
-                  <option value="languages">Langues & Communication</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2 uppercase tracking-wider">Choisissez votre forfait</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {[
-                    { id: "FREE", name: "Free", price: "0$" },
-                    { id: "BASE", name: "Base", price: "19$" },
-                    { id: "PRO", name: "Pro", price: "49$" },
-                    { id: "MAX", name: "Max", price: "200$" }
-                  ].map((plan) => (
-                    <div 
-                      key={plan.id}
-                      onClick={() => setSelectedPlan(plan.id as "FREE" | "BASE" | "PRO" | "MAX")}
-                      className={`p-2 rounded-xl border-2 cursor-pointer flex flex-col items-center justify-center transition-all ${
-                        selectedPlan === plan.id 
-                          ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-600 font-bold" 
-                          : "border-zinc-200 dark:border-zinc-800 hover:border-blue-300 text-zinc-500 dark:text-zinc-400"
-                      }`}
-                    >
-                      <span className="text-[10px] font-semibold">{plan.name}</span>
-                      <span className="text-[9px] mt-0.5">{plan.price}/m</span>
-                      {selectedPlan === plan.id && <CheckCircle2 className="w-3 h-3 text-blue-600 mt-1" />}
-                    </div>
-                  ))}
-                </div>
-                <p className="text-zinc-400 text-[10px] mt-2 text-center leading-relaxed">Aucune carte bancaire requise. Vous pouvez modifier votre abonnement ou payer plus tard.</p>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Petite description / Bio</label>
+                <textarea 
+                  required 
+                  value={bio} 
+                  onChange={e => setBio(e.target.value)} 
+                  placeholder="Décrivez votre expérience ou votre académie..." 
+                  rows={4}
+                  className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white resize-none" 
+                />
               </div>
             </div>
           )}
@@ -480,20 +465,6 @@ function RegisterForm() {
                   <option value="Débutant">Débutant (Je découvre)</option>
                   <option value="Intermédiaire">Intermédiaire (J'ai quelques notions)</option>
                   <option value="Avancé">Avancé (Je souhaite me spécialiser)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Thématique d'intérêt</label>
-                <select 
-                  value={interestCourse}
-                  onChange={e => setInterestCourse(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-950 dark:text-white"
-                >
-                  <option value="tech">Informatique & Programmation</option>
-                  <option value="business">Marketing & Vente</option>
-                  <option value="design">Design UI/UX & Création</option>
-                  <option value="languages">Gestion de Projet & Management</option>
                 </select>
               </div>
               
