@@ -139,6 +139,16 @@ export type SupportTicket = {
   replies: SupportTicketReply[];
 };
 
+export type ContactMessage = {
+  id: string;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  createdAt: string;
+  read?: boolean;
+};
+
 export type Database = {
   users: User[];
   courses: Course[];
@@ -153,6 +163,7 @@ export type Database = {
   transactions: Transaction[];
   payouts: Payout[];
   supportTickets: SupportTicket[];
+  contactMessages: ContactMessage[];
 };
 
 // Seed Constants matching Catalog
@@ -214,7 +225,8 @@ const defaultDB: Database = {
   certificates: [],
   transactions: [],
   payouts: [],
-  supportTickets: []
+  supportTickets: [],
+  contactMessages: []
 };
 
 export const generateUUID = (): string => {
@@ -247,7 +259,10 @@ export const getDB = (): Database => {
   const data = localStorage.getItem("kuettu_db");
   if (data) {
     try {
-      return JSON.parse(data);
+      const parsed = JSON.parse(data) as Database;
+      // Migration: ensure new fields exist for older stored data
+      if (!parsed.contactMessages) parsed.contactMessages = [];
+      return parsed;
     } catch {
       return defaultDB;
     }

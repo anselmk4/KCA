@@ -25,44 +25,68 @@ export default function InstructorsPage() {
   useEffect(() => {
     async function loadInstructors() {
       try {
+        // 2. Primary: fetch IDs of users with INSTRUCTOR role
         const { data: roleData } = await supabase
           .from("roles")
           .select("id")
           .eq("name", "INSTRUCTOR")
           .maybeSingle();
 
-        let instructorIds: string[] = [];
-        if (roleData) {
+        let profilesData: Instructor[] | null = null;
+
+        if (roleData?.id) {
           const { data: userRoles } = await supabase
             .from("user_roles")
             .select("user_id")
             .eq("role_id", roleData.id);
-          if (userRoles) {
-            instructorIds = userRoles.map(ur => ur.user_id);
+
+          const ids = (userRoles || []).map((ur) => ur.user_id);
+
+          if (ids.length > 0) {
+            const { data } = await supabase
+              .from("profiles")
+              .select("id, full_name, bio, specialty, avatar_url, academy_name, nationality, website")
+              .in("id", ids)
+              .order("full_name", { ascending: true });
+            profilesData = data as Instructor[];
           }
         }
 
-        let profilesData = null;
-        if (instructorIds.length > 0) {
-          const { data } = await supabase
+        // 3. Fallback: fetch profiles that have academy_name or specialty
+        if (!profilesData || profilesData.length === 0) {
+          const { data: fallbackA } = await supabase
             .from("profiles")
             .select("id, full_name, bio, specialty, avatar_url, academy_name, nationality, website")
-            .in("id", instructorIds)
+            .not("academy_name", "is", null)
             .order("full_name", { ascending: true });
-          profilesData = data;
+
+          const { data: fallbackB } = await supabase
+            .from("profiles")
+            .select("id, full_name, bio, specialty, avatar_url, academy_name, nationality, website")
+            .not("specialty", "is", null)
+            .order("full_name", { ascending: true });
+
+          const merged = [...(fallbackA || []), ...(fallbackB || [])];
+          const seen = new Set<string>();
+          profilesData = merged.filter((p) => {
+            if (seen.has(p.id)) return false;
+            seen.add(p.id);
+            return true;
+          }) as Instructor[];
         }
 
+        // 4. Last resort: load any profile that has a name
         if (!profilesData || profilesData.length === 0) {
-          const { data } = await supabase
+          const { data: anyProfiles } = await supabase
             .from("profiles")
             .select("id, full_name, bio, specialty, avatar_url, academy_name, nationality, website")
             .not("full_name", "is", null)
-            .order("full_name", { ascending: true });
-          profilesData = data?.filter(p => p.specialty || p.academy_name) || null;
+            .limit(10);
+          profilesData = (anyProfiles || []) as Instructor[];
         }
 
         if (profilesData) {
-          setInstructors(profilesData as Instructor[]);
+          setInstructors(profilesData);
         }
       } catch (err) {
         console.error("Error loading instructors list:", err);

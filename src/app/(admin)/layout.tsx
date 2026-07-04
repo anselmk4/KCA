@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Users, CreditCard, LogOut, ShieldAlert, LifeBuoy, BookOpen, Coins, Settings, Ticket, Activity, Menu, X } from "lucide-react";
+import { LayoutDashboard, Users, CreditCard, LogOut, ShieldAlert, LifeBuoy, BookOpen, Coins, Settings, Ticket, Activity, Menu, X, Mail } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { getSimulatedSession, canAccessRoute } from "@/lib/rbac";
 
@@ -29,6 +29,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const menuItems = [
     { icon: <LayoutDashboard className="w-5 h-5" />, label: "Vue d'ensemble", href: "/admin" },
     { icon: <Users className="w-5 h-5" />, label: "Utilisateurs", href: "/admin/users" },
+    { icon: <Mail className="w-5 h-5" />, label: "Messages du site", href: "/admin/messages" },
     { icon: <Activity className="w-5 h-5" />, label: "Surveillance Live", href: "/admin/connected-users" },
     { icon: <Ticket className="w-5 h-5" />, label: "Coupons de réduction", href: "/admin/coupons" },
     { icon: <BookOpen className="w-5 h-5" />, label: "Validation Cours", href: "/admin/courses" },
@@ -94,8 +95,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <button 
             onClick={async () => {
               const { supabase } = await import("@/lib/supabase/client");
+              const { clearSimulatedSession } = await import("@/lib/rbac");
               await supabase.auth.signOut();
-              router.push("/login");
+              clearSimulatedSession();
+              window.location.href = "/login";
             }}
             className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all cursor-pointer text-left font-medium"
           >

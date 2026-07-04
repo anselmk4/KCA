@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import Image from "next/image";
-import { GraduationCap, Award, ShieldCheck, Mail, Phone, MapPin, Send } from "lucide-react";
+import { GraduationCap, Award, ShieldCheck, Mail, Phone, MapPin, Send, Loader2, CheckCircle2 } from "lucide-react";
 import { motion, Variants } from "framer-motion";
+import { supabase } from "@/lib/supabase/client";
 
 export default function AboutPage() {
   const pageVariants: Variants = {
@@ -18,6 +20,57 @@ export default function AboutPage() {
   const itemVariants: Variants = {
     hidden: { opacity: 0, y: 25 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+  };
+
+  const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name || !form.email || !form.subject || !form.message) return;
+    setLoading(true);
+    setError(null);
+    setSuccess(false);
+
+    try {
+      // Store in local DB first for simulated offline/admin read
+      const { getDB, saveDB } = await import("@/lib/db");
+      const currentDB = getDB();
+      const newMsg = {
+        id: crypto.randomUUID(),
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        subject: form.subject.trim(),
+        message: form.message.trim(),
+        createdAt: new Date().toISOString(),
+        read: false,
+      };
+      
+      currentDB.contactMessages = [...(currentDB.contactMessages || []), newMsg];
+      saveDB(currentDB);
+
+      // Try storing in Supabase as a support ticket (best-effort, ignored if it fails)
+      try {
+        await supabase.from("support_tickets").insert({
+          ticket_number: `CONTACT-${Date.now()}`,
+          subject: `[Formulaire Contact] ${form.subject.trim()}`,
+          message: `Nom: ${form.name.trim()}\nEmail: ${form.email.trim()}\n\nMessage:\n${form.message.trim()}`,
+          status: "OPEN",
+          user_id: "00000000-0000-0000-0000-000000000000"
+        });
+      } catch (sbErr) {
+        console.warn("Supabase backup contact submit skipped:", sbErr);
+      }
+
+      setSuccess(true);
+      setForm({ name: "", email: "", subject: "", message: "" });
+    } catch (err: any) {
+      setError("Erreur : " + (err.message || "Impossible d'envoyer le message."));
+    } finally {
+      setLoading(false);
+    }
   };
 
 
@@ -172,13 +225,28 @@ export default function AboutPage() {
                   </p>
                 </div>
 
-                <form className="space-y-5">
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  {success && (
+                    <div className="bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 text-xs p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/30 flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 shrink-0" />
+                      <span>Votre message a été envoyé avec succès ! Notre équipe vous répondra très bientôt.</span>
+                    </div>
+                  )}
+
+                  {error && (
+                    <div className="bg-red-50 dark:bg-red-950/20 text-red-650 dark:text-red-400 text-xs p-4 rounded-xl border border-red-200 dark:border-red-900/30">
+                      {error}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold uppercase tracking-wider mb-2 text-zinc-550 dark:text-zinc-500">Nom Complet</label>
                       <input
                         type="text"
                         placeholder="Ex: Jean Mukendi"
+                        value={form.name}
+                        onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
                         className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/20 focus:bg-white dark:focus:bg-zinc-900/60 focus:border-teal-500/50 text-zinc-900 dark:text-white outline-none text-xs transition-colors"
                         required
                       />
@@ -188,6 +256,8 @@ export default function AboutPage() {
                       <input
                         type="email"
                         placeholder="Ex: jean.m@ansella.app"
+                        value={form.email}
+                        onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
                         className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/20 focus:bg-white dark:focus:bg-zinc-900/60 focus:border-teal-500/50 text-zinc-900 dark:text-white outline-none text-xs transition-colors"
                         required
                       />
@@ -198,6 +268,8 @@ export default function AboutPage() {
                     <input
                       type="text"
                       placeholder="Ex: Partenariat Académique"
+                      value={form.subject}
+                      onChange={(e) => setForm(prev => ({ ...prev, subject: e.target.value }))}
                       className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/20 focus:bg-white dark:focus:bg-zinc-900/60 focus:border-teal-500/50 text-zinc-900 dark:text-white outline-none text-xs transition-colors"
                       required
                     />
@@ -207,6 +279,8 @@ export default function AboutPage() {
                     <textarea
                       rows={5}
                       placeholder="Décrivez votre besoin..."
+                      value={form.message}
+                      onChange={(e) => setForm(prev => ({ ...prev, message: e.target.value }))}
                       className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/20 focus:bg-white dark:focus:bg-zinc-900/60 focus:border-teal-500/50 text-zinc-900 dark:text-white outline-none text-xs transition-colors resize-none"
                       required
                     />
@@ -214,10 +288,17 @@ export default function AboutPage() {
 
                   <button
                     type="submit"
-                    className="w-full py-3.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-zinc-950 font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-widest cursor-pointer shadow-md shadow-teal-500/10"
+                    disabled={loading}
+                    className="w-full py-3.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-zinc-950 font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-widest cursor-pointer shadow-md shadow-teal-500/10 disabled:opacity-50"
                   >
-                    <span>Envoyer le Message</span>
-                    <Send className="h-4 w-4" />
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-zinc-950" />
+                    ) : (
+                      <>
+                        <span>Envoyer le Message</span>
+                        <Send className="h-4 w-4" />
+                      </>
+                    )}
                   </button>
                 </form>
               </motion.div>

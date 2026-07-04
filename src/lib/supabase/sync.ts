@@ -313,6 +313,16 @@ export async function syncFromSupabase(): Promise<LocalDatabase | null> {
       };
     });
 
+    // Preserve existing local contact messages (not synced from Supabase)
+    let existingContactMessages: any[] = [];
+    const existingRawForMessages = localStorage.getItem('kuettu_db');
+    if (existingRawForMessages) {
+      try {
+        const prev = JSON.parse(existingRawForMessages);
+        existingContactMessages = prev.contactMessages || [];
+      } catch { /* ignore */ }
+    }
+
     const db: LocalDatabase = {
       users,
       courses: localCourses,
@@ -326,7 +336,8 @@ export async function syncFromSupabase(): Promise<LocalDatabase | null> {
       certificates: localCertificates,
       transactions: localTransactions,
       payouts: localPayouts,
-      supportTickets: localTickets
+      supportTickets: localTickets,
+      contactMessages: existingContactMessages
     };
 
     // Merge strategy: preserve local-only courses (created but not yet in Supabase)

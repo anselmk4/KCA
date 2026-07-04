@@ -131,7 +131,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
   const handleLogout = async () => {
     await supabase.auth.signOut();
     clearSimulatedSession();
-    router.push("/login");
+    window.location.href = "/login";
   };
 
   const initials = session?.name

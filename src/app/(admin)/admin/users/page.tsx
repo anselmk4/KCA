@@ -18,7 +18,8 @@ import {
   X,
   Plus,
   KeyRound,
-  Check
+  Check,
+  Sparkles
 } from "lucide-react";
 
 type RoleName = 'STUDENT' | 'INSTRUCTOR' | 'ADMIN' | 'SUPER_ADMIN';
@@ -48,8 +49,32 @@ export default function AdminUsersPage() {
   });
   const [passwordUser, setPasswordUser] = useState<AdminUserItem | null>(null);
   const [newPasswordVal, setNewPasswordVal] = useState("");
+  const [planUser, setPlanUser] = useState<AdminUserItem | null>(null);
+  const [newPlanVal, setNewPlanVal] = useState<"FREE" | "BASE" | "PRO" | "MAX">("FREE");
   const [modalLoading, setModalLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const handleUpdatePlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!planUser) return;
+    setModalLoading(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ plan: newPlanVal })
+        .eq("id", planUser.id);
+
+      if (error) throw error;
+
+      setUsers(prev => prev.map(u => u.id === planUser.id ? { ...u, plan: newPlanVal } : u));
+      alert(`Le plan de ${planUser.name} a été mis à jour vers "${newPlanVal}" avec succès !`);
+      setPlanUser(null);
+    } catch (err: any) {
+      alert("Erreur lors de la modification du forfait : " + err.message);
+    } finally {
+      setModalLoading(false);
+    }
+  };
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -417,6 +442,18 @@ export default function AdminUsersPage() {
                         >
                           <KeyRound className="w-4 h-4" />
                         </button>
+
+                        {/* Override Subscription Plan */}
+                        <button
+                          onClick={() => {
+                            setPlanUser(user);
+                            setNewPlanVal((user.plan as any) || "FREE");
+                          }}
+                          className="p-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-600 hover:scale-105 hover:bg-blue-100 transition-all cursor-pointer"
+                          title="Modifier le plan d'abonnement"
+                        >
+                          <Sparkles className="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -547,6 +584,52 @@ export default function AdminUsersPage() {
                   <Check className="w-4 h-4" />
                 )}
                 Confirmer la modification
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Modal Edit Subscription Plan */}
+      {planUser && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl max-w-md w-full overflow-hidden">
+            <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+              <h3 className="font-bold text-zinc-900 dark:text-white font-sans">Modifier le forfait d&apos;abonnement</h3>
+              <button onClick={() => setPlanUser(null)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleUpdatePlan} className="p-6 space-y-4 font-sans">
+              <div className="bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 text-xs p-3 rounded-xl border border-blue-200 dark:border-blue-900/30 flex items-start gap-2">
+                <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>Vous modifiez manuellement le forfait de <strong>{planUser.name}</strong> ({planUser.email}).</span>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Forfait d&apos;abonnement</label>
+                <select
+                  value={newPlanVal}
+                  onChange={(e) => setNewPlanVal(e.target.value as any)}
+                  className="w-full px-4 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 text-zinc-900 dark:text-white"
+                >
+                  <option value="FREE">FREE (Gratuit)</option>
+                  <option value="BASE">BASE (Débutant)</option>
+                  <option value="PRO">PRO (Professionnel)</option>
+                  <option value="MAX">MAX (Illimité)</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                disabled={modalLoading}
+                className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold text-sm transition-colors mt-6 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {modalLoading ? (
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Check className="w-4 h-4" />
+                )}
+                Enregistrer le Forfait
               </button>
             </form>
           </div>
