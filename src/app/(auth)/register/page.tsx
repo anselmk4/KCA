@@ -139,12 +139,18 @@ function RegisterForm() {
     setLoading(true);
     
     try {
-      // 1. Supabase Auth signup
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: { 
-          data: { full_name: name },
+          data: { 
+            full_name: name,
+            role: role || "STUDENT",
+            academy_name: academyName || null,
+            bio: bio || null,
+            student_level: studentLevel || null,
+            interest_course: interestCourse || null
+          },
           emailRedirectTo: `${window.location.origin}/auth/callback?next=/auth/confirmed`,
         }
       });

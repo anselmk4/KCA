@@ -24,44 +24,125 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login?error=auth-failed`);
   }
 
-  // Ensure profile exists (fallback if DB trigger did not fire)
-  const { data: profile } = await supabase
+  const targetRole = user.user_metadata?.role || 'STUDENT';
+  const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Utilisateur';
+
+  // 1. Ensure profile exists (fallback if trigger did not fire)
+  let { data: profile } = await supabase
     .from('profiles')
     .select('id, plan, status, full_name, email')
     .eq('id', user.id)
     .maybeSingle();
 
   if (!profile) {
-    const fullName =
-      user.user_metadata?.full_name ||
-      user.email?.split('@')[0] ||
-      'Utilisateur';
-
-    const { error: insertError } = await supabase.from('profiles').insert({
-      id: user.id,
-      email: user.email!,
-      full_name: fullName,
-      status: 'ACTIVE',
-      plan: 'FREE',
-    });
+    const { data: newProfile, error: insertError } = await supabase
+      .from('profiles')
+      .insert({
+        id: user.id,
+        email: user.email!,
+        full_name: fullName,
+        status: 'ACTIVE',
+        plan: 'FREE',
+      })
+      .select()
+      .single();
 
     if (insertError) {
       console.error('[callback] profile insert error:', insertError.message);
+    } else {
+      profile = newProfile;
     }
+  }
 
-    // Assign default STUDENT role if not already present
-    const { data: studentRole } = await supabase
-      .from('roles')
-      .select('id')
-      .eq('name', 'STUDENT')
-      .single();
+  // 2. Fetch the ID for the target role
+  const { data: targetDbRole } = await supabase
+    .from('roles')
+    .select('id')
+    .eq('name', targetRole)
+    .single();
 
-    if (studentRole) {
+  if (targetDbRole) {
+    // Check user's current roles
+    const { data: existingRoles } = await supabase
+      .from('user_roles')
+      .select('role_id')
+      .eq('user_id', user.id);
+
+    const hasTargetRole = existingRoles?.some(r => r.role_id === targetDbRole.id);
+
+    if (!hasTargetRole) {
+      // If registering as INSTRUCTOR, remove STUDENT role if trigger auto-created it
+      if (targetRole === 'INSTRUCTOR') {
+        const { data: studentDbRole } = await supabase
+          .from('roles')
+          .select('id')
+          .eq('name', 'STUDENT')
+          .single();
+
+        if (studentDbRole && existingRoles?.some(r => r.role_id === studentDbRole.id)) {
+          await supabase
+            .from('user_roles')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('role_id', studentDbRole.id);
+        }
+      }
+
+      // Upsert the target role
       await supabase.from('user_roles').upsert(
-        { user_id: user.id, role_id: studentRole.id },
+        { user_id: user.id, role_id: targetDbRole.id },
         { onConflict: 'user_id,role_id', ignoreDuplicates: true }
       );
     }
+  }
+
+  // 3. Save role-specific details to the profile in the DB if needed
+  if (targetRole === 'INSTRUCTOR') {
+    const academyName = user.user_metadata?.academy_name || 'Mon Académie';
+    const bio = user.user_metadata?.bio || '';
+    await supabase
+      .from('profiles')
+      .update({
+        plan: 'FREE',
+        academy_name: academyName,
+        bio: bio,
+      })
+      .eq('id', user.id);
+  } else {
+    // STUDENT
+    const studentLevel = user.user_metadata?.student_level || 'Débutant';
+    const interestCourse = user.user_metadata?.interest_course || 'blockchain';
+    const levelMap: Record<string, 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'> = {
+      'Débutant': 'BEGINNER',
+      'Intermédiaire': 'INTERMEDIATE',
+      'Avancé': 'ADVANCED',
+    };
+    await supabase
+      .from('profiles')
+      .update({
+        level: levelMap[studentLevel] || 'BEGINNER',
+      })
+      .eq('id', user.id);
+
+    // Auto-enroll in chosen course
+    const COURSE_MAP: Record<string, string> = {
+      blockchain: '10000000-0000-0000-0000-000000000001',
+      trading: '10000000-0000-0000-0000-000000000002',
+      ai: '10000000-0000-0000-0000-000000000003',
+      web3: '10000000-0000-0000-0000-000000000004',
+    };
+    const courseId = COURSE_MAP[interestCourse] || interestCourse;
+
+    await supabase.from('enrollments').upsert(
+      {
+        student_id: user.id,
+        course_id: courseId,
+        progress_percent: 0,
+        status: 'ACTIVE',
+        enrolled_at: new Date().toISOString(),
+      },
+      { onConflict: 'student_id,course_id', ignoreDuplicates: true }
+    );
   }
 
   // Resolve primary role for redirect
