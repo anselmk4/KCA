@@ -15,7 +15,7 @@ import {
   Users, Award, MapPin, Send, Loader2, MessageCircle,
   Trash2, ChevronDown, ChevronUp, User, GraduationCap,
   Star, TrendingUp, Clock, CheckCircle2, Edit3, LayoutDashboard,
-  Twitter, Youtube, Instagram, Linkedin, ArrowRight, Sparkles, Shield
+  ArrowRight, Sparkles, Shield
 } from "lucide-react";
 
 interface Profile {
