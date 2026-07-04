@@ -34,6 +34,7 @@ function RegisterForm() {
   const [interestCourse, setInterestCourse] = useState<string>("blockchain");
 
   const [formError, setFormError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -96,6 +97,7 @@ function RegisterForm() {
 
   const handleNext = () => {
     setFormError(null);
+    setSuccessMessage(null);
     if (step === 1) {
       if (!name.trim()) { setFormError("Le nom complet est requis."); return; }
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setFormError("Adresse email invalide."); return; }
@@ -105,6 +107,8 @@ function RegisterForm() {
   };
   
   const handlePrev = () => {
+    setFormError(null);
+    setSuccessMessage(null);
     if (step === 1) {
       setRole(null); // Go back to role selection
     } else {
@@ -135,7 +139,7 @@ function RegisterForm() {
     setLoading(true);
     
     try {
-      // 1. Sign up in Supabase Auth
+      // 1. Supabase Auth signup
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -153,12 +157,10 @@ function RegisterForm() {
           setFormError("Erreur lors de la création. Cet email est peut-être déjà utilisé.");
         } else if (msg.includes("password")) {
           setFormError("Mot de passe trop faible. Minimum 8 caractères.");
-        } else if (msg.includes("invalid email") || msg.includes("unable to validate email") || msg.includes("email address") && msg.includes("invalid")) {
+        } else if (msg.includes("invalid email") || msg.includes("unable to validate email")) {
           setFormError("Adresse email invalide.");
         } else if (msg.includes("email rate limit") || msg.includes("rate limit")) {
           setFormError("Trop de tentatives. Attendez quelques minutes et réessayez.");
-        } else if (msg.includes("email") && msg.includes("confirm")) {
-          setFormError("Un email de confirmation a été envoyé. Vérifiez votre boîte mail.");
         } else {
           setFormError(authError.message);
         }
@@ -168,85 +170,91 @@ function RegisterForm() {
 
       const sessionUser = authData.user;
       if (!sessionUser) {
-        setFormError("Erreur lors de l'inscription.");
+        setFormError("Erreur lors de l'inscription. Réessayez.");
         setLoading(false);
         return;
       }
 
-      // 2. Ensure profile exists in public.profiles and set proper role
-      await ensureProfile(sessionUser.id, email, name, role || "STUDENT");
+      // Check if session is immediately active (email confirmations disabled in Supabase)
+      const hasActiveSession = !!authData.session;
 
-      // 3. Update additional fields depending on role
-      if (role === "INSTRUCTOR") {
-        await supabase
-          .from("profiles")
-          .update({ 
+      if (hasActiveSession) {
+        // Email auto-confirmed — set up profile and redirect immediately
+        await ensureProfile(sessionUser.id, email, name, role || "STUDENT");
+
+        if (role === "INSTRUCTOR") {
+          await supabase.from("profiles").update({
             plan: "FREE",
             academy_name: academyName || "Mon Académie",
-            bio: bio
-          })
-          .eq("id", sessionUser.id);
+            bio: bio,
+          }).eq("id", sessionUser.id);
 
-        setSimulatedSession({
-          userId: sessionUser.id,
-          name,
-          email,
-          role: "INSTRUCTOR",
-          status: "ACTIVE",
-          plan: "FREE"
-        });
+          setSimulatedSession({
+            userId: sessionUser.id,
+            name,
+            email,
+            role: "INSTRUCTOR",
+            status: "ACTIVE",
+            plan: "FREE",
+          });
 
-        localStorage.setItem("kuettu_academy_name", academyName || "Mon Académie");
-        localStorage.setItem("kuettu_user_name", name);
+          localStorage.setItem("kuettu_academy_name", academyName || "Mon Académie");
+          localStorage.setItem("kuettu_user_name", name);
 
-        router.push("/instructor");
-      } else {
-        // STUDENT
-        const levelMap: Record<string, "BEGINNER" | "INTERMEDIATE" | "ADVANCED"> = {
-          "Débutant": "BEGINNER",
-          "Intermédiaire": "INTERMEDIATE",
-          "Avancé": "ADVANCED"
-        };
-        await supabase
-          .from("profiles")
-          .update({ level: levelMap[studentLevel] || "BEGINNER" })
-          .eq("id", sessionUser.id);
+          router.push("/instructor");
+        } else {
+          // STUDENT
+          const levelMap: Record<string, "BEGINNER" | "INTERMEDIATE" | "ADVANCED"> = {
+            "Débutant": "BEGINNER",
+            "Intermédiaire": "INTERMEDIATE",
+            "Avancé": "ADVANCED",
+          };
+          await supabase.from("profiles").update({
+            level: levelMap[studentLevel] || "BEGINNER",
+          }).eq("id", sessionUser.id);
 
-        setSimulatedSession({
-          userId: sessionUser.id,
-          name,
-          email,
-          role: "STUDENT",
-          status: "ACTIVE",
-          plan: "FREE"
-        });
+          setSimulatedSession({
+            userId: sessionUser.id,
+            name,
+            email,
+            role: "STUDENT",
+            status: "ACTIVE",
+            plan: "FREE",
+          });
 
-        localStorage.setItem("kuettu_user_name", name);
-        localStorage.setItem("kuettu_user_level", studentLevel);
-        localStorage.setItem("kuettu_active_module", interestCourse);
+          localStorage.setItem("kuettu_user_name", name);
+          localStorage.setItem("kuettu_user_level", studentLevel);
+          localStorage.setItem("kuettu_active_module", interestCourse);
 
-        // Auto-enroll in chosen course
-        const COURSE_MAP: Record<string, string> = {
-          blockchain: "10000000-0000-0000-0000-000000000001",
-          trading: "10000000-0000-0000-0000-000000000002",
-          ai: "10000000-0000-0000-0000-000000000003",
-          web3: "10000000-0000-0000-0000-000000000004",
-        };
-        const courseId = COURSE_MAP[interestCourse] || interestCourse;
+          // Auto-enroll in chosen course
+          const COURSE_MAP: Record<string, string> = {
+            blockchain: "10000000-0000-0000-0000-000000000001",
+            trading: "10000000-0000-0000-0000-000000000002",
+            ai: "10000000-0000-0000-0000-000000000003",
+            web3: "10000000-0000-0000-0000-000000000004",
+          };
+          const courseId = COURSE_MAP[interestCourse] || interestCourse;
 
-        const { error: enrollError } = await supabase.from("enrollments").upsert({
-          student_id: sessionUser.id,
-          course_id: courseId,
-          progress_percent: 0,
-          status: "ACTIVE",
-          enrolled_at: new Date().toISOString()
-        }, { onConflict: "student_id,course_id", ignoreDuplicates: true });
+          const { error: enrollError } = await supabase.from("enrollments").upsert({
+            student_id: sessionUser.id,
+            course_id: courseId,
+            progress_percent: 0,
+            status: "ACTIVE",
+            enrolled_at: new Date().toISOString(),
+          }, { onConflict: "student_id,course_id", ignoreDuplicates: true });
 
-        if (enrollError) {
-          console.error("Auto-enrollment error during registration:", enrollError.message);
+          if (enrollError) {
+            console.error("Auto-enrollment error during registration:", enrollError.message);
+          }
+
+          router.push("/dashboard");
         }
-
-        router.push("/dashboard");
+      } else {
+        // Email confirmation required — show success message, do NOT redirect
+        // The /auth/callback route will handle profile creation after email click
+        setSuccessMessage(
+          "Inscription réussie ! Un email de confirmation a été envoyé à " + email + ". Vérifiez votre boîte mail (et vos spams) puis cliquez sur le lien pour activer votre compte."
+        );
       }
     } catch (err: any) {
       setFormError(err.message || "Une erreur est survenue.");
@@ -340,6 +348,13 @@ function RegisterForm() {
           {formError && (
             <div className="px-4 py-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 text-xs text-red-700 dark:text-red-400 font-semibold rounded-xl animate-in fade-in">
               {formError}
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="px-4 py-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 text-xs text-emerald-700 dark:text-emerald-400 font-semibold rounded-xl animate-in fade-in flex items-start gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{successMessage}</span>
             </div>
           )}
           
