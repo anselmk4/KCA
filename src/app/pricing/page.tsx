@@ -176,7 +176,7 @@ export default function PricingPage() {
           <div className="border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 bg-white/40 dark:bg-zinc-950/20 max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-around gap-6 text-sm text-zinc-650 dark:text-zinc-400">
             <div className="flex items-center gap-3">
               <ShieldCheck className="w-6 h-6 text-teal-500 dark:text-teal-400" />
-              <span>Garantie de sécurité RDC/Afrique</span>
+              <span>Garantie de sécurité internationale</span>
             </div>
             <div className="flex items-center gap-3">
               <CreditCard className="w-6 h-6 text-teal-500 dark:text-teal-400" />

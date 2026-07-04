@@ -76,7 +76,7 @@ export function Footer() {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>Email: info@ansella.app</li>
               <li>Téléphone: +243990387237</li>
-              <li>Goma / Bukavu, RDC</li>
+              <li>Bukavu, RDC (Bureau International)</li>
             </ul>
           </div>
         </div>

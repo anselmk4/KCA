@@ -13,7 +13,7 @@ const partners = [
   { name: "McBuleli", logo: <McBuleliLogo className="w-6 h-6 shrink-0" /> },
   { name: "PECB", logo: <PECBLogo className="w-6 h-6 shrink-0" /> },
   { name: "Kivutech", logo: <KivutechLogo className="w-6 h-6 shrink-0" /> },
-  { name: "Anadec RDC", logo: <AnadecLogo className="w-6 h-6 shrink-0" /> }
+  { name: "Anadec", logo: <AnadecLogo className="w-6 h-6 shrink-0" /> }
 ];
 
 export function PartnersMarquee() {

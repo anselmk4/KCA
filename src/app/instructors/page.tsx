@@ -94,11 +94,11 @@ export default function InstructorsPage() {
             <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-[1.1] text-white">
               Apprenez des experts du{" "}
               <span className="bg-gradient-to-r from-teal-400 via-emerald-400 to-indigo-400 bg-clip-text text-transparent">
-                continent africain.
+                monde entier.
               </span>
             </h1>
             <p className="text-lg text-zinc-400">
-              Découvrez la liste complète des instructeurs qui partagent leur savoir et propulsent l&apos;entrepreneuriat numérique en Afrique.
+              Découvrez la liste complète des instructeurs qui partagent leur savoir et propulsent l&apos;entrepreneuriat numérique à l'échelle mondiale.
             </p>
           </div>
 

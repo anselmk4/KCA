@@ -20,15 +20,15 @@ export function Hero() {
           {/* Left Text Column */}
           <div className="lg:col-span-7 text-left space-y-8">
             
-            {/* Tag Congolais avec Animation d'entrée */}
+            {/* Badge mondial */}
             <motion.div 
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
-              className="inline-flex items-center rounded-full border border-teal-500/20 px-4 py-1.5 text-xs font-bold text-teal-400 bg-teal-950/30 backdrop-blur-md shadow-sm"
+              className="inline-flex items-center rounded-full border border-teal-500/30 px-4 py-1.5 text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/30 backdrop-blur-md shadow-sm"
             >
-              <span className="flex h-2 w-2 rounded-full bg-teal-400 mr-2 animate-pulse" />
-              🇨🇩 Plateforme 100% Congolaise
+              <span className="flex h-2 w-2 rounded-full bg-teal-500 dark:bg-teal-400 mr-2 animate-pulse" />
+              🌍 Plateforme LMS Mondiale
             </motion.div>
 
             {/* Title with Gradient Text */}
@@ -39,7 +39,7 @@ export function Hero() {
               className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1] text-zinc-900 dark:text-white"
             >
               Créez, vendez vos formations{" "}
-              <span className="bg-gradient-to-r from-teal-400 via-emerald-400 to-indigo-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-teal-500 via-teal-400 to-indigo-500 dark:from-teal-400 dark:via-emerald-400 dark:to-indigo-400 bg-clip-text text-transparent">
                 partout et facilement.
               </span>
             </motion.h1>
@@ -52,7 +52,7 @@ export function Hero() {
                 transition={{ duration: 0.6, delay: 0.2 }}
                 className="text-lg md:text-xl text-zinc-700 dark:text-zinc-300 font-semibold"
               >
-                ANSELLA est une plateforme 100% Congolaise tout-en-un.
+                ANSELLA est une plateforme LMS tout-en-un pensée pour le monde entier.
               </motion.p>
               
               <motion.p 
@@ -61,7 +61,7 @@ export function Hero() {
                 transition={{ duration: 0.6, delay: 0.3 }}
                 className="text-sm md:text-base text-zinc-600 dark:text-zinc-400 leading-relaxed"
               >
-                Hébergez vos cours, évaluez vos apprenants, encaissez vos gains en Mobile Money — et faites grandir votre académie sans limite.
+                Hébergez vos cours, évaluez vos apprenants, encaissez vos gains via Mobile Money, carte bancaire ou PayPal — et faites grandir votre académie sans frontières.
               </motion.p>
             </div>
 
@@ -76,7 +76,6 @@ export function Hero() {
                 href="/register" 
                 className="group relative inline-flex items-center justify-center rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white h-14 px-8 w-full sm:w-auto shadow-lg shadow-teal-500/20 overflow-hidden"
               >
-                {/* Glow button border animation effect */}
                 <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                 Créer mon académie gratuitement
                 <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
@@ -84,7 +83,7 @@ export function Hero() {
               
               <Link 
                 href="/courses" 
-                className="inline-flex items-center justify-center rounded-xl text-sm font-bold transition-all border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-white/50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-750 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white h-14 px-8 w-full sm:w-auto backdrop-blur-sm"
+                className="inline-flex items-center justify-center rounded-xl text-sm font-bold transition-all border border-zinc-300 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 bg-white/70 dark:bg-zinc-900/50 hover:bg-white dark:hover:bg-zinc-900 text-zinc-800 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white h-14 px-8 w-full sm:w-auto backdrop-blur-sm shadow-sm"
               >
                 Voir le catalogue
               </Link>
@@ -95,27 +94,27 @@ export function Hero() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.5 }}
-              className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 text-left border-t border-zinc-800/80 pt-8"
+              className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 text-left border-t border-zinc-200 dark:border-zinc-800/80 pt-8"
             >
               <div className="flex items-center gap-3">
-                <div className="bg-teal-950/50 p-2.5 rounded-xl border border-teal-500/20">
-                  <BookOpen className="h-5 w-5 text-teal-400" />
+                <div className="bg-teal-50 dark:bg-teal-950/50 p-2.5 rounded-xl border border-teal-200 dark:border-teal-500/20">
+                  <BookOpen className="h-5 w-5 text-teal-600 dark:text-teal-400" />
                 </div>
-                <span className="text-sm font-semibold text-zinc-300">Création intuitive</span>
+                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Création intuitive</span>
               </div>
               
               <div className="flex items-center gap-3">
-                <div className="bg-indigo-950/50 p-2.5 rounded-xl border border-indigo-500/20">
-                  <GraduationCap className="h-5 w-5 text-indigo-400" />
+                <div className="bg-indigo-50 dark:bg-indigo-950/50 p-2.5 rounded-xl border border-indigo-200 dark:border-indigo-500/20">
+                  <GraduationCap className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                 </div>
-                <span className="text-sm font-semibold text-zinc-300">Quiz & Diplômes</span>
+                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Quiz & Diplômes</span>
               </div>
               
               <div className="flex items-center gap-3">
-                <div className="bg-emerald-950/50 p-2.5 rounded-xl border border-emerald-500/20">
-                  <ShieldCheck className="h-5 w-5 text-emerald-400" />
+                <div className="bg-emerald-50 dark:bg-emerald-950/50 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-500/20">
+                  <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 </div>
-                <span className="text-sm font-semibold text-zinc-300">Paiements Locaux</span>
+                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Paiements Globaux</span>
               </div>
             </motion.div>
           </div>
@@ -132,7 +131,7 @@ export function Hero() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.8, delay: 0.2 }}
-                className="relative w-full h-[90%] rounded-3xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-white/60 dark:bg-zinc-950/60 backdrop-blur-md shadow-2xl p-6 flex flex-col gap-6"
+                className="relative w-full h-[90%] rounded-3xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/60 backdrop-blur-md shadow-2xl p-6 flex flex-col gap-6"
               >
                 {/* Header Mock */}
                 <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-900 pb-4">
@@ -141,45 +140,45 @@ export function Hero() {
                     <span className="w-3 h-3 rounded-full bg-yellow-500/80" />
                     <span className="w-3 h-3 rounded-full bg-green-500/80" />
                   </div>
-                  <span className="text-[10px] text-zinc-650 dark:text-zinc-400 bg-zinc-100/50 dark:bg-zinc-900/60 px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-800/50 font-mono">ansella.app/dashboard</span>
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900/60 px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-800/50 font-mono">ansella.app/dashboard</span>
                 </div>
 
                 {/* Simulated course creation layout */}
                 <div className="flex-1 space-y-4">
                   <div className="h-4 bg-zinc-200 dark:bg-zinc-900 rounded-lg w-1/3" />
-                  <div className="h-8 bg-zinc-200/50 dark:bg-zinc-900/50 rounded-xl w-3/4" />
+                  <div className="h-8 bg-zinc-100 dark:bg-zinc-900/50 rounded-xl w-3/4" />
                   <div className="grid grid-cols-2 gap-3 pt-2">
-                    <div className="bg-zinc-100/20 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-900 rounded-2xl p-4 space-y-1">
+                    <div className="bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-900 rounded-2xl p-4 space-y-1">
                       <p className="text-[10px] text-zinc-500 font-semibold uppercase">Revenus du mois</p>
-                      <p className="text-xl font-bold text-teal-400">$3,420</p>
+                      <p className="text-xl font-bold text-teal-600 dark:text-teal-400">$3,420</p>
                     </div>
-                    <div className="bg-zinc-100/20 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-900 rounded-2xl p-4 space-y-1">
+                    <div className="bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-900 rounded-2xl p-4 space-y-1">
                       <p className="text-[10px] text-zinc-500 font-semibold uppercase">Nouveaux élèves</p>
-                      <p className="text-xl font-bold text-indigo-400">+124</p>
+                      <p className="text-xl font-bold text-indigo-600 dark:text-indigo-400">+124</p>
                     </div>
                   </div>
-                  <div className="border border-zinc-200 dark:border-zinc-900 rounded-2xl p-4 bg-zinc-100/20 dark:bg-zinc-900/10 space-y-2 flex items-center justify-between gap-3">
+                  <div className="border border-zinc-200 dark:border-zinc-900 rounded-2xl p-4 bg-zinc-50 dark:bg-zinc-900/10 space-y-2 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center">
-                        <Play className="w-4 h-4 text-teal-400 fill-teal-400" />
+                      <div className="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-500/10 border border-teal-200 dark:border-teal-500/20 flex items-center justify-center">
+                        <Play className="w-4 h-4 text-teal-600 dark:text-teal-400 fill-teal-600 dark:fill-teal-400" />
                       </div>
                       <div>
                         <p className="text-xs font-bold text-zinc-900 dark:text-white">Introduction au Web3</p>
                         <p className="text-[9px] text-zinc-500">Vidéo • 12:45 min</p>
                       </div>
                     </div>
-                    <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold">En ligne</span>
+                    <span className="text-[9px] bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 px-2 py-0.5 rounded-full font-bold">En ligne</span>
                   </div>
                 </div>
               </motion.div>
 
-              {/* Floating Widget 1: Earnings (Micro-parallaxe / float animation) */}
+              {/* Floating Widget 1: Earnings */}
               <motion.div 
                 animate={{ y: [0, -10, 0] }}
                 transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute -top-4 -left-6 bg-white/85 dark:bg-zinc-950/80 backdrop-blur-xl border border-zinc-200 dark:border-zinc-850 rounded-2xl p-4 shadow-xl flex items-center gap-3 max-w-[190px]"
+                className="absolute -top-4 -left-6 bg-white dark:bg-zinc-950/80 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-xl flex items-center gap-3 max-w-[190px]"
               >
-                <div className="w-10 h-10 rounded-xl bg-teal-500/15 border border-teal-500/20 flex items-center justify-center text-teal-400 shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-teal-100 dark:bg-teal-500/15 border border-teal-200 dark:border-teal-500/20 flex items-center justify-center text-teal-600 dark:text-teal-400 shrink-0">
                   <DollarSign className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">
@@ -188,13 +187,13 @@ export function Hero() {
                 </div>
               </motion.div>
 
-              {/* Floating Widget 2: Students (Micro-parallaxe contrarié) */}
+              {/* Floating Widget 2: Students */}
               <motion.div 
                 animate={{ y: [0, 8, 0] }}
                 transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                className="absolute -bottom-6 -right-6 bg-white/85 dark:bg-zinc-950/80 backdrop-blur-xl border border-zinc-200 dark:border-zinc-850 rounded-2xl p-4 shadow-xl flex items-center gap-3 max-w-[200px]"
+                className="absolute -bottom-6 -right-6 bg-white dark:bg-zinc-950/80 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-xl flex items-center gap-3 max-w-[200px]"
               >
-                <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
                   <Users className="w-5 h-5" />
                 </div>
                 <div className="min-w-0">

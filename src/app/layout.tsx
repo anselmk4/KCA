@@ -8,12 +8,12 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "ANSELLA | Plateforme congolaise pour tous les Formateurs | Gagnez en faisant ce que vous aimez",
-  description: "Créez, hébergez et vendez vos formations en ligne en RDC et partout en Afrique. ANSELLA est une plateforme 100% congolaise permettant d'évaluer vos apprenants et d'encaisser vos gains directement par Mobile Money (M-Pesa, Orange Money, Airtel Money).",
+  title: "ANSELLA | Plateforme LMS Mondiale pour tous les Formateurs | Partagez votre savoir",
+  description: "Créez, hébergez et vendez vos formations en ligne dans le monde entier. ANSELLA est une plateforme LMS de classe mondiale permettant d'évaluer vos apprenants, de délivrer des certificats et d'encaisser vos gains facilement.",
   keywords: [
-    "ANSELLA", "SaaS LMS", "E-learning Congo", "RDC", "Formations en ligne", 
-    "Vendre des cours", "Mobile Money", "M-Pesa", "Orange Money", "Airtel Money",
-    "Blockchain", "Intelligence Artificielle", "Monétisation", "Formateurs africains"
+    "ANSELLA", "SaaS LMS", "E-learning", "Formations en ligne", 
+    "Vendre des cours", "Stripe", "PayPal", "Mobile Money",
+    "Blockchain", "Intelligence Artificielle", "Monétisation", "Formateurs"
   ],
   authors: [{ name: "ANSELLA Team", url: "https://ansella.app" }],
   creator: "ANSELLA",
@@ -23,8 +23,8 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   openGraph: {
-    title: "ANSELLA | Plateforme congolaise pour tous les Formateurs | Gagnez en faisant ce que vous aimez",
-    description: "Créez et vendez vos formations en ligne en RDC et en Afrique. Encaissez vos revenus directement par Mobile Money.",
+    title: "ANSELLA | Plateforme LMS Mondiale pour tous les Formateurs",
+    description: "Créez et vendez vos formations en ligne partout dans le monde. Encaissez vos revenus facilement.",
     url: "https://ansella.app",
     siteName: "ANSELLA",
     locale: "fr_FR",
@@ -32,8 +32,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "ANSELLA | Plateforme congolaise pour tous les Formateurs | Gagnez en faisant ce que vous aimez",
-    description: "Créez et vendez vos formations en ligne en RDC et en Afrique. Encaissez vos revenus directement par Mobile Money.",
+    title: "ANSELLA | Plateforme LMS Mondiale pour tous les Formateurs",
+    description: "Créez et vendez vos formations en ligne partout dans le monde. Encaissez vos revenus facilement.",
   },
   robots: {
     index: true,

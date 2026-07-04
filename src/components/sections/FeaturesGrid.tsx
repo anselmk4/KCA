@@ -66,9 +66,9 @@ export function FeaturesGrid() {
               <div className="bg-teal-500/15 w-12 h-12 rounded-2xl flex items-center justify-center text-teal-400 border border-teal-500/20">
                 <Smartphone className="h-6 w-6" />
               </div>
-              <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Paiements et Retraits Mobiles</h3>
+              <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Paiements et Retraits Flexibles</h3>
               <p className="text-sm text-zinc-650 dark:text-zinc-400 max-w-md leading-relaxed">
-                Encaissez les inscriptions en ligne et retirez vos gains directement via Airtel Money, M-Pesa et Orange Money. Pas besoin de cartes bancaires compliquées.
+                Encaissez les inscriptions en ligne et retirez vos gains par cartes bancaires, PayPal ou Mobile Money de manière simple et sécurisée.
               </p>
             </div>
 
@@ -80,7 +80,7 @@ export function FeaturesGrid() {
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
                   <p className="text-sm font-bold">$150.00 USD</p>
                 </div>
-                <p className="text-[10px] text-zinc-600 dark:text-zinc-450">Via M-Pesa • Bukavu, RDC</p>
+                <p className="text-[10px] text-zinc-600 dark:text-zinc-450">Via Stripe • Paris, FR</p>
               </div>
               
               <div className="flex flex-col gap-1.5 shrink-0 bg-white dark:bg-zinc-950/80 border border-zinc-200 dark:border-zinc-800/80 p-3 rounded-xl">

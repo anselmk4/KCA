@@ -33,23 +33,23 @@ export default function FeaturesPage() {
               </span>
             </h1>
             <p className="text-lg text-zinc-650 dark:text-zinc-400 leading-relaxed">
-              Explorez tous les outils haut de gamme développés spécifiquement pour concevoir, structurer, dispenser et rentabiliser vos cours en Afrique.
+              Explorez tous les outils haut de gamme développés spécifiquement pour concevoir, structurer, dispenser et rentabiliser vos cours dans le monde entier.
             </p>
           </div>
 
           {/* Grid of Main Features */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8">
             
-            {/* Feature 1: Mobile Money Integration */}
+            {/* Feature 1: Flexible & Global Payments */}
             <div className="bg-white/40 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800/80 rounded-3xl p-8 space-y-6 hover:border-zinc-350 dark:hover:border-zinc-700/80 transition-all group relative overflow-hidden text-left">
               <div className="absolute inset-0 bg-gradient-to-r from-teal-500/10 to-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
               <div className="bg-teal-500/15 w-12 h-12 rounded-2xl flex items-center justify-center text-teal-500 dark:text-teal-400 border border-teal-500/20 shrink-0">
                 <Smartphone className="h-6 w-6" />
               </div>
               <div className="space-y-3">
-                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Paiements Locaux & Mobile Money</h3>
+                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Paiements Flexibles & Globaux</h3>
                 <p className="text-zinc-650 dark:text-zinc-400 text-sm leading-relaxed">
-                  Encaissez directement les inscriptions via les réseaux Mobile Money les plus populaires (M-Pesa, Orange Money, Airtel Money). Retirez instantanément vos revenus d'instructeur sur votre propre compte mobile sans cartes bancaires ni intermédiaires compliqués.
+                  Encaissez directement les inscriptions via cartes bancaires, PayPal et les réseaux Mobile Money mondiaux et locaux. Retirez instantanément vos revenus d'instructeur de manière simple et sécurisée, sans intermédiaires compliqués.
                 </p>
               </div>
               <ul className="space-y-2.5 text-sm text-zinc-700 dark:text-zinc-300">

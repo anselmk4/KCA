@@ -610,7 +610,7 @@ export default function CertificatesPage() {
             <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-3">Pourquoi obtenir nos certificats ?</h3>
             <ul className="space-y-4 text-zinc-600 dark:text-zinc-400">
               {[
-                "Démontrez votre expertise auprès des employeurs en Afrique et à l'international.",
+                "Démontrez votre expertise auprès des employeurs à l'échelle internationale.",
                 "Lien de vérification unique pour votre profil LinkedIn.",
                 "Accédez à des opportunités exclusives au sein du réseau ANSELLA.",
               ].map((item, i) => (
@@ -637,7 +637,7 @@ export default function CertificatesPage() {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {["Expertise reconnue en Afrique et à l'international", "Lien de vérification unique pour LinkedIn", "Opportunités exclusives réseau ANSELLA"].map((item, i) => (
+            {["Expertise reconnue à l'échelle internationale", "Lien de vérification unique pour LinkedIn", "Opportunités exclusives réseau ANSELLA"].map((item, i) => (
               <div key={i} className="flex items-start gap-3 p-4 bg-white/50 dark:bg-zinc-900/30 rounded-xl">
                 <CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                 <span className="text-sm text-zinc-600 dark:text-zinc-400">{item}</span>

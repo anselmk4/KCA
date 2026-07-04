@@ -6,11 +6,11 @@ import { ChevronDown } from "lucide-react";
 const faqs = [
   {
     q: "Comment mes apprenants payent-ils mes formations ?",
-    a: "Vos apprenants peuvent acheter vos cours en utilisant les moyens de paiement locaux les plus populaires en Afrique : Airtel Money, M-Pesa, Orange Money, ainsi que par carte bancaire (Stripe) et PayPal."
+    a: "Vos apprenants peuvent acheter vos cours en utilisant les moyens de paiement les plus populaires : Mobile Money (Airtel Money, M-Pesa, Orange Money), carte bancaire (Stripe) et PayPal — disponibles à l'international."
   },
   {
     q: "Comment puis-je retirer les revenus générés par mes ventes ?",
-    a: "Vous pouvez initier des retraits de vos gains accumulés à tout moment directement vers votre compte Mobile Money (Airtel, M-Pesa, Orange), PayPal ou par virement bancaire depuis votre tableau de bord instructeur."
+    a: "Vous pouvez initier des retraits de vos gains à tout moment directement vers votre compte Mobile Money, PayPal ou par virement bancaire depuis votre tableau de bord instructeur."
   },
   {
     q: "Quelles sont les limites du Plan Free ?",
@@ -34,11 +34,14 @@ export function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section className="py-24 bg-zinc-50 dark:bg-zinc-900/50">
+    <section className="py-24 bg-white/40 dark:bg-zinc-900/30 border-t border-zinc-200 dark:border-zinc-900">
       <div className="container mx-auto px-4 md:px-8 max-w-3xl">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold mb-4">Questions fréquentes</h2>
-          <p className="text-lg text-muted-foreground">
+          <span className="text-xs font-bold text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-3.5 py-1 rounded-full uppercase tracking-widest inline-block mb-4">
+            FAQ
+          </span>
+          <h2 className="text-3xl md:text-5xl font-bold mb-4 text-zinc-900 dark:text-white">Questions fréquentes</h2>
+          <p className="text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed">
             Tout ce que vous devez savoir pour lancer et gérer votre académie avec ANSELLA.
           </p>
         </div>
@@ -49,7 +52,7 @@ export function FAQ() {
             return (
               <div
                 key={index}
-                className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden"
+                className="bg-white/60 dark:bg-zinc-900/40 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors"
               >
                 <button
                   onClick={() => setOpenIndex(isOpen ? null : index)}
@@ -59,7 +62,7 @@ export function FAQ() {
                   <ChevronDown className={`w-5 h-5 text-zinc-500 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                 </button>
                 {isOpen && (
-                  <div className="px-6 pb-6 text-zinc-600 dark:text-zinc-400 leading-relaxed animate-in fade-in slide-in-from-top-1">
+                  <div className="px-6 pb-6 text-zinc-600 dark:text-zinc-400 leading-relaxed text-sm animate-in fade-in slide-in-from-top-1">
                     {faq.a}
                   </div>
                 )}

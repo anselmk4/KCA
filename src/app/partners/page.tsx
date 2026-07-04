@@ -54,15 +54,15 @@ const partnersList = [
   {
     name: "Kivutech",
     role: "Incubateur & Innovation technologique",
-    desc: "Kivutech soutient l'innovation numérique locale dans l'est de la RDC. Ce partenariat permet de sourcer les talents tech et de leur offrir des formations de haut niveau en intelligence artificielle et développement d'applications.",
+    desc: "Kivutech soutient l'innovation numérique locale à l'échelle régionale et internationale. Ce partenariat permet de sourcer les talents tech et de leur offrir des formations de haut niveau en intelligence artificielle et développement d'applications.",
     logo: <KivutechLogo className="w-12 h-12" />,
     color: "from-teal-600/10 to-emerald-500/5",
     border: "hover:border-teal-600/40"
   },
   {
-    name: "Anadec RDC",
+    name: "Anadec",
     role: "Appui Institutionnel à l'Entrepreneuriat",
-    desc: "L'Agence Nationale pour le Développement de l'Entrepreneuriat Congolais soutient nos initiatives d'autonomisation des jeunes créateurs en facilitant l'accès aux dispositifs d'accompagnement de l'État.",
+    desc: "L'Agence Nationale pour le Développement de l'Entrepreneuriat soutient nos initiatives d'autonomisation des jeunes créateurs en facilitant l'accès aux dispositifs d'accompagnement de l'État.",
     logo: <AnadecLogo className="w-12 h-12" />,
     color: "from-sky-500/10 to-blue-600/5",
     border: "hover:border-sky-500/40"
@@ -109,8 +109,8 @@ export default function PartnersPage() {
             </div>
             <div className="bg-white/40 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-900 rounded-2xl p-6 text-left space-y-3">
               <Target className="w-8 h-8 text-teal-500 dark:text-teal-400" />
-              <h3 className="font-bold text-zinc-900 dark:text-white text-base">Impact Local</h3>
-              <p className="text-xs text-zinc-650 dark:text-zinc-400 leading-relaxed">Des opportunités concrètes et adaptées aux réalités économiques de la RDC.</p>
+              <h3 className="font-bold text-zinc-900 dark:text-white text-base">Impact Global</h3>
+              <p className="text-xs text-zinc-650 dark:text-zinc-400 leading-relaxed">Des opportunités concrètes et adaptées aux réalités économiques de chaque marché.</p>
             </div>
           </div>
 
@@ -154,7 +154,7 @@ export default function PartnersPage() {
             <div className="space-y-2 max-w-xl mx-auto">
               <h2 className="text-2xl md:text-3xl font-black">Devenir partenaire Ansella</h2>
               <p className="text-sm text-zinc-300 leading-relaxed">
-                Vous souhaitez collaborer avec nous pour autonomiser les entrepreneurs numériques d&apos;Afrique ? Écrivez-nous pour initier un partenariat.
+                Vous souhaitez collaborer avec nous pour autonomiser les entrepreneurs numériques dans le monde ? Écrivez-nous pour initier un partenariat.
               </p>
             </div>
             <a 

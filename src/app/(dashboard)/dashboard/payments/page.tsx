@@ -146,7 +146,7 @@ export default function StudentPaymentsPage() {
                   <tr>
                     <td>
                       ANSELLA Academy Inc.<br>
-                      Kinshasa, RDC / Dakar, Sénégal<br>
+                      Bureau de facturation international<br>
                       support@ansella.app
                     </td>
                     <td>

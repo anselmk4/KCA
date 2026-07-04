@@ -29,7 +29,7 @@ export default function TermsPage() {
                 1. Acceptation des Conditions
               </h2>
               <p>
-                En accédant et en utilisant la plateforme éducative ANSELLA, vous acceptez d&apos;être lié par les présentes conditions générales d&apos;utilisation, toutes les lois et réglementations applicables en République Démocratique du Congo (RDC) et dans les autres pays d&apos;Afrique où la plateforme opère. Si vous n&apos;acceptez pas ces conditions, vous ne devez pas utiliser le service.
+                En accédant et en utilisant la plateforme éducative ANSELLA, vous acceptez d&apos;être lié par les présentes conditions générales d&apos;utilisation, toutes les lois et réglementations applicables à l&apos;échelle internationale et locale. Si vous n&apos;acceptez pas ces conditions, vous ne devez pas utiliser le service.
               </p>
             </section>
 

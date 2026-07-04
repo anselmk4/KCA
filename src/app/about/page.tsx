@@ -46,17 +46,17 @@ export default function AboutPage() {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="text-4xl md:text-6xl font-black tracking-tight leading-[1.1] text-zinc-900 dark:text-white"
             >
-              Révolutionner l&apos;éducation numérique en{" "}
-              <span className="bg-gradient-to-r from-teal-500 via-teal-450 to-indigo-500 dark:from-teal-400 dark:to-indigo-400 bg-clip-text text-transparent">RDC & en Afrique</span>
+              Révolutionner l&apos;éducation numérique dans le{" "}
+              <span className="bg-gradient-to-r from-teal-500 via-teal-450 to-indigo-500 dark:from-teal-400 dark:to-indigo-400 bg-clip-text text-transparent">Monde Entier</span>
             </motion.h1>
             
             <motion.p 
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="text-lg md:text-xl text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed"
+              className="text-lg md:text-xl text-zinc-650 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed"
             >
-              Une plateforme 100% Congolaise tout-en-un conçue pour autonomiser les formateurs, experts et apprenants grâce aux technologies modernes.
+              Une plateforme LMS tout-en-un de classe mondiale conçue pour autonomiser les formateurs, experts et apprenants grâce aux technologies modernes.
             </motion.p>
           </div>
         </section>
@@ -96,13 +96,13 @@ export default function AboutPage() {
                 </p>
                 <div className="space-y-4 text-zinc-650 dark:text-zinc-400 leading-relaxed text-sm md:text-base">
                   <p>
-                    Reconnu pour son esprit d&apos;innovation exceptionnel et son leadership pragmatique, l&apos;<strong>Ingénieur Ansel Makomo</strong> est l&apos;architecte principal d&apos;ANSELLA. Sous sa direction inspirée au sein de <strong>Kuettu Corporation SARL</strong>, il façonne le futur de la technologie éducative et financière en Afrique centrale.
+                    Reconnu pour son esprit d&apos;innovation exceptionnel et son leadership pragmatique, l&apos;<strong>Ingénieur Ansel Makomo</strong> est l&apos;architecte principal d&apos;ANSELLA. Sous sa direction inspirée au sein de <strong>Kuettu Corporation SARL</strong>, il façonne le futur de la technologie éducative et financière à l'échelle internationale.
                   </p>
                   <p>
-                    Doté d&apos;une expertise technique remarquable et d&apos;une vision d&apos;impact sociétal hors pair, l&apos;Ingénieur Ansel Makomo s&apos;efforce de briser les barrières d&apos;accès au savoir de pointe (Blockchain, Web3, Intelligence Artificielle). Sa rigueur académique combinée à une compréhension fine des réalités du continent africain fait de lui l&apos;un des leaders technologiques les plus visionnaires de sa génération.
+                    Doté d&apos;une expertise technique remarquable et d&apos;une vision d&apos;impact sociétal hors pair, l&apos;Ingénieur Ansel Makomo s&apos;efforce de briser les barrières d&apos;accès au savoir de pointe (Blockchain, Web3, Intelligence Artificielle). Sa rigueur académique combinée à une compréhension fine des réalités du secteur éducatif fait de lui l&apos;un des leaders technologiques les plus visionnaires de sa génération.
                   </p>
                   <p>
-                    À travers ANSELLA, il offre aux créateurs de contenu locaux une infrastructure robuste et souveraine, démontrant qu&apos;une solution 100% congolaise peut égaler et surpasser les standards technologiques internationaux.
+                    À travers ANSELLA, il offre aux créateurs de contenu une infrastructure robuste et souveraine, démontrant qu&apos;une solution globale et innovante peut redéfinir les standards technologiques internationaux.
                   </p>
                 </div>
               </motion.div>
@@ -133,8 +133,8 @@ export default function AboutPage() {
                   <ShieldCheck className="h-6 w-6 text-red-500 dark:text-red-400" />
                 </div>
                 <h3 className="text-lg font-bold mb-3 text-zinc-900 dark:text-white">Le Problème Résolu</h3>
-                <p className="text-zinc-600 dark:text-zinc-400 text-xs md:text-sm leading-relaxed">
-                  En RDC et dans de nombreux pays africains, les créateurs de cours et experts faisaient face à un obstacle insurmontable : l&apos;impossibilité d&apos;intégrer facilement les paiements par Mobile Money (M-Pesa, Airtel Money, Orange Money) sur les plateformes éducatives occidentales. Les apprenants sans carte bancaire étaient exclus du savoir en ligne, et les formateurs ne pouvaient pas monétiser leur expertise localement.
+                <p className="text-zinc-650 dark:text-zinc-400 text-xs md:text-sm leading-relaxed">
+                  De nombreux créateurs de cours et experts faisaient face à des obstacles majeurs : l&apos;impossibilité d&apos;intégrer facilement les paiements locaux et internationaux sur les plateformes éducatives occidentales. Les apprenants sans carte bancaire classique ou outils de paiement mondiaux étaient exclus du savoir en ligne, et les formateurs ne pouvaient pas monétiser leur expertise de manière flexible.
                 </p>
               </motion.div>
 
@@ -144,8 +144,8 @@ export default function AboutPage() {
                   <GraduationCap className="h-6 w-6 text-teal-650 dark:text-teal-400" />
                 </div>
                 <h3 className="text-lg font-bold mb-3 text-zinc-900 dark:text-white">Notre Solution</h3>
-                <p className="text-zinc-600 dark:text-zinc-400 text-xs md:text-sm leading-relaxed">
-                  ANSELLA est née pour unifier l&apos;apprentissage en ligne et la finance mobile africaine. Conçue par Kuettu Corporation SARL, elle propose un LMS moderne, fluide, sécurisé et nativement connecté aux services de paiement locaux. Désormais, n&apos;importe quel formateur peut lancer son académie certifiante en quelques minutes et collecter ses gains instantanément.
+                <p className="text-zinc-650 dark:text-zinc-400 text-xs md:text-sm leading-relaxed">
+                  ANSELLA est née pour unifier l&apos;apprentissage en ligne et la finance numérique moderne. Conçue par Kuettu Corporation SARL, elle propose un LMS moderne, fluide, sécurisé et nativement connecté aux services de paiement mondiaux et locaux. Désormais, n&apos;importe quel formateur peut lancer son académie certifiante en quelques minutes et collecter ses gains instantanément.
                 </p>
               </motion.div>
             </motion.div>
@@ -233,7 +233,7 @@ export default function AboutPage() {
                 <div className="space-y-6">
                   <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Notre Siège Social</h3>
                   <p className="text-zinc-650 dark:text-zinc-400 text-xs md:text-sm leading-relaxed">
-                    Situé dans la ville de Bukavu en République Démocratique du Congo, le siège d&apos;ANSELLA et de Kuettu Corporation SARL pilote le développement de la plateforme pour toute l&apos;Afrique.
+                    Le siège d&apos;ANSELLA et de Kuettu Corporation SARL pilote le développement technologique de la plateforme pour toute son audience mondiale.
                   </p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -243,7 +243,7 @@ export default function AboutPage() {
                       </div>
                       <div>
                         <h4 className="font-bold text-xs text-zinc-900 dark:text-white">Adresse</h4>
-                        <p className="text-[11px] text-zinc-550 dark:text-zinc-500 mt-0.5">Bukavu, Sud-Kivu, RDC</p>
+                        <p className="text-[11px] text-zinc-550 dark:text-zinc-500 mt-0.5">Bukavu, RDC (Bureau International)</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">

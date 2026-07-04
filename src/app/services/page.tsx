@@ -16,7 +16,7 @@ export default function ServicesPage() {
     {
       icon: <Landmark className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />,
       title: "Paiements Mobiles Sécurisés",
-      desc: "Pas besoin de comptes bancaires compliqués ou de passerelles inaccessibles. Encaissez vos élèves par Airtel Money, M-Pesa, Orange Money ou carte de crédit directement dans toute la RDC.",
+      desc: "Pas besoin de comptes bancaires compliqués ou de passerelles inaccessibles. Encaissez vos élèves par Airtel Money, M-Pesa, Orange Money, carte de crédit ou PayPal directement dans le monde entier.",
       bgGlow: "group-hover:shadow-[0_0_25px_rgba(16,185,129,0.15)] group-hover:border-emerald-500/50"
     },
     {
@@ -28,7 +28,7 @@ export default function ServicesPage() {
     {
       icon: <MessageCircle className="h-6 w-6 text-pink-500 dark:text-pink-400" />,
       title: "Accompagnement & Conseil",
-      desc: "Notre équipe vous aide à structurer vos modules de formation, à enregistrer vos vidéos et à optimiser vos tunnels de vente pour maximiser vos revenus en Afrique centrale.",
+      desc: "Notre équipe vous aide à structurer vos modules de formation, à enregistrer vos vidéos et à optimiser vos tunnels de vente pour maximiser vos revenus à l'international.",
       bgGlow: "group-hover:shadow-[0_0_25px_rgba(236,72,153,0.15)] group-hover:border-pink-500/50"
     }
   ];
@@ -68,10 +68,10 @@ export default function ServicesPage() {
             </span>
             <h1 className="text-4xl md:text-6xl font-black mb-6 text-zinc-900 dark:text-white leading-tight">
               Tout pour créer et monétiser vos{" "}
-              <span className="bg-gradient-to-r from-teal-500 via-teal-450 to-indigo-500 dark:from-teal-400 dark:to-indigo-400 bg-clip-text text-transparent">formations en Afrique.</span>
+              <span className="bg-gradient-to-r from-teal-500 via-teal-450 to-indigo-500 dark:from-teal-400 dark:to-indigo-400 bg-clip-text text-transparent">formations partout dans le monde.</span>
             </h1>
             <p className="text-base text-zinc-650 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-              Des technologies de pointe et un accompagnement local pour propulser votre académie en ligne.
+              Des technologies de pointe et un accompagnement sur mesure pour propulser votre académie en ligne.
             </p>
           </motion.div>
 

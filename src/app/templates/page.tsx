@@ -217,7 +217,7 @@ export default function TemplatesPage() {
                 <h2 className="text-2xl font-bold flex items-center gap-2">
                   <Users className="w-5 h-5 text-teal-400" /> Formateurs Ansella
                 </h2>
-                <p className="text-xs text-zinc-550 dark:text-zinc-500 mt-1">Apprenez auprès des professionnels et experts reconnus en RDC.</p>
+                <p className="text-xs text-zinc-550 dark:text-zinc-500 mt-1">Apprenez auprès des professionnels et experts reconnus mondialement.</p>
               </div>
               <Link href="/instructors" className="inline-flex items-center gap-1.5 text-sm text-teal-500 dark:text-teal-400 hover:underline">
                 Voir tous les formateurs <ArrowRight className="w-4 h-4" />
