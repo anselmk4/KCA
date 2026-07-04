@@ -163,8 +163,9 @@ export async function GET(request: Request) {
   else if (roleNames.includes('TEACHING_ASSISTANT')) role = 'TEACHING_ASSISTANT';
 
   // /auth/confirmed is a special page — always honor it (email confirmation landing)
+  // Pass resolved role so the page can bootstrap the session client-side
   if (next === '/auth/confirmed') {
-    return NextResponse.redirect(`${origin}/auth/confirmed`);
+    return NextResponse.redirect(`${origin}/auth/confirmed?role=${role}`);
   }
 
   // For all other `next` values, redirect based on role

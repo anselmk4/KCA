@@ -70,18 +70,30 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
       return;
     }
     setSession(s);
-    setAcademyName(localStorage.getItem("kuettu_academy_name") || "Mon Académie");
-    const handleStorage = () => {
-      setSession(getSimulatedSession());
-      setAcademyName(localStorage.getItem("kuettu_academy_name") || "Mon Académie");
-    };
-    window.addEventListener("storage", handleStorage);
 
-    // Get Supabase userId for profile link
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserId(user.id);
+    // Fetch academy name from Supabase profile
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (user) {
+        setUserId(user.id);
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("academy_name, full_name")
+          .eq("id", user.id)
+          .single();
+        if (profile?.academy_name) {
+          setAcademyName(profile.academy_name);
+        } else if (profile?.full_name) {
+          setAcademyName(`Académie de ${profile.full_name}`);
+        } else {
+          setAcademyName("Mon Académie");
+        }
+      }
     });
 
+    const handleStorage = () => {
+      setSession(getSimulatedSession());
+    };
+    window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
   }, [router]);
 

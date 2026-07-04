@@ -1,10 +1,91 @@
 "use client";
 
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { CheckCircle2, ArrowRight, Sparkles, ShieldCheck } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { CheckCircle2, ArrowRight, Sparkles, ShieldCheck, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
+import { fetchUserProfile } from "@/lib/supabase/auth-helpers";
+import { setSimulatedSession } from "@/lib/rbac";
 
-export default function ConfirmedPage() {
+function ConfirmedContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [loading, setLoading] = useState(true);
+  const [dashboardHref, setDashboardHref] = useState("/login");
+  const [dashboardLabel, setDashboardLabel] = useState("Se connecter à mon Espace");
+
+  useEffect(() => {
+    async function bootstrapSession() {
+      try {
+        // The cookie-based Supabase session was set by the server callback.
+        // We now need to sync it to the client and read the profile + role.
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (session?.user) {
+          const profile = await fetchUserProfile(session.user.id);
+          if (profile) {
+            setSimulatedSession({
+              userId: profile.id,
+              name: profile.full_name,
+              email: profile.email,
+              role: profile.role,
+              status: profile.status === "ACTIVE" ? "ACTIVE" : "INACTIVE",
+              plan: profile.plan,
+            });
+
+            if (
+              profile.role === "SUPER_ADMIN" ||
+              profile.role === "ADMIN" ||
+              profile.role === "FINANCE_ADMIN" ||
+              profile.role === "ACADEMIC_ADMIN" ||
+              profile.role === "SUPPORT_AGENT"
+            ) {
+              setDashboardHref("/admin");
+              setDashboardLabel("Accéder au Panneau Admin");
+            } else if (profile.role === "INSTRUCTOR" || profile.role === "TEACHING_ASSISTANT") {
+              setDashboardHref("/instructor");
+              setDashboardLabel("Accéder à mon Espace Formateur");
+            } else {
+              setDashboardHref("/dashboard");
+              setDashboardLabel("Accéder à mon Espace Apprenant");
+            }
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Fallback: no session found → use role query param from callback
+        const roleParam = searchParams.get("role") || "STUDENT";
+        if (roleParam === "INSTRUCTOR" || roleParam === "TEACHING_ASSISTANT") {
+          setDashboardHref("/instructor");
+          setDashboardLabel("Accéder à mon Espace Formateur");
+        } else if (
+          roleParam === "ADMIN" ||
+          roleParam === "SUPER_ADMIN" ||
+          roleParam === "FINANCE_ADMIN" ||
+          roleParam === "ACADEMIC_ADMIN" ||
+          roleParam === "SUPPORT_AGENT"
+        ) {
+          setDashboardHref("/admin");
+          setDashboardLabel("Accéder au Panneau Admin");
+        } else {
+          setDashboardHref("/dashboard");
+          setDashboardLabel("Accéder à mon Espace Apprenant");
+        }
+      } catch (err) {
+        console.error("[confirmed] session bootstrap error:", err);
+        setDashboardHref("/login");
+        setDashboardLabel("Se connecter à mon Espace");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    bootstrapSession();
+  }, [searchParams, router]);
+
   return (
     <div className="min-h-screen flex flex-col justify-between bg-zinc-50 dark:bg-zinc-950 font-sans relative overflow-hidden">
       {/* Abstract Glowing shapes */}
@@ -15,6 +96,9 @@ export default function ConfirmedPage() {
       <header className="z-10 w-full max-w-7xl mx-auto px-6 py-6 flex justify-between items-center">
         <Link href="/">
           <Image src="/logo.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto" priority />
+        </Link>
+        <Link href="/" className="text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
+          ← Retour à l&apos;accueil
         </Link>
       </header>
 
@@ -43,13 +127,20 @@ export default function ConfirmedPage() {
             Votre adresse email a été vérifiée avec succès. Votre compte est maintenant activé et prêt à être utilisé sur la plateforme ANSELLA.
           </p>
 
-          <Link
-            href="/login"
-            className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] duration-200 cursor-pointer text-sm"
-          >
-            <span>Se connecter à mon Espace</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
+          {loading ? (
+            <div className="w-full py-4 px-6 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-zinc-500 text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Préparation de votre espace...</span>
+            </div>
+          ) : (
+            <Link
+              href={dashboardHref}
+              className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] duration-200 cursor-pointer text-sm"
+            >
+              <span>{dashboardLabel}</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          )}
 
           <div className="mt-6 flex items-center gap-2 text-xxs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
@@ -64,5 +155,17 @@ export default function ConfirmedPage() {
         © {new Date().getFullYear()} Ansella Inc. Tous droits réservés.
       </footer>
     </div>
+  );
+}
+
+export default function ConfirmedPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+      </div>
+    }>
+      <ConfirmedContent />
+    </Suspense>
   );
 }

@@ -149,8 +149,13 @@ export default function LoginPage() {
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-teal-500/10 dark:bg-teal-500/5 rounded-full blur-[120px] -ml-40 -mb-40 animate-pulse duration-[8000ms]" />
 
         {/* Header Branding */}
-        <div className="z-10 flex items-center">
-          <Image src="/logo.png" alt="ANSELLA Logo" width={160} height={48} className="object-contain h-10 w-auto" priority />
+        <div className="z-10 flex items-center justify-between">
+          <Link href="/">
+            <Image src="/logo.png" alt="ANSELLA Logo" width={160} height={48} className="object-contain h-10 w-auto" priority />
+          </Link>
+          <Link href="/" className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-white transition-colors font-medium">
+            ← Accueil
+          </Link>
         </div>
 
         {/* Catchy advertisement and logo representation */}
@@ -207,9 +212,14 @@ export default function LoginPage() {
 
           {/* Top Brand representing mobile view logo */}
           <div className="flex flex-col items-center mb-8">
-            <Link href="/" className="lg:hidden flex items-center mb-6">
-              <Image src="/logo.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto" priority />
+            <Link href="/" className="flex items-center mb-6">
+              <Image src="/logo.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto lg:hidden" priority />
             </Link>
+            <div className="w-full flex justify-end mb-4 lg:hidden">
+              <Link href="/" className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-white transition-colors font-medium">
+                ← Retour à l&apos;accueil
+              </Link>
+            </div>
             <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Bienvenue sur Ansella</h2>
             <p className="text-zinc-500 dark:text-zinc-400 text-center text-sm">
               Connectez-vous à votre académie ou à votre espace apprenant.

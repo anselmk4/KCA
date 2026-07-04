@@ -32,7 +32,6 @@ export default function InstructorDashboardPage() {
   useEffect(() => {
     const activeSession = getSimulatedSession();
     setSession(activeSession);
-    setAcademyName(localStorage.getItem("kuettu_academy_name") || "Kuettu Crypto Academy");
     if (!activeSession) {
       setLoading(false);
       return;
@@ -43,6 +42,19 @@ export default function InstructorDashboardPage() {
     async function loadDashboardData() {
       setLoading(true);
       try {
+
+        // 0. Fetch academy name from Supabase profile
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("academy_name, full_name")
+          .eq("id", instructorId)
+          .single();
+
+        if (profileData?.academy_name) {
+          setAcademyName(profileData.academy_name);
+        } else if (profileData?.full_name) {
+          setAcademyName(`Académie de ${profileData.full_name}`);
+        }
 
         // 1. Fetch courses owned by the instructor
         const { data: coursesData } = await supabase
@@ -68,7 +80,7 @@ export default function InstructorDashboardPage() {
             student_id, 
             course_id, 
             progress_percent, 
-            joined_at, 
+            enrolled_at, 
             profiles(id, full_name, email, avatar_url)
           `)
           .in("course_id", courseIds);
@@ -125,14 +137,14 @@ export default function InstructorDashboardPage() {
 
         // 6. Map recent enrollments
         const sortedEnrolls = [...enrollList]
-          .sort((a: any, b: any) => new Date(b.joined_at).getTime() - new Date(a.joined_at).getTime())
+          .sort((a: any, b: any) => new Date(b.enrolled_at || b.created_at || 0).getTime() - new Date(a.enrolled_at || a.created_at || 0).getTime())
           .slice(0, 5)
           .map((enr: any) => ({
             id: enr.id,
             studentName: enr.profiles?.full_name || "Étudiant",
             studentInit: enr.profiles?.full_name?.charAt(0) || "?",
             courseTitle: coursesList.find((c: any) => c.id === enr.course_id)?.title || "Cours",
-            joinedAt: enr.joined_at
+            joinedAt: enr.enrolled_at || enr.created_at
           }));
         setRecentEnrollments(sortedEnrolls);
 
