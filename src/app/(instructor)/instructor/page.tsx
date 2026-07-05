@@ -193,6 +193,42 @@ export default function InstructorDashboardPage() {
         </div>
       </div>
 
+      {/* Plan Free Limitations Card / Upgrade Invite Banner */}
+      {session?.plan === "FREE" && (
+        <div className="bg-gradient-to-r from-red-500/10 via-amber-500/10 to-blue-500/10 border-2 border-dashed border-red-500/30 rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6 shadow-md relative overflow-hidden text-left">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/5 dark:bg-red-500/5 rounded-full blur-[40px] pointer-events-none -mr-16 -mt-16" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/5 dark:bg-blue-500/5 rounded-full blur-[40px] pointer-events-none -ml-16 -mb-16" />
+          
+          <div className="space-y-3 z-10 max-w-2xl">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-[10px] font-bold uppercase tracking-wider rounded-lg">
+              ⚠️ Plan d&apos;essai gratuit actif
+            </span>
+            <h2 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white leading-snug">
+              Boostez votre Académie en passant au Plan Supérieur !
+            </h2>
+            <p className="text-xs md:text-sm text-zinc-650 dark:text-zinc-400 leading-relaxed font-medium">
+              Votre plan actuel est limité à <span className="font-bold text-zinc-900 dark:text-white">1 cours actif</span>, <span className="font-bold text-zinc-900 dark:text-white">15 apprenants</span> et comporte des frais de transaction de <span className="font-bold text-zinc-900 dark:text-white">50%</span>. 
+              Passez au Plan supérieur pour débloquer les <span className="font-semibold text-blue-600 dark:text-blue-400">sessions live</span>, réduire vos frais de transaction à <span className="font-semibold text-teal-600 dark:text-teal-400">10% ou moins</span> et accueillir des élèves en illimité.
+            </p>
+          </div>
+          <div className="shrink-0 z-10 flex flex-col sm:flex-row lg:flex-col gap-3">
+            <Link
+              href="/instructor/billing"
+              className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-md transition-all text-center flex items-center justify-center gap-2 cursor-pointer"
+            >
+              Passer à l&apos;offre supérieure
+              <TrendingUp className="w-4 h-4" />
+            </Link>
+            <Link
+              href="/instructor/billing"
+              className="px-6 py-3 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-850 text-zinc-650 dark:text-zinc-350 font-bold text-xs rounded-xl transition-all text-center cursor-pointer"
+            >
+              Voir tous les tarifs & avantages
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* KPI Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Revenue */}

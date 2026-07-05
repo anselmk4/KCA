@@ -71,13 +71,13 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
     }
     setSession(s);
 
-    // Fetch academy name from Supabase profile
+    // Fetch academy name and plan from Supabase profile
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) {
         setUserId(user.id);
         const { data: profile } = await supabase
           .from("profiles")
-          .select("academy_name, full_name")
+          .select("academy_name, full_name, plan")
           .eq("id", user.id)
           .single();
         if (profile?.academy_name) {
@@ -86,6 +86,9 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
           setAcademyName(`Académie de ${profile.full_name}`);
         } else {
           setAcademyName("Mon Académie");
+        }
+        if (profile?.plan) {
+          setSession((prev: any) => prev ? { ...prev, plan: profile.plan } : { plan: profile.plan });
         }
       }
     });
@@ -166,19 +169,26 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
           {menuItems.map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;
+            const isLiveLocked = item.href === "/instructor/live" && session?.plan === "FREE";
+
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
+                className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all ${
                   active
                     ? "bg-teal-50 dark:bg-teal-900/20 text-teal-600 font-semibold"
                     : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white"
                 }`}
               >
-                <Icon className="w-5 h-5 shrink-0" />
-                <span className="text-sm">{item.label}</span>
+                <div className="flex items-center space-x-3">
+                  <Icon className="w-5 h-5 shrink-0" />
+                  <span className="text-sm">{item.label}</span>
+                </div>
+                {isLiveLocked && (
+                  <Lock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
+                )}
               </Link>
             );
           })}

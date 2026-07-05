@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+
+// Service role admin client to bypass any client-side RLS constraints
+const supabaseAdmin = createSupabaseClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -25,7 +32,7 @@ export async function GET(request: Request) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.redirect(`${origin}/login?error=auth-failed`);
 
-    const role = await bootstrapUserAndGetRole(supabase, user);
+    const role = await bootstrapUserAndGetRole(user);
     return NextResponse.redirect(`${origin}/auth/confirmed?role=${role}`);
   }
 
@@ -49,7 +56,7 @@ export async function GET(request: Request) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.redirect(`${origin}/login?error=auth-failed`);
 
-    const role = await bootstrapUserAndGetRole(supabase, user);
+    const role = await bootstrapUserAndGetRole(user);
 
     // Always redirect to /auth/confirmed when that was the intended destination
     if (next === '/auth/confirmed') {
@@ -73,22 +80,22 @@ export async function GET(request: Request) {
 }
 
 /**
- * Bootstraps the user's profile and roles in the database and returns the resolved role name.
+ * Bootstraps the user's profile and roles in the database using admin privileges and returns the resolved role name.
  */
-async function bootstrapUserAndGetRole(supabase: any, user: any): Promise<string> {
+async function bootstrapUserAndGetRole(user: any): Promise<string> {
   const targetRole = user.user_metadata?.role || 'STUDENT';
   const fullName =
     user.user_metadata?.full_name || user.email?.split('@')[0] || 'Utilisateur';
 
-  // 1. Ensure profile exists (fallback if the DB trigger did not fire)
-  const { data: profile } = await supabase
+  // 1. Ensure profile exists (using admin client to bypass any read/write RLS limits)
+  const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('id')
     .eq('id', user.id)
     .maybeSingle();
 
   if (!profile) {
-    const { error: insertError } = await supabase.from('profiles').insert({
+    const { error: insertError } = await supabaseAdmin.from('profiles').insert({
       id: user.id,
       email: user.email!,
       full_name: fullName,
@@ -101,14 +108,14 @@ async function bootstrapUserAndGetRole(supabase: any, user: any): Promise<string
   }
 
   // 2. Ensure the correct role is assigned
-  const { data: targetDbRole } = await supabase
+  const { data: targetDbRole } = await supabaseAdmin
     .from('roles')
     .select('id')
     .eq('name', targetRole)
     .single();
 
   if (targetDbRole) {
-    const { data: existingRoles } = await supabase
+    const { data: existingRoles } = await supabaseAdmin
       .from('user_roles')
       .select('role_id')
       .eq('user_id', user.id);
@@ -118,36 +125,45 @@ async function bootstrapUserAndGetRole(supabase: any, user: any): Promise<string
     if (!hasTargetRole) {
       // If registering as INSTRUCTOR, remove any auto-created STUDENT role first
       if (targetRole === 'INSTRUCTOR') {
-        const { data: studentDbRole } = await supabase
+        const { data: studentDbRole } = await supabaseAdmin
           .from('roles')
           .select('id')
           .eq('name', 'STUDENT')
           .single();
 
         if (studentDbRole && existingRoles?.some((r: any) => r.role_id === studentDbRole.id)) {
-          await supabase
+          const { error: delErr } = await supabaseAdmin
             .from('user_roles')
             .delete()
             .eq('user_id', user.id)
             .eq('role_id', studentDbRole.id);
+          if (delErr) {
+            console.error('[callback] error deleting auto STUDENT role:', delErr.message);
+          }
         }
       }
 
-      await supabase.from('user_roles').upsert(
+      const { error: upsertErr } = await supabaseAdmin.from('user_roles').upsert(
         { user_id: user.id, role_id: targetDbRole.id },
         { onConflict: 'user_id,role_id', ignoreDuplicates: true }
       );
+      if (upsertErr) {
+        console.error('[callback] error assigning target role:', upsertErr.message);
+      }
     }
   }
 
-  // 3. Save role-specific profile fields
+  // 3. Save role-specific profile fields (using admin client to write)
   if (targetRole === 'INSTRUCTOR') {
     const academyName = user.user_metadata?.academy_name || 'Mon Académie';
     const bio = user.user_metadata?.bio || '';
-    await supabase
+    const { error: updateErr } = await supabaseAdmin
       .from('profiles')
       .update({ plan: 'FREE', academy_name: academyName, bio })
       .eq('id', user.id);
+    if (updateErr) {
+      console.error('[callback] error updating instructor profile:', updateErr.message);
+    }
   } else {
     const studentLevel = user.user_metadata?.student_level || 'Débutant';
     const interestCourse = user.user_metadata?.interest_course || 'blockchain';
@@ -156,10 +172,13 @@ async function bootstrapUserAndGetRole(supabase: any, user: any): Promise<string
       Intermédiaire: 'INTERMEDIATE',
       Avancé: 'ADVANCED',
     };
-    await supabase
+    const { error: updateErr } = await supabaseAdmin
       .from('profiles')
       .update({ level: levelMap[studentLevel] || 'BEGINNER' })
       .eq('id', user.id);
+    if (updateErr) {
+      console.error('[callback] error updating student profile:', updateErr.message);
+    }
 
     const COURSE_MAP: Record<string, string> = {
       blockchain: '10000000-0000-0000-0000-000000000001',
@@ -168,7 +187,7 @@ async function bootstrapUserAndGetRole(supabase: any, user: any): Promise<string
       web3: '10000000-0000-0000-0000-000000000004',
     };
     const courseId = COURSE_MAP[interestCourse] || interestCourse;
-    await supabase.from('enrollments').upsert(
+    const { error: enrollErr } = await supabaseAdmin.from('enrollments').upsert(
       {
         student_id: user.id,
         course_id: courseId,
@@ -178,10 +197,13 @@ async function bootstrapUserAndGetRole(supabase: any, user: any): Promise<string
       },
       { onConflict: 'student_id,course_id', ignoreDuplicates: true }
     );
+    if (enrollErr) {
+      console.error('[callback] error auto-enrolling student:', enrollErr.message);
+    }
   }
 
   // 4. Resolve the final role name from user_roles
-  const { data: userRoles } = await supabase
+  const { data: userRoles } = await supabaseAdmin
     .from('user_roles')
     .select('roles(name)')
     .eq('user_id', user.id);

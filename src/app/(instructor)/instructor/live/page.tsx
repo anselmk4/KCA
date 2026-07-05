@@ -6,6 +6,8 @@ import {
   Video, Clock, Plus, Calendar, Users, Link2, X, CheckCircle2, 
   Trash2, Shield, ShieldAlert, Search, Loader2, Sparkles, User
 } from "lucide-react";
+import { getSimulatedSession } from "@/lib/rbac";
+import Link from "next/link";
 
 interface LiveSession {
   id: string;
@@ -37,6 +39,7 @@ export default function LivePage() {
   const [showCreate, setShowCreate] = useState(false);
   const [created, setCreated] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentPlan, setCurrentPlan] = useState<string>("FREE");
 
   // Form State
   const [form, setForm] = useState({
@@ -63,6 +66,16 @@ export default function LivePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setCurrentUser(user);
+
+      // Fetch user profile plan
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("plan")
+        .eq("id", user.id)
+        .single();
+      
+      const plan = profile?.plan || getSimulatedSession()?.plan || "FREE";
+      setCurrentPlan(plan);
 
       // 1. Fetch live sessions (RLS automatically filters public or created/invited by current user)
       const { data: sessionsData, error: sessionsErr } = await supabase
@@ -365,10 +378,38 @@ export default function LivePage() {
     );
   }
 
+  const isFreePlan = currentPlan === "FREE";
+
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-300 relative">
+      
+      {/* Overlay Banner for FREE plan */}
+      {isFreePlan && (
+        <div className="bg-gradient-to-br from-amber-600 to-red-600 text-white rounded-3xl p-6 md:p-8 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 z-30 animate-in slide-in-from-top-4 duration-500">
+          <div className="flex items-start gap-4 text-left">
+            <div className="p-3 bg-white/20 rounded-2xl shrink-0">
+              <ShieldAlert className="w-8 h-8 text-white animate-bounce" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-extrabold text-lg md:text-xl">Sessions Live Verrouillées</h3>
+              <p className="text-xs md:text-sm text-white/90 max-w-xl leading-relaxed">
+                Les cours et sessions en direct sont réservés aux formateurs ayant souscrit au <span className="font-semibold underline">Plan Base (19$/mois)</span> ou supérieur. Passez au plan supérieur pour diffuser en direct et interagir en temps réel avec vos apprenants !
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/instructor/billing"
+            className="px-6 py-3 bg-white text-red-650 hover:bg-zinc-50 font-black text-xs rounded-xl shadow-lg transition-all text-center whitespace-nowrap cursor-pointer shrink-0"
+          >
+            Débloquer les Sessions Live
+          </Link>
+        </div>
+      )}
+
+      {/* Main Content Area (greyed out if Free plan) */}
+      <div className={`space-y-8 transition-all duration-300 ${isFreePlan ? "opacity-35 pointer-events-none select-none filter blur-[0.5px]" : ""}`}>
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
             <Video className="w-6 h-6 text-teal-600" />
@@ -762,6 +803,7 @@ export default function LivePage() {
           </div>
         </div>
       )}
+      </div> {/* Closes grayed out wrapper */}
     </div>
   );
 }
