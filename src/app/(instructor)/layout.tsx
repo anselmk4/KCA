@@ -169,7 +169,11 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
           {menuItems.map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;
-            const isLiveLocked = item.href === "/instructor/live" && session?.plan === "FREE";
+            const isLocked = (
+              item.href === "/instructor/live" ||
+              item.href === "/instructor/coupons" ||
+              item.href === "/instructor/community"
+            ) && session?.plan === "FREE";
 
             return (
               <Link
@@ -186,7 +190,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
                   <Icon className="w-5 h-5 shrink-0" />
                   <span className="text-sm">{item.label}</span>
                 </div>
-                {isLiveLocked && (
+                {isLocked && (
                   <Lock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
                 )}
               </Link>
