@@ -19,67 +19,57 @@ function ConfirmedContent() {
   useEffect(() => {
     async function bootstrapSession() {
       try {
-        // The cookie-based Supabase session was set by the server callback.
-        // We now need to sync it to the client and read the profile + role.
+        // The role query param is the authoritative source — set by the server callback
+        // which already resolved roles from user_roles with full DB access.
+        const roleParam = searchParams.get("role");
+
+        // Try to bootstrap the client-side session from cookies
         const { data: { session } } = await supabase.auth.getSession();
 
         if (session?.user) {
           const profile = await fetchUserProfile(session.user.id);
           if (profile) {
+            // Use the role param if available (more reliable), else use profile.role
+            const resolvedRole = roleParam || profile.role;
             setSimulatedSession({
               userId: profile.id,
               name: profile.full_name,
               email: profile.email,
-              role: profile.role,
+              role: resolvedRole as any,
               status: profile.status === "ACTIVE" ? "ACTIVE" : "INACTIVE",
               plan: profile.plan,
             });
-
-            if (
-              profile.role === "SUPER_ADMIN" ||
-              profile.role === "ADMIN" ||
-              profile.role === "FINANCE_ADMIN" ||
-              profile.role === "ACADEMIC_ADMIN" ||
-              profile.role === "SUPPORT_AGENT"
-            ) {
-              setDashboardHref("/admin");
-              setDashboardLabel("Accéder au Panneau Admin");
-            } else if (profile.role === "INSTRUCTOR" || profile.role === "TEACHING_ASSISTANT") {
-              setDashboardHref("/instructor");
-              setDashboardLabel("Accéder à mon Espace Formateur");
-            } else {
-              setDashboardHref("/dashboard");
-              setDashboardLabel("Accéder à mon Espace Apprenant");
-            }
-            setLoading(false);
-            return;
           }
         }
 
-        // Fallback: no session found → use role query param from callback
-        const roleParam = searchParams.get("role") || "STUDENT";
-        if (roleParam === "INSTRUCTOR" || roleParam === "TEACHING_ASSISTANT") {
-          setDashboardHref("/instructor");
-          setDashboardLabel("Accéder à mon Espace Formateur");
-        } else if (
-          roleParam === "ADMIN" ||
-          roleParam === "SUPER_ADMIN" ||
-          roleParam === "FINANCE_ADMIN" ||
-          roleParam === "ACADEMIC_ADMIN" ||
-          roleParam === "SUPPORT_AGENT"
-        ) {
-          setDashboardHref("/admin");
-          setDashboardLabel("Accéder au Panneau Admin");
-        } else {
-          setDashboardHref("/dashboard");
-          setDashboardLabel("Accéder à mon Espace Apprenant");
-        }
+        // Determine redirect based on role — always prefer the URL param
+        const finalRole = roleParam || "STUDENT";
+        applyRoleRedirect(finalRole);
       } catch (err) {
         console.error("[confirmed] session bootstrap error:", err);
-        setDashboardHref("/login");
-        setDashboardLabel("Se connecter à mon Espace");
+        // Still try the role param even on error
+        const roleParam = searchParams.get("role");
+        if (roleParam) {
+          applyRoleRedirect(roleParam);
+        } else {
+          setDashboardHref("/login");
+          setDashboardLabel("Se connecter à mon Espace");
+        }
       } finally {
         setLoading(false);
+      }
+    }
+
+    function applyRoleRedirect(role: string) {
+      if (["SUPER_ADMIN", "ADMIN", "FINANCE_ADMIN", "ACADEMIC_ADMIN", "SUPPORT_AGENT"].includes(role)) {
+        setDashboardHref("/admin");
+        setDashboardLabel("Accéder au Panneau Admin");
+      } else if (role === "INSTRUCTOR" || role === "TEACHING_ASSISTANT") {
+        setDashboardHref("/instructor");
+        setDashboardLabel("Accéder à mon Espace Formateur");
+      } else {
+        setDashboardHref("/dashboard");
+        setDashboardLabel("Accéder à mon Espace Apprenant");
       }
     }
 
