@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getSimulatedSession } from "@/lib/rbac";
-import { Ticket, Plus, Trash2, ToggleLeft, ToggleRight, Calendar, Users, Loader2, DollarSign, Percent } from "lucide-react";
+import { Ticket, Plus, Trash2, ToggleLeft, ToggleRight, Calendar, Users, Loader2, DollarSign, Percent, ShieldAlert, TrendingUp } from "lucide-react";
+import Link from "next/link";
 
 interface Course {
   id: string;
@@ -30,6 +31,7 @@ export default function InstructorCouponsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState<string>("FREE");
 
   // Form State
   const [form, setForm] = useState({
@@ -47,6 +49,16 @@ export default function InstructorCouponsPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      // Fetch user profile plan
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("plan")
+        .eq("id", user.id)
+        .single();
+      
+      const plan = profile?.plan || getSimulatedSession()?.plan || "FREE";
+      setCurrentPlan(plan);
 
       // 1. Fetch courses owned by the instructor
       const { data: coursesData } = await supabase
@@ -168,10 +180,38 @@ export default function InstructorCouponsPage() {
 
   const courseMap = new Map(courses.map(c => [c.id, c.title]));
 
+  const isFreePlan = currentPlan === "FREE";
+
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in relative">
+      
+      {/* Overlay Banner for FREE plan */}
+      {isFreePlan && (
+        <div className="bg-gradient-to-br from-amber-600 to-red-600 text-white rounded-3xl p-6 md:p-8 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 z-30 animate-in slide-in-from-top-4 duration-500 text-left">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-white/20 rounded-2xl shrink-0">
+              <ShieldAlert className="w-8 h-8 text-white animate-bounce" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-extrabold text-lg md:text-xl">Codes Promo Verrouillés</h3>
+              <p className="text-xs md:text-sm text-white/90 max-w-xl leading-relaxed font-medium">
+                La création et gestion de coupons de réduction sont réservées aux formateurs ayant souscrit au <span className="font-semibold underline">Plan Base (19$/mois)</span> ou supérieur. Passez au plan supérieur pour proposer des réductions exclusives et stimuler vos ventes !
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/instructor/billing"
+            className="px-6 py-3 bg-white text-red-650 hover:bg-zinc-50 font-black text-xs rounded-xl shadow-lg transition-all text-center whitespace-nowrap cursor-pointer shrink-0"
+          >
+            Débloquer les Codes Promo
+          </Link>
+        </div>
+      )}
+
+      {/* Main Content Area (greyed out if Free plan) */}
+      <div className={`space-y-8 transition-all duration-300 ${isFreePlan ? "opacity-35 pointer-events-none select-none filter blur-[0.5px]" : ""}`}>
+        {/* Header */}
+        <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Coupons de réduction</h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Créez et gérez des codes de réduction pour vos formations.</p>
@@ -391,6 +431,7 @@ export default function InstructorCouponsPage() {
           </div>
         </div>
       )}
+      </div> {/* Closes grayed out wrapper */}
     </div>
   );
 }
