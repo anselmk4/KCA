@@ -6,6 +6,12 @@ import Link from "next/link";
 import { ChevronLeft, CreditCard, Smartphone, ShieldCheck, QrCode, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
+declare global {
+  interface Window {
+    paypal?: any;
+  }
+}
+
 interface Course {
   id: string;
   title: string;
@@ -109,6 +115,7 @@ export default function PaymentPage() {
 
   // PayPal state
   const [paypalEmail, setPaypalEmail] = useState("");
+  const [paypalLoaded, setPaypalLoaded] = useState(false);
 
   // Crypto state
   const [cryptoNetwork, setCryptoNetwork] = useState("trc20");
@@ -232,9 +239,104 @@ export default function PaymentPage() {
     }
   };
 
+  // Load PayPal SDK Script dynamically
+  useEffect(() => {
+    if (method !== "paypal" || paypalLoaded) return;
+
+    const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+    if (!clientId) {
+      console.warn("NEXT_PUBLIC_PAYPAL_CLIENT_ID is not configured in env variables.");
+      return;
+    }
+
+    const existingScript = document.getElementById("paypal-sdk-script");
+    if (existingScript) {
+      setPaypalLoaded(true);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "paypal-sdk-script";
+    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD`;
+    script.async = true;
+    script.onload = () => {
+      setPaypalLoaded(true);
+    };
+    script.onerror = () => {
+      console.error("Failed to load PayPal SDK script.");
+    };
+    document.body.appendChild(script);
+  }, [method, paypalLoaded]);
+
+  // Render PayPal buttons once script is loaded
+  useEffect(() => {
+    if (!paypalLoaded || method !== "paypal" || !course?.id) return;
+
+    const container = document.getElementById("paypal-button-container");
+    if (!container) return;
+
+    // Clear previous button elements to prevent duplicates
+    container.innerHTML = "";
+
+    if (window.paypal) {
+      window.paypal.Buttons({
+        style: {
+          layout: 'vertical',
+          color:  'blue',
+          shape:  'rect',
+          label:  'paypal'
+        },
+        createOrder: async () => {
+          try {
+            const res = await fetch("/api/payments/paypal/create-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ 
+                type: "COURSE", 
+                itemId: course.id 
+              }),
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            return data.orderId;
+          } catch (err: any) {
+            alert("Erreur lors de la création de la commande PayPal : " + err.message);
+            throw err;
+          }
+        },
+        onApprove: async (data: any) => {
+          setSubmitting(true);
+          try {
+            const res = await fetch("/api/payments/paypal/capture-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ orderId: data.orderID }),
+            });
+            const captureData = await res.json();
+            if (captureData.error) {
+              alert("Erreur lors de la capture : " + captureData.error);
+            } else {
+              alert("Paiement validé avec succès ! Votre formation est débloquée.");
+              router.push("/dashboard/courses");
+            }
+          } catch (err: any) {
+            alert("Erreur de capture du paiement : " + err.message);
+          } finally {
+            setSubmitting(false);
+          }
+        },
+        onError: (err: any) => {
+          console.error("PayPal Error:", err);
+          alert("La transaction PayPal a échoué ou a été annulée.");
+        }
+      }).render("#paypal-button-container");
+    }
+  }, [paypalLoaded, method, course?.id, discountedAmount, router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!course) return;
+    if (method === "paypal") return;
 
     setSubmitting(true);
 
@@ -315,7 +417,7 @@ export default function PaymentPage() {
         } as any);
 
         let payProvider: 'STRIPE' | 'PAYPAL' | 'MOBILE_MONEY' | 'CRYPTO' | 'MANUAL' = 'STRIPE';
-        if (method === 'paypal') payProvider = 'PAYPAL';
+        if ((method as string) === 'paypal') payProvider = 'PAYPAL';
         else if (method === 'crypto') payProvider = 'CRYPTO';
 
         await supabase.from('payments').insert({
@@ -518,17 +620,17 @@ export default function PaymentPage() {
               {/* PayPal Form */}
               {method === "paypal" && (
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Adresse email PayPal</label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="votre-email@exemple.com"
-                      value={paypalEmail}
-                      onChange={(e) => setPaypalEmail(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-sm text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/40"
-                    />
+                  <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-200 dark:border-zinc-800 text-center space-y-2">
+                    <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Payer en toute sécurité avec PayPal</p>
+                    <p className="text-xxs text-zinc-400">Cliquez sur le bouton ci-dessous pour ouvrir la fenêtre de paiement PayPal.</p>
                   </div>
+                  {process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ? (
+                    <div id="paypal-button-container" className="relative z-10 w-full min-h-[150px] mt-4" />
+                  ) : (
+                    <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 text-yellow-800 dark:text-yellow-400 rounded-xl border border-yellow-250 dark:border-yellow-900/30 text-xs text-center font-bold">
+                      Identifiant client PayPal non configuré dans .env.local
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -607,23 +709,25 @@ export default function PaymentPage() {
               )}
 
               {/* Submit CTA */}
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-xl transition-all cursor-pointer shadow-lg shadow-blue-500/20"
-              >
-                {submitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Validation de la transaction...</span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck className="w-5 h-5" />
-                    <span>Valider le paiement de ${discountedAmount}</span>
-                  </>
-                )}
-              </button>
+              {method !== "paypal" && (
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-xl transition-all cursor-pointer shadow-lg shadow-blue-500/20"
+                >
+                  {submitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Validation de la transaction...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-5 h-5" />
+                      <span>Valider le paiement de ${discountedAmount}</span>
+                    </>
+                  )}
+                </button>
+              )}
 
             </form>
           </div>

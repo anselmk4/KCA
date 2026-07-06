@@ -25,6 +25,12 @@ import {
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 
+declare global {
+  interface Window {
+    paypal?: any;
+  }
+}
+
 type PaymentMethod = "mastercard" | "stripe" | "paypal" | "crypto" | "mobile_money";
 
 function PaymentContent() {
@@ -38,6 +44,7 @@ function PaymentContent() {
   const [showPendingState, setShowPendingState] = useState(false);
   const [paymentId, setPaymentId] = useState("");
   const [verifying, setVerifying] = useState(false);
+  const [paypalLoaded, setPaypalLoaded] = useState(false);
 
   // Form Fields
   const [cardNumber, setCardNumber] = useState("");
@@ -141,9 +148,104 @@ function PaymentContent() {
     }
   };
 
+  // Load PayPal SDK Script dynamically
+  useEffect(() => {
+    if (method !== "paypal" || paypalLoaded) return;
+
+    const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+    if (!clientId) {
+      console.warn("NEXT_PUBLIC_PAYPAL_CLIENT_ID is not configured in env variables.");
+      return;
+    }
+
+    const existingScript = document.getElementById("paypal-sdk-script");
+    if (existingScript) {
+      setPaypalLoaded(true);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = "paypal-sdk-script";
+    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD`;
+    script.async = true;
+    script.onload = () => {
+      setPaypalLoaded(true);
+    };
+    script.onerror = () => {
+      console.error("Failed to load PayPal SDK script.");
+    };
+    document.body.appendChild(script);
+  }, [method, paypalLoaded]);
+
+  // Render PayPal buttons once script is loaded
+  useEffect(() => {
+    if (!paypalLoaded || method !== "paypal" || !plan) return;
+
+    const container = document.getElementById("paypal-button-container");
+    if (!container) return;
+
+    // Clear previous button elements to prevent duplicates
+    container.innerHTML = "";
+
+    if (window.paypal) {
+      window.paypal.Buttons({
+        style: {
+          layout: 'vertical',
+          color:  'blue',
+          shape:  'rect',
+          label:  'paypal'
+        },
+        createOrder: async () => {
+          try {
+            const res = await fetch("/api/payments/paypal/create-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ 
+                type: "INSTRUCTOR_PLAN", 
+                itemId: plan
+              }),
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            return data.orderId;
+          } catch (err: any) {
+            alert("Erreur lors de la création de la commande PayPal : " + err.message);
+            throw err;
+          }
+        },
+        onApprove: async (data: any) => {
+          setLoading(true);
+          try {
+            const res = await fetch("/api/payments/paypal/capture-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ orderId: data.orderID }),
+            });
+            const captureData = await res.json();
+            if (captureData.error) {
+              alert("Erreur lors de la capture : " + captureData.error);
+            } else {
+              alert(`Paiement validé avec succès ! Votre abonnement ${plan} est activé.`);
+              handlePaymentSuccess();
+            }
+          } catch (err: any) {
+            alert("Erreur de capture du paiement : " + err.message);
+          } finally {
+            setLoading(false);
+          }
+        },
+        onError: (err: any) => {
+          console.error("PayPal Error:", err);
+          alert("La transaction PayPal a échoué ou a été annulée.");
+        }
+      }).render("#paypal-button-container");
+    }
+  }, [paypalLoaded, method, plan, router]);
+
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session) return;
+    if (method === "paypal") return;
     
     setLoading(true);
 
@@ -446,14 +548,18 @@ function PaymentContent() {
                 </div>
               )}
 
-              {/* 3. PayPal direct mock */}
+              {/* 3. PayPal direct Integration */}
               {method === "paypal" && (
                 <div className="space-y-4 animate-in fade-in duration-200 py-4 text-center">
-                  <h4 className="font-bold text-sm text-zinc-900 dark:text-white">Simuler un paiement PayPal</h4>
-                  <p className="text-xs text-zinc-500 max-w-sm mx-auto">Validez en un clic pour vous connecter à votre compte PayPal et confirmer le prélèvement mensuel récurrent.</p>
-                  <div className="inline-flex items-center gap-1.5 bg-blue-50 dark:bg-blue-950/20 text-blue-600 border border-blue-150 px-4 py-2 rounded-full text-xs font-bold">
-                    PayPal checkout actif
-                  </div>
+                  <h4 className="font-bold text-sm text-zinc-900 dark:text-white">Paiement sécurisé par PayPal</h4>
+                  <p className="text-xs text-zinc-500 max-w-sm mx-auto">Cliquez sur le bouton PayPal ci-dessous pour finaliser votre abonnement.</p>
+                  {process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ? (
+                    <div id="paypal-button-container" className="relative z-10 w-full min-h-[150px] mt-4" />
+                  ) : (
+                    <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 text-yellow-800 dark:text-yellow-400 rounded-xl border border-yellow-250 dark:border-yellow-900/30 text-xs text-center font-bold">
+                      Identifiant client PayPal non configuré dans .env.local
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -557,20 +663,22 @@ function PaymentContent() {
                 >
                   Annuler
                 </Link>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="px-6 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-lg shadow-teal-500/20 transition-all flex items-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Traitement...
-                    </>
-                  ) : (
-                    "Confirmer et Payer"
-                  )}
-                </button>
+                {method !== "paypal" && (
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-6 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-lg shadow-teal-500/20 transition-all flex items-center gap-2"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Traitement...
+                      </>
+                    ) : (
+                      "Confirmer et Payer"
+                    )}
+                  </button>
+                )}
               </div>
 
             </div>
