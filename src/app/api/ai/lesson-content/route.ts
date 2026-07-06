@@ -51,9 +51,8 @@ Assure-toi d'inclure au moins 2 sections (avec h2), plusieurs paragraphes de tex
         if (response.ok) {
           const resData = await response.json();
           const textResult = resData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          // Strip any remaining markdown wrapper ticks robustly
           generatedHtml = textResult
-            .replace(/^```html\s*/i, "")
+            .replace(/^```(?:html)?\s*/i, "")
             .replace(/```$/m, "")
             .trim();
         } else {

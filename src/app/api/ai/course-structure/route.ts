@@ -16,20 +16,34 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { courseId, prompt, numChapters } = body;
+    const { courseId, prompt } = body;
+    let numChapters = body.numChapters || 3;
 
     if (!courseId || !prompt) {
       return NextResponse.json({ error: "courseId et prompt sont requis." }, { status: 400 });
     }
 
+    // Limit chapters to a maximum of 10
+    if (typeof numChapters === "string") {
+      numChapters = parseInt(numChapters, 10);
+    }
+    numChapters = Math.min(Math.max(1, numChapters || 3), 10);
+
+    // Create the client dynamically to ensure it reads the latest process.env vars
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const clientToUse = serviceKey
+      ? createDirectClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey)
+      : supabase;
+
     // Verify course ownership
-    const { data: course, error: courseError } = await supabaseAdmin
+    const { data: course, error: courseError } = await clientToUse
       .from("courses")
       .select("instructor_id")
       .eq("id", courseId)
       .maybeSingle();
 
     if (courseError || !course) {
+      console.error("[ai-course-structure] Course lookup error or not found. Error:", courseError?.message, "Course:", course);
       return NextResponse.json({ error: "Cours introuvable." }, { status: 404 });
     }
 
@@ -111,8 +125,12 @@ Chaque chapitre doit avoir un titre pertinent et une liste de leçons avec un ti
         }
 
         const resData = await response.json();
-        const textResult = resData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        structure = JSON.parse(textResult.trim());
+        let textResult = resData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        textResult = textResult.trim();
+        if (textResult.startsWith("```")) {
+          textResult = textResult.replace(/^```(?:json)?\s*/i, "").replace(/```$/m, "").trim();
+        }
+        structure = JSON.parse(textResult);
       } catch (err: any) {
         console.error("Gemini API call failed, falling back to simulated generation:", err);
       }
@@ -237,7 +255,7 @@ Chaque chapitre doit avoir un titre pertinent et une liste de leçons avec un ti
 
     // Insert structure into database
     // Get current sections order to append at the end
-    const { data: existingSections } = await supabaseAdmin
+    const { data: existingSections } = await clientToUse
       .from("course_sections")
       .select("sort_order")
       .eq("course_id", courseId)
@@ -247,7 +265,7 @@ Chaque chapitre doit avoir un titre pertinent et une liste de leçons avec un ti
 
     for (const sec of structure) {
       // Create Section
-      const { data: sectionData, error: secErr } = await supabaseAdmin
+      const { data: sectionData, error: secErr } = await clientToUse
         .from("course_sections")
         .insert({
           course_id: courseId,
@@ -262,7 +280,7 @@ Chaque chapitre doit avoir un titre pertinent et une liste de leçons avec un ti
       // Create Lessons for this Section
       let currentLessonOrder = 0;
       for (const les of sec.lessons) {
-        const { error: lesErr } = await supabaseAdmin
+        const { error: lesErr } = await clientToUse
           .from("lessons")
           .insert({
             section_id: sectionData.id,

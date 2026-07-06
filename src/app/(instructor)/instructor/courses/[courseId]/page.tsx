@@ -140,6 +140,7 @@ export default function CourseDetailPage() {
   const [aiStructurePrompt, setAiStructurePrompt] = useState("");
   const [numChaptersAi, setNumChaptersAi] = useState("3");
   const [generatingStructure, setGeneratingStructure] = useState(false);
+  const [generatingLessonContent, setGeneratingLessonContent] = useState(false);
 
   // ─── Lesson form (right panel) ────────────────────────────
   const [lessonForm, setLessonForm] = useState({
@@ -420,6 +421,43 @@ export default function CourseDetailPage() {
       alert("Erreur lors de la génération de la structure : " + err.message);
     } finally {
       setGeneratingStructure(false);
+    }
+  };
+  const handleGenerateLessonContentAi = async () => {
+    if (!selectedLessonId) return;
+    const defaultPrompt = `Leçon sur "${lessonForm.title}"` + (lessonForm.description ? `, description: ${lessonForm.description}` : "");
+    const userPrompt = prompt("Sujet ou consignes spécifiques pour générer le contenu de la leçon :", defaultPrompt);
+    
+    if (userPrompt === null) return; // user cancelled
+    if (!userPrompt.trim()) return;
+
+    setGeneratingLessonContent(true);
+    try {
+      const res = await fetch("/api/ai/lesson-content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: userPrompt.trim()
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Erreur lors de la génération.");
+      }
+
+      const data = await res.json();
+      if (data.html) {
+        setLessonForm(prev => ({
+          ...prev,
+          content: data.html
+        }));
+        alert("Contenu de la leçon généré avec succès par l'IA ! (N'oubliez pas d'enregistrer la leçon)");
+      }
+    } catch (err: any) {
+      alert("Erreur de génération : " + err.message);
+    } finally {
+      setGeneratingLessonContent(false);
     }
   };
 
@@ -1146,7 +1184,27 @@ export default function CourseDetailPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2">Contenu de la Leçon (Éditeur de Blocs)</label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300">Contenu de la Leçon (Éditeur de Blocs)</label>
+                      <button
+                        type="button"
+                        onClick={handleGenerateLessonContentAi}
+                        disabled={generatingLessonContent}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-teal-500/10 border border-teal-500/20 rounded-lg text-[11px] font-bold text-teal-600 hover:text-teal-700 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        {generatingLessonContent ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-650" />
+                            <span>Génération...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-3.5 h-3.5 text-teal-650" />
+                            <span>Rédiger avec l'IA</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                     <BlockEditor value={lessonForm.content} onChange={(html) => setLessonForm((p) => ({ ...p, content: html }))} />
                   </div>
 
@@ -1212,6 +1270,11 @@ export default function CourseDetailPage() {
                     <option value="3">3 chapitres</option>
                     <option value="4">4 chapitres</option>
                     <option value="5">5 chapitres</option>
+                    <option value="6">6 chapitres</option>
+                    <option value="7">7 chapitres</option>
+                    <option value="8">8 chapitres</option>
+                    <option value="9">9 chapitres</option>
+                    <option value="10">10 chapitres</option>
                   </select>
                 </div>
               </div>
