@@ -118,6 +118,7 @@ export default function PaymentPage() {
   const [paypalEmail, setPaypalEmail] = useState("");
   const [paypalLoaded, setPaypalLoaded] = useState(false);
   const [paypalError, setPaypalError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   // Crypto state
   const [cryptoNetwork, setCryptoNetwork] = useState("trc20");
@@ -225,8 +226,12 @@ export default function PaymentPage() {
       
       if (error) throw error;
       if (data?.status === 'PAID') {
-        alert("Paiement validé avec succès ! Votre formation est débloquée.");
-        router.push("/dashboard/courses");
+        setShowPendingState(false);
+        setSuccess(true);
+        router.refresh();
+        setTimeout(() => {
+          router.push("/dashboard/courses");
+        }, 3000);
       } else if (data?.status === 'FAILED') {
         alert(`Le paiement a échoué : ${data.failure_reason || "Transaction refusée par l'opérateur."}`);
         setShowPendingState(false);
@@ -295,8 +300,11 @@ export default function PaymentPage() {
               if (captureData.error) {
                 alert("Erreur lors de la capture : " + captureData.error);
               } else {
-                alert("Paiement validé avec succès ! Votre formation est débloquée.");
-                router.push("/dashboard/courses");
+                setSuccess(true);
+                router.refresh();
+                setTimeout(() => {
+                  router.push("/dashboard/courses");
+                }, 3000);
               }
             } catch (err: any) {
               alert("Erreur de capture du paiement : " + err.message);
@@ -439,8 +447,11 @@ export default function PaymentPage() {
       }
 
       setSubmitting(false);
-      alert(`Paiement de $${discountedAmount} validé avec succès ! Votre formation est débloquée.`);
-      router.push("/dashboard/courses");
+      setSuccess(true);
+      router.refresh();
+      setTimeout(() => {
+        router.push("/dashboard/courses");
+      }, 3000);
     } catch (err: any) {
       console.error('[payment] Unexpected error during checkout:', err);
       alert(err.message || "Une erreur est survenue lors de la validation de votre paiement.");
@@ -464,6 +475,25 @@ export default function PaymentPage() {
         <Link href="/dashboard/discover" className="px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-xl">
           Retour au catalogue
         </Link>
+      </div>
+    );
+  }
+
+  if (success) {
+    return (
+      <div className="max-w-xl mx-auto py-12 px-6">
+        <div className="bg-white dark:bg-zinc-900 rounded-3xl p-12 border border-zinc-200 dark:border-zinc-800 shadow-xl text-center space-y-6 animate-in zoom-in-95">
+          <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 rounded-full flex items-center justify-center mx-auto scale-110 transition-transform">
+            <CheckCircle className="w-12 h-12" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Paiement Validé !</h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
+              Félicitations ! Votre paiement pour la formation <span className="font-extrabold text-blue-600 dark:text-blue-400">{course.title}</span> a été validé avec succès.
+            </p>
+          </div>
+          <p className="text-xs text-zinc-400 animate-pulse">Déblocage de votre espace de cours...</p>
+        </div>
       </div>
     );
   }

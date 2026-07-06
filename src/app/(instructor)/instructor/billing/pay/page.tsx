@@ -114,11 +114,12 @@ function PaymentContent() {
     setSimulatedSession(updatedSession);
     
     setSuccess(true);
+    router.refresh();
 
     // Redirect after showing success screen
     setTimeout(() => {
       router.push("/instructor/billing");
-    }, 2000);
+    }, 3000);
   };
 
   const checkPaymentStatus = async () => {
@@ -325,11 +326,12 @@ function PaymentContent() {
       
       setLoading(false);
       setSuccess(true);
+      router.refresh();
 
       // Redirect after showing success screen
       setTimeout(() => {
         router.push("/instructor/billing");
-      }, 2000);
+      }, 3000);
     }, 2000);
   };
 
