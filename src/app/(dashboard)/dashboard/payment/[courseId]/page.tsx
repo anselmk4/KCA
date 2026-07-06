@@ -270,68 +270,90 @@ export default function PaymentPage() {
 
   // Render PayPal buttons once script is loaded
   useEffect(() => {
-    if (!paypalLoaded || method !== "paypal" || !course?.id) return;
+    if (method !== "paypal" || !course?.id) return;
 
-    const container = document.getElementById("paypal-button-container");
-    if (!container) return;
+    let intervalId: any;
+    let attempts = 0;
 
-    // Clear previous button elements to prevent duplicates
-    container.innerHTML = "";
+    const tryRender = () => {
+      const container = document.getElementById("paypal-button-container");
+      if (!container) return false;
 
-    if (window.paypal) {
-      window.paypal.Buttons({
-        style: {
-          layout: 'vertical',
-          color:  'blue',
-          shape:  'rect',
-          label:  'paypal'
-        },
-        createOrder: async () => {
-          try {
-            const res = await fetch("/api/payments/paypal/create-order", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ 
-                type: "COURSE", 
-                itemId: course.id 
-              }),
-            });
-            const data = await res.json();
-            if (data.error) throw new Error(data.error);
-            return data.orderId;
-          } catch (err: any) {
-            alert("Erreur lors de la création de la commande PayPal : " + err.message);
-            throw err;
-          }
-        },
-        onApprove: async (data: any) => {
-          setSubmitting(true);
-          try {
-            const res = await fetch("/api/payments/paypal/capture-order", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ orderId: data.orderID }),
-            });
-            const captureData = await res.json();
-            if (captureData.error) {
-              alert("Erreur lors de la capture : " + captureData.error);
-            } else {
-              alert("Paiement validé avec succès ! Votre formation est débloquée.");
-              router.push("/dashboard/courses");
+      if (window.paypal) {
+        // Clear previous button elements to prevent duplicates
+        container.innerHTML = "";
+
+        window.paypal.Buttons({
+          style: {
+            layout: 'vertical',
+            color:  'blue',
+            shape:  'rect',
+            label:  'paypal'
+          },
+          createOrder: async () => {
+            try {
+              const res = await fetch("/api/payments/paypal/create-order", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                  type: "COURSE", 
+                  itemId: course.id 
+                }),
+              });
+              const data = await res.json();
+              if (data.error) throw new Error(data.error);
+              return data.orderId;
+            } catch (err: any) {
+              alert("Erreur lors de la création de la commande PayPal : " + err.message);
+              throw err;
             }
-          } catch (err: any) {
-            alert("Erreur de capture du paiement : " + err.message);
-          } finally {
-            setSubmitting(false);
+          },
+          onApprove: async (data: any) => {
+            setSubmitting(true);
+            try {
+              const res = await fetch("/api/payments/paypal/capture-order", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderId: data.orderID }),
+              });
+              const captureData = await res.json();
+              if (captureData.error) {
+                alert("Erreur lors de la capture : " + captureData.error);
+              } else {
+                alert("Paiement validé avec succès ! Votre formation est débloquée.");
+                router.push("/dashboard/courses");
+              }
+            } catch (err: any) {
+              alert("Erreur de capture du paiement : " + err.message);
+            } finally {
+              setSubmitting(false);
+            }
+          },
+          onError: (err: any) => {
+            console.error("PayPal Error:", err);
+            alert("La transaction PayPal a échoué ou a été annulée.");
           }
-        },
-        onError: (err: any) => {
-          console.error("PayPal Error:", err);
-          alert("La transaction PayPal a échoué ou a été annulée.");
+        }).render("#paypal-button-container");
+        return true;
+      }
+      return false;
+    };
+
+    const rendered = tryRender();
+    if (!rendered) {
+      intervalId = setInterval(() => {
+        attempts++;
+        const success = tryRender();
+        if (success || attempts > 50) {
+          clearInterval(intervalId);
         }
-      }).render("#paypal-button-container");
+      }, 100);
     }
-  }, [paypalLoaded, method, course?.id, discountedAmount, router]);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [method, course?.id, discountedAmount, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
