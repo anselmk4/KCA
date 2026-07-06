@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import Script from "next/script";
 import { ChevronLeft, CreditCard, Smartphone, ShieldCheck, QrCode, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
@@ -116,6 +117,7 @@ export default function PaymentPage() {
   // PayPal state
   const [paypalEmail, setPaypalEmail] = useState("");
   const [paypalLoaded, setPaypalLoaded] = useState(false);
+  const [paypalError, setPaypalError] = useState<string | null>(null);
 
   // Crypto state
   const [cryptoNetwork, setCryptoNetwork] = useState("trc20");
@@ -239,34 +241,7 @@ export default function PaymentPage() {
     }
   };
 
-  // Load PayPal SDK Script dynamically
-  useEffect(() => {
-    if (method !== "paypal" || paypalLoaded) return;
-
-    const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
-    if (!clientId) {
-      console.warn("NEXT_PUBLIC_PAYPAL_CLIENT_ID is not configured in env variables.");
-      return;
-    }
-
-    const existingScript = document.getElementById("paypal-sdk-script");
-    if (existingScript) {
-      setPaypalLoaded(true);
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = "paypal-sdk-script";
-    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD`;
-    script.async = true;
-    script.onload = () => {
-      setPaypalLoaded(true);
-    };
-    script.onerror = () => {
-      console.error("Failed to load PayPal SDK script.");
-    };
-    document.body.appendChild(script);
-  }, [method, paypalLoaded]);
+  // Note: PayPal SDK script is loaded dynamically in the JSX using next/script component
 
   // Render PayPal buttons once script is loaded
   useEffect(() => {
@@ -340,12 +315,20 @@ export default function PaymentPage() {
     };
 
     const rendered = tryRender();
-    if (!rendered) {
+    if (rendered) {
+      setPaypalError(null);
+    } else {
       intervalId = setInterval(() => {
         attempts++;
         const success = tryRender();
-        if (success || attempts > 50) {
+        if (success) {
           clearInterval(intervalId);
+          setPaypalError(null);
+        } else if (attempts > 50) {
+          clearInterval(intervalId);
+          const rawId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "VIDE";
+          const maskedId = rawId.length > 10 ? `${rawId.substring(0, 8)}...${rawId.substring(rawId.length - 8)}` : rawId;
+          setPaypalError(`Impossible de charger le script PayPal. (Client ID: ${maskedId}, Longueur: ${rawId.length}). L'identifiant est probablement incorrect, ou bloqué par un bloqueur de pub.`);
         }
       }, 100);
     }
@@ -646,8 +629,23 @@ export default function PaymentPage() {
                     <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Payer en toute sécurité avec PayPal</p>
                     <p className="text-xxs text-zinc-400">Cliquez sur le bouton ci-dessous pour ouvrir la fenêtre de paiement PayPal.</p>
                   </div>
+                  
+                  {paypalError && (
+                    <div className="p-4 bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-900/30 text-xs text-center font-bold">
+                      {paypalError}
+                    </div>
+                  )}
+
                   {process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ? (
-                    <div id="paypal-button-container" className="relative z-10 w-full min-h-[150px] mt-4" />
+                    <>
+                      <div id="paypal-button-container" className="relative z-10 w-full min-h-[150px] mt-4" />
+                      <Script
+                        src={`https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD`}
+                        strategy="lazyOnload"
+                        onLoad={() => setPaypalLoaded(true)}
+                        onError={() => setPaypalError("Impossible de charger le script de paiement PayPal. Veuillez vérifier votre clé client ou désactiver votre bloqueur de publicité.")}
+                      />
+                    </>
                   ) : (
                     <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 text-yellow-800 dark:text-yellow-400 rounded-xl border border-yellow-250 dark:border-yellow-900/30 text-xs text-center font-bold">
                       Identifiant client PayPal non configuré dans .env.local
