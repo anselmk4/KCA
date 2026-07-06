@@ -78,8 +78,10 @@ export async function ensureProfile(
   userId: string,
   email: string,
   fullName: string,
-  roleName: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN' | 'SUPER_ADMIN' = 'STUDENT'
+  roleName: 'STUDENT' | 'INSTRUCTOR' | 'TEACHING_ASSISTANT' | 'ADMIN' | 'SUPER_ADMIN' = 'STUDENT'
 ): Promise<void> {
+  // Normalize to uppercase to prevent silent case-mismatch failures
+  roleName = (roleName?.toUpperCase() as typeof roleName) || 'STUDENT';
   try {
     // Check if the profile already exists (normally created via database trigger on auth.users)
     const { data: existing, error: fetchError } = await supabase
@@ -131,8 +133,9 @@ export async function ensureProfile(
       const hasTargetRole = existingRoles?.some(r => r.role_id === targetRole.id);
 
       if (!hasTargetRole) {
-        // If registering as INSTRUCTOR, remove any auto-created STUDENT role from trigger
-        if (roleName === 'INSTRUCTOR' || roleName === 'ADMIN' || roleName === 'SUPER_ADMIN') {
+        // If the target role is not STUDENT, always purge any auto-created STUDENT
+        // role that the DB trigger may have assigned before we got here.
+        if (roleName !== 'STUDENT') {
           const { data: studentRole } = await supabase
             .from('roles')
             .select('id')

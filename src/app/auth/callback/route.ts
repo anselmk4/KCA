@@ -83,11 +83,14 @@ export async function GET(request: Request) {
  * Bootstraps the user's profile and roles in the database using admin privileges and returns the resolved role name.
  */
 async function bootstrapUserAndGetRole(user: any): Promise<string> {
-  const targetRole = user.user_metadata?.role || 'STUDENT';
+  // Read intended role from metadata — default to STUDENT
+  const targetRole: string = (user.user_metadata?.role || 'STUDENT').toUpperCase();
   const fullName =
     user.user_metadata?.full_name || user.email?.split('@')[0] || 'Utilisateur';
 
-  // 1. Ensure profile exists (using admin client to bypass any read/write RLS limits)
+  console.log(`[callback] bootstrapUserAndGetRole — targetRole=${targetRole}, userId=${user.id}`);
+
+  // 1. Ensure profile exists (using admin client to bypass RLS)
   const { data: profile } = await supabaseAdmin
     .from('profiles')
     .select('id')
@@ -107,7 +110,7 @@ async function bootstrapUserAndGetRole(user: any): Promise<string> {
     }
   }
 
-  // 2. Ensure the correct role is assigned
+  // 2. Enforce the correct role — always clean up conflicting roles first
   const { data: targetDbRole } = await supabaseAdmin
     .from('roles')
     .select('id')
@@ -115,42 +118,42 @@ async function bootstrapUserAndGetRole(user: any): Promise<string> {
     .single();
 
   if (targetDbRole) {
-    const { data: existingRoles } = await supabaseAdmin
-      .from('user_roles')
-      .select('role_id')
-      .eq('user_id', user.id);
+    // ALWAYS remove STUDENT role when the intended role is INSTRUCTOR
+    // This handles the race condition where the DB trigger auto-assigns STUDENT
+    // before our callback has a chance to set the correct role.
+    if (targetRole === 'INSTRUCTOR' || targetRole === 'TEACHING_ASSISTANT') {
+      const { data: studentDbRole } = await supabaseAdmin
+        .from('roles')
+        .select('id')
+        .eq('name', 'STUDENT')
+        .single();
 
-    const hasTargetRole = existingRoles?.some((r: any) => r.role_id === targetDbRole.id);
-
-    if (!hasTargetRole) {
-      // If registering as INSTRUCTOR, remove any auto-created STUDENT role first
-      if (targetRole === 'INSTRUCTOR') {
-        const { data: studentDbRole } = await supabaseAdmin
-          .from('roles')
-          .select('id')
-          .eq('name', 'STUDENT')
-          .single();
-
-        if (studentDbRole && existingRoles?.some((r: any) => r.role_id === studentDbRole.id)) {
-          const { error: delErr } = await supabaseAdmin
-            .from('user_roles')
-            .delete()
-            .eq('user_id', user.id)
-            .eq('role_id', studentDbRole.id);
-          if (delErr) {
-            console.error('[callback] error deleting auto STUDENT role:', delErr.message);
-          }
+      if (studentDbRole) {
+        const { error: delErr } = await supabaseAdmin
+          .from('user_roles')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('role_id', studentDbRole.id);
+        if (delErr) {
+          console.error('[callback] error deleting STUDENT role for instructor:', delErr.message);
+        } else {
+          console.log('[callback] STUDENT role removed for INSTRUCTOR user');
         }
       }
-
-      const { error: upsertErr } = await supabaseAdmin.from('user_roles').upsert(
-        { user_id: user.id, role_id: targetDbRole.id },
-        { onConflict: 'user_id,role_id', ignoreDuplicates: true }
-      );
-      if (upsertErr) {
-        console.error('[callback] error assigning target role:', upsertErr.message);
-      }
     }
+
+    // Assign the correct target role (upsert is safe — idempotent)
+    const { error: upsertErr } = await supabaseAdmin.from('user_roles').upsert(
+      { user_id: user.id, role_id: targetDbRole.id },
+      { onConflict: 'user_id,role_id', ignoreDuplicates: true }
+    );
+    if (upsertErr) {
+      console.error('[callback] error assigning target role:', upsertErr.message);
+    } else {
+      console.log(`[callback] Role ${targetRole} assigned to user ${user.id}`);
+    }
+  } else {
+    console.error(`[callback] Role ${targetRole} not found in roles table — falling back to STUDENT`);
   }
 
   // 3. Save role-specific profile fields (using admin client to write)
