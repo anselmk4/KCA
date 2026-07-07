@@ -30,15 +30,13 @@ export async function GET(req: NextRequest) {
       : supabase;
 
     // 1. Fetch user's profile to get plan
-    const { data: profile } = await dbClient
+    const { data: profileData } = await dbClient
       .from('profiles')
       .select('plan')
       .eq('id', user.id)
       .maybeSingle();
 
-    if (!profile) {
-      return NextResponse.json({ error: 'Profil introuvable' }, { status: 404 });
-    }
+    const profile = profileData || { plan: 'FREE' };
 
     // 2. Fetch instructor's courses
     const { data: courses, error: coursesError } = await dbClient

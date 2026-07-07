@@ -24,15 +24,13 @@ export async function GET(req: NextRequest) {
       : supabase;
 
     // 1. Fetch user's profile to check if they exist and retrieve plan
-    const { data: profile } = await dbClient
+    const { data: profileData } = await dbClient
       .from('profiles')
       .select('id, plan, status')
       .eq('id', user.id)
       .maybeSingle();
 
-    if (!profile) {
-      return NextResponse.json({ error: 'Profil introuvable' }, { status: 404 });
-    }
+    const profile = profileData || { plan: 'FREE', status: 'ACTIVE' };
 
     // 2. Fetch instructor's courses
     const { data: coursesData, error: coursesError } = await dbClient
