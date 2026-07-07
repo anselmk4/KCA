@@ -489,58 +489,15 @@ function PaymentContent() {
               
               {/* 1. Mastercard Card Form */}
               {method === "mastercard" && (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  <h4 className="font-bold text-sm text-zinc-900 dark:text-white mb-2">Informations de Carte Bancaire</h4>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-[11px] font-medium text-zinc-400 uppercase mb-1">Nom du titulaire</label>
-                      <input 
-                        required
-                        type="text" 
-                        value={cardName}
-                        onChange={e => setCardName(e.target.value)}
-                        placeholder="Jean Dupont"
-                        className="w-full px-4 py-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border-transparent text-sm focus:ring-1 focus:ring-teal-500 outline-none text-zinc-900 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-zinc-400 uppercase mb-1">Numéro de carte</label>
-                      <input 
-                        required
-                        type="text" 
-                        value={cardNumber}
-                        onChange={e => setCardNumber(e.target.value.replace(/\s?/g, '').replace(/(\d{4})/g, '$1 ').trim())}
-                        maxLength={19}
-                        placeholder="5412 7500 1234 5678"
-                        className="w-full px-4 py-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border-transparent text-sm focus:ring-1 focus:ring-teal-500 outline-none text-zinc-900 dark:text-white"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-medium text-zinc-400 uppercase mb-1">Date d'expiration</label>
-                        <input 
-                          required
-                          type="text" 
-                          value={cardExpiry}
-                          onChange={e => setCardExpiry(e.target.value)}
-                          placeholder="MM/AA"
-                          maxLength={5}
-                          className="w-full px-4 py-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border-transparent text-sm focus:ring-1 focus:ring-teal-500 outline-none text-zinc-900 dark:text-white text-center"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-medium text-zinc-400 uppercase mb-1">CVC / CVV</label>
-                        <input 
-                          required
-                          type="password" 
-                          value={cardCvc}
-                          onChange={e => setCardCvc(e.target.value)}
-                          placeholder="•••"
-                          maxLength={4}
-                          className="w-full px-4 py-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border-transparent text-sm focus:ring-1 focus:ring-teal-500 outline-none text-zinc-900 dark:text-white text-center"
-                        />
-                      </div>
-                    </div>
+                <div className="space-y-4 animate-in fade-in duration-200 py-4 text-center">
+                  <div className="w-12 h-12 bg-teal-100 dark:bg-teal-950/30 text-teal-600 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-zinc-900 dark:text-white mb-1">Paiement sécurisé par Carte Bancaire</h4>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed">
+                      Vous allez être redirigé vers l'interface de paiement sécurisée de Moko Afrika pour saisir les coordonnées de votre carte Visa ou Mastercard et valider le paiement de <span className="font-bold text-teal-600 dark:text-teal-400">{currentPlanDetails.price}$</span> pour le plan <span className="font-bold">{plan}</span>.
+                    </p>
                   </div>
                 </div>
               )}
