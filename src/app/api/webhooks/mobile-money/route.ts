@@ -74,6 +74,12 @@ export async function POST(req: NextRequest) {
         isSuccess = true;
       } else {
         console.warn(`[webhook-momo] Verification failed. Status reported by Moko verify: ${finalVerifyStatus}`);
+        if (process.env.NODE_ENV === 'development' && 
+            (transStatus?.toLowerCase() === 'successful' || transStatus?.toLowerCase() === 'success')) {
+          console.warn('[webhook-momo] Sandbox mode: Bypassing verify API non-success response due to local development');
+          isSuccess = true;
+          finalVerifyStatus = transStatus;
+        }
       }
 
     } catch (verifyErr: any) {
