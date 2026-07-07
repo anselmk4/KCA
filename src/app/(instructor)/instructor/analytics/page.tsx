@@ -46,6 +46,7 @@ export default function AnalyticsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<AnalyticsData | null>(null);
+  const [session, setSession] = useState<{ name: string; email: string } | null>(null);
 
   const fetchAnalytics = useCallback(async () => {
     setLoading(true);
@@ -61,6 +62,24 @@ export default function AnalyticsPage() {
 
       if (!res.ok) {
         throw new Error(resData.error || "Impossible de charger les statistiques.");
+      }
+
+      const { data: rawProfile } = await supabase
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (rawProfile) {
+        setSession({
+          name: rawProfile.full_name || "Instructeur",
+          email: rawProfile.email || user.email || ""
+        });
+      } else {
+        setSession({
+          name: user.email?.split("@")[0] || "Instructeur",
+          email: user.email || ""
+        });
       }
 
       setData(resData);
@@ -152,7 +171,10 @@ export default function AnalyticsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Analytique</h1>
-          <p className="text-zinc-500 dark:text-zinc-400 mt-1">Suivez les performances de vos formations et vos revenus en temps réel.</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+            Compte : <span className="font-bold text-zinc-900 dark:text-zinc-200">{session?.name}</span> ({session?.email})
+          </p>
+          <p className="text-xs text-zinc-450 dark:text-zinc-500 mt-0.5">Suivez les performances de vos formations et vos revenus en temps réel.</p>
         </div>
         <span className="self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-850">
           Forfait actuel : {data.plan}
