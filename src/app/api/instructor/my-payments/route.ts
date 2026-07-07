@@ -62,8 +62,14 @@ export async function GET(_req: NextRequest) {
         const courseId = orderItemMap.get(p.order_id) || "";
         let label = "Formation";
 
-        if (courseId.startsWith("plan_")) {
-          label = PLAN_LABELS[courseId] || `Abonnement ${courseId.replace("plan_", "").toUpperCase()}`;
+        const PLAN_LABELS: Record<string, string> = {
+          "99999999-9999-9999-9999-999999990001": "Abonnement Plan Base",
+          "99999999-9999-9999-9999-999999990002": "Abonnement Plan Pro",
+          "99999999-9999-9999-9999-999999990003": "Abonnement Plan Max",
+        };
+
+        if (courseId && PLAN_LABELS[courseId]) {
+          label = PLAN_LABELS[courseId];
         } else if (courseId) {
           const { data: course } = await supabaseAdmin
             .from("courses")

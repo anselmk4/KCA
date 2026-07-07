@@ -251,10 +251,17 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Erreur d'enregistrement commande plan: ${orderInsertErr.message}` }, { status: 500 });
       }
 
+      const planUuidMap: Record<string, string> = {
+        BASE: "99999999-9999-9999-9999-999999990001",
+        PRO: "99999999-9999-9999-9999-999999990002",
+        MAX: "99999999-9999-9999-9999-999999990003",
+      };
+      const planCourseId = planUuidMap[planName] || planUuidMap.BASE;
+
       const { error: itemInsertErr } = await dbClient.from("order_items").insert({
         id: crypto.randomUUID(),
         order_id: dbOrderId,
-        course_id: `plan_${planName.toLowerCase()}`,
+        course_id: planCourseId,
         unit_price: amountCaptured,
         discount_amount: 0,
         final_price: amountCaptured,

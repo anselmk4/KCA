@@ -58,10 +58,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ paym
       const firstItem = orderItems[0];
       const courseId = firstItem.course_id;
 
-      if (courseId && courseId.startsWith("plan_")) {
-        const planName = courseId.replace("plan_", "").toUpperCase();
-        itemLabel = `Abonnement Formateur — Plan ${planName}`;
-        itemDescription = "Abonnement mensuel à la plateforme Kuettu Crypto Academy";
+      const PLAN_MAP: Record<string, { label: string; desc: string }> = {
+        "99999999-9999-9999-9999-999999990001": { label: "Abonnement Formateur — Plan BASE", desc: "Abonnement mensuel à la plateforme Kuettu Crypto Academy" },
+        "99999999-9999-9999-9999-999999990002": { label: "Abonnement Formateur — Plan PRO", desc: "Abonnement mensuel à la plateforme Kuettu Crypto Academy" },
+        "99999999-9999-9999-9999-999999990003": { label: "Abonnement Formateur — Plan MAX", desc: "Abonnement mensuel à la plateforme Kuettu Crypto Academy" },
+      };
+
+      if (courseId && PLAN_MAP[courseId]) {
+        itemLabel = PLAN_MAP[courseId].label;
+        itemDescription = PLAN_MAP[courseId].desc;
       } else if (courseId) {
         const { data: course } = await supabaseAdmin
           .from("courses")

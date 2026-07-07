@@ -86,10 +86,19 @@ export async function POST(req: NextRequest) {
       if (orderError) throw orderError;
 
       // Insert Order Item
+      const planUuidMap: Record<string, string> = {
+        BASE: "99999999-9999-9999-9999-999999990001",
+        PRO: "99999999-9999-9999-9999-999999990002",
+        MAX: "99999999-9999-9999-9999-999999990003",
+      };
+      const resolvedCourseId = type === 'STUDENT_COURSE' 
+        ? itemId 
+        : (planUuidMap[itemId.toUpperCase()] || planUuidMap.BASE);
+
       const { error: itemError } = await dbClient.from('order_items').insert({
         id: crypto.randomUUID(),
         order_id: orderId,
-        course_id: type === 'STUDENT_COURSE' ? itemId : `plan_${itemId.toLowerCase()}`,
+        course_id: resolvedCourseId,
         unit_price: amount,
         discount_amount: 0,
         final_price: amount,
