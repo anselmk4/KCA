@@ -30,7 +30,7 @@ interface Course {
   installmentsCount: number;
 }
 
-type PaymentMethod = "momo" | "paypal" | "crypto";
+type PaymentMethod = "momo" | "paypal" | "crypto" | "card";
 
 export default function PaymentPage() {
   const params = useParams();
@@ -50,6 +50,12 @@ export default function PaymentPage() {
   // MOMO state
   const [momoProvider, setMomoProvider] = useState("mpesa");
   const [momoPhone, setMomoPhone] = useState("");
+
+  // CARD state
+  const [cardName, setCardName] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCvc, setCardCvc] = useState("");
 
   // Coupon state
   const [couponCode, setCouponCode] = useState("");
@@ -423,6 +429,74 @@ export default function PaymentPage() {
         return;
       }
 
+      if (method === 'card') {
+        try {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          
+          const { error: enrollError } = await supabase
+            .from('enrollments')
+            .upsert({
+              student_id: user.id,
+              course_id: course.id,
+              progress_percent: 0,
+              status: 'ACTIVE',
+              enrolled_at: new Date().toISOString()
+            }, { onConflict: 'student_id,course_id' });
+
+          if (enrollError) throw enrollError;
+
+          const orderId = crypto.randomUUID();
+          const orderNumber = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+          await supabase.from('orders').insert({
+            id: orderId,
+            order_number: orderNumber,
+            user_id: user.id,
+            status: 'COMPLETED',
+            subtotal: course.price,
+            discount_amount: course.price - discountedAmount,
+            tax_amount: 0,
+            total: discountedAmount,
+            currency: 'USD',
+            coupon_id: appliedCoupon?.id || null,
+            created_at: new Date().toISOString()
+          } as any);
+
+          await supabase.from('order_items').insert({
+            id: crypto.randomUUID(),
+            order_id: orderId,
+            course_id: course.id,
+            unit_price: course.price,
+            discount_amount: course.price - discountedAmount,
+            final_price: discountedAmount,
+            created_at: new Date().toISOString()
+          } as any);
+
+          await supabase.from('payments').insert({
+            id: crypto.randomUUID(),
+            order_id: orderId,
+            user_id: user.id,
+            amount: discountedAmount,
+            currency: 'USD',
+            provider: 'CARD',
+            status: 'PAID',
+            method: 'CARD',
+            paid_at: new Date().toISOString()
+          } as any);
+
+          setSubmitting(false);
+          setSuccess(true);
+          router.refresh();
+          setTimeout(() => {
+            router.push("/dashboard/courses");
+          }, 3000);
+          return;
+        } catch (cardErr: any) {
+          alert("Erreur lors de la validation du paiement par carte : " + cardErr.message);
+          setSubmitting(false);
+          return;
+        }
+      }
+
       // 1. Écrire l'enrollment dans Supabase en tant qu'ACTIVE (Pour PayPal et Crypto, simulation instantanée)
       const { error: enrollError } = await supabase
         .from('enrollments')
@@ -628,7 +702,7 @@ export default function PaymentPage() {
             </div>
 
             {/* Selection tabs */}
-            <div className="grid grid-cols-3 border-b border-zinc-200 dark:border-zinc-800 p-2 gap-1 bg-zinc-50/20">
+            <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-zinc-200 dark:border-zinc-800 p-2 gap-1 bg-zinc-50/20">
               <button
                 type="button"
                 onClick={() => setMethod("momo")}
@@ -643,6 +717,18 @@ export default function PaymentPage() {
               </button>
               <button
                 type="button"
+                onClick={() => setMethod("card")}
+                className={`flex flex-col items-center gap-2 py-3 rounded-xl transition-all cursor-pointer ${
+                  method === "card"
+                    ? "bg-zinc-100 dark:bg-zinc-800 text-blue-600 dark:text-blue-400 font-bold"
+                    : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-700"
+                }`}
+              >
+                <CreditCard className="w-5 h-5" />
+                <span className="text-xs">Carte bancaire</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setMethod("paypal")}
                 className={`flex flex-col items-center gap-2 py-3 rounded-xl transition-all cursor-pointer ${
                   method === "paypal"
@@ -650,7 +736,7 @@ export default function PaymentPage() {
                     : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-700"
                 }`}
               >
-                <CreditCard className="w-5 h-5" />
+                <span className="text-sm font-bold leading-none">PP</span>
                 <span className="text-xs">PayPal</span>
               </button>
               <button
@@ -669,6 +755,64 @@ export default function PaymentPage() {
 
             {/* Input Forms */}
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              
+              {/* CARD Form */}
+              {method === "card" && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <h4 className="font-bold text-sm text-zinc-900 dark:text-white mb-2">Informations de Carte Bancaire</h4>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-medium text-zinc-400 uppercase mb-1">Nom du titulaire</label>
+                      <input 
+                        required
+                        type="text" 
+                        value={cardName}
+                        onChange={e => setCardName(e.target.value)}
+                        placeholder="Jean Dupont"
+                        className="w-full px-4 py-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm focus:ring-1 focus:ring-blue-500 outline-none text-zinc-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-zinc-400 uppercase mb-1">Numéro de carte</label>
+                      <input 
+                        required
+                        type="text" 
+                        value={cardNumber}
+                        onChange={e => setCardNumber(e.target.value.replace(/\s?/g, '').replace(/(\d{4})/g, '$1 ').trim())}
+                        maxLength={19}
+                        placeholder="4000 1234 5678 9010"
+                        className="w-full px-4 py-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm focus:ring-1 focus:ring-blue-500 outline-none text-zinc-900 dark:text-white"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-medium text-zinc-400 uppercase mb-1">Date d'expiration</label>
+                        <input 
+                          required
+                          type="text" 
+                          value={cardExpiry}
+                          onChange={e => setCardExpiry(e.target.value)}
+                          placeholder="MM/AA"
+                          maxLength={5}
+                          className="w-full px-4 py-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm focus:ring-1 focus:ring-blue-500 outline-none text-zinc-900 dark:text-white text-center"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-zinc-400 uppercase mb-1">CVC / CVV</label>
+                        <input 
+                          required
+                          type="password" 
+                          value={cardCvc}
+                          onChange={e => setCardCvc(e.target.value)}
+                          placeholder="•••"
+                          maxLength={4}
+                          className="w-full px-4 py-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-sm focus:ring-1 focus:ring-blue-500 outline-none text-zinc-900 dark:text-white text-center"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               {/* MOMO Form */}
               {method === "momo" && (

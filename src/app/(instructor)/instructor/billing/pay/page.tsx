@@ -432,7 +432,7 @@ function PaymentContent() {
               
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 {[
-                  { id: "mastercard", label: "Mastercard", icon: <CreditCard className="w-5 h-5" /> },
+                  { id: "mastercard", label: "Carte bancaire", icon: <CreditCard className="w-5 h-5" /> },
                   { id: "stripe", label: "Stripe", icon: <ShieldCheck className="w-5 h-5 text-indigo-500" /> },
                   { id: "paypal", label: "PayPal", icon: <DollarSign className="w-5 h-5 text-blue-500" /> },
                   { id: "crypto", label: "Crypto", icon: <Coins className="w-5 h-5 text-amber-500" /> },
@@ -460,7 +460,7 @@ function PaymentContent() {
               {/* 1. Mastercard Card Form */}
               {method === "mastercard" && (
                 <div className="space-y-4 animate-in fade-in duration-200">
-                  <h4 className="font-bold text-sm text-zinc-900 dark:text-white mb-2">Informations de Carte Mastercard</h4>
+                  <h4 className="font-bold text-sm text-zinc-900 dark:text-white mb-2">Informations de Carte Bancaire</h4>
                   <div className="space-y-3">
                     <div>
                       <label className="block text-[11px] font-medium text-zinc-400 uppercase mb-1">Nom du titulaire</label>
