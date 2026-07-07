@@ -142,7 +142,16 @@ export async function POST(req: NextRequest) {
       callback_url: callbackUrl
     };
 
-    const payloadString = JSON.stringify(mokoPayload);
+    // Canonicalize JSON payload by sorting keys alphabetically
+    const sortKeys = (obj: any) => {
+      const sorted: any = {};
+      Object.keys(obj).sort().forEach(key => {
+        sorted[key] = obj[key];
+      });
+      return sorted;
+    };
+
+    const payloadString = JSON.stringify(sortKeys(mokoPayload));
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const signature = crypto.createHmac('sha256', apiSecret)
       .update(payloadString + timestamp)
@@ -151,7 +160,7 @@ export async function POST(req: NextRequest) {
     console.log('[moko-initiate-card] Sending order creation request to Moko Card API:', mokoCardEndpoint, {
       reference,
       timestamp,
-      signature: '***'
+      payload: payloadString
     });
 
     try {
@@ -167,6 +176,7 @@ export async function POST(req: NextRequest) {
       });
 
       const responseText = await response.text();
+      console.log('[moko-initiate-card] Moko Card API raw response:', responseText);
       let responseData: any = {};
       try {
         responseData = JSON.parse(responseText);
