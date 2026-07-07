@@ -20,6 +20,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Non authentifié. Veuillez vous connecter." }, { status: 401 });
     }
 
+    // Determine the database client: use supabaseAdmin if the service role key is valid, otherwise use the authenticated user's client (which satisfies RLS checked columns)
+    const dbClient = (process.env.SUPABASE_SERVICE_ROLE_KEY && 
+                      process.env.SUPABASE_SERVICE_ROLE_KEY !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+      ? supabaseAdmin 
+      : supabase;
+
     const { orderId } = await req.json();
     console.log(`[paypal-capture-order] Order ID received: ${orderId} for User: ${user.id}`);
 
@@ -123,7 +129,7 @@ export async function POST(req: NextRequest) {
       const paymentId = crypto.randomUUID();
 
       // Check course exists
-      const { data: course, error: courseErr } = await supabaseAdmin
+      const { data: course, error: courseErr } = await dbClient
         .from("courses")
         .select("id, price, title")
         .eq("id", itemId)
@@ -134,11 +140,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Cours introuvable pour validation finale." }, { status: 404 });
       }
 
-      console.log(`[paypal-capture-order] Processing course purchase for "${course.title}"`);
-
       // Write Order record
       const orderNumber = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      const { error: orderInsertErr } = await supabaseAdmin.from("orders").insert({
+      const { error: orderInsertErr } = await dbClient.from("orders").insert({
         id: dbOrderId,
         order_number: orderNumber,
         user_id: user.id,
@@ -158,7 +162,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Write Order Item
-      const { error: itemInsertErr } = await supabaseAdmin.from("order_items").insert({
+      const { error: itemInsertErr } = await dbClient.from("order_items").insert({
         id: crypto.randomUUID(),
         order_id: dbOrderId,
         course_id: course.id,
@@ -174,7 +178,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Write Payment
-      const { error: paymentInsertErr } = await supabaseAdmin.from("payments").insert({
+      const { error: paymentInsertErr } = await dbClient.from("payments").insert({
         id: paymentId,
         order_id: dbOrderId,
         user_id: user.id,
@@ -196,7 +200,7 @@ export async function POST(req: NextRequest) {
 
       // Create ACTIVE enrollment
       console.log(`[paypal-capture-order] Upserting enrollment for user: ${user.id}, course: ${course.id}`);
-      const { error: enrollErr } = await supabaseAdmin.from("enrollments").upsert({
+      const { error: enrollErr } = await dbClient.from("enrollments").upsert({
         student_id: user.id,
         course_id: course.id,
         progress_percent: 0,
@@ -228,7 +232,7 @@ export async function POST(req: NextRequest) {
 
       // Write Order and Payment records
       const orderNumber = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      const { error: orderInsertErr } = await supabaseAdmin.from("orders").insert({
+      const { error: orderInsertErr } = await dbClient.from("orders").insert({
         id: dbOrderId,
         order_number: orderNumber,
         user_id: user.id,
@@ -247,7 +251,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Erreur d'enregistrement commande plan: ${orderInsertErr.message}` }, { status: 500 });
       }
 
-      const { error: itemInsertErr } = await supabaseAdmin.from("order_items").insert({
+      const { error: itemInsertErr } = await dbClient.from("order_items").insert({
         id: crypto.randomUUID(),
         order_id: dbOrderId,
         course_id: `plan_${planName.toLowerCase()}`,
@@ -262,7 +266,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Erreur d'enregistrement item plan: ${itemInsertErr.message}` }, { status: 500 });
       }
 
-      const { error: paymentInsertErr } = await supabaseAdmin.from("payments").insert({
+      const { error: paymentInsertErr } = await dbClient.from("payments").insert({
         id: paymentId,
         order_id: dbOrderId,
         user_id: user.id,
@@ -284,7 +288,7 @@ export async function POST(req: NextRequest) {
 
       // Update the instructor profile's plan in Supabase
       console.log(`[paypal-capture-order] Upgrading profile plan to: ${planName} for user: ${user.id}`);
-      const { error: profileErr } = await supabaseAdmin
+      const { error: profileErr } = await dbClient
         .from("profiles")
         .update({ plan: planName })
         .eq("id", user.id);

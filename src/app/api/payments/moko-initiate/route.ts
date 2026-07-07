@@ -58,11 +58,17 @@ export async function POST(req: NextRequest) {
       ? `std_pay_${paymentId}` 
       : `ins_plan_${paymentId}`;
 
-    // 6. Save PENDING records in Supabase using admin client (to ensure robustness and bypass RLS constraints if any)
+    // Determine the database client: use supabaseAdmin if the service role key is valid, otherwise use the authenticated user's client (which satisfies RLS checked columns)
+    const dbClient = (process.env.SUPABASE_SERVICE_ROLE_KEY && 
+                      process.env.SUPABASE_SERVICE_ROLE_KEY !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+      ? supabaseAdmin 
+      : supabase;
+
+    // 6. Save PENDING records in Supabase (to ensure robustness)
     try {
       // Insert Order
       const orderNumber = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      const { error: orderError } = await supabaseAdmin.from('orders').insert({
+      const { error: orderError } = await dbClient.from('orders').insert({
         id: orderId,
         order_number: orderNumber,
         user_id: user.id,
@@ -80,7 +86,7 @@ export async function POST(req: NextRequest) {
       if (orderError) throw orderError;
 
       // Insert Order Item
-      const { error: itemError } = await supabaseAdmin.from('order_items').insert({
+      const { error: itemError } = await dbClient.from('order_items').insert({
         id: crypto.randomUUID(),
         order_id: orderId,
         course_id: type === 'STUDENT_COURSE' ? itemId : `plan_${itemId.toLowerCase()}`,
@@ -93,7 +99,7 @@ export async function POST(req: NextRequest) {
       if (itemError) throw itemError;
 
       // Insert Payment record
-      const { error: paymentError } = await supabaseAdmin.from('payments').insert({
+      const { error: paymentError } = await dbClient.from('payments').insert({
         id: paymentId,
         order_id: orderId,
         user_id: user.id,
@@ -110,7 +116,7 @@ export async function POST(req: NextRequest) {
 
       // If Student course payment, also create a PENDING enrollment
       if (type === 'STUDENT_COURSE') {
-        const { error: enrollError } = await supabaseAdmin.from('enrollments').upsert({
+        const { error: enrollError } = await dbClient.from('enrollments').upsert({
           student_id: user.id,
           course_id: itemId,
           progress_percent: 0,
@@ -169,13 +175,13 @@ export async function POST(req: NextRequest) {
 
       if (!response.ok || responseData.Status === 'Failed' || responseData.status === 'Failed') {
         // Update payment to FAILED if Moko rejected it immediately
-        await supabaseAdmin.from('payments').update({
+        await dbClient.from('payments').update({
           status: 'FAILED',
           failure_reason: responseData.message || responseData.Message || 'Rejeté par la passerelle',
           updated_at: new Date().toISOString()
         } as any).eq('id', paymentId);
 
-        await supabaseAdmin.from('orders').update({
+        await dbClient.from('orders').update({
           status: 'CANCELLED',
           updated_at: new Date().toISOString()
         } as any).eq('id', orderId);
@@ -198,13 +204,13 @@ export async function POST(req: NextRequest) {
       console.error('[moko-initiate] Moko API fetch error:', apiErr);
       
       // Update payment to FAILED since API is unreachable or errored
-      await supabaseAdmin.from('payments').update({
+      await dbClient.from('payments').update({
         status: 'FAILED',
         failure_reason: apiErr.message || 'API Moko inaccessible',
         updated_at: new Date().toISOString()
       } as any).eq('id', paymentId);
 
-      await supabaseAdmin.from('orders').update({
+      await dbClient.from('orders').update({
         status: 'CANCELLED',
         updated_at: new Date().toISOString()
       } as any).eq('id', orderId);
