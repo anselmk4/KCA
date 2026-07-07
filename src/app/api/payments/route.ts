@@ -25,8 +25,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
     }
 
+    // Determine the database client: use supabaseAdmin if the service role key is valid, otherwise use the authenticated user's client (which satisfies RLS checked columns)
+    const dbClient = (process.env.SUPABASE_SERVICE_ROLE_KEY && 
+                      process.env.SUPABASE_SERVICE_ROLE_KEY !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+      ? supabaseAdmin 
+      : supabase;
+
     // 1. Fetch the user's completed payments
-    const { data: paymentsData, error: paymentsError } = await supabaseAdmin
+    const { data: paymentsData, error: paymentsError } = await dbClient
       .from("payments")
       .select("id, order_id, amount, status, provider, paid_at")
       .eq("user_id", user.id)
@@ -45,7 +51,7 @@ export async function GET(req: NextRequest) {
     const orderIds = payments.map((p) => p.order_id);
 
     // 2. Fetch order items to match payments with courses
-    const { data: itemsData, error: itemsError } = await supabaseAdmin
+    const { data: itemsData, error: itemsError } = await dbClient
       .from("order_items")
       .select("order_id, course_id")
       .in("order_id", orderIds);
@@ -59,7 +65,7 @@ export async function GET(req: NextRequest) {
     const courseIds = [...new Set(orderItems.map((item) => item.course_id))];
 
     // 3. Fetch courses
-    const { data: coursesData } = await supabaseAdmin
+    const { data: coursesData } = await dbClient
       .from("courses")
       .select("id, title, instructor_id")
       .in("id", courseIds);
@@ -68,7 +74,7 @@ export async function GET(req: NextRequest) {
     const instructorIds = [...new Set(courses.map((c) => c.instructor_id).filter(Boolean))];
 
     // 4. Fetch instructor profile names
-    const { data: instructorsData } = await supabaseAdmin
+    const { data: instructorsData } = await dbClient
       .from("profiles")
       .select("id, full_name")
       .in("id", instructorIds);

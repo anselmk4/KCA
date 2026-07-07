@@ -28,7 +28,9 @@ export default function AdminPayoutsPage() {
   const [payouts, setPayouts] = useState<AdminPayoutItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalSales, setTotalSales] = useState(0);
-  const [commissionRate, setCommissionRate] = useState(20); // 20% platform commission by default
+  const [platformCommissions, setPlatformCommissions] = useState(0);
+  const [instructorShare, setInstructorShare] = useState(0);
+  const [commissionRate, setCommissionRate] = useState(20); // Fallback commission rate
   const [activeTab, setActiveTab] = useState<"ALL" | "PENDING" | "PAID">("PENDING");
 
   const loadData = async () => {
@@ -41,24 +43,86 @@ export default function AdminPayoutsPage() {
 
       if (payoutErr) throw payoutErr;
 
-      // 2. Fetch profiles for instructor names
-      const { data: profiles } = await supabase
+      // 2. Fetch profiles for names and plans
+      const { data: sbProfiles } = await supabase
         .from('profiles')
-        .select('id, full_name');
+        .select('id, full_name, plan');
 
       const profileMap = new Map<string, string>();
-      profiles?.forEach(p => {
+      const planMap = new Map<string, string>();
+      
+      sbProfiles?.forEach(p => {
         profileMap.set(p.id, p.full_name || 'Instructeur');
+        planMap.set(p.id, p.plan || 'FREE');
       });
 
-      // 3. Fetch all orders / payments to calculate platform sales
+      // 3. Fetch all completed payments
       const { data: paymentsData } = await supabase
         .from('payments')
-        .select('amount, status')
+        .select('id, order_id, amount, status, user_id')
         .eq('status', 'PAID');
 
-      const salesSum = (paymentsData || []).reduce((acc, curr) => acc + (curr.amount || 0), 0);
-      setTotalSales(salesSum);
+      const payments = paymentsData || [];
+      const orderIds = payments.map(p => p.order_id).filter(Boolean);
+
+      // 4. Fetch order items
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('order_id, course_id')
+        .in('order_id', orderIds);
+
+      const orderItemMap = new Map(orderItems?.map(oi => [oi.order_id, oi.course_id]) || []);
+      const courseIds = [...new Set(orderItems?.map(oi => oi.course_id) || [])];
+
+      // 5. Fetch courses to identify instructor
+      const { data: courses } = await supabase
+        .from('courses')
+        .select('id, instructor_id')
+        .in('id', courseIds);
+
+      const courseMap = new Map(courses?.map(c => [c.id, c.instructor_id]) || []);
+
+      // Plan configurations
+      const PLAN_COMMISSION_CONFIG: Record<string, { commissionRate: number; instructorShare: number }> = {
+        FREE: { commissionRate: 0.20, instructorShare: 0.80 },
+        BASE: { commissionRate: 0.10, instructorShare: 0.90 },
+        PRO: { commissionRate: 0.05, instructorShare: 0.95 },
+        MAX: { commissionRate: 0.00, instructorShare: 1.00 },
+      };
+
+      const planUuidMap: Record<string, string> = {
+        "99999999-9999-9999-9999-999999990001": "BASE",
+        "99999999-9999-9999-9999-999999990002": "PRO",
+        "99999999-9999-9999-9999-999999990003": "MAX",
+      };
+
+      let computedTotalSales = 0;
+      let computedPlatformCommissions = 0;
+      let computedInstructorShare = 0;
+
+      payments.forEach(p => {
+        const amount = p.amount || 0;
+        computedTotalSales += amount;
+
+        const courseId = orderItemMap.get(p.order_id) || "";
+        
+        // If it is a subscription plan payment, 100% of revenue goes to platform
+        if (planUuidMap[courseId]) {
+          computedPlatformCommissions += amount;
+        } else {
+          // It is a course purchase
+          const instructorId = courseMap.get(courseId) || "";
+          const instPlan = planMap.get(instructorId) || "FREE";
+          const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;
+
+          computedPlatformCommissions += amount * commConfig.commissionRate;
+          computedInstructorShare += amount * commConfig.instructorShare;
+        }
+      });
+
+      setTotalSales(Math.round(computedTotalSales));
+      setPlatformCommissions(Math.round(computedPlatformCommissions));
+      setInstructorShare(Math.round(computedInstructorShare));
 
       const items: AdminPayoutItem[] = (sbPayouts || []).map((p: any) => ({
         id: p.id,
@@ -76,6 +140,8 @@ export default function AdminPayoutsPage() {
       const db = getDB();
       const rev = db.transactions.reduce((acc, curr) => acc + curr.amount, 0);
       setTotalSales(rev);
+      setPlatformCommissions(Math.round(rev * 0.20));
+      setInstructorShare(Math.round(rev * 0.80));
       
       // Fallback fake payouts
       setPayouts([
@@ -122,9 +188,6 @@ export default function AdminPayoutsPage() {
     }
   };
 
-  const platformCommissions = (totalSales * commissionRate) / 100;
-  const instructorShare = totalSales - platformCommissions;
-
   const filtered = payouts.filter(p => {
     if (activeTab === "ALL") return true;
     return p.status === activeTab;
@@ -161,7 +224,7 @@ export default function AdminPayoutsPage() {
             <div className="flex justify-between items-center">
               <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Commissions de la plateforme</p>
               <span className="text-xs bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-lg font-bold">
-                {commissionRate}%
+                Par Plan
               </span>
             </div>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">{platformCommissions}$</h3>
@@ -180,22 +243,29 @@ export default function AdminPayoutsPage() {
         </div>
       </div>
 
-      {/* Adjust Commission Rate Card */}
-      <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <h4 className="font-bold text-zinc-900 dark:text-white">Ajuster le taux de commission</h4>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Définissez la commission prélevée par la plateforme sur chaque transaction.</p>
+      {/* Commission Rates Config Card */}
+      <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-4">
+        <div>
+          <h4 className="font-bold text-zinc-900 dark:text-white">Configuration des Commissions par Forfait</h4>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Les commissions sont prélevées dynamiquement selon le forfait d'abonnement actif du formateur lors de l'achat.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <input
-            type="number"
-            min="0"
-            max="100"
-            value={commissionRate}
-            onChange={(e) => setCommissionRate(Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
-            className="w-20 px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-center text-sm font-bold text-zinc-900 dark:text-white"
-          />
-          <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">% de commission</span>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="p-3 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-150 dark:border-zinc-800 rounded-xl text-center">
+            <span className="text-xxs font-bold text-zinc-400 uppercase block">Plan Free</span>
+            <span className="text-lg font-extrabold text-zinc-800 dark:text-white">20%</span>
+          </div>
+          <div className="p-3 bg-blue-50/40 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/20 rounded-xl text-center">
+            <span className="text-xxs font-bold text-blue-500 dark:text-blue-400 uppercase block">Plan Base</span>
+            <span className="text-lg font-extrabold text-blue-700 dark:text-blue-400">10%</span>
+          </div>
+          <div className="p-3 bg-teal-50/40 dark:bg-teal-900/10 border border-teal-100 dark:border-teal-900/20 rounded-xl text-center">
+            <span className="text-xxs font-bold text-teal-500 dark:text-teal-400 uppercase block">Plan Pro</span>
+            <span className="text-lg font-extrabold text-teal-700 dark:text-teal-400">5%</span>
+          </div>
+          <div className="p-3 bg-amber-50/40 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20 rounded-xl text-center">
+            <span className="text-xxs font-bold text-amber-550 dark:text-amber-400 uppercase block">Plan Max</span>
+            <span className="text-lg font-extrabold text-amber-700 dark:text-amber-400">0%</span>
+          </div>
         </div>
       </div>
 

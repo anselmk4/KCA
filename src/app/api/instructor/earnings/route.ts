@@ -17,8 +17,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
     }
 
+    // Determine the database client: use supabaseAdmin if the service role key is valid, otherwise use the authenticated user's client (which satisfies RLS checked columns)
+    const dbClient = (process.env.SUPABASE_SERVICE_ROLE_KEY && 
+                      process.env.SUPABASE_SERVICE_ROLE_KEY !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+      ? supabaseAdmin 
+      : supabase;
+
     // 1. Fetch user's profile to check if they exist and retrieve plan
-    const { data: profile } = await supabaseAdmin
+    const { data: profile } = await dbClient
       .from('profiles')
       .select('id, plan, status')
       .eq('id', user.id)
@@ -29,7 +35,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 2. Fetch instructor's courses
-    const { data: coursesData, error: coursesError } = await supabaseAdmin
+    const { data: coursesData, error: coursesError } = await dbClient
       .from("courses")
       .select("id, title, status, price")
       .eq("instructor_id", user.id);
@@ -53,7 +59,7 @@ export async function GET(req: NextRequest) {
     const courseMap = new Map(courses.map((c) => [c.id, c]));
 
     // 3. Fetch order items for these courses
-    const { data: orderItems, error: itemsError } = await supabaseAdmin
+    const { data: orderItems, error: itemsError } = await dbClient
       .from("order_items")
       .select("order_id, course_id")
       .in("course_id", courseIds);
@@ -71,8 +77,8 @@ export async function GET(req: NextRequest) {
     const orderIds = orderItems.map((oi) => oi.order_id);
     const orderItemMap = new Map(orderItems.map((oi) => [oi.order_id, oi.course_id]));
 
-    // 4. Fetch payments using supabaseAdmin to bypass RLS (since payments belong to students, not the instructor)
-    const { data: payments, error: paymentsError } = await supabaseAdmin
+    // 4. Fetch payments using dbClient (which bypasses RLS when using service role key, otherwise falls back to instructor session)
+    const { data: payments, error: paymentsError } = await dbClient
       .from("payments")
       .select("id, order_id, amount, status, paid_at, user_id, provider")
       .in("order_id", orderIds);
@@ -90,7 +96,7 @@ export async function GET(req: NextRequest) {
     const studentIds = [...new Set(payments.map((p) => p.user_id))];
 
     // 5. Fetch student profiles (names)
-    const { data: studentProfiles } = await supabaseAdmin
+    const { data: studentProfiles } = await dbClient
       .from("profiles")
       .select("id, full_name")
       .in("id", studentIds);

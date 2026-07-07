@@ -30,8 +30,14 @@ export async function GET(_req: NextRequest) {
       return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
     }
 
+    // Determine the database client: use supabaseAdmin if the service role key is valid, otherwise use the authenticated user's client (which satisfies RLS checked columns)
+    const dbClient = (process.env.SUPABASE_SERVICE_ROLE_KEY && 
+                      process.env.SUPABASE_SERVICE_ROLE_KEY !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+      ? supabaseAdmin 
+      : supabase;
+
     // Fetch all payments made by this instructor (includes their plan subscriptions)
-    const { data: paymentsData, error: paymentsError } = await supabaseAdmin
+    const { data: paymentsData, error: paymentsError } = await dbClient
       .from("payments")
       .select("id, order_id, amount, currency, status, provider, provider_transaction_id, paid_at, created_at")
       .eq("user_id", user.id)
@@ -50,7 +56,7 @@ export async function GET(_req: NextRequest) {
     const orderIds = payments.map((p) => p.order_id).filter(Boolean);
 
     // Fetch order items to get course_id for each order
-    const { data: orderItems } = await supabaseAdmin
+    const { data: orderItems } = await dbClient
       .from("order_items")
       .select("order_id, course_id")
       .in("order_id", orderIds);
@@ -71,7 +77,7 @@ export async function GET(_req: NextRequest) {
         if (courseId && PLAN_LABELS[courseId]) {
           label = PLAN_LABELS[courseId];
         } else if (courseId) {
-          const { data: course } = await supabaseAdmin
+          const { data: course } = await dbClient
             .from("courses")
             .select("title")
             .eq("id", courseId)

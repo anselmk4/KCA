@@ -262,13 +262,15 @@ export default function StudentPaymentsPage() {
                           ${tx.amount}
                         </td>
                         <td className="px-5 py-4 text-center">
-                          <button
-                            onClick={() => downloadInvoice(tx)}
+                          <a
+                            href={`/api/payments/invoice/${tx.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="inline-flex items-center justify-center p-2 text-teal-600 hover:text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-900/20 rounded-lg transition-colors cursor-pointer"
                             title="Télécharger la facture HTML"
                           >
                             <Download className="w-4 h-4" />
-                          </button>
+                          </a>
                         </td>
                       </tr>
                     ))}
