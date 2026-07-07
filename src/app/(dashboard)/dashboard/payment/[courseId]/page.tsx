@@ -45,6 +45,7 @@ export default function PaymentPage() {
   const [showPendingState, setShowPendingState] = useState(false);
   const [paymentId, setPaymentId] = useState("");
   const [verifying, setVerifying] = useState(false);
+  const [simulating, setSimulating] = useState(false);
 
   // MOMO state
   const [momoProvider, setMomoProvider] = useState("mpesa");
@@ -245,8 +246,6 @@ export default function PaymentPage() {
       setVerifying(false);
     }
   };
-
-  const [simulating, setSimulating] = useState(false);
 
   const simulateSuccess = async () => {
     if (!paymentId) return;

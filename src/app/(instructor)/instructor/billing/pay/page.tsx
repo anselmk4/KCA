@@ -35,6 +35,7 @@ function PaymentContent() {
   const [showPendingState, setShowPendingState] = useState(false);
   const [paymentId, setPaymentId] = useState("");
   const [verifying, setVerifying] = useState(false);
+  const [simulating, setSimulating] = useState(false);
   const [paypalLoaded, setPaypalLoaded] = useState(false);
   const [paypalError, setPaypalError] = useState<string | null>(null);
 
@@ -113,8 +114,6 @@ function PaymentContent() {
       setVerifying(false);
     }
   };
-
-  const [simulating, setSimulating] = useState(false);
 
   const simulateSuccess = async () => {
     if (!paymentId) return;
