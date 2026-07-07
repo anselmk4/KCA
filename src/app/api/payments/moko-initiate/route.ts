@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
       : `${mokoBaseUrl.replace(/\/$/, '')}/gateway`;
 
     const mokoPayload = {
-      merchant_id: process.env.MOKO_MERCHANT_ID,
+      merchant_id: process.env.MOKO_MERCHANT_CODE || process.env.MOKO_MERCHANT_ID,
       merchant_secrete: process.env.MOKO_MERCHANT_SECRET,
       amount: amount.toString(),
       currency: 'USD',

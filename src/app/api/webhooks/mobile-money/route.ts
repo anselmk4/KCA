@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       : `${mokoBaseUrl.replace(/\/$/, '')}/gateway`;
 
     const verifyPayload = {
-      merchant_id: process.env.MOKO_MERCHANT_ID,
+      merchant_id: process.env.MOKO_MERCHANT_CODE || process.env.MOKO_MERCHANT_ID,
       merchant_secrete: process.env.MOKO_MERCHANT_SECRET,
       action: 'verify',
       reference: reference
