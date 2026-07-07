@@ -280,7 +280,37 @@ function PaymentContent() {
       return;
     }
 
-    // Simulate other payment methods (mastercard, stripe, crypto) — update Supabase directly
+    if (method === "mastercard") {
+      try {
+        const response = await fetch("/api/payments/moko-initiate-card", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: currentPlanDetails.price,
+            type: "INSTRUCTOR_PLAN",
+            itemId: plan,
+          }),
+        });
+
+        const resData = await response.json();
+        if (!response.ok) {
+          throw new Error(resData.error || "Une erreur est survenue lors de l'initiation du paiement par carte.");
+        }
+
+        if (resData.redirectUrl) {
+          window.location.href = resData.redirectUrl;
+        } else {
+          throw new Error("URL de redirection introuvable.");
+        }
+      } catch (err: any) {
+        alert(err.message || "Une erreur est survenue lors de l'appel de la passerelle.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Simulate other payment methods (stripe, crypto) — update Supabase directly
     setTimeout(async () => {
       try {
         // Update plan in Supabase

@@ -431,70 +431,37 @@ export default function PaymentPage() {
 
       if (method === 'card') {
         try {
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          
-          const { error: enrollError } = await supabase
-            .from('enrollments')
-            .upsert({
-              student_id: user.id,
-              course_id: course.id,
-              progress_percent: 0,
-              status: 'ACTIVE',
-              enrolled_at: new Date().toISOString()
-            }, { onConflict: 'student_id,course_id' });
+          const response = await fetch('/api/payments/moko-initiate-card', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              amount: discountedAmount,
+              type: 'STUDENT_COURSE',
+              itemId: course.id,
+              couponId: appliedCoupon?.id || null
+            }),
+          });
 
-          if (enrollError) throw enrollError;
+          const resData = await response.json();
+          if (!response.ok) {
+            throw new Error(resData.error || "Une erreur est survenue lors de l'initiation du paiement par carte.");
+          }
 
-          const orderId = crypto.randomUUID();
-          const orderNumber = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-          await supabase.from('orders').insert({
-            id: orderId,
-            order_number: orderNumber,
-            user_id: user.id,
-            status: 'COMPLETED',
-            subtotal: course.price,
-            discount_amount: course.price - discountedAmount,
-            tax_amount: 0,
-            total: discountedAmount,
-            currency: 'USD',
-            coupon_id: appliedCoupon?.id || null,
-            created_at: new Date().toISOString()
-          } as any);
-
-          await supabase.from('order_items').insert({
-            id: crypto.randomUUID(),
-            order_id: orderId,
-            course_id: course.id,
-            unit_price: course.price,
-            discount_amount: course.price - discountedAmount,
-            final_price: discountedAmount,
-            created_at: new Date().toISOString()
-          } as any);
-
-          await supabase.from('payments').insert({
-            id: crypto.randomUUID(),
-            order_id: orderId,
-            user_id: user.id,
-            amount: discountedAmount,
-            currency: 'USD',
-            provider: 'CARD',
-            status: 'PAID',
-            method: 'CARD',
-            paid_at: new Date().toISOString()
-          } as any);
-
-          setSubmitting(false);
-          setSuccess(true);
-          router.refresh();
-          setTimeout(() => {
-            router.push("/dashboard/courses");
-          }, 3000);
+          setPaymentId(resData.paymentId);
+          if (resData.redirectUrl) {
+            window.location.href = resData.redirectUrl;
+          } else {
+            throw new Error("URL de redirection introuvable.");
+          }
           return;
         } catch (cardErr: any) {
-          alert("Erreur lors de la validation du paiement par carte : " + cardErr.message);
+          alert(cardErr.message || "Une erreur est survenue avec le paiement par carte.");
+        } finally {
           setSubmitting(false);
-          return;
         }
+        return;
       }
 
       // 1. Écrire l'enrollment dans Supabase en tant qu'ACTIVE (Pour PayPal et Crypto, simulation instantanée)
