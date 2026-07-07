@@ -33,7 +33,7 @@ export async function GET(_req: NextRequest) {
     // Fetch all payments made by this instructor (includes their plan subscriptions)
     const { data: paymentsData, error: paymentsError } = await supabaseAdmin
       .from("payments")
-      .select("id, order_id, amount, currency, status, provider, transaction_reference, paid_at, created_at")
+      .select("id, order_id, amount, currency, status, provider, provider_transaction_id, paid_at, created_at")
       .eq("user_id", user.id)
       .eq("status", "PAID")
       .order("paid_at", { ascending: false });
@@ -80,7 +80,7 @@ export async function GET(_req: NextRequest) {
           amount: p.amount,
           currency: p.currency || "USD",
           provider: PROVIDER_LABELS[p.provider] || p.provider || "—",
-          transactionRef: p.transaction_reference || null,
+          transactionRef: p.provider_transaction_id || null,
           date: p.paid_at || p.created_at,
         };
       })

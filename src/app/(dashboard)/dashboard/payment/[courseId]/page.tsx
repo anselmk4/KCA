@@ -412,11 +412,17 @@ export default function PaymentPage() {
       // 2. Écrire la transaction dans Supabase
       try {
         const orderId = crypto.randomUUID();
+        const orderNumber = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
         await supabase.from('orders').insert({
           id: orderId,
+          order_number: orderNumber,
           user_id: user.id,
           status: 'COMPLETED',
-          total_price: discountedAmount,
+          subtotal: course.price,
+          discount_amount: course.price - discountedAmount,
+          tax_amount: 0,
+          total: discountedAmount,
+          currency: 'USD',
           coupon_id: appliedCoupon?.id || null,
           created_at: new Date().toISOString()
         } as any);
@@ -426,7 +432,9 @@ export default function PaymentPage() {
           order_id: orderId,
           course_id: course.id,
           unit_price: course.price,
-          final_price: discountedAmount
+          discount_amount: course.price - discountedAmount,
+          final_price: discountedAmount,
+          created_at: new Date().toISOString()
         } as any);
 
         let payProvider: 'STRIPE' | 'PAYPAL' | 'MOBILE_MONEY' | 'CRYPTO' | 'MANUAL' = 'STRIPE';
@@ -438,8 +446,10 @@ export default function PaymentPage() {
           order_id: orderId,
           user_id: user.id,
           amount: discountedAmount,
-          status: 'PAID',
+          currency: 'USD',
           provider: payProvider,
+          status: 'PAID',
+          method: payProvider,
           paid_at: new Date().toISOString()
         } as any);
       } catch (receiptErr) {

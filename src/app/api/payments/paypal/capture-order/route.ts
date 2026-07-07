@@ -69,11 +69,17 @@ export async function POST(req: NextRequest) {
       }
 
       // Write Order records
+      const orderNumber = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       await supabaseAdmin.from("orders").insert({
         id: dbOrderId,
+        order_number: orderNumber,
         user_id: user.id,
         status: "COMPLETED",
-        total_price: amountCaptured,
+        subtotal: amountCaptured,
+        discount_amount: 0,
+        tax_amount: 0,
+        total: amountCaptured,
+        currency: "USD",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       } as any);
@@ -83,6 +89,7 @@ export async function POST(req: NextRequest) {
         order_id: dbOrderId,
         course_id: course.id,
         unit_price: course.price,
+        discount_amount: 0,
         final_price: amountCaptured,
         created_at: new Date().toISOString(),
       } as any);
@@ -93,10 +100,10 @@ export async function POST(req: NextRequest) {
         user_id: user.id,
         amount: amountCaptured,
         currency: "USD",
-        status: "PAID",
         provider: "PAYPAL",
+        status: "PAID",
+        provider_transaction_id: captureId,
         method: "PAYPAL",
-        transaction_reference: captureId,
         paid_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -130,11 +137,17 @@ export async function POST(req: NextRequest) {
       const paymentId = crypto.randomUUID();
 
       // Write Order and Payment records
+      const orderNumber = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       await supabaseAdmin.from("orders").insert({
         id: dbOrderId,
+        order_number: orderNumber,
         user_id: user.id,
         status: "COMPLETED",
-        total_price: amountCaptured,
+        subtotal: amountCaptured,
+        discount_amount: 0,
+        tax_amount: 0,
+        total: amountCaptured,
+        currency: "USD",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       } as any);
@@ -144,6 +157,7 @@ export async function POST(req: NextRequest) {
         order_id: dbOrderId,
         course_id: `plan_${planName.toLowerCase()}`,
         unit_price: amountCaptured,
+        discount_amount: 0,
         final_price: amountCaptured,
         created_at: new Date().toISOString(),
       } as any);
@@ -154,10 +168,10 @@ export async function POST(req: NextRequest) {
         user_id: user.id,
         amount: amountCaptured,
         currency: "USD",
-        status: "PAID",
         provider: "PAYPAL",
+        status: "PAID",
+        provider_transaction_id: captureId,
         method: "PAYPAL",
-        transaction_reference: captureId,
         paid_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

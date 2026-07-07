@@ -29,7 +29,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ paym
     // Fetch payment — must belong to the authenticated user
     const { data: payment, error: payError } = await supabaseAdmin
       .from("payments")
-      .select("id, order_id, amount, currency, status, provider, method, transaction_reference, paid_at, created_at")
+      .select("id, order_id, amount, currency, status, provider, method, provider_transaction_id, paid_at, created_at")
       .eq("id", paymentId)
       .eq("user_id", user.id)
       .maybeSingle();
@@ -256,7 +256,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ paym
           <label>Informations de paiement</label>
           <p>Date : ${invoiceDate}</p>
           <p class="light">Mode : ${providerLabel}</p>
-          ${payment.transaction_reference ? `<p class="light" style="font-size:11px;margin-top:4px">Réf. : ${payment.transaction_reference}</p>` : ""}
+          ${payment.provider_transaction_id ? `<p class="light" style="font-size:11px;margin-top:4px">Réf. : ${payment.provider_transaction_id}</p>` : ""}
         </div>
       </div>
 

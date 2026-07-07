@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
             .from('enrollments')
             .update({
               status: 'ACTIVE',
-              joined_at: new Date().toISOString()
+              enrolled_at: new Date().toISOString()
             } as any)
             .eq('student_id', payment.user_id)
             .eq('course_id', courseId);

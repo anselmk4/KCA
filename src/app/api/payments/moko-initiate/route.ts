@@ -61,11 +61,17 @@ export async function POST(req: NextRequest) {
     // 6. Save PENDING records in Supabase using admin client (to ensure robustness and bypass RLS constraints if any)
     try {
       // Insert Order
+      const orderNumber = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       const { error: orderError } = await supabaseAdmin.from('orders').insert({
         id: orderId,
+        order_number: orderNumber,
         user_id: user.id,
         status: 'PENDING',
-        total_price: amount,
+        subtotal: amount,
+        discount_amount: 0,
+        tax_amount: 0,
+        total: amount,
+        currency: 'USD',
         coupon_id: couponId || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -79,6 +85,7 @@ export async function POST(req: NextRequest) {
         order_id: orderId,
         course_id: type === 'STUDENT_COURSE' ? itemId : `plan_${itemId.toLowerCase()}`,
         unit_price: amount,
+        discount_amount: 0,
         final_price: amount,
         created_at: new Date().toISOString()
       } as any);
