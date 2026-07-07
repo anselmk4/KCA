@@ -144,7 +144,9 @@ export async function POST(req: NextRequest) {
 
     // 7. Make API request to Moko Afrika Gateway
     const mokoBaseUrl = process.env.MOKO_API_BASE_URL || 'https://paydrc.gofreshbakery.net';
-    const mokoGatewayUrl = `${mokoBaseUrl.replace(/\/$/, '')}/gateway`;
+    const mokoGatewayUrl = mokoBaseUrl.endsWith('/gateway')
+      ? mokoBaseUrl
+      : `${mokoBaseUrl.replace(/\/$/, '')}/gateway`;
 
     const mokoPayload = {
       merchant_id: process.env.MOKO_MERCHANT_ID,

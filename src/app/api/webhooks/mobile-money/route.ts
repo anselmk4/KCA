@@ -28,7 +28,9 @@ export async function POST(req: NextRequest) {
 
     // 2. Call Moko Afrika API to verify the transaction status (API Server-to-Server double check for security)
     const mokoBaseUrl = process.env.MOKO_API_BASE_URL || 'https://paydrc.gofreshbakery.net';
-    const mokoGatewayUrl = `${mokoBaseUrl.replace(/\/$/, '')}/gateway`;
+    const mokoGatewayUrl = mokoBaseUrl.endsWith('/gateway')
+      ? mokoBaseUrl
+      : `${mokoBaseUrl.replace(/\/$/, '')}/gateway`;
 
     const verifyPayload = {
       merchant_id: process.env.MOKO_MERCHANT_ID,
