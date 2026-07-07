@@ -142,7 +142,8 @@ export async function GET(req: NextRequest) {
       plan: profile.plan || 'FREE',
       transactions,
       payouts: payoutsData || [],
-      hasServiceRole
+      hasServiceRole,
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || ''
     });
 
   } catch (err: any) {

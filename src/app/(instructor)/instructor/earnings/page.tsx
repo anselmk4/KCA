@@ -58,7 +58,7 @@ export default function EarningsPage() {
   const [instructorPlan, setInstructorPlan] = useState<string>("FREE");
   const [transactions, setTransactions] = useState<LocalTransaction[]>([]);
   const [payouts, setPayouts] = useState<LocalPayout[]>([]);
-  const [session, setSession] = useState<{ name: string; email: string } | null>(null);
+  const [session, setSession] = useState<{ name: string; email: string; supabaseUrl?: string } | null>(null);
   const [hasServiceRole, setHasServiceRole] = useState(true);
   
   // Date filtering state
@@ -99,12 +99,14 @@ export default function EarningsPage() {
       if (rawProfile) {
         setSession({
           name: rawProfile.full_name || "Instructeur",
-          email: rawProfile.email || user.email || ""
+          email: rawProfile.email || user.email || "",
+          supabaseUrl: data.supabaseUrl
         });
       } else {
         setSession({
           name: user.email?.split("@")[0] || "Instructeur",
-          email: user.email || ""
+          email: user.email || "",
+          supabaseUrl: data.supabaseUrl
         });
       }
 
@@ -339,6 +341,11 @@ export default function EarningsPage() {
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               Compte : <span className="font-bold text-zinc-900 dark:text-zinc-200">{session?.name}</span> ({session?.email})
             </p>
+            {session?.supabaseUrl && (
+              <p className="text-[10px] text-zinc-400 font-mono">
+                DB: {session.supabaseUrl}
+              </p>
+            )}
             <p className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2 flex-wrap text-sm">
               <span>Part instructeur :</span>
               <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${planConfig.badgeColor}`}>

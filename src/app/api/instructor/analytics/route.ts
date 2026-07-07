@@ -137,7 +137,8 @@ export async function GET(req: NextRequest) {
       totalRevenue,
       platformCommission,
       netRevenue,
-      hasServiceRole
+      hasServiceRole,
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || ''
     });
 
   } catch (err: any) {
