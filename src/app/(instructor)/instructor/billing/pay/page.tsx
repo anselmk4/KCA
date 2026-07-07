@@ -114,6 +114,37 @@ function PaymentContent() {
     }
   };
 
+  const [simulating, setSimulating] = useState(false);
+
+  const simulateSuccess = async () => {
+    if (!paymentId) return;
+    setSimulating(true);
+    try {
+      const response = await fetch("/api/webhooks/mobile-money", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          reference: `ins_plan_${paymentId}`,
+          status: "Successful",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur de simulation");
+      }
+
+      // Check status immediately
+      await checkPaymentStatus();
+    } catch (err: any) {
+      console.error("[Simulate Success Error]", err);
+      alert("Erreur lors de la simulation : " + err.message);
+    } finally {
+      setSimulating(false);
+    }
+  };
+
   // Note: PayPal SDK script is loaded dynamically in the JSX using next/script component
 
   // Render PayPal buttons once script is loaded
@@ -335,6 +366,26 @@ function PaymentContent() {
                 <span>J'ai saisi mon code PIN</span>
               )}
             </button>
+
+            {/* Sandbox Simulation Button */}
+            {(process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS === "true") && (
+              <button
+                type="button"
+                onClick={simulateSuccess}
+                disabled={simulating}
+                className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-400 text-white font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm cursor-pointer border border-amber-600"
+              >
+                {simulating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Simulation en cours...</span>
+                  </>
+                ) : (
+                  <span>[Mode Test] Simuler validation Moko</span>
+                )}
+              </button>
+            )}
+            
             <button
               onClick={() => setShowPendingState(false)}
               className="w-full py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-300 font-bold rounded-xl transition-all text-xs cursor-pointer"
