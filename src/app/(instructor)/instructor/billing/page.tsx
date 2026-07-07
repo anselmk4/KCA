@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getSimulatedSession, setSimulatedSession, CurrentSession } from "@/lib/rbac";
-import { Check, CheckCircle2, ShieldAlert, Loader2 } from "lucide-react";
+import { Check, CheckCircle2, ShieldAlert, Loader2, Download, Receipt, CreditCard } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
 export default function BillingPage() {
@@ -16,8 +16,23 @@ export default function BillingPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  interface InstructorPayment {
+    id: string;
+    orderId: string;
+    label: string;
+    amount: number;
+    currency: string;
+    provider: string;
+    transactionRef: string | null;
+    date: string;
+  }
+
+  const [myPayments, setMyPayments] = useState<InstructorPayment[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+
   const loadBillingData = useCallback(async () => {
     setLoading(true);
+    setPaymentsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -25,7 +40,7 @@ export default function BillingPage() {
         return;
       }
 
-      // 1. Charger le profil de l'instructeur
+      // 1. Load instructor profile
       const { data: rawProfile } = await supabase
         .from("profiles")
         .select("id, plan, full_name, email")
@@ -50,7 +65,7 @@ export default function BillingPage() {
         setSimulatedSession(updatedSession);
       }
 
-      // 2. Charger les cours
+      // 2. Load courses
       const { data: coursesData } = await supabase
         .from("courses")
         .select("id")
@@ -59,7 +74,7 @@ export default function BillingPage() {
       const count = coursesData ? coursesData.length : 0;
       setCoursesCount(count);
 
-      // 3. Charger les inscriptions uniques
+      // 3. Load unique enrollments
       if (coursesData && coursesData.length > 0) {
         const courseIds = coursesData.map((c) => c.id);
         const { data: enrollmentsData } = await supabase
@@ -71,6 +86,19 @@ export default function BillingPage() {
         setTotalStudents(studentsSet.size);
       } else {
         setTotalStudents(0);
+      }
+
+      // 4. Load instructor's own payments (subscriptions + any purchases)
+      try {
+        const res = await fetch("/api/instructor/my-payments");
+        if (res.ok) {
+          const data = await res.json();
+          setMyPayments(data.payments || []);
+        }
+      } catch (err) {
+        console.error("[billing] Error loading my-payments:", err);
+      } finally {
+        setPaymentsLoading(false);
       }
     } catch (err) {
       console.error("Error loading billing details:", err);
@@ -466,6 +494,80 @@ export default function BillingPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Payments History Section */}
+      <div className="pt-4">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-teal-50 dark:bg-teal-900/20">
+              <Receipt className="w-5 h-5 text-teal-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Mes Paiements</h2>
+              <p className="text-xs text-zinc-400">Historique de vos abonnements et achats sur la plateforme</p>
+            </div>
+          </div>
+        </div>
+
+        {paymentsLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
+          </div>
+        ) : myPayments.length === 0 ? (
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-10 text-center">
+            <CreditCard className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
+            <p className="text-zinc-500 text-sm font-medium">Aucun paiement enregistré</p>
+            <p className="text-zinc-400 text-xs mt-1">Vos achats et abonnements apparaîtront ici.</p>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-zinc-50 dark:bg-zinc-800/30 text-zinc-500 dark:text-zinc-400 text-xs font-semibold uppercase tracking-wider border-b border-zinc-100 dark:border-zinc-800">
+                  <tr>
+                    <th className="px-6 py-3">Description</th>
+                    <th className="px-6 py-3">Mode</th>
+                    <th className="px-6 py-3">Date</th>
+                    <th className="px-6 py-3 text-right">Montant</th>
+                    <th className="px-6 py-3 text-center">Facture</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                  {myPayments.map((p) => (
+                    <tr key={p.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
+                      <td className="px-6 py-4">
+                        <p className="font-semibold text-zinc-900 dark:text-white">{p.label}</p>
+                        {p.transactionRef && (
+                          <p className="text-[11px] text-zinc-400 mt-0.5 font-mono">Réf: {p.transactionRef}</p>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-zinc-500 text-xs">{p.provider}</td>
+                      <td className="px-6 py-4 text-zinc-500 text-xs whitespace-nowrap">
+                        {new Date(p.date).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })}
+                      </td>
+                      <td className="px-6 py-4 text-right font-bold text-zinc-900 dark:text-white">
+                        {Number(p.amount).toFixed(2)} {p.currency}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <a
+                          href={`/api/payments/invoice/${p.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 dark:bg-teal-900/20 dark:hover:bg-teal-900/40 text-teal-700 dark:text-teal-400 rounded-lg text-xs font-semibold transition-colors cursor-pointer border border-teal-200 dark:border-teal-800/40"
+                          title="Télécharger la facture"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Facture
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

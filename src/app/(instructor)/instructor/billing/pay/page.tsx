@@ -3,16 +3,6 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { 
-  getDB, 
-  saveDB, 
-  addTransaction 
-} from "@/lib/db";
-import { 
-  getSimulatedSession, 
-  setSimulatedSession, 
-  CurrentSession 
-} from "@/lib/rbac";
-import { 
   ArrowLeft, 
   CreditCard, 
   CheckCircle2, 
@@ -38,7 +28,7 @@ function PaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [plan, setPlan] = useState<"BASE" | "PRO" | "MAX">("PRO");
-  const [session, setSession] = useState<CurrentSession | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [method, setMethod] = useState<PaymentMethod>("mastercard");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -53,7 +43,7 @@ function PaymentContent() {
   const [cardName, setCardName] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvc, setCardCvc] = useState("");
-  
+
   const [phone, setPhone] = useState("");
   const [carrier, setCarrier] = useState("mpesa");
 
@@ -61,7 +51,6 @@ function PaymentContent() {
   const [cryptoTxId, setCryptoTxId] = useState("");
 
   useEffect(() => {
-    setSession(getSimulatedSession());
     const queryPlan = searchParams.get("plan")?.toUpperCase();
     if (queryPlan === "MAX") {
       setPlan("MAX");
@@ -70,6 +59,9 @@ function PaymentContent() {
     } else {
       setPlan("PRO");
     }
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id);
+    });
   }, [searchParams]);
 
   const planDetails = {
@@ -80,42 +72,14 @@ function PaymentContent() {
 
   const currentPlanDetails = planDetails[plan];
 
+  /**
+   * Called after any successful payment to show success state and redirect.
+   * The plan update in Supabase is handled server-side by the capture handler
+   * (PayPal) or directly in handlePaymentSubmit (other methods).
+   */
   const handlePaymentSuccess = () => {
-    if (!session) return;
-    const database = getDB();
-    
-    // 1. Update user plan in DB
-    const updatedUsers = database.users.map(u => {
-      if (u.id === session.userId) {
-        return { ...u, plan: plan };
-      }
-      return u;
-    });
-    database.users = updatedUsers;
-    saveDB(database);
-
-    // 2. Register simulation transaction
-    addTransaction({
-      userId: session.userId,
-      userName: session.name,
-      amount: currentPlanDetails.price,
-      courseId: `plan_${plan.toLowerCase()}`,
-      instructorId: "",
-      instructorName: "Plateforme ANSELLA",
-      status: "PAID",
-      method: "Mobile Money"
-    });
-
-    // 3. Update session
-    const updatedSession = {
-      ...session,
-      plan: plan
-    };
-    setSimulatedSession(updatedSession);
-    
     setSuccess(true);
     router.refresh();
-
     // Redirect after showing success screen
     setTimeout(() => {
       router.push("/instructor/billing");
@@ -127,24 +91,23 @@ function PaymentContent() {
     setVerifying(true);
     try {
       const { data, error } = await supabase
-        .from('payments')
-        .select('status, failure_reason')
-        .eq('id', paymentId)
+        .from("payments")
+        .select("status, failure_reason")
+        .eq("id", paymentId)
         .maybeSingle();
-      
+
       if (error) throw error;
-      if (data?.status === 'PAID') {
-        alert("Paiement validé avec succès ! Votre abonnement est activé.");
+      if (data?.status === "PAID") {
         setShowPendingState(false);
         handlePaymentSuccess();
-      } else if (data?.status === 'FAILED') {
+      } else if (data?.status === "FAILED") {
         alert(`Le paiement a échoué : ${data.failure_reason || "Transaction refusée par l'opérateur."}`);
         setShowPendingState(false);
       } else {
         alert("Paiement toujours en attente. Assurez-vous d'avoir validé la notification sur votre téléphone mobile.");
       }
     } catch (err: any) {
-      console.error('[instructor-pay] Status check error:', err);
+      console.error("[instructor-pay] Status check error:", err);
       alert("Erreur lors de la vérification : " + (err.message || err));
     } finally {
       setVerifying(false);
@@ -205,7 +168,7 @@ function PaymentContent() {
               if (captureData.error) {
                 alert("Erreur lors de la capture : " + captureData.error);
               } else {
-                alert(`Paiement validé avec succès ! Votre abonnement ${plan} est activé.`);
+                // Plan already updated in Supabase by the server-side capture handler
                 handlePaymentSuccess();
               }
             } catch (err: any) {
@@ -250,24 +213,25 @@ function PaymentContent() {
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!session) return;
+    if (!userId) {
+      alert("Session introuvable. Veuillez vous connecter.");
+      return;
+    }
     if (method === "paypal") return;
-    
+
     setLoading(true);
 
     if (method === "mobile_money") {
       try {
-        const response = await fetch('/api/payments/moko-initiate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+        const response = await fetch("/api/payments/moko-initiate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             amount: currentPlanDetails.price,
             phoneNumber: phone,
             carrier: carrier,
-            type: 'INSTRUCTOR_PLAN',
-            itemId: plan
+            type: "INSTRUCTOR_PLAN",
+            itemId: plan,
           }),
         });
 
@@ -286,62 +250,19 @@ function PaymentContent() {
       return;
     }
 
-    // Simulate other payment methods (mastercard, stripe, paypal, crypto)
-    setTimeout(() => {
-      const database = getDB();
-      
-      // 1. Update user plan in DB
-      const updatedUsers = database.users.map(u => {
-        if (u.id === session.userId) {
-          return { ...u, plan: plan };
-        }
-        return u;
-      });
-      database.users = updatedUsers;
-      saveDB(database);
-
-      // 2. Register simulation transaction
-      const paymentMethodName = 
-        method === "mastercard" ? "Carte" :
-        method === "stripe" ? "Carte" :
-        method === "crypto" ? "Crypto" : "PayPal";
-        
-      addTransaction({
-        userId: session.userId,
-        userName: session.name,
-        amount: currentPlanDetails.price,
-        courseId: `plan_${plan.toLowerCase()}`,
-        instructorId: "",
-        instructorName: "Plateforme ANSELLA",
-        status: "PAID",
-        method: paymentMethodName as any
-      });
-
-      // 3. Update session
-      const updatedSession = {
-        ...session,
-        plan: plan
-      };
-      setSimulatedSession(updatedSession);
-      
+    // Simulate other payment methods (mastercard, stripe, crypto) — update Supabase directly
+    setTimeout(async () => {
+      try {
+        // Update plan in Supabase
+        await supabase.from("profiles").update({ plan }).eq("id", userId);
+      } catch (err) {
+        console.error("[instructor-pay] Error updating plan for simulated method:", err);
+      }
       setLoading(false);
-      setSuccess(true);
-      router.refresh();
-
-      // Redirect after showing success screen
-      setTimeout(() => {
-        router.push("/instructor/billing");
-      }, 3000);
+      handlePaymentSuccess();
     }, 2000);
   };
 
-  if (!session) {
-    return (
-      <div className="max-w-4xl mx-auto flex items-center justify-center py-20">
-        <Loader2 className="w-10 h-10 text-teal-600 animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in">
