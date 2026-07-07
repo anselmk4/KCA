@@ -235,8 +235,11 @@ export async function POST(req: NextRequest) {
 
         const courseIdStr = orderItem?.course_id || '';
         let planName = 'BASE';
-        if (courseIdStr.includes('pro')) planName = 'PRO';
-        else if (courseIdStr.includes('max')) planName = 'MAX';
+        if (courseIdStr === '99999999-9999-9999-9999-999999990002' || courseIdStr.toLowerCase().includes('pro')) {
+          planName = 'PRO';
+        } else if (courseIdStr === '99999999-9999-9999-9999-999999990003' || courseIdStr.toLowerCase().includes('max')) {
+          planName = 'MAX';
+        }
 
         // Update payment to PAID
         await supabaseAdmin
