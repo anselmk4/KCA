@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { normalizeStatus } from "@/lib/statusHelpers";
-import { getSimulatedSession, setSimulatedSession } from "@/lib/rbac";
 import {
   Wallet,
   CircleDollarSign,
@@ -14,18 +13,14 @@ import {
   Crown,
   Users,
   Loader2,
+  Calendar,
+  ArrowUpRight,
+  X,
+  Phone,
+  CheckCircle2,
+  AlertCircle
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
-
-// Commission rates per instructor plan
-const PLAN_COMMISSION_CONFIG: Record<string, { commissionRate: number; instructorShare: number; label: string; badgeColor: string }> = {
-  FREE: { commissionRate: 0.20, instructorShare: 0.80, label: "Free (20% commission)", badgeColor: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400" },
-  BASE: { commissionRate: 0.10, instructorShare: 0.90, label: "Base (10% commission)", badgeColor: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
-  PRO: { commissionRate: 0.05, instructorShare: 0.95, label: "Pro (5% commission)", badgeColor: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400" },
-  MAX: { commissionRate: 0.00, instructorShare: 1.00, label: "Max (0% commission)", badgeColor: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
-};
-
-const months = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
 
 interface LocalTransaction {
   id: string;
@@ -40,14 +35,42 @@ interface LocalTransaction {
   status: string;
 }
 
+interface LocalPayout {
+  id: string;
+  amount: number;
+  status: string;
+  created_at: string;
+  payment_method: string;
+  payment_reference: string;
+  notes: string | null;
+}
+
+const PLAN_COMMISSION_CONFIG: Record<string, { commissionRate: number; instructorShare: number; label: string; badgeColor: string }> = {
+  FREE: { commissionRate: 0.20, instructorShare: 0.80, label: "Gratuit (20% commission)", badgeColor: "bg-zinc-100 text-zinc-650 dark:bg-zinc-800 dark:text-zinc-405" },
+  BASE: { commissionRate: 0.10, instructorShare: 0.90, label: "Basique (10% commission)", badgeColor: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+  PRO: { commissionRate: 0.05, instructorShare: 0.95, label: "Pro (5% commission)", badgeColor: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400" },
+  MAX: { commissionRate: 0.00, instructorShare: 1.00, label: "Maximum (0% commission)", badgeColor: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
+};
+
 export default function EarningsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [instructorPlan, setInstructorPlan] = useState<string>("FREE");
   const [transactions, setTransactions] = useState<LocalTransaction[]>([]);
-  const [totalRevenue, setTotalRevenue] = useState(0);
-  const [pendingRevenue, setPendingRevenue] = useState(0);
-  const [uniqueStudentsCount, setUniqueStudentsCount] = useState(0);
+  const [payouts, setPayouts] = useState<LocalPayout[]>([]);
+  
+  // Date filtering state
+  const [filterType, setFilterType] = useState<"daily" | "weekly" | "monthly" | "custom">("monthly");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+
+  // Withdrawal modal state
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState<string>("");
+  const [withdrawCarrier, setWithdrawCarrier] = useState<string>("MPESA");
+  const [withdrawPhone, setWithdrawPhone] = useState<string>("");
+  const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
+  const [withdrawMessage, setWithdrawMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const fetchEarningsData = useCallback(async () => {
     setLoading(true);
@@ -58,7 +81,6 @@ export default function EarningsPage() {
         return;
       }
 
-      // Load data from RLS-bypassed server API
       const res = await fetch("/api/instructor/earnings");
       const data = await res.json();
       
@@ -66,25 +88,9 @@ export default function EarningsPage() {
         throw new Error(data.error || "Une erreur est survenue.");
       }
 
-      const currentPlan = data.plan || "FREE";
-      setInstructorPlan(currentPlan);
-
-      const mappedTransactions: LocalTransaction[] = data.transactions || [];
-
-      // Calculate totals
-      const paidTx = mappedTransactions.filter((t) => normalizeStatus(t.status) === "PAID");
-      const sumTotal = paidTx.reduce((acc, t) => acc + t.amount, 0);
-      const sumPending = mappedTransactions
-        .filter((t) => normalizeStatus(t.status) === "PENDING")
-        .reduce((acc, t) => acc + t.amount, 0);
-
-      setTransactions(mappedTransactions);
-      setTotalRevenue(sumTotal);
-      setPendingRevenue(sumPending);
-
-      const uniqueSet = new Set(paidTx.map((t) => t.userId));
-      setUniqueStudentsCount(uniqueSet.size);
-
+      setInstructorPlan(data.plan || "FREE");
+      setTransactions(data.transactions || []);
+      setPayouts(data.payouts || []);
     } catch (err) {
       console.error("Error fetching instructor earnings:", err);
     } finally {
@@ -96,6 +102,204 @@ export default function EarningsPage() {
     fetchEarningsData();
   }, [fetchEarningsData]);
 
+  const planConfig = PLAN_COMMISSION_CONFIG[instructorPlan] || PLAN_COMMISSION_CONFIG.FREE;
+  const commissionRate = planConfig.commissionRate;
+  const instructorShare = planConfig.instructorShare;
+
+  // Filtered transactions for calculation
+  const paidTransactions = useMemo(() => {
+    return transactions.filter(t => normalizeStatus(t.status) === "PAID");
+  }, [transactions]);
+
+  // Total gross revenue
+  const totalRevenue = useMemo(() => {
+    return paidTransactions.reduce((acc, t) => acc + t.amount, 0);
+  }, [paidTransactions]);
+
+  const platformFee = totalRevenue * commissionRate;
+  const netRevenue = totalRevenue * instructorShare;
+
+  // Calculate pending revenue from orders that are still pending
+  const pendingRevenue = useMemo(() => {
+    return transactions
+      .filter((t) => normalizeStatus(t.status) === "PENDING")
+      .reduce((acc, t) => acc + t.amount, 0) * instructorShare;
+  }, [transactions, instructorShare]);
+
+  // Unique students count
+  const uniqueStudentsCount = useMemo(() => {
+    return new Set(paidTransactions.map((t) => t.userId)).size;
+  }, [paidTransactions]);
+
+  // Calculate total already paid or pending payouts
+  const totalWithdrawnOrPending = useMemo(() => {
+    return payouts
+      .filter((p) => p.status === "PAID" || p.status === "PENDING" || p.status === "PROCESSING")
+      .reduce((acc, p) => acc + p.amount, 0);
+  }, [payouts]);
+
+  // Available balance for withdrawal
+  const availableBalance = useMemo(() => {
+    return Math.max(netRevenue - totalWithdrawnOrPending, 0);
+  }, [netRevenue, totalWithdrawnOrPending]);
+
+  // Chart data aggregation based on selected filter
+  const chartData = useMemo(() => {
+    const dataMap = new Map<string, number>();
+
+    // Initialize labels
+    if (filterType === "monthly") {
+      const months = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
+      months.forEach(m => dataMap.set(m, 0));
+      
+      paidTransactions.forEach(t => {
+        const d = new Date(t.date);
+        const m = months[d.getMonth()];
+        const net = t.amount * instructorShare;
+        dataMap.set(m, (dataMap.get(m) || 0) + net);
+      });
+    } else if (filterType === "weekly") {
+      // Last 8 weeks
+      const now = new Date();
+      const labels: string[] = [];
+      for (let i = 7; i >= 0; i--) {
+        const label = `Sem -${i}`;
+        labels.push(label);
+        dataMap.set(label, 0);
+      }
+      
+      paidTransactions.forEach(t => {
+        const d = new Date(t.date);
+        const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+        const weekIndex = 7 - Math.floor(diffDays / 7);
+        if (weekIndex >= 0 && weekIndex <= 7) {
+          const label = `Sem -${7 - weekIndex}`;
+          const net = t.amount * instructorShare;
+          dataMap.set(label, (dataMap.get(label) || 0) + net);
+        }
+      });
+    } else if (filterType === "daily") {
+      // Last 7 days
+      const labels: string[] = [];
+      const days = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const label = `${days[d.getDay()]} ${d.getDate()}`;
+        labels.push(label);
+        dataMap.set(label, 0);
+      }
+      
+      paidTransactions.forEach(t => {
+        const d = new Date(t.date);
+        const diffDays = Math.floor((new Date().getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays >= 0 && diffDays < 7) {
+          const label = `${days[d.getDay()]} ${d.getDate()}`;
+          const net = t.amount * instructorShare;
+          dataMap.set(label, (dataMap.get(label) || 0) + net);
+        }
+      });
+    } else if (filterType === "custom" && startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+
+      // Group by day for the selected range
+      paidTransactions.forEach(t => {
+        const d = new Date(t.date);
+        if (d >= start && d <= end) {
+          const label = `${d.getDate()}/${d.getMonth() + 1}`;
+          const net = t.amount * instructorShare;
+          dataMap.set(label, (dataMap.get(label) || 0) + net);
+        }
+      });
+    }
+
+    return Array.from(dataMap.entries()).map(([label, value]) => ({ label, value }));
+  }, [paidTransactions, filterType, startDate, endDate, instructorShare]);
+
+  const maxChartValue = useMemo(() => {
+    return Math.max(...chartData.map(d => d.value), 1);
+  }, [chartData]);
+
+  // CSV Export utility
+  const handleExportCSV = () => {
+    const headers = "ID Transaction,Apprenant,Cours,Moyen de Paiement,Date,Montant Brut,Part Instructeur\n";
+    const rows = transactions.map(t => {
+      const fee = t.amount * commissionRate;
+      const net = t.amount * instructorShare;
+      return `"${t.id}","${t.studentName}","${t.courseTitle}","${t.method}","${new Date(t.date).toLocaleDateString("fr-FR")}","${t.amount.toFixed(2)}","${net.toFixed(2)}"`;
+    }).join("\n");
+
+    const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `revenus_instructeur_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Submit withdrawal request
+  const handleSubmitWithdrawal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setWithdrawMessage(null);
+
+    const amountNum = parseFloat(withdrawAmount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      setWithdrawMessage({ type: "error", text: "Veuillez entrer un montant valide supérieur à 0." });
+      return;
+    }
+
+    if (amountNum > availableBalance) {
+      setWithdrawMessage({ type: "error", text: `Le montant demandé dépasse votre solde disponible de ${availableBalance.toFixed(2)} $.` });
+      return;
+    }
+
+    if (!withdrawPhone || withdrawPhone.length < 9) {
+      setWithdrawMessage({ type: "error", text: "Veuillez entrer un numéro de téléphone valide." });
+      return;
+    }
+
+    setSubmittingWithdraw(true);
+    try {
+      const response = await fetch("/api/instructor/payouts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: amountNum,
+          paymentMethod: "MOBILE_MONEY",
+          carrier: withdrawCarrier,
+          phoneNumber: withdrawPhone
+        }),
+      });
+
+      const resData = await response.json();
+      if (!response.ok) {
+        throw new Error(resData.error || "Échec de l'enregistrement de la demande.");
+      }
+
+      setWithdrawMessage({ type: "success", text: "Votre demande de retrait a été enregistrée avec succès !" });
+      setWithdrawAmount("");
+      setWithdrawPhone("");
+      
+      // Reload earnings data to update the payouts list and balance
+      fetchEarningsData();
+      
+      // Close modal after delay
+      setTimeout(() => {
+        setIsWithdrawModalOpen(false);
+        setWithdrawMessage(null);
+      }, 3000);
+
+    } catch (err: any) {
+      setWithdrawMessage({ type: "error", text: err.message || "Une erreur inattendue est survenue." });
+    } finally {
+      setSubmittingWithdraw(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -104,25 +308,6 @@ export default function EarningsPage() {
     );
   }
 
-  const planConfig = PLAN_COMMISSION_CONFIG[instructorPlan] || PLAN_COMMISSION_CONFIG.FREE;
-  const commissionRate = planConfig.commissionRate;
-  const instructorShare = planConfig.instructorShare;
-
-  const platformFee = totalRevenue * commissionRate;
-  const netRevenue = totalRevenue * instructorShare;
-
-  // Monthly revenue calculations
-  const monthlyRevenue = months.map((_, monthIdx) => {
-    return transactions
-      .filter((t) => normalizeStatus(t.status) === "PAID" && new Date(t.date).getMonth() === monthIdx)
-      .reduce((s, t) => s + (t.amount * instructorShare), 0);
-  });
-  const maxBar = Math.max(...monthlyRevenue, 1);
-
-  const recentTransactions = [...transactions]
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 10);
-
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in">
       {/* Header */}
@@ -130,17 +315,30 @@ export default function EarningsPage() {
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Mes Revenus</h1>
           <p className="text-zinc-500 dark:text-zinc-400 mt-1 flex items-center gap-2 flex-wrap text-sm">
-            <span>Votre part instructeur :</span>
-            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${planConfig.badgeColor}`}>
+            <span>Part instructeur :</span>
+            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${planConfig.badgeColor}`}>
               <Crown className="w-3 h-3" />
               {instructorPlan} — {Math.round(instructorShare * 100)}% net
             </span>
           </p>
         </div>
-        <button className="inline-flex items-center gap-2 px-5 py-2.5 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-sm cursor-pointer">
-          <Download className="w-4 h-4" />
-          Exporter CSV
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button 
+            onClick={() => setIsWithdrawModalOpen(true)}
+            disabled={availableBalance <= 0}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-650 hover:bg-teal-500 disabled:bg-zinc-150 disabled:text-zinc-450 dark:disabled:bg-zinc-800 text-white font-bold rounded-xl shadow-sm transition-all text-sm cursor-pointer disabled:cursor-not-allowed"
+          >
+            <ArrowUpRight className="w-4 h-4" />
+            Demander un retrait
+          </button>
+          <button 
+            onClick={handleExportCSV}
+            className="inline-flex items-center gap-2 px-5 py-2.5 border border-zinc-200 dark:border-zinc-700 text-zinc-750 dark:text-zinc-300 font-semibold rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-sm cursor-pointer"
+          >
+            <Download className="w-4 h-4" />
+            Exporter CSV
+          </button>
+        </div>
       </div>
 
       {/* Commission Plan Card */}
@@ -150,21 +348,20 @@ export default function EarningsPage() {
             <BadgePercent className="w-6 h-6 text-teal-600" />
           </div>
           <div>
-            <p className="text-sm font-bold text-zinc-900 dark:text-white">
-              Plan {instructorPlan} — Commission plateforme : {Math.round(commissionRate * 100)}%
+            <p className="text-sm font-bold text-zinc-900 dark:text-white animate-pulse">
+              Solde disponible pour retrait : <span className="text-teal-650 dark:text-teal-400 font-extrabold text-base">{availableBalance.toLocaleString("fr-FR")} $</span>
             </p>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              Vous recevez <span className="font-bold text-teal-600">{Math.round(instructorShare * 100)}%</span> de chaque vente de vos cours. 
-              {instructorPlan !== "MAX" && " Passez au plan supérieur pour réduire la commission."}
+              Revenus nets cumulés : {netRevenue.toFixed(2)}$ · Retraits effectués ou demandés : {totalWithdrawnOrPending.toFixed(2)}$
             </p>
           </div>
         </div>
         {instructorPlan !== "MAX" && (
           <a
             href="/instructor/billing"
-            className="shrink-0 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl transition-colors shadow-sm"
+            className="shrink-0 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-white text-xs font-bold rounded-xl transition-colors shadow-sm"
           >
-            Upgrader mon plan
+            Réduire la commission
           </a>
         )}
       </div>
@@ -176,7 +373,7 @@ export default function EarningsPage() {
             label: "Revenus bruts",
             value: `${totalRevenue.toLocaleString("fr-FR")} $`,
             icon: CircleDollarSign,
-            color: "text-teal-600",
+            color: "text-teal-650 dark:text-teal-400",
             bg: "bg-teal-50 dark:bg-teal-900/20",
           },
           {
@@ -187,24 +384,24 @@ export default function EarningsPage() {
             bg: "bg-red-50 dark:bg-red-900/20",
           },
           {
-            label: `Revenus nets (${Math.round(instructorShare * 100)}%)`,
+            label: `Revenus nets`,
             value: `${netRevenue.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} $`,
             icon: Wallet,
-            color: "text-blue-600",
+            color: "text-blue-650 dark:text-blue-400",
             bg: "bg-blue-50 dark:bg-blue-900/20",
           },
           {
-            label: "En attente",
+            label: "En attente (Net)",
             value: `${pendingRevenue.toLocaleString("fr-FR")} $`,
             icon: Clock,
-            color: "text-amber-600",
+            color: "text-amber-650 dark:text-amber-400",
             bg: "bg-amber-50 dark:bg-amber-900/20",
           },
           {
-            label: "Apprenants payants",
+            label: "Inscriptions payantes",
             value: uniqueStudentsCount,
             icon: Users,
-            color: "text-emerald-600",
+            color: "text-emerald-600 dark:text-emerald-450",
             bg: "bg-emerald-50 dark:bg-emerald-900/20",
           },
         ].map((kpi, i) => {
@@ -213,104 +410,194 @@ export default function EarningsPage() {
             <div key={i} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-5">
               <div className="flex items-start justify-between mb-3">
                 <div className={`p-2.5 rounded-xl ${kpi.bg}`}>
-                  <Icon className={`w-5 h-5 ${kpi.color}`} />
+                  <Icon className="w-5 h-5" />
                 </div>
               </div>
-              <p className={`text-xl font-extrabold ${kpi.color}`}>{kpi.value}</p>
-              <p className="text-xs text-zinc-500 mt-0.5">{kpi.label}</p>
+              <p className={`text-xl font-black ${kpi.color}`}>{kpi.value}</p>
+              <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 dark:text-zinc-500 mt-1">{kpi.label}</p>
             </div>
           );
         })}
       </div>
 
-      {/* Revenue bar chart */}
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <TrendingUp className="w-5 h-5 text-teal-600" />
-            <h2 className="font-semibold text-zinc-900 dark:text-white text-base">Revenus nets mensuels ({new Date().getFullYear()})</h2>
+      {/* Revenue chart with controls */}
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-teal-650" />
+            <h2 className="font-semibold text-zinc-900 dark:text-white text-base">Historique des gains nets</h2>
           </div>
-          <span className="text-xs bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 px-2.5 py-1 rounded-full font-medium">
-            {Math.round(instructorShare * 100)}% net
-          </span>
-        </div>
-        <div className="flex items-end gap-2 h-40">
-          {months.map((month, i) => (
-            <div key={month} className="flex-1 flex flex-col items-center gap-1.5">
-              <span className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300 hidden sm:block">
-                {monthlyRevenue[i] > 0 ? `${monthlyRevenue[i].toFixed(0)}$` : ""}
-              </span>
-              <div
-                className={`w-full rounded-t-lg transition-all duration-700 ${
-                  monthlyRevenue[i] > 0
-                    ? "bg-gradient-to-t from-teal-700 to-teal-400"
-                    : "bg-zinc-100 dark:bg-zinc-800"
+          
+          {/* Filter options */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {(["daily", "weekly", "monthly", "custom"] as const).map((type) => (
+              <button
+                key={type}
+                onClick={() => setFilterType(type)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  filterType === type
+                    ? "bg-zinc-900 text-white dark:bg-zinc-850"
+                    : "bg-zinc-50 text-zinc-500 dark:bg-zinc-800/50 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                 }`}
-                style={{ height: monthlyRevenue[i] > 0 ? `${Math.max((monthlyRevenue[i] / maxBar) * 128, 4)}px` : "4px" }}
-              />
-              <span className="text-[10px] text-zinc-400">{month}</span>
-            </div>
-          ))}
+              >
+                {type === "daily" ? "Journalier" : type === "weekly" ? "Hebdomadaire" : type === "monthly" ? "Mensuel" : "Tranche de dates"}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {/* Custom date range inputs */}
+        {filterType === "custom" && (
+          <div className="flex items-center gap-4 bg-zinc-50 dark:bg-zinc-800/40 p-4 rounded-xl flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">Du</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-3 py-1.5 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-900 rounded-lg text-xs"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">Au</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-3 py-1.5 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-900 rounded-lg text-xs"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* CSS Chart */}
+        {chartData.length === 0 ? (
+          <div className="h-40 flex items-center justify-center text-zinc-400 text-sm">
+            Aucun gain net enregistré sur la période sélectionnée.
+          </div>
+        ) : (
+          <div className="flex items-end gap-2 h-40 pt-4">
+            {chartData.map((dataPoint) => (
+              <div key={dataPoint.label} className="flex-1 flex flex-col items-center gap-1.5 group">
+                <span className="text-[10px] font-bold text-teal-650 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {dataPoint.value.toFixed(0)}$
+                </span>
+                <div
+                  className={`w-full rounded-t-lg transition-all duration-500 ${
+                    dataPoint.value > 0
+                      ? "bg-gradient-to-t from-teal-700 to-teal-400 hover:from-teal-600 hover:to-teal-300"
+                      : "bg-zinc-100 dark:bg-zinc-850"
+                  }`}
+                  style={{ height: dataPoint.value > 0 ? `${(dataPoint.value / maxChartValue) * 110 + 4}px` : "4px" }}
+                />
+                <span className="text-[9px] text-zinc-400 font-medium truncate max-w-[50px]">{dataPoint.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Transactions table */}
+      {/* Payout requests list */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-          <h2 className="font-semibold text-zinc-900 dark:text-white text-base">Paiements des apprenants</h2>
-          <span className="text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 px-2.5 py-1 rounded-full font-medium">
-            {transactions.length} transaction{transactions.length > 1 ? "s" : ""}
+        <div className="px-6 py-4 border-b border-zinc-150 dark:border-zinc-850 flex items-center justify-between">
+          <h2 className="font-semibold text-zinc-900 dark:text-white text-base">Historique des retraits</h2>
+          <span className="text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-550 dark:text-zinc-400 px-2 py-0.5 rounded-full font-medium">
+            {payouts.length} demande{payouts.length > 1 ? "s" : ""}
           </span>
         </div>
-        {recentTransactions.length === 0 ? (
-          <div className="py-12 text-center">
-            <Wallet className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
-            <p className="text-zinc-500 text-sm">Aucune transaction pour l&apos;instant.</p>
-            <p className="text-zinc-400 text-xs mt-1">Les paiements de vos apprenants apparaîtront ici.</p>
+        
+        {payouts.length === 0 ? (
+          <div className="py-8 text-center text-zinc-500 text-sm">
+            Aucune demande de retrait effectuée.
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-zinc-50 dark:bg-zinc-800/30 text-zinc-500 dark:text-zinc-400 text-xs font-semibold uppercase tracking-wider border-b border-zinc-100 dark:border-zinc-800">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-zinc-50 dark:bg-zinc-800/30 text-zinc-500 dark:text-zinc-400 text-xs font-semibold uppercase border-b border-zinc-100 dark:border-zinc-800">
+                <tr>
+                  <th className="px-6 py-3">Date</th>
+                  <th className="px-6 py-3">Méthode / Référence</th>
+                  <th className="px-6 py-3">Notes</th>
+                  <th className="px-6 py-3 text-right">Montant</th>
+                  <th className="px-6 py-3 text-center">Statut</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 text-sm">
+                {payouts.map((p) => (
+                  <tr key={p.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10 transition-colors">
+                    <td className="px-6 py-4 text-xs text-zinc-500">
+                      {new Date(p.created_at).toLocaleDateString("fr-FR")} à {new Date(p.created_at).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-zinc-950 dark:text-white text-sm">{p.payment_method}</div>
+                      <div className="text-xs text-zinc-400 font-bold">{p.payment_reference}</div>
+                    </td>
+                    <td className="px-6 py-4 text-xs text-zinc-500">{p.notes || "—"}</td>
+                    <td className="px-6 py-4 text-right font-extrabold text-zinc-900 dark:text-white">
+                      ${p.amount.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                        p.status === "PAID"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                          : p.status === "PENDING"
+                          ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                          : p.status === "PROCESSING"
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                      }`}>
+                        {p.status === "PAID" ? "Validé" : p.status === "PENDING" ? "En attente" : p.status === "PROCESSING" ? "En cours" : "Annulé / Échoué"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Transactions list */}
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-zinc-150 dark:border-zinc-850 flex items-center justify-between">
+          <h2 className="font-semibold text-zinc-900 dark:text-white text-base">Historique des ventes</h2>
+          <span className="text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-550 dark:text-zinc-400 px-2 py-0.5 rounded-full font-medium">
+            {transactions.length} transaction{transactions.length > 1 ? "s" : ""}
+          </span>
+        </div>
+        
+        {transactions.length === 0 ? (
+          <div className="py-12 text-center text-zinc-400 text-sm">
+            Aucun paiement enregistré pour l&apos;instant.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-sm">
+              <thead className="bg-zinc-50 dark:bg-zinc-800/30 text-zinc-500 dark:text-zinc-400 text-xs font-semibold uppercase border-b border-zinc-100 dark:border-zinc-800">
                 <tr>
                   <th className="px-6 py-3">Apprenant</th>
                   <th className="px-6 py-3">Cours</th>
-                  <th className="px-6 py-3">Moyen</th>
+                  <th className="px-6 py-3">Méthode</th>
                   <th className="px-6 py-3">Date</th>
                   <th className="px-6 py-3 text-right">Montant brut</th>
-                  <th className="px-6 py-3 text-right">Commission</th>
-                  <th className="px-6 py-3 text-right">Votre part</th>
+                  <th className="px-6 py-3 text-right">Votre part ({Math.round(instructorShare * 100)}%)</th>
                   <th className="px-6 py-3 text-center">Statut</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                {recentTransactions.map((tx) => {
+                {transactions.map((tx) => {
                   const fee = tx.amount * commissionRate;
                   const net = tx.amount * instructorShare;
                   return (
-                    <tr key={tx.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors text-sm text-zinc-900 dark:text-zinc-100">
-                      <td className="px-6 py-4 font-medium">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-blue-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                            {tx.studentName.charAt(0).toUpperCase()}
-                          </div>
-                          <span className="truncate max-w-[120px]">{tx.studentName}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-zinc-650 dark:text-zinc-400 text-xs truncate max-w-[160px]">{tx.courseTitle}</td>
-                      <td className="px-6 py-4 text-xs text-zinc-500">{tx.method}</td>
-                      <td className="px-6 py-4 text-xs text-zinc-500 whitespace-nowrap">{new Date(tx.date).toLocaleDateString("fr-FR")}</td>
-                      <td className="px-6 py-4 text-right text-sm font-semibold">
-                        ${tx.amount.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 text-right text-xs font-semibold text-red-500">
-                        −${fee.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 text-right text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                        +${net.toFixed(2)}
-                      </td>
+                    <tr key={tx.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10 transition-colors">
+                      <td className="px-6 py-4 font-semibold text-zinc-900 dark:text-white">{tx.studentName}</td>
+                      <td className="px-6 py-4 text-xs text-zinc-500 truncate max-w-[200px]">{tx.courseTitle}</td>
+                      <td className="px-6 py-4 text-xs text-zinc-550 font-bold">{tx.method}</td>
+                      <td className="px-6 py-4 text-xs text-zinc-500">{new Date(tx.date).toLocaleDateString("fr-FR")}</td>
+                      <td className="px-6 py-4 text-right">${tx.amount.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-right text-emerald-600 dark:text-emerald-450 font-bold">+${net.toFixed(2)}</td>
                       <td className="px-6 py-4 text-center">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase shrink-0 ${
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                           normalizeStatus(tx.status) === "PAID"
                             ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                             : normalizeStatus(tx.status) === "PENDING"
@@ -324,24 +611,131 @@ export default function EarningsPage() {
                   );
                 })}
               </tbody>
-              {/* Totals footer */}
-              <tfoot className="border-t-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/20 text-zinc-950 dark:text-zinc-150">
-                <tr className="text-sm font-bold">
-                  <td colSpan={4} className="px-6 py-4">TOTAL</td>
-                  <td className="px-6 py-4 text-right">${totalRevenue.toFixed(2)}</td>
-                  <td className="px-6 py-4 text-right text-red-500">−${platformFee.toFixed(2)}</td>
-                  <td className="px-6 py-4 text-right text-emerald-600 dark:text-emerald-400">${netRevenue.toFixed(2)}</td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="text-xs text-zinc-400 font-medium">
-                      {transactions.filter((tx) => normalizeStatus(tx.status) === "PAID").length} payé(s)
-                    </span>
-                  </td>
-                </tr>
-              </tfoot>
             </table>
           </div>
         )}
       </div>
+
+      {/* Withdrawal CSS Overlay Modal */}
+      {isWithdrawModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-6 relative animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Wallet className="w-5 h-5 text-teal-650" />
+                <h3 className="font-bold text-zinc-950 dark:text-white text-lg">Demande de Retrait</h3>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsWithdrawModalOpen(false);
+                  setWithdrawMessage(null);
+                }}
+                className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-zinc-650 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body / Form */}
+            <form onSubmit={handleSubmitWithdrawal} className="space-y-4">
+              <div className="bg-teal-50 dark:bg-teal-900/20 p-4 rounded-2xl flex justify-between items-center">
+                <span className="text-xs text-zinc-650 dark:text-zinc-400 font-semibold">Disponible pour retrait</span>
+                <span className="font-extrabold text-teal-650 dark:text-teal-400 text-lg">${availableBalance.toFixed(2)}</span>
+              </div>
+
+              {/* Status alerts */}
+              {withdrawMessage && (
+                <div className={`p-3.5 rounded-xl text-xs font-semibold flex items-start gap-2.5 ${
+                  withdrawMessage.type === "success" 
+                    ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400 border border-emerald-250" 
+                    : "bg-red-50 text-red-800 dark:bg-red-950/20 dark:text-red-400 border border-red-250"
+                }`}>
+                  {withdrawMessage.type === "success" ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+                  <span>{withdrawMessage.text}</span>
+                </div>
+              )}
+
+              {/* Amount input */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-350">Montant à retirer ($ USD)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  max={availableBalance}
+                  required
+                  placeholder="Ex: 50"
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  className="w-full px-4 py-3 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-950 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent transition-all"
+                />
+              </div>
+
+              {/* Carrier selection */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-350">Opérateur Mobile Money</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "MPESA", label: "M-Pesa" },
+                    { id: "ORANGE", label: "Orange" },
+                    { id: "AIRTEL", label: "Airtel" }
+                  ].map((carrier) => (
+                    <button
+                      key={carrier.id}
+                      type="button"
+                      onClick={() => setWithdrawCarrier(carrier.id)}
+                      className={`py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                        withdrawCarrier === carrier.id
+                          ? "border-teal-600 bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-400"
+                          : "border-zinc-200 dark:border-zinc-700 text-zinc-650 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                      }`}
+                    >
+                      {carrier.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Phone number input */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-350">Numéro de téléphone du compte</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-3.5 text-zinc-400"><Phone className="w-4 h-4" /></span>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="Ex: 0820000000"
+                    value={withdrawPhone}
+                    onChange={(e) => setWithdrawPhone(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-950 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent transition-all"
+                  />
+                </div>
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-500">Le retrait sera envoyé directement vers ce numéro Mobile Money.</p>
+              </div>
+
+              {/* Submit button */}
+              <button
+                type="submit"
+                disabled={submittingWithdraw || availableBalance <= 0}
+                className="w-full py-3.5 mt-4 bg-teal-650 hover:bg-teal-500 disabled:bg-zinc-150 disabled:text-zinc-450 dark:disabled:bg-zinc-800 text-white text-sm font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                {submittingWithdraw ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Traitement en cours...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    Confirmer le retrait
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

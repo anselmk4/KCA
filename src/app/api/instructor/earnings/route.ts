@@ -126,9 +126,21 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    // 7. Fetch all payouts for this instructor
+    const { data: payoutsData, error: payoutsErr } = await dbClient
+      .from('payouts')
+      .select('id, amount, status, created_at, payment_method, payment_reference, notes')
+      .eq('instructor_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (payoutsErr) {
+      console.warn('[API instructor/earnings GET] Payouts fetch warning:', payoutsErr.message);
+    }
+
     return NextResponse.json({
       plan: profile.plan || 'FREE',
-      transactions
+      transactions,
+      payouts: payoutsData || []
     });
 
   } catch (err: any) {
