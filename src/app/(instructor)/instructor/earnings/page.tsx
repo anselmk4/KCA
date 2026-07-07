@@ -59,6 +59,7 @@ export default function EarningsPage() {
   const [transactions, setTransactions] = useState<LocalTransaction[]>([]);
   const [payouts, setPayouts] = useState<LocalPayout[]>([]);
   const [session, setSession] = useState<{ name: string; email: string } | null>(null);
+  const [hasServiceRole, setHasServiceRole] = useState(true);
   
   // Date filtering state
   const [filterType, setFilterType] = useState<"daily" | "weekly" | "monthly" | "custom">("monthly");
@@ -110,6 +111,7 @@ export default function EarningsPage() {
       setInstructorPlan(data.plan || "FREE");
       setTransactions(data.transactions || []);
       setPayouts(data.payouts || []);
+      setHasServiceRole(data.hasServiceRole !== false);
     } catch (err) {
       console.error("Error fetching instructor earnings:", err);
     } finally {
@@ -364,6 +366,21 @@ export default function EarningsPage() {
           </button>
         </div>
       </div>
+
+      {/* Warning Alert if SUPABASE_SERVICE_ROLE_KEY is missing on production */}
+      {!hasServiceRole && (
+        <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-2xl animate-in fade-in">
+          <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-450 shrink-0 mt-0.5" />
+          <div>
+            <h4 className="font-bold text-amber-800 dark:text-amber-400 text-sm">Clé de service Supabase manquante (Vercel)</h4>
+            <p className="text-xs text-amber-700 dark:text-amber-400/80 mt-1 leading-relaxed">
+              La variable d&apos;environnement <code className="bg-amber-100 dark:bg-amber-955 px-1 py-0.5 rounded font-mono text-xs">SUPABASE_SERVICE_ROLE_KEY</code> n&apos;est pas configurée dans les paramètres de votre projet Vercel. 
+              Par conséquent, les requêtes sur les achats des étudiants sont limitées par la sécurité RLS et retournent 0. 
+              Veuillez ajouter cette clé dans votre console Vercel pour que le tableau de bord puisse charger toutes les transactions réelles.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Commission Plan Card */}
       <div className="bg-gradient-to-r from-teal-50 via-blue-50 to-indigo-50 dark:from-teal-950/20 dark:via-blue-950/20 dark:to-indigo-950/20 rounded-2xl border border-teal-200/50 dark:border-teal-800/30 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

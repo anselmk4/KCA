@@ -121,6 +121,9 @@ export async function GET(req: NextRequest) {
     const platformCommission = totalRevenue * planConfig.commissionRate;
     const netRevenue = totalRevenue * planConfig.instructorShare;
 
+    const hasServiceRole = !!(process.env.SUPABASE_SERVICE_ROLE_KEY && 
+                              process.env.SUPABASE_SERVICE_ROLE_KEY !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
     return NextResponse.json({
       plan: instructorPlan,
       courses: myCourses,
@@ -133,7 +136,8 @@ export async function GET(req: NextRequest) {
       weeklyEnrollments: weeklyInscriptions,
       totalRevenue,
       platformCommission,
-      netRevenue
+      netRevenue,
+      hasServiceRole
     });
 
   } catch (err: any) {
