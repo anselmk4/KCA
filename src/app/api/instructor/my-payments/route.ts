@@ -19,6 +19,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   STRIPE: "Stripe / Carte",
   CRYPTO: "Cryptomonnaie",
   MANUAL: "Validation manuelle",
+  MOKO_CARD: "Carte bancaire (Moko)",
 };
 
 export async function GET(_req: NextRequest) {

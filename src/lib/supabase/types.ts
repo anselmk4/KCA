@@ -2154,6 +2154,7 @@ export const Constants = {
         "MOBILE_MONEY",
         "CRYPTO",
         "MANUAL",
+        "MOKO_CARD",
       ],
       payment_status: [
         "PENDING",

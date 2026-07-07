@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
         user_id: user.id,
         amount: amount,
         currency: 'USD',
-        provider: 'STRIPE',
+        provider: 'MOKO_CARD',
         status: 'PENDING',
         method: 'CARD',
         created_at: new Date().toISOString(),
