@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
         courseTitle,
         instructorName,
         amount: p.amount || 0,
-        method: PROVIDER_MAP[p.provider] || p.provider || "Carte",
+        method: p.provider ? (PROVIDER_MAP[p.provider] || p.provider) : "Carte",
         date: p.paid_at || new Date().toISOString(),
       };
     });

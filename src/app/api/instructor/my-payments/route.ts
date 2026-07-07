@@ -92,7 +92,7 @@ export async function GET(_req: NextRequest) {
           label,
           amount: p.amount,
           currency: p.currency || "USD",
-          provider: PROVIDER_LABELS[p.provider] || p.provider || "—",
+          provider: p.provider ? (PROVIDER_LABELS[p.provider] || p.provider) : "—",
           transactionRef: p.provider_transaction_id || null,
           date: p.paid_at || p.created_at,
         };

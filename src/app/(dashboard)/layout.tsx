@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { DashboardHeader } from "@/components/layout/DashboardHeader";
 import { getSimulatedSession } from "@/lib/rbac";
 import { OnboardingTour } from "@/components/layout/OnboardingTour";
+import Chatbot from "@/components/Chatbot";
 
 export default function DashboardLayout({
   children,
@@ -60,6 +61,7 @@ export default function DashboardLayout({
         </main>
       </div>
       <OnboardingTour />
+      <Chatbot />
     </div>
   );
 }

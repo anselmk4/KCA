@@ -287,6 +287,43 @@ export default function InstructorDashboardPage() {
         </div>
       </div>
 
+      {/* Invite to create first course banner if they don't have any courses yet */}
+      {myCourses.length === 0 && (
+        <div className="bg-gradient-to-r from-teal-500 via-emerald-500 to-indigo-650 rounded-3xl p-8 text-white relative overflow-hidden shadow-xl text-left animate-in fade-in slide-in-from-bottom-3 duration-500">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-white/10 rounded-full blur-[50px] pointer-events-none -mr-16 -mt-16" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/30 rounded-full blur-[40px] pointer-events-none -ml-16 -mb-16" />
+          
+          <div className="relative z-10 max-w-3xl space-y-4">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg backdrop-blur-sm">
+              ✨ Lancez votre activité gratuitement
+            </span>
+            <h2 className="text-xl md:text-2xl font-black leading-snug">
+              Créez et publiez votre premier cours 100% gratuitement !
+            </h2>
+            <p className="text-sm text-teal-50/90 leading-relaxed font-medium">
+              Conformément à notre promesse, votre premier cours sur la plateforme est entièrement gratuit. 
+              Partagez votre expertise en Blockchain, Cryptomonnaies ou Intelligence Artificielle et commencez à enseigner dès aujourd'hui. 
+              Vous disposez de tous les outils nécessaires pour structurer vos chapitres, ajouter des leçons, et évaluer vos premiers élèves.
+            </p>
+            <div className="pt-2 flex flex-wrap gap-4">
+              <Link
+                href="/instructor/courses"
+                className="px-6 py-3 bg-white text-teal-900 hover:bg-teal-50 font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer"
+              >
+                Créer mon premier cours
+                <ArrowUpRight className="w-4 h-4 text-teal-900" />
+              </Link>
+              <Link
+                href="/instructor/community"
+                className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Consulter les guides formateurs
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Two-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* My Courses Quick View */}
