@@ -308,15 +308,17 @@ export default function PaymentPage() {
           },
           createOrder: async () => {
             try {
-              const res = await fetch("/api/payments/paypal/create-order", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                  type: "COURSE", 
-                  itemId: course.id 
-                }),
-              });
-              const data = await res.json();
+               const res = await fetch("/api/payments/paypal/create-order", {
+                 method: "POST",
+                 headers: { "Content-Type": "application/json" },
+                 body: JSON.stringify({ 
+                   type: "COURSE", 
+                   itemId: course.id,
+                   payInstallment,
+                   couponId: appliedCoupon?.id || null
+                 }),
+               });
+               const data = await res.json();
               if (data.error) throw new Error(data.error);
               return data.orderId;
             } catch (err: any) {

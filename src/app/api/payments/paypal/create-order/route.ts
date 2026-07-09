@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
     }
 
-    const { type, itemId } = await req.json(); // type: "COURSE" or "INSTRUCTOR_PLAN", itemId: courseId or planName
+    const { type, itemId, payInstallment, couponId } = await req.json(); // type: "COURSE" or "INSTRUCTOR_PLAN", itemId: courseId or planName
 
     if (!type || !itemId) {
       return NextResponse.json({ error: "Paramètres 'type' et 'itemId' requis." }, { status: 400 });
@@ -22,9 +22,9 @@ export async function POST(req: NextRequest) {
 
     if (type === "COURSE") {
       // 1. Fetch course details from DB to get the correct price (avoid client-side price tampering)
-      const { data: course, error: courseError } = await supabase
+      const { data: course, error: courseError } = await (supabase as any)
         .from("courses")
-        .select("price, title")
+        .select("price, title, allow_installments, installments_count")
         .eq("id", itemId)
         .maybeSingle();
 
@@ -32,7 +32,31 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Cours introuvable." }, { status: 404 });
       }
 
-      amount = course.price;
+      let coursePrice = course.price;
+      if (payInstallment && course.allow_installments && course.installments_count) {
+        coursePrice = Math.round(course.price / course.installments_count);
+      }
+
+      // Apply coupon if any
+      if (couponId) {
+        const { data: coupon } = await (supabase as any)
+          .from("coupons")
+          .select("*")
+          .eq("id", couponId)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        if (coupon) {
+          if (coupon.discount_type === "PERCENTAGE") {
+            coursePrice = Math.max(0, coursePrice - (coursePrice * (coupon.discount_value / 100)));
+          } else if (coupon.discount_type === "FIXED") {
+            coursePrice = Math.max(0, coursePrice - coupon.discount_value);
+          }
+          coursePrice = Math.round(coursePrice);
+        }
+      }
+
+      amount = coursePrice;
       customId = `COURSE:${itemId}:${user.id}`;
     } else if (type === "INSTRUCTOR_PLAN") {
       // 2. Resolve plan price
