@@ -22,6 +22,15 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  icons: {
+    icon: [
+      { url: "/icon.png", type: "image/png", sizes: "192x192" },
+    ],
+    apple: [
+      { url: "/apple-icon.png", type: "image/png", sizes: "180x180" },
+    ],
+  },
+  manifest: "/manifest.json",
   openGraph: {
     title: "ANSELLA | Plateforme LMS Mondiale pour tous les Formateurs",
     description: "Créez et vendez vos formations en ligne partout dans le monde. Encaissez vos revenus facilement.",
@@ -29,11 +38,20 @@ export const metadata: Metadata = {
     siteName: "ANSELLA",
     locale: "fr_FR",
     type: "website",
+    images: [
+      {
+        url: "/og-image-final.png",
+        width: 1200,
+        height: 630,
+        alt: "ANSELLA - Plateforme LMS Mondiale",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "ANSELLA | Plateforme LMS Mondiale pour tous les Formateurs",
     description: "Créez et vendez vos formations en ligne partout dans le monde. Encaissez vos revenus facilement.",
+    images: ["/og-image-final.png"],
   },
   robots: {
     index: true,
