@@ -154,7 +154,7 @@ export async function PUT(req: NextRequest) {
     // Verify instructor owns the course this submission is related to
     const { data: submission } = await (supabase as any)
       .from("homework_submissions")
-      .select("homework_id")
+      .select("homework_id, student_id")
       .eq("id", id)
       .maybeSingle();
 
@@ -164,7 +164,7 @@ export async function PUT(req: NextRequest) {
 
     const { data: homework } = await (supabase as any)
       .from("homeworks")
-      .select("course_id")
+      .select("course_id, title")
       .eq("id", submission.homework_id)
       .maybeSingle();
 
@@ -196,6 +196,20 @@ export async function PUT(req: NextRequest) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    // Trigger notification
+    try {
+      const { createNotification } = await import("@/lib/supabase/notifications-helper");
+      await createNotification({
+        userId: submission.student_id,
+        title: "Devoir évalué !",
+        message: `Votre devoir "${homework?.title || 'Devoir'}" a été évalué avec une note de ${grade}/100.`,
+        type: "SUCCESS",
+        link: `/dashboard/courses`
+      });
+    } catch (notifErr) {
+      console.error("[API homework-submissions PUT] Error sending notification:", notifErr);
     }
 
     return NextResponse.json({ submission: data });

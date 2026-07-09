@@ -243,9 +243,36 @@ export default function LivePage() {
 
       // Send notifications to invited guests
       try {
-        if (selectedUserIds.length > 0) {
-          const { createNotification } = await import('@/lib/supabase/notifications-helper');
-          
+        const { createNotification } = await import('@/lib/supabase/notifications-helper');
+
+        if (form.isPublic) {
+          // Get all student IDs to notify them
+          const { data: roleStudent } = await supabase
+            .from("roles")
+            .select("id")
+            .eq("name", "STUDENT")
+            .maybeSingle();
+
+          if (roleStudent) {
+            const { data: userRolesStudent } = await supabase
+              .from("user_roles")
+              .select("user_id")
+              .eq("role_id", roleStudent.id);
+
+            const studentIds = (userRolesStudent || []).map(ur => ur.user_id);
+            if (studentIds.length > 0) {
+              for (const sId of studentIds) {
+                await createNotification({
+                  userId: sId,
+                  title: "Nouveau live public !",
+                  message: `Un live public a été programmé : "${form.title}". Rejoignez-nous !`,
+                  type: "INFO",
+                  link: `/dashboard/live`
+                });
+              }
+            }
+          }
+        } else if (selectedUserIds.length > 0) {
           const { data: profilesData } = await supabase
             .from('profiles')
             .select('id')

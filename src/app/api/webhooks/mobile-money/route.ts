@@ -280,6 +280,17 @@ export async function POST(req: NextRequest) {
           console.error('[webhook-momo] Profile plan update error:', profileUpdateErr.message);
         } else {
           console.log(`[webhook-momo] Instructor ${payment.user_id} profile plan successfully upgraded to ${planName}`);
+          try {
+            await createNotification({
+              userId: payment.user_id,
+              title: "Plan mis à jour !",
+              message: `Votre abonnement de formateur a été mis à jour vers le plan "${planName}".`,
+              type: "SUCCESS",
+              link: `/instructor/billing`
+            });
+          } catch (notifErr) {
+            console.error('[webhook-momo] Error triggering plan notification:', notifErr);
+          }
         }
       }
 

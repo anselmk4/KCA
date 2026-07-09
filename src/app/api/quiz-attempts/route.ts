@@ -97,6 +97,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: attemptError.message }, { status: 400 });
     }
 
+    // Notify the student about their quiz result
+    try {
+      await createNotification({
+        userId: user.id,
+        title: passed ? "Quiz réussi !" : "Quiz échoué",
+        message: `Vous avez complété le quiz avec un score de ${scorePercent}%. (${passed ? "Réussi avec succès" : "Échoué, score requis : 70%"})`,
+        type: passed ? "SUCCESS" : "WARNING",
+        link: `/dashboard/courses`
+      });
+    } catch (notifErr) {
+      console.error('[API quiz-attempts POST] Error sending student quiz notification:', notifErr);
+    }
+
     if (passed) {
       try {
         const { data: courseData } = await supabase

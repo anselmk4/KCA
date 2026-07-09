@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
       // Check course exists
       const { data: course, error: courseErr } = await dbClient
         .from("courses")
-        .select("id, price, title")
+        .select("id, price, title, instructor_id")
         .eq("id", itemId)
         .maybeSingle();
 
@@ -211,6 +211,41 @@ export async function POST(req: NextRequest) {
       if (enrollErr) {
         console.error("[paypal-capture-order] Error upserting enrollment:", enrollErr.message);
         return NextResponse.json({ error: `Erreur d'inscription de l'apprenant: ${enrollErr.message}` }, { status: 500 });
+      }
+
+      // Trigger notifications
+      try {
+        const { createNotification } = await import("@/lib/supabase/notifications-helper");
+        
+        // Student Notification
+        await createNotification({
+          userId: user.id,
+          title: "Paiement validé !",
+          message: `Votre paiement de ${amountCaptured}$ pour le cours "${course.title}" a été validé.`,
+          type: "SUCCESS",
+          link: `/dashboard/courses`
+        });
+
+        // Instructor Notification
+        if (course.instructor_id) {
+          const { data: studentProfile } = await dbClient
+            .from("profiles")
+            .select("full_name")
+            .eq("id", user.id)
+            .maybeSingle();
+
+          const studentName = studentProfile?.full_name || "Un apprenant";
+
+          await createNotification({
+            userId: course.instructor_id,
+            title: "Nouvelle inscription !",
+            message: `"${studentName}" s'est inscrit à votre cours "${course.title}".`,
+            type: "SUCCESS",
+            link: `/instructor/students`
+          });
+        }
+      } catch (notifErr) {
+        console.error("[paypal-capture-order] Error triggering purchase notifications:", notifErr);
       }
 
       console.log("[paypal-capture-order] Course enrollment written successfully!");
@@ -303,6 +338,20 @@ export async function POST(req: NextRequest) {
       if (profileErr) {
         console.error("[paypal-capture-order] Error updating profile plan:", profileErr.message);
         return NextResponse.json({ error: `Impossible de mettre à jour votre plan: ${profileErr.message}` }, { status: 500 });
+      }
+
+      // Trigger notification
+      try {
+        const { createNotification } = await import("@/lib/supabase/notifications-helper");
+        await createNotification({
+          userId: user.id,
+          title: "Plan mis à jour !",
+          message: `Votre abonnement de formateur a été mis à jour vers le plan "${planName}".`,
+          type: "SUCCESS",
+          link: `/instructor/billing`
+        });
+      } catch (notifErr) {
+        console.error("[paypal-capture-order] Error triggering plan notification:", notifErr);
       }
 
       console.log("[paypal-capture-order] Profile plan updated successfully!");

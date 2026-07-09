@@ -175,18 +175,38 @@ export default function AdminCoursesPage() {
 
       // Trigger notification for the instructor
       const course = courses.find(c => c.id === courseId);
-      if (course && course.instructorId && nextStatus === 'PUBLISHED') {
-        try {
-          const { createNotification } = await import('@/lib/supabase/notifications-helper');
-          await createNotification({
-            userId: course.instructorId,
-            title: "Cours publié !",
-            message: `Votre cours "${course.title}" a été validé et publié par l'administrateur.`,
-            type: "SUCCESS",
-            link: `/instructor/courses`
-          });
-        } catch (notifErr) {
-          console.error('Error triggering course publication notification:', notifErr);
+      if (course && course.instructorId) {
+        let notifTitle = "";
+        let notifMessage = "";
+        let notifType: "SUCCESS" | "WARNING" | "INFO" = "INFO";
+
+        if (nextStatus === 'PUBLISHED') {
+          notifTitle = "Cours publié !";
+          notifMessage = `Votre cours "${course.title}" a été validé et publié par l'administrateur.`;
+          notifType = "SUCCESS";
+        } else if (nextStatus === 'ARCHIVED') {
+          notifTitle = "Cours archivé";
+          notifMessage = `Votre cours "${course.title}" a été archivé par l'administrateur.`;
+          notifType = "WARNING";
+        } else if (nextStatus === 'DRAFT') {
+          notifTitle = "Cours renvoyé en brouillon";
+          notifMessage = `Votre cours "${course.title}" a été renvoyé en brouillon par l'administrateur.`;
+          notifType = "INFO";
+        }
+
+        if (notifTitle) {
+          try {
+            const { createNotification } = await import('@/lib/supabase/notifications-helper');
+            await createNotification({
+              userId: course.instructorId,
+              title: notifTitle,
+              message: notifMessage,
+              type: notifType,
+              link: `/instructor/courses`
+            });
+          } catch (notifErr) {
+            console.error('Error triggering course status update notification:', notifErr);
+          }
         }
       }
 
