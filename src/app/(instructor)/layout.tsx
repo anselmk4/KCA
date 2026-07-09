@@ -158,7 +158,8 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-zinc-100 dark:border-zinc-800">
           <Link href="/instructor" className="flex items-center" onClick={() => setSidebarOpen(false)}>
-            <Image src="/logo.png" alt="ANSELLA" width={100} height={30} className="object-contain h-7 w-auto" />
+            <Image src="/logo.png" alt="ANSELLA" width={100} height={30} className="object-contain h-7 w-auto dark:hidden" />
+            <Image src="/logo-dark.png" alt="ANSELLA" width={100} height={30} className="object-contain h-7 w-auto hidden dark:block" />
             <span className="font-bold text-xs text-zinc-400 dark:text-zinc-500 border-l border-zinc-200 dark:border-zinc-700 pl-2 ml-2 leading-none">Instructeur</span>
           </Link>
           <button className="lg:hidden p-1 text-zinc-500" onClick={() => setSidebarOpen(false)}>
@@ -227,7 +228,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
       {/* Main content */}
       <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
         {/* Header */}
-        <header className="h-16 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 md:px-8 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10">
+        <header className="h-16 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 md:px-8 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-30">
           <div className="flex items-center gap-3">
             {/* Hamburger */}
             <button

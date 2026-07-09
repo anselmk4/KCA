@@ -78,146 +78,19 @@ export default function StudentDetailPage() {
     if (!session?.userId) { router.replace("/login"); return; }
     fetchStudentDetail(session.userId, studentId);
   }, [studentId, router]);
-
   async function fetchStudentDetail(instructorId: string, sId: string) {
     setLoading(true);
     try {
-      // 1. Get instructor courses
-      const { data: courses } = await supabase
-        .from("courses")
-        .select("id, title, slug, price")
-        .eq("instructor_id", instructorId);
-
-      if (!courses || courses.length === 0) { setLoading(false); return; }
-      const courseIds = courses.map(c => c.id);
-      const courseMap = new Map(courses.map(c => [c.id, c]));
-
-      // 2. Get student profile
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id, full_name, email, plan, created_at")
-        .eq("id", sId)
-        .single();
-
-      if (!profile) { setError("Étudiant introuvable."); setLoading(false); return; }
-
-      // 3. Get enrollments for this student in instructor's courses
-      const { data: enrollments } = await supabase
-        .from("enrollments")
-        .select("id, course_id, progress_percent, status, enrolled_at")
-        .eq("student_id", sId)
-        .in("course_id", courseIds);
-
-      if (!enrollments || enrollments.length === 0) {
-        setStudent({ id: sId, name: profile.full_name, email: profile.email, plan: profile.plan || "FREE", joinedAt: profile.created_at, courses: [] });
-        setLoading(false);
-        return;
-      }
-
-      const enrolledCourseIds = enrollments.map(e => e.course_id);
-
-      // 4. Get lessons per section per course
-      const { data: sections } = await supabase
-        .from("course_sections")
-        .select("id, course_id")
-        .in("course_id", enrolledCourseIds);
-      const sectionIds = sections?.map(s => s.id) || [];
-      const sectionCourseMap = new Map(sections?.map(s => [s.id, s.course_id]) || []);
-
-      const { data: lessons } = await supabase
-        .from("lessons")
-        .select("id, section_id")
-        .in("section_id", sectionIds);
-
-      // Lesson count per course
-      const lessonCountByCourse = new Map<string, number>();
-      lessons?.forEach(l => {
-        const cId = sectionCourseMap.get(l.section_id);
-        if (cId) lessonCountByCourse.set(cId, (lessonCountByCourse.get(cId) || 0) + 1);
-      });
-
-      // 5. Get lesson progress for this student via enrollment IDs
-      const enrollmentIds = enrollments?.map(e => e.id) || [];
-      const completedLessonIds = new Set<string>();
-
-      if (enrollmentIds.length > 0) {
-        const { data: lessonProgress } = await supabase
-          .from("lesson_progress")
-          .select("lesson_id, completed, enrollment_id")
-          .in("enrollment_id", enrollmentIds)
-          .eq("completed", true);
-        lessonProgress?.forEach(lp => { if (lp.lesson_id) completedLessonIds.add(lp.lesson_id); });
-      }
-
-      // Count completed lessons per course
-      const completedByCourse = new Map<string, number>();
-      lessons?.forEach(l => {
-        if (completedLessonIds.has(l.id)) {
-          const cId = sectionCourseMap.get(l.section_id);
-          if (cId) completedByCourse.set(cId, (completedByCourse.get(cId) || 0) + 1);
+      const res = await fetch(`/api/instructor/students?studentId=${sId}`);
+      if (!res.ok) {
+        if (res.status === 404) {
+          setError("Étudiant introuvable.");
+          return;
         }
-      });
-
-      // 6. Get payments
-      const { data: orderItems } = await supabase
-        .from("order_items")
-        .select("order_id, course_id")
-        .in("course_id", enrolledCourseIds);
-      const orderItemCourseMap = new Map(orderItems?.map(oi => [oi.order_id, oi.course_id]) || []);
-      const orderIds = orderItems?.map(oi => oi.order_id) || [];
-
-      const payDataByCourse = new Map<string, { status: string; amount: number; date: string | null }>();
-      if (orderIds.length > 0) {
-        const { data: payments } = await supabase
-          .from("payments")
-          .select("order_id, status, amount, paid_at, created_at")
-          .eq("user_id", sId)
-          .in("order_id", orderIds);
-        payments?.forEach(p => {
-          const cId = orderItemCourseMap.get(p.order_id);
-          if (cId) payDataByCourse.set(cId, { status: p.status, amount: p.amount, date: p.paid_at || p.created_at });
-        });
+        throw new Error("Erreur de récupération des données");
       }
-
-      // 7. Get certificates
-      const { data: certs } = await supabase
-        .from("certificates")
-        .select("course_id, issued_at")
-        .eq("student_id", sId)
-        .in("course_id", enrolledCourseIds);
-      const certMap = new Map(certs?.map(c => [c.course_id, c.issued_at]) || []);
-
-      // 8. Assemble
-      const courseDetails: CourseDetail[] = enrollments.map(e => {
-        const course = courseMap.get(e.course_id);
-        const pay = payDataByCourse.get(e.course_id);
-        const certDate = certMap.get(e.course_id) || null;
-        return {
-          courseId: e.course_id,
-          courseTitle: course?.title || "Cours",
-          courseSlug: course?.slug || "",
-          coursePrice: course?.price || 0,
-          enrollmentStatus: e.status || "ACTIVE",
-          enrolledAt: e.enrolled_at,
-          progressPercent: e.progress_percent || 0,
-          totalLessons: lessonCountByCourse.get(e.course_id) || 0,
-          completedLessons: completedByCourse.get(e.course_id) || 0,
-          paymentStatus: pay?.status || "none",
-          paymentAmount: pay?.amount || 0,
-          paymentDate: pay?.date || null,
-          hasCertificate: certMap.has(e.course_id),
-          certificateDate: certDate,
-        };
-      });
-
-      setStudent({
-        id: sId,
-        name: profile.full_name,
-        email: profile.email,
-        plan: profile.plan || "FREE",
-        joinedAt: profile.created_at,
-        courses: courseDetails,
-      });
+      const data = await res.json();
+      setStudent(data);
     } catch (err) {
       console.error("[student-detail] error:", err);
       setError("Erreur lors du chargement des données.");

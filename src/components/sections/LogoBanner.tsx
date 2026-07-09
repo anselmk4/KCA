@@ -9,7 +9,14 @@ export function LogoBanner() {
             src="/logo.png"
             alt="Logo ANSELLA"
             fill
-            className="object-contain drop-shadow-lg"
+            className="object-contain drop-shadow-lg dark:hidden"
+            priority
+          />
+          <Image
+            src="/logo-dark.png"
+            alt="Logo ANSELLA"
+            fill
+            className="object-contain drop-shadow-lg hidden dark:block"
             priority
           />
         </div>

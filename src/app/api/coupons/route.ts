@@ -40,9 +40,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Choose write client (use admin if configured, fallback to user's client otherwise)
-    const writeClient = process.env.SUPABASE_SERVICE_ROLE_KEY ? supabaseAdmin : supabase;
-
-    // If INSTRUCTOR, check if course belongs to them
+    const writeClient = process.env.SUPABASE_SERVICE_ROLE_KEY ? supabaseAdmin : supabase;    // If INSTRUCTOR, check if course belongs to them
     if (roles.includes("INSTRUCTOR") && !roles.some(r => ["SUPER_ADMIN", "ADMIN"].includes(r))) {
       if (applicable_course_id) {
         const { data: course } = await writeClient
@@ -54,6 +52,9 @@ export async function POST(req: NextRequest) {
         if (course?.instructor_id !== user.id) {
           return NextResponse.json({ error: "Non autorisé à créer un coupon pour ce cours." }, { status: 403 });
         }
+      } else {
+        // Instructors are not allowed to create global coupons (without an applicable course)
+        return NextResponse.json({ error: "Non autorisé. Un formateur doit obligatoirement lier son code promo à l'un de ses cours." }, { status: 403 });
       }
     }
 

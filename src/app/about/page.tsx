@@ -130,7 +130,7 @@ export default function AboutPage() {
               >
                 <div className="absolute inset-0 bg-gradient-to-t from-teal-500/10 to-transparent z-10 pointer-events-none" />
                 <Image
-                  src="/ceo-ansel-makomo.png"
+                  src="/ceo-ansel-makomo.jpg"
                   alt="Ingénieur Ansel Makomo - PDG de Kuettu Corporation SARL"
                   fill
                   className="object-cover transition-transform duration-700 hover:scale-105"

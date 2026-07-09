@@ -52,7 +52,12 @@ export function MobileMenu() {
       </button>
 
       {open && (
-        <div className="absolute top-16 left-0 right-0 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 shadow-xl z-50 animate-in slide-in-from-top-2">
+        <>
+          <div 
+            className="fixed inset-0 top-16 bg-black/40 backdrop-blur-xs z-45 animate-in fade-in duration-200" 
+            onClick={() => setOpen(false)} 
+          />
+          <div className="absolute top-16 left-0 right-0 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 shadow-xl z-50 animate-in slide-in-from-top-2">
           <nav className="flex flex-col p-6 space-y-4 text-left">
             <Link href="/about" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
               À propos
@@ -97,7 +102,7 @@ export function MobileMenu() {
             </div>
           </nav>
         </div>
-      )}
+      </>)}
     </div>
   );
 }

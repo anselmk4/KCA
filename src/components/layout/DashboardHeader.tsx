@@ -140,7 +140,7 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
     : "AN";
 
   return (
-    <header className="h-16 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 md:px-8 border-b border-zinc-200 dark:border-white/10 sticky top-0 z-10">
+    <header className="h-16 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 md:px-8 border-b border-zinc-200 dark:border-white/10 sticky top-0 z-30">
       <div className="flex items-center gap-3">
         {/* Mobile hamburger */}
         <button

@@ -81,87 +81,15 @@ export default function StudentsPage() {
     if (!s?.userId) { router.replace("/login"); return; }
     fetchStudents(s.userId);
   }, [router]);
-
   async function fetchStudents(instructorId: string) {
     setLoading(true);
     try {
-      // 1. Get instructor's courses
-      const { data: courses } = await supabase
-        .from("courses")
-        .select("id, title, price")
-        .eq("instructor_id", instructorId);
-
-      if (!courses || courses.length === 0) { setLoading(false); return; }
-      const courseIds = courses.map(c => c.id);
-      const courseMap = new Map(courses.map(c => [c.id, c]));
-
-      // 2. Get enrollments for those courses
-      const { data: enrData } = await supabase
-        .from("enrollments")
-        .select("id, student_id, course_id, progress_percent, status, enrolled_at")
-        .in("course_id", courseIds);
-
-      if (!enrData || enrData.length === 0) { setLoading(false); return; }
-      const studentIds = [...new Set(enrData.map(e => e.student_id))];
-
-      // 3. Get student profiles
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, full_name, email")
-        .in("id", studentIds);
-      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
-
-      // 4. Get orders & payments for those courses
-      const { data: orderItems } = await supabase
-        .from("order_items")
-        .select("order_id, course_id")
-        .in("course_id", courseIds);
-      const orderIds = orderItems?.map(oi => oi.order_id) || [];
-      const orderItemMap = new Map(orderItems?.map(oi => [oi.order_id, oi.course_id]) || []);
-
-      let paymentMap = new Map<string, { status: string; amount: number; userId: string }>();
-      if (orderIds.length > 0) {
-        const { data: payments } = await supabase
-          .from("payments")
-          .select("order_id, status, amount, user_id")
-          .in("order_id", orderIds);
-        payments?.forEach(p => {
-          const courseId = orderItemMap.get(p.order_id);
-          if (courseId) {
-            paymentMap.set(`${p.user_id}_${courseId}`, { status: p.status, amount: p.amount, userId: p.user_id });
-          }
-        });
+      const res = await fetch("/api/instructor/students");
+      if (!res.ok) {
+        throw new Error("Erreur de récupération des données");
       }
-
-      // 5. Get certificates
-      const { data: certs } = await supabase
-        .from("certificates")
-        .select("student_id, course_id")
-        .in("course_id", courseIds);
-      const certSet = new Set(certs?.map(c => `${c.student_id}_${c.course_id}`) || []);
-
-      // 6. Map everything
-      const rows: StudentEnrollment[] = enrData.map(e => {
-        const profile = profileMap.get(e.student_id);
-        const course = courseMap.get(e.course_id);
-        const pay = paymentMap.get(`${e.student_id}_${e.course_id}`);
-        return {
-          studentId: e.student_id,
-          studentName: profile?.full_name || "Étudiant",
-          studentEmail: profile?.email || "",
-          courseId: e.course_id,
-          courseTitle: course?.title || "Cours",
-          coursePrice: course?.price || 0,
-          progressPercent: e.progress_percent || 0,
-          enrollmentStatus: e.status || "ACTIVE",
-          enrolledAt: e.enrolled_at,
-          paymentStatus: (pay?.status as any) || "none",
-          paymentAmount: pay?.amount || 0,
-          hasCertificate: certSet.has(`${e.student_id}_${e.course_id}`),
-        };
-      });
-
-      setEnrollments(rows);
+      const data = await res.json();
+      setEnrollments(data.enrollments || []);
     } catch (err) {
       console.error("[students] fetch error:", err);
     } finally {

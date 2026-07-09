@@ -110,7 +110,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       
       {/* Main Content Wrapper */}
       <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
-        <header className="h-16 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 md:px-8 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10">
+         <header className="h-16 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 md:px-8 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-30">
           <div className="flex items-center gap-3">
             <button
               className="lg:hidden p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"

@@ -46,7 +46,8 @@ export default function VerifyClient({ code }: { code: string }) {
 
       {/* Header */}
       <Link href="/" className="flex items-center mb-10 group">
-        <Image src="/logo.png" alt="ANSELLA Logo" width={150} height={45} className="object-contain h-10 w-auto" priority />
+        <Image src="/logo.png" alt="ANSELLA Logo" width={150} height={45} className="object-contain h-10 w-auto dark:hidden" priority />
+        <Image src="/logo-dark.png" alt="ANSELLA Logo" width={150} height={45} className="object-contain h-10 w-auto hidden dark:block" priority />
       </Link>
 
       <div className="w-full max-w-2xl">

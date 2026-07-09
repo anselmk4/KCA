@@ -7,7 +7,8 @@ export default function NotFound() {
     <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black p-4">
       <div className="text-center max-w-md">
         <div className="flex justify-center mb-8">
-          <Image src="/logo.png" alt="ANSELLA" width={64} height={64} className="object-contain" />
+          <Image src="/logo.png" alt="ANSELLA" width={64} height={64} className="object-contain dark:hidden" />
+          <Image src="/logo-dark.png" alt="ANSELLA" width={64} height={64} className="object-contain hidden dark:block" />
         </div>
         <h1 className="text-7xl font-extrabold text-zinc-900 dark:text-white mb-4">404</h1>
         <p className="text-xl text-zinc-500 dark:text-zinc-400 mb-8">

@@ -46,7 +46,8 @@ export default function ForgotPasswordPage() {
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <Link href="/" className="flex items-center mb-6">
-            <Image src="/logo.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto" priority />
+            <Image src="/logo.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto dark:hidden" priority />
+            <Image src="/logo-dark.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto hidden dark:block" priority />
           </Link>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Mot de passe oublié</h1>
           <p className="text-zinc-500 dark:text-zinc-400 text-center text-sm">

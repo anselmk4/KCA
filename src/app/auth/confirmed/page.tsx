@@ -209,7 +209,8 @@ function ConfirmedContent() {
 
       <header className="z-10 w-full max-w-7xl mx-auto px-6 py-6 flex justify-between items-center">
         <Link href="/">
-          <Image src="/logo.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto" priority />
+          <Image src="/logo.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto dark:hidden" priority />
+          <Image src="/logo-dark.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto hidden dark:block" priority />
         </Link>
         <Link href="/" className="text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
           ← Retour à l&apos;accueil

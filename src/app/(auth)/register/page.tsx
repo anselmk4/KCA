@@ -285,7 +285,8 @@ function RegisterForm() {
       {/* Header */}
       <div className="flex flex-col items-center mb-8 mt-2">
         <Link href="/" className="flex items-center mb-4">
-          <Image src="/logo.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto lg:hidden" priority />
+          <Image src="/logo.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto lg:hidden dark:hidden" priority />
+          <Image src="/logo-dark.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto lg:hidden hidden dark:block" priority />
         </Link>
         <div className="w-full flex justify-end mb-3 lg:hidden">
           <Link href="/" className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-white transition-colors font-medium">
@@ -541,7 +542,8 @@ export default function RegisterPage() {
         {/* Header Branding */}
         <div className="z-10 flex items-center justify-between">
           <Link href="/">
-            <Image src="/logo.png" alt="ANSELLA Logo" width={160} height={48} className="object-contain h-10 w-auto" priority />
+            <Image src="/logo.png" alt="ANSELLA Logo" width={160} height={48} className="object-contain h-10 w-auto dark:hidden" priority />
+            <Image src="/logo-dark.png" alt="ANSELLA Logo" width={160} height={48} className="object-contain h-10 w-auto hidden dark:block" priority />
           </Link>
           <Link href="/" className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-white transition-colors font-medium">
             ← Accueil

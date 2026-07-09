@@ -479,6 +479,67 @@ BEGIN
   END IF;
 END $$;
 
+-- ==================== COUPONS TABLE ====================
+-- Enable RLS on coupons
+ALTER TABLE public.coupons ENABLE ROW LEVEL SECURITY;
+
+-- Allow authenticated users to read active coupons
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'coupons' AND policyname = 'Anyone can read active coupons'
+  ) THEN
+    CREATE POLICY "Anyone can read active coupons"
+      ON public.coupons
+      FOR SELECT
+      TO authenticated
+      USING (is_active = true);
+  END IF;
+END $$;
+
+-- Allow instructors/admins to insert coupons
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'coupons' AND policyname = 'Instructors and admins can insert coupons'
+  ) THEN
+    CREATE POLICY "Instructors and admins can insert coupons"
+      ON public.coupons
+      FOR INSERT
+      TO authenticated
+      WITH CHECK (auth.uid() = created_by);
+  END IF;
+END $$;
+
+-- Allow creators to update their own coupons
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'coupons' AND policyname = 'Creators can update own coupons'
+  ) THEN
+    CREATE POLICY "Creators can update own coupons"
+      ON public.coupons
+      FOR UPDATE
+      TO authenticated
+      USING (auth.uid() = created_by)
+      WITH CHECK (auth.uid() = created_by);
+  END IF;
+END $$;
+
+-- Allow creators to delete their own coupons
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'coupons' AND policyname = 'Creators can delete own coupons'
+  ) THEN
+    CREATE POLICY "Creators can delete own coupons"
+      ON public.coupons
+      FOR DELETE
+      TO authenticated
+      USING (auth.uid() = created_by);
+  END IF;
+END $$;
+
 -- ==================== VERIFY ====================
 -- List all policies for verification
 SELECT tablename, policyname, cmd FROM pg_policies 

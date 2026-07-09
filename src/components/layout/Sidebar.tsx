@@ -60,7 +60,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       ${open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
       <div className="h-16 flex items-center justify-between px-6 border-b border-zinc-100 dark:border-zinc-800">
         <Link href="/" className="flex items-center">
-          <Image src="/logo.png" alt="ANSELLA" width={100} height={30} className="object-contain h-7 w-auto" />
+          <Image src="/logo.png" alt="ANSELLA" width={100} height={30} className="object-contain h-7 w-auto dark:hidden" />
+          <Image src="/logo-dark.png" alt="ANSELLA" width={100} height={30} className="object-contain h-7 w-auto hidden dark:block" />
         </Link>
         <button className="lg:hidden p-1 text-zinc-500" onClick={onClose}>
           <X className="w-5 h-5" />
