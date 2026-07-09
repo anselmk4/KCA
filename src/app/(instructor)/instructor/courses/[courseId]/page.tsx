@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   BookOpen,
+  Camera,
   Plus,
   Edit3,
   Trash2,
@@ -154,11 +155,29 @@ export default function CourseDetailPage() {
   // ─── Description tab states ───────────────────────────────
   const [descForm, setDescForm] = useState({
     title: "",
-    category: "",
+    category_id: "",
     level: "Débutant",
     description: "",
   });
+  const [benefits, setBenefits] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [categories, setCategories] = useState<any[]>([]);
+  const [categorySearch, setCategorySearch] = useState("");
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const [descSavedMessage, setDescSavedMessage] = useState(false);
+
+  // ─── Homework states ──────────────────────────────────────
+  const [homeworks, setHomeworks] = useState<any[]>([]);
+  const [addingHomeworkToSection, setAddingHomeworkToSection] = useState<string | null>(null);
+  const [newHomeworkTitle, setNewHomeworkTitle] = useState("");
+  const [newHomeworkDeadline, setNewHomeworkDeadline] = useState("");
+  const [selectedHomeworkId, setSelectedHomeworkId] = useState<string | null>(null);
+  const [homeworkForm, setHomeworkForm] = useState({
+    title: "",
+    description: "",
+    deadline: "",
+    file_url: ""
+  });
 
   // ─── Quiz tab states ──────────────────────────────────────
   const [showCreateQuizModal, setShowCreateQuizModal] = useState(false);
@@ -208,12 +227,22 @@ export default function CourseDetailPage() {
       }
       setCourse(courseData as unknown as CourseData);
       const cd = courseData as unknown as Record<string, unknown>;
+      // Categories
+      const { data: catData } = await supabase
+        .from("categories")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+      setCategories(catData || []);
+
       setDescForm({
         title: courseData.title || "",
-        category: (cd.category as string) || "",
+        category_id: courseData.category_id || "",
         level: courseData.level || "Débutant",
         description: courseData.description || "",
       });
+      setBenefits((cd.benefits as string) || "");
+      setThumbnailUrl((cd.thumbnail_url as string) || "");
       setCoursePrice(String(courseData.price || 0));
       setAllowInstallments(Boolean(cd.allow_installments));
       setInstallmentsCount(Number(cd.installments_count) || 2);
@@ -265,6 +294,13 @@ export default function CourseDetailPage() {
         .select("*, profiles!student_id(full_name, email)")
         .eq("course_id", courseId);
       setEnrollments((enrollmentsData || []) as EnrollmentData[]);
+
+      // Homeworks
+      const { data: hwData } = await (supabase as any)
+        .from("homeworks")
+        .select("*")
+        .eq("course_id", courseId);
+      setHomeworks(hwData || []);
 
     } catch (err) {
       console.error("[CourseBuilder] loadData error:", err);
@@ -321,6 +357,14 @@ export default function CourseDetailPage() {
   // ─── SECTION CRUD ─────────────────────────────────────────
   const handleAddSection = async () => {
     if (!newSectionTitle.trim()) return;
+    if (sections.length > 0) {
+      const lastSection = sections[sections.length - 1];
+      const lastSectionQuizzes = quizzes.filter((q) => q.section_id === lastSection.id);
+      if (lastSectionQuizzes.length === 0) {
+        alert(`Vous devez d'abord créer un Quiz à la fin du chapitre "${lastSection.title}" avant de pouvoir créer le chapitre suivant.`);
+        return;
+      }
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/sections", {
@@ -619,6 +663,12 @@ export default function CourseDetailPage() {
     const correctIdx = Number(newQCorrect);
     if (correctIdx >= cleanChoices.length) { alert("La bonne réponse est invalide."); return; }
 
+    const quizQuestions = questions.filter((q) => q.quiz_id === selectedQuizId);
+    if (quizQuestions.length >= 10) {
+      alert("Erreur : Un quiz ne peut pas contenir plus de 10 questions (QCM).");
+      return;
+    }
+
     setSaving(true);
     try {
       const res = await fetch("/api/questions", {
@@ -656,20 +706,23 @@ export default function CourseDetailPage() {
     setSaving(true);
     try {
       const slug = descForm.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("courses")
         .update({
           title: descForm.title,
           slug,
+          category_id: descForm.category_id || null,
           level: descForm.level as "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "EXPERT",
           description: descForm.description,
+          benefits: benefits || null,
+          thumbnail_url: thumbnailUrl || null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", courseId);
       if (error) { alert("Erreur : " + error.message); return; }
       setDescForm({
         title: descForm.title,
-        category: descForm.category,
+        category_id: descForm.category_id,
         level: descForm.level,
         description: descForm.description,
       });
@@ -682,9 +735,14 @@ export default function CourseDetailPage() {
   const handleSavePrice = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("courses")
-        .update({ price: parseFloat(coursePrice) || 0, updated_at: new Date().toISOString() })
+        .update({
+          price: parseFloat(coursePrice) || 0,
+          allow_installments: allowInstallments,
+          installments_count: installmentsCount,
+          updated_at: new Date().toISOString()
+        })
         .eq("id", courseId);
       if (error) { alert("Erreur : " + error.message); return; }
       setPriceSavedMessage(true);
@@ -696,7 +754,7 @@ export default function CourseDetailPage() {
   const handleRequestReview = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("courses")
         .update({ status: "REVIEW", updated_at: new Date().toISOString() })
         .eq("id", courseId);
@@ -710,7 +768,7 @@ export default function CourseDetailPage() {
   const handleCancelReview = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from("courses")
         .update({ status: "DRAFT", updated_at: new Date().toISOString() })
         .eq("id", courseId);
@@ -1005,7 +1063,7 @@ export default function CourseDetailPage() {
                               return (
                                 <div
                                   key={lesson.id}
-                                  onClick={() => setSelectedLessonId(lesson.id)}
+                                  onClick={() => { setSelectedLessonId(lesson.id); setSelectedHomeworkId(null); }}
                                   className={`flex items-center justify-between px-5 py-2.5 cursor-pointer transition-colors ${
                                     active
                                       ? "bg-teal-50/70 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400 border-l-2 border-teal-500"
@@ -1042,7 +1100,7 @@ export default function CourseDetailPage() {
                             {sectionQuizzes.map((quiz) => (
                               <div
                                 key={quiz.id}
-                                onClick={() => { setSelectedQuizId(quiz.id); setActiveTab("quizzes"); }}
+                                onClick={() => { setSelectedQuizId(quiz.id); setSelectedLessonId(null); setSelectedHomeworkId(null); setActiveTab("quizzes"); }}
                                 className="flex items-center justify-between px-5 py-2.5 cursor-pointer hover:bg-zinc-100/30 dark:hover:bg-zinc-850/20 text-zinc-700 dark:text-zinc-300 transition-colors"
                               >
                                 <div className="flex items-center gap-2 min-w-0">
@@ -1050,6 +1108,53 @@ export default function CourseDetailPage() {
                                   <span className="text-xs font-semibold truncate text-zinc-650 dark:text-zinc-350">Quiz : {quiz.title}</span>
                                 </div>
                                 <span className="text-[9px] bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full font-bold">QCM</span>
+                              </div>
+                            ))}
+
+                            {/* Section homeworks */}
+                            {homeworks.filter((h) => h.section_id === section.id).map((hw) => (
+                              <div
+                                key={hw.id}
+                                onClick={() => {
+                                  setSelectedHomeworkId(hw.id);
+                                  setSelectedLessonId(null);
+                                  setSelectedQuizId(null);
+                                  setHomeworkForm({
+                                    title: hw.title || "",
+                                    description: hw.description || "",
+                                    deadline: hw.deadline ? hw.deadline.slice(0, 16) : "",
+                                    file_url: hw.file_url || ""
+                                  });
+                                  setActiveTab("programme");
+                                }}
+                                className={`flex items-center justify-between px-5 py-2.5 cursor-pointer hover:bg-zinc-100/30 dark:hover:bg-zinc-850/20 transition-colors ${
+                                  selectedHomeworkId === hw.id ? "bg-teal-50/70 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400 border-l-2 border-teal-500" : ""
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <FileText className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                                  <span className="text-xs truncate text-zinc-650 dark:text-zinc-350">Devoir : {hw.title}</span>
+                                </div>
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (!confirm("Supprimer ce devoir ?")) return;
+                                    setSaving(true);
+                                    try {
+                                      const res = await fetch(`/api/homeworks?id=${hw.id}`, { method: "DELETE" });
+                                      if (res.ok) {
+                                        if (selectedHomeworkId === hw.id) setSelectedHomeworkId(null);
+                                        await loadData(true);
+                                      } else {
+                                        const err = await res.json();
+                                        alert("Erreur : " + err.error);
+                                      }
+                                    } finally { setSaving(false); }
+                                  }}
+                                  className="p-0.5 text-zinc-400 hover:text-red-500 transition-colors shrink-0"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
                               </div>
                             ))}
 
@@ -1091,6 +1196,58 @@ export default function CourseDetailPage() {
                                   </button>
                                 </div>
                               </div>
+                            ) : addingHomeworkToSection === section.id ? (
+                              <div className="p-3 bg-zinc-50 dark:bg-zinc-800/40 flex flex-col gap-2">
+                                <input
+                                  type="text"
+                                  value={newHomeworkTitle}
+                                  onChange={(e) => setNewHomeworkTitle(e.target.value)}
+                                  placeholder="Titre du devoir"
+                                  className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold"
+                                  autoFocus
+                                />
+                                <input
+                                  type="datetime-local"
+                                  value={newHomeworkDeadline}
+                                  onChange={(e) => setNewHomeworkDeadline(e.target.value)}
+                                  className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs text-zinc-600 dark:text-zinc-400 font-semibold"
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={async () => {
+                                      if (!newHomeworkTitle.trim()) return;
+                                      setSaving(true);
+                                      try {
+                                        const res = await fetch("/api/homeworks", {
+                                          method: "POST",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({
+                                            courseId,
+                                            sectionId: section.id,
+                                            title: newHomeworkTitle.trim(),
+                                            deadline: newHomeworkDeadline || null
+                                          })
+                                        });
+                                        if (res.ok) {
+                                          setNewHomeworkTitle("");
+                                          setNewHomeworkDeadline("");
+                                          setAddingHomeworkToSection(null);
+                                          await loadData(true);
+                                        } else {
+                                          const err = await res.json();
+                                          alert("Erreur : " + err.error);
+                                        }
+                                      } finally { setSaving(false); }
+                                    }}
+                                    className="flex-1 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold"
+                                  >
+                                    Créer
+                                  </button>
+                                  <button onClick={() => setAddingHomeworkToSection(null)} className="p-1.5 text-zinc-400 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg">
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
                             ) : (
                               <div className="relative">
                                 <button
@@ -1103,11 +1260,14 @@ export default function CourseDetailPage() {
                                   <>
                                     <div className="fixed inset-0 z-40" onClick={() => setActiveMenuSectionId(null)} />
                                     <div className="absolute left-4 top-full mt-1 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-lg z-50 py-1 font-semibold text-xs text-zinc-750 dark:text-zinc-300">
-                                      <button onClick={() => { setAddingLessonToSection(section.id); setAddingQuizToSection(null); setActiveMenuSectionId(null); }} className="w-full text-left px-3.5 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2 cursor-pointer">
+                                      <button onClick={() => { setAddingLessonToSection(section.id); setAddingQuizToSection(null); setAddingHomeworkToSection(null); setActiveMenuSectionId(null); }} className="w-full text-left px-3.5 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2 cursor-pointer">
                                         <BookOpen className="w-3.5 h-3.5 text-teal-600 shrink-0" /> Leçon
                                       </button>
-                                      <button onClick={() => { setAddingQuizToSection(section.id); setAddingLessonToSection(null); setActiveMenuSectionId(null); }} className="w-full text-left px-3.5 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2 cursor-pointer">
+                                      <button onClick={() => { setAddingQuizToSection(section.id); setAddingLessonToSection(null); setAddingHomeworkToSection(null); setActiveMenuSectionId(null); }} className="w-full text-left px-3.5 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2 cursor-pointer">
                                         <ClipboardCheck className="w-3.5 h-3.5 text-amber-500 shrink-0" /> Quiz de section
+                                      </button>
+                                      <button onClick={() => { setAddingHomeworkToSection(section.id); setAddingLessonToSection(null); setAddingQuizToSection(null); setActiveMenuSectionId(null); }} className="w-full text-left px-3.5 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2 cursor-pointer">
+                                        <FileText className="w-3.5 h-3.5 text-indigo-500 shrink-0" /> Devoir
                                       </button>
                                     </div>
                                   </>
@@ -1225,12 +1385,127 @@ export default function CourseDetailPage() {
                     </button>
                   </div>
                 </div>
+              ) : selectedHomeworkId ? (
+                <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm space-y-5">
+                  <div className="flex items-center justify-between pb-3 border-b border-zinc-150 dark:border-zinc-850">
+                    <div>
+                      <h3 className="font-bold text-zinc-900 dark:text-white text-base">Édition du Devoir</h3>
+                      <p className="text-zinc-450 text-[11px] mt-0.5">Saisissez les consignes et paramétrez ce devoir.</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Titre du devoir *</label>
+                      <input
+                        type="text"
+                        required
+                        value={homeworkForm.title}
+                        onChange={(e) => setHomeworkForm((p) => ({ ...p, title: e.target.value }))}
+                        className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Date limite de remise</label>
+                      <input
+                        type="datetime-local"
+                        value={homeworkForm.deadline}
+                        onChange={(e) => setHomeworkForm((p) => ({ ...p, deadline: e.target.value }))}
+                        className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-750 dark:text-zinc-350"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Fichier joint / Ressource (Max 5 Mo)</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={homeworkForm.file_url}
+                          onChange={(e) => setHomeworkForm((p) => ({ ...p, file_url: e.target.value }))}
+                          placeholder="Collez l'URL du document ou chargez un fichier..."
+                          className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs placeholder-zinc-400"
+                        />
+                        <input
+                          type="file"
+                          id="homework-file-upload-editor"
+                          accept=".pdf,.doc,.docx,.zip,.txt"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            if (file.size > 5 * 1024 * 1024) {
+                              alert("Le document est trop volumineux (Max 5 Mo).");
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setHomeworkForm((p) => ({ ...p, file_url: reader.result as string }));
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => document.getElementById("homework-file-upload-editor")?.click()}
+                          className="px-3.5 py-2 bg-zinc-105 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-205 dark:border-zinc-700 rounded-xl text-xs font-bold cursor-pointer shrink-0"
+                        >
+                          Uploader
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Description complète / Consignes *</label>
+                      <textarea
+                        value={homeworkForm.description}
+                        onChange={(e) => setHomeworkForm((p) => ({ ...p, description: e.target.value }))}
+                        rows={6}
+                        placeholder="Rédigez les détails du devoir demandé..."
+                        className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-end">
+                    <button
+                      onClick={async () => {
+                        if (!homeworkForm.title.trim()) return;
+                        setSaving(true);
+                        try {
+                          const res = await fetch("/api/homeworks", {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              id: selectedHomeworkId,
+                              title: homeworkForm.title,
+                              description: homeworkForm.description,
+                              fileUrl: homeworkForm.file_url,
+                              deadline: homeworkForm.deadline || null
+                            })
+                          });
+                          if (res.ok) {
+                            alert("Devoir enregistré avec succès !");
+                            await loadData(true);
+                          } else {
+                            const err = await res.json();
+                            alert("Erreur : " + err.error);
+                          }
+                        } finally { setSaving(false); }
+                      }}
+                      disabled={saving}
+                      className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-bold transition-all cursor-pointer shadow-md shadow-teal-500/10 disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" /> Enregistrer le devoir
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div className="bg-zinc-50 dark:bg-zinc-900/40 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 py-28 text-center text-zinc-400">
                   <Play className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
-                  <h4 className="font-bold text-zinc-700 dark:text-zinc-300 text-sm">Sélectionnez une leçon</h4>
+                  <h4 className="font-bold text-zinc-700 dark:text-zinc-300 text-sm">Sélectionnez un élément</h4>
                   <p className="text-zinc-450 dark:text-zinc-500 text-xs mt-1 max-w-xs mx-auto">
-                    Cliquez sur une leçon dans l'arborescence pour modifier son titre, sa vidéo et son contenu.
+                    Cliquez sur une leçon ou un devoir dans l'arborescence pour modifier son titre et ses consignes.
                   </p>
                 </div>
               )}
@@ -1338,17 +1613,65 @@ export default function CourseDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Thématique / Catégorie</label>
-                  <select value={descForm.category} onChange={(e) => setDescForm((p) => ({ ...p, category: e.target.value }))} className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white">
-                    <option value="">Sélectionnez une catégorie</option>
-                    <option value="Blockchain">Blockchain</option>
-                    <option value="Trading">Trading</option>
-                    <option value="Intelligence Artificielle">Intelligence Artificielle</option>
-                    <option value="Web3">Web3</option>
-                    <option value="DeFi">DeFi</option>
-                    <option value="NFT & Métavers">NFT & Métavers</option>
-                    <option value="Sécurité">Sécurité</option>
-                    <option value="Minage">Minage</option>
-                  </select>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
+                      className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-left text-zinc-900 dark:text-white flex justify-between items-center cursor-pointer select-none"
+                    >
+                      <span className="truncate">
+                        {categories.find((c) => c.id === descForm.category_id)?.name || "Sélectionnez une catégorie"}
+                      </span>
+                      <ChevronDown className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform ${categoryDropdownOpen ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {categoryDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setCategoryDropdownOpen(false)} />
+                        <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl z-50 overflow-hidden max-h-60 flex flex-col">
+                          <div className="p-2 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850">
+                            <input
+                              type="text"
+                              value={categorySearch}
+                              onChange={(e) => setCategorySearch(e.target.value)}
+                              placeholder="Rechercher une catégorie..."
+                              className="w-full px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs"
+                              autoFocus
+                            />
+                          </div>
+                          <div className="overflow-y-auto divide-y divide-zinc-50 dark:divide-zinc-850/50">
+                            {categories.filter((c) =>
+                              c.name.toLowerCase().includes(categorySearch.toLowerCase())
+                            ).length === 0 ? (
+                              <div className="px-4 py-3 text-xs text-zinc-400 text-center">Aucun résultat</div>
+                            ) : (
+                              categories
+                                .filter((c) =>
+                                  c.name.toLowerCase().includes(categorySearch.toLowerCase())
+                                )
+                                .map((c) => (
+                                  <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setDescForm((prev) => ({ ...prev, category_id: c.id }));
+                                      setCategoryDropdownOpen(false);
+                                      setCategorySearch("");
+                                    }}
+                                    className={`w-full text-left px-4 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs transition-colors flex items-center justify-between ${
+                                      descForm.category_id === c.id ? "text-teal-600 font-bold bg-teal-50/20 dark:bg-teal-900/10" : "text-zinc-700 dark:text-zinc-300"
+                                    }`}
+                                  >
+                                    <span>{c.name}</span>
+                                    {descForm.category_id === c.id && <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />}
+                                  </button>
+                                ))
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Niveau cible</label>
@@ -1360,6 +1683,72 @@ export default function CourseDetailPage() {
                   </select>
                 </div>
               </div>
+
+              {/* Cover image uploader */}
+              <div className="bg-zinc-50 dark:bg-zinc-850/50 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-3">
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300">Image de couverture du cours</label>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  {thumbnailUrl ? (
+                    <img src={thumbnailUrl} alt="Couverture" className="w-40 h-24 rounded-xl object-cover border border-zinc-200 dark:border-zinc-700 shrink-0" />
+                  ) : (
+                    <div className="w-40 h-24 bg-zinc-100 dark:bg-zinc-800 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 flex items-center justify-center text-xs text-zinc-400 shrink-0">
+                      Pas d'image de couverture
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="file"
+                      id="cover-image-upload"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 1.5 * 1024 * 1024) {
+                          alert("L'image est trop volumineuse. Veuillez choisir une image de moins de 1.5 Mo.");
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setThumbnailUrl(reader.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById("cover-image-upload")?.click()}
+                      className="px-4 py-2 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-semibold cursor-pointer transition-all shadow-sm flex items-center gap-1.5"
+                    >
+                      <Camera className="w-3.5 h-3.5 text-zinc-500" /> Charger une image
+                    </button>
+                    {thumbnailUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setThumbnailUrl("")}
+                        className="text-xs text-red-500 hover:underline text-left font-medium cursor-pointer"
+                      >
+                        Supprimer la couverture
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Course Benefits Field */}
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                  Bénéfices du cours / À la fin du cours l'apprenant va bénéficier de
+                </label>
+                <textarea
+                  value={benefits}
+                  onChange={(e) => setBenefits(e.target.value)}
+                  rows={3}
+                  placeholder="Écrivez les compétences ou avantages que les étudiants obtiendront..."
+                  className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                />
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2">Description complète</label>
                 <RichEditor value={descForm.description} onChange={(html) => setDescForm((p) => ({ ...p, description: html }))} placeholder="Détaillez le programme, les compétences cibles et les perspectives..." />

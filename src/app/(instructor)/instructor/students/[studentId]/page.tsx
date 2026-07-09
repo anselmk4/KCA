@@ -73,11 +73,22 @@ export default function StudentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [homeworks, setHomeworks] = useState<any[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [quizzes, setQuizzes] = useState<any[]>([]);
+  const [attempts, setAttempts] = useState<any[]>([]);
+  const [gradingSubId, setGradingSubId] = useState<string | null>(null);
+  const [editGrade, setEditGrade] = useState<string>("");
+  const [editFeedback, setEditFeedback] = useState<string>("");
+  const [savingGrade, setSavingGrade] = useState<string | null>(null);
+  const [unlockingCertCourseId, setUnlockingCertCourseId] = useState<string | null>(null);
+
   useEffect(() => {
     const session = getSimulatedSession();
     if (!session?.userId) { router.replace("/login"); return; }
     fetchStudentDetail(session.userId, studentId);
   }, [studentId, router]);
+
   async function fetchStudentDetail(instructorId: string, sId: string) {
     setLoading(true);
     try {
@@ -91,6 +102,39 @@ export default function StudentDetailPage() {
       }
       const data = await res.json();
       setStudent(data);
+
+      // Fetch homeworks and submissions
+      const courseIds = data.courses.map((c: any) => c.courseId);
+      if (courseIds.length > 0) {
+        // Homeworks
+        const { data: hws } = await (supabase as any)
+          .from("homeworks")
+          .select("*")
+          .in("course_id", courseIds);
+        setHomeworks(hws || []);
+
+        // Submissions
+        const subRes = await fetch(`/api/homework-submissions?studentId=${sId}`);
+        if (subRes.ok) {
+          const subData = await subRes.json();
+          setSubmissions(subData.submissions || []);
+        }
+
+        // Quizzes
+        const { data: qzs } = await supabase
+          .from("quizzes")
+          .select("*")
+          .in("course_id", courseIds);
+        setQuizzes(qzs || []);
+
+        // Quiz attempts
+        const { data: atts } = await supabase
+          .from("quiz_attempts")
+          .select("*")
+          .eq("student_id", sId)
+          .in("quiz_id", qzs?.map((q: any) => q.id) || []);
+          setAttempts(atts || []);
+      }
     } catch (err) {
       console.error("[student-detail] error:", err);
       setError("Erreur lors du chargement des données.");
@@ -98,6 +142,68 @@ export default function StudentDetailPage() {
       setLoading(false);
     }
   }
+
+  const handleGradeSubmit = async (submissionId: string) => {
+    if (!editGrade || isNaN(parseFloat(editGrade))) {
+      alert("Veuillez saisir une note valide.");
+      return;
+    }
+    setSavingGrade(submissionId);
+    try {
+      const res = await fetch("/api/homework-submissions", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: submissionId,
+          grade: parseFloat(editGrade),
+          feedback: editFeedback
+        })
+      });
+      if (res.ok) {
+        alert("Note enregistrée avec succès !");
+        setGradingSubId(null);
+        const session = getSimulatedSession();
+        if (session?.userId) {
+          await fetchStudentDetail(session.userId, studentId);
+        }
+      } else {
+        const err = await res.json();
+        alert("Erreur : " + err.error);
+      }
+    } catch (err) {
+      alert("Erreur de connexion.");
+    } finally {
+      setSavingGrade(null);
+    }
+  };
+
+  const handleUnlockCertificate = async (courseId: string) => {
+    setUnlockingCertCourseId(courseId);
+    try {
+      const res = await fetch("/api/certificates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId,
+          studentId
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert("🎉 Certificat débloqué et émis avec succès pour l'apprenant !");
+        const session = getSimulatedSession();
+        if (session?.userId) {
+          await fetchStudentDetail(session.userId, studentId);
+        }
+      } else {
+        alert("Erreur : " + data.error);
+      }
+    } catch (err) {
+      alert("Erreur de connexion.");
+    } finally {
+      setUnlockingCertCourseId(null);
+    }
+  };
 
   if (loading) return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -307,6 +413,209 @@ export default function StudentDetailPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Hybrid Scoring & Grading details */}
+                  {(() => {
+                    const courseQuizzes = quizzes.filter(q => q.course_id === course.courseId);
+                    const bestQuizScores = courseQuizzes.map(quiz => {
+                      const quizAttemptsForQuiz = attempts.filter(a => a.quiz_id === quiz.id);
+                      return quizAttemptsForQuiz.length > 0 ? Math.max(...quizAttemptsForQuiz.map(a => a.score)) : 0;
+                    });
+                    const quizAverage = courseQuizzes.length > 0 ? Math.round(bestQuizScores.reduce((s, score) => s + score, 0) / courseQuizzes.length) : 0;
+
+                    const courseHomeworks = homeworks.filter(h => h.course_id === course.courseId);
+                    const courseSubmissions = submissions.filter(s => courseHomeworks.some(h => h.id === s.homework_id));
+                    const gradedSubmissions = courseSubmissions.filter(s => s.status === "GRADED");
+                    const homeworkAverage = gradedSubmissions.length > 0 ? Math.round(gradedSubmissions.reduce((s, sub) => s + (sub.grade || 0), 0) / gradedSubmissions.length) : 0;
+
+                    const hybridScore = Math.round((quizAverage * 0.7) + (homeworkAverage * 0.3));
+                    const canUnlock = quizAverage >= 80;
+
+                    return (
+                      <div className="px-6 pb-6 border-t border-zinc-100 dark:border-zinc-800 pt-5 space-y-6">
+                        
+                        {/* Hybrid Score Cards */}
+                        <div>
+                          <h4 className="text-xs font-bold text-zinc-550 dark:text-zinc-450 uppercase tracking-wider mb-3">Notes & Barème Hybride</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="bg-zinc-50 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                              <p className="text-[10px] font-bold text-zinc-500 uppercase">Moyenne QCM (70%)</p>
+                              <p className="text-lg font-black text-amber-500 mt-1">{quizAverage}%</p>
+                              <p className="text-[9px] text-zinc-400 mt-0.5">{courseQuizzes.length} quiz au total</p>
+                            </div>
+                            <div className="bg-zinc-50 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                              <p className="text-[10px] font-bold text-zinc-500 uppercase">Moyenne Devoirs (30%)</p>
+                              <p className="text-lg font-black text-indigo-500 mt-1">{homeworkAverage}%</p>
+                              <p className="text-[9px] text-zinc-400 mt-0.5">{courseSubmissions.length} devoirs rendus sur {courseHomeworks.length}</p>
+                            </div>
+                            <div className="bg-zinc-50 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                              <p className="text-[10px] font-bold text-zinc-500 uppercase">Score Général Hybride</p>
+                              <p className="text-lg font-black text-teal-600 mt-1">{hybridScore}%</p>
+                              <p className="text-[9px] text-zinc-400 mt-0.5">Quiz 70% + Devoirs 30%</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Manual release button */}
+                        <div className="bg-zinc-50 dark:bg-zinc-800/20 p-4 rounded-2xl border border-zinc-150 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <div className="space-y-1 flex-1">
+                            <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Déblocage manuel du Certificat</p>
+                            <p className="text-[10px] text-zinc-500 max-w-lg">
+                              Le certificat final est débloqué manuellement par l&apos;instructeur. L&apos;élève doit valider le cumul des quiz à hauteur de 80% minimum pour activer le bouton.
+                            </p>
+                          </div>
+                          {course.hasCertificate ? (
+                            <div className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250 dark:border-emerald-900/30 px-3 py-2 rounded-xl">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                              Certificat émis
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleUnlockCertificate(course.courseId)}
+                              disabled={!canUnlock || unlockingCertCourseId === course.courseId}
+                              className={`shrink-0 px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                                canUnlock
+                                  ? "bg-purple-600 hover:bg-purple-750 text-white shadow-md shadow-purple-500/10"
+                                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed border border-zinc-205 dark:border-zinc-705"
+                              }`}
+                            >
+                              {unlockingCertCourseId === course.courseId ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Award className="w-3.5 h-3.5" />
+                              )}
+                              Débloquer le certificat
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Homework Submissions Section */}
+                        <div className="space-y-3">
+                          <h4 className="text-xs font-bold text-zinc-550 dark:text-zinc-450 uppercase tracking-wider">Devoirs et Travaux Remis</h4>
+                          {courseHomeworks.length === 0 ? (
+                            <p className="text-xs text-zinc-500 italic">Aucun devoir configuré pour cette formation.</p>
+                          ) : (
+                            <div className="space-y-3.5">
+                              {courseHomeworks.map((hw) => {
+                                const sub = courseSubmissions.find(s => s.homework_id === hw.id);
+                                const isGradingThis = gradingSubId === sub?.id;
+
+                                return (
+                                  <div key={hw.id} className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-3">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-zinc-50 dark:border-zinc-800/40 pb-2">
+                                      <div>
+                                        <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{hw.title}</p>
+                                        <p className="text-[10px] text-zinc-500 whitespace-pre-wrap">{hw.description}</p>
+                                      </div>
+                                      <div className="shrink-0">
+                                        {sub ? (
+                                          <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${sub.status === "GRADED" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400" : "bg-blue-100 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400"}`}>
+                                            {sub.status === "GRADED" ? `Noté : ${sub.grade}/100` : "À corriger"}
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-400 dark:bg-zinc-800">Non soumis</span>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {sub && (
+                                      <div className="space-y-3">
+                                        {/* Submission link */}
+                                        <div className="flex items-center justify-between p-2 bg-zinc-50 dark:bg-zinc-800/40 rounded-lg text-xs">
+                                          <span className="text-zinc-500 font-mono text-[10px] truncate max-w-[200px] sm:max-w-md">Soumission : {sub.file_url.slice(0, 50)}...</span>
+                                          <a
+                                            href={sub.file_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded text-[10px] font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1"
+                                          >
+                                            <ExternalLink className="w-3 h-3" /> Télécharger / Voir
+                                          </a>
+                                        </div>
+
+                                        {/* Grade form or details */}
+                                        {isGradingThis ? (
+                                          <div className="p-3 bg-zinc-50 dark:bg-zinc-800/35 border border-zinc-150 dark:border-zinc-800 rounded-lg space-y-3">
+                                            <div className="flex flex-col sm:flex-row gap-3">
+                                              <div className="flex-1 space-y-1">
+                                                <label className="text-[10px] font-bold text-zinc-500">Note (0 - 100)</label>
+                                                <input
+                                                  type="number"
+                                                  value={editGrade}
+                                                  onChange={(e) => setEditGrade(e.target.value)}
+                                                  placeholder="Ex: 85"
+                                                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-white"
+                                                  min="0"
+                                                  max="100"
+                                                />
+                                              </div>
+                                              <div className="flex-[3] space-y-1">
+                                                <label className="text-[10px] font-bold text-zinc-500">Commentaire / Feedback</label>
+                                                <input
+                                                  type="text"
+                                                  value={editFeedback}
+                                                  onChange={(e) => setEditFeedback(e.target.value)}
+                                                  placeholder="Ex: Bon travail, les concepts sont bien assimilés."
+                                                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-white"
+                                                />
+                                              </div>
+                                            </div>
+                                            <div className="flex justify-end gap-2">
+                                              <button
+                                                onClick={() => setGradingSubId(null)}
+                                                className="px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-[10px] font-bold hover:bg-zinc-50 transition-colors"
+                                              >
+                                                Annuler
+                                              </button>
+                                              <button
+                                                onClick={() => handleGradeSubmit(sub.id)}
+                                                disabled={savingGrade === sub.id}
+                                                className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-[10px] font-bold transition-colors"
+                                              >
+                                                {savingGrade === sub.id ? "Enregistrement..." : "Enregistrer la note"}
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-zinc-50/50 dark:bg-zinc-800/10 rounded-lg">
+                                            <div>
+                                              {sub.status === "GRADED" ? (
+                                                <div className="space-y-1">
+                                                  <p className="text-xs text-zinc-700 dark:text-zinc-300">
+                                                    Note : <span className="font-bold text-emerald-600">{sub.grade} / 100</span>
+                                                  </p>
+                                                  {sub.feedback && (
+                                                    <p className="text-[11px] text-zinc-500 italic">"{sub.feedback}"</p>
+                                                  )}
+                                                </div>
+                                              ) : (
+                                                <p className="text-xs text-zinc-500 italic">Pas encore de note attribuée.</p>
+                                              )}
+                                            </div>
+                                            <button
+                                              onClick={() => {
+                                                setGradingSubId(sub.id);
+                                                setEditGrade(sub.grade?.toString() || "");
+                                                setEditFeedback(sub.feedback || "");
+                                              }}
+                                              className="px-3 py-1.5 bg-white dark:bg-zinc-800 border rounded-lg text-[10px] font-bold hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors cursor-pointer shrink-0"
+                                            >
+                                              {sub.status === "GRADED" ? "Modifier la note" : "Évaluer"}
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}

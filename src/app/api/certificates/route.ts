@@ -29,24 +29,40 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { courseId } = body;
+    const { courseId, studentId } = body;
 
     if (!courseId) {
       return NextResponse.json({ error: 'courseId est requis' }, { status: 400 });
+    }
+
+    let targetStudentId = user.id;
+
+    if (studentId && studentId !== user.id) {
+      // Verify instructor roles
+      const { data: userRoles } = await supabase
+        .from("user_roles")
+        .select("roles(name)")
+        .eq("user_id", user.id);
+      const roles = userRoles?.map((ur: any) => ur.roles?.name) || [];
+      const isPrivileged = roles.some(r => ["SUPER_ADMIN", "ADMIN", "INSTRUCTOR"].includes(r));
+      if (!isPrivileged) {
+        return NextResponse.json({ error: "Non autorisé à émettre ce certificat" }, { status: 403 });
+      }
+      targetStudentId = studentId;
     }
 
     // 1. Vérifier enrollment actif ou complété
     const { data: enrollment, error: enrollError } = await activeClient
       .from('enrollments')
       .select('id, progress_percent, status')
-      .eq('student_id', user.id)
+      .eq('student_id', targetStudentId)
       .eq('course_id', courseId)
       .in('status', ['ACTIVE', 'COMPLETED'])
       .maybeSingle();
 
     if (enrollError || !enrollment) {
       return NextResponse.json(
-        { error: 'Vous n\'êtes pas inscrit à ce cours ou votre inscription est inactive', eligible: false },
+        { error: 'L\'inscription est introuvable ou inactive pour cet étudiant', eligible: false },
         { status: 403 }
       );
     }
@@ -101,33 +117,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. Vérifier tous les quiz du cours passés
+    // 5. Vérifier tous les quiz du cours (le cumul doit être >= 80%)
     const { data: quizzes } = await activeClient
       .from('quizzes')
-      .select('id, pass_percentage, title')
+      .select('id, title')
       .eq('course_id', courseId);
 
     if (quizzes && quizzes.length > 0) {
-      for (const quiz of quizzes) {
-        const passThreshold = quiz.pass_percentage || 80;
-        const { data: passedAttempts } = await activeClient
-          .from('quiz_attempts')
-          .select('id')
-          .eq('student_id', user.id)
-          .eq('quiz_id', quiz.id)
-          .gte('score', passThreshold)
-          .limit(1);
+      const quizIds = quizzes.map(q => q.id);
+      const { data: attempts } = await activeClient
+        .from('quiz_attempts')
+        .select('quiz_id, score')
+        .eq('student_id', targetStudentId)
+        .in('quiz_id', quizIds);
 
-        if (!passedAttempts || passedAttempts.length === 0) {
-          return NextResponse.json(
-            {
-              error: `Quiz "${quiz.title}" non validé (score requis : ${passThreshold}%)`,
-              eligible: false,
-              failedQuiz: quiz.title,
-            },
-            { status: 400 }
-          );
-        }
+      let totalBestScore = 0;
+      quizzes.forEach(quiz => {
+        const quizAttemptsForQuiz = attempts?.filter(a => a.quiz_id === quiz.id) || [];
+        const bestScoreForQuiz = quizAttemptsForQuiz.length > 0 ? Math.max(...quizAttemptsForQuiz.map(a => a.score)) : 0;
+        totalBestScore += bestScoreForQuiz;
+      });
+      const quizAverage = totalBestScore / quizzes.length;
+
+      if (quizAverage < 80) {
+        return NextResponse.json(
+          {
+            error: `Le cumul moyen des quiz doit être supérieur ou égal à 80% (Moyenne actuelle : ${Math.round(quizAverage)}%)`,
+            eligible: false,
+          },
+          { status: 400 }
+        );
       }
     }
 
@@ -135,7 +154,7 @@ export async function POST(req: NextRequest) {
     const { data: existingCert } = await activeClient
       .from('certificates')
       .select('id, code, issued_at')
-      .eq('student_id', user.id)
+      .eq('student_id', targetStudentId)
       .eq('course_id', courseId)
       .maybeSingle();
 
@@ -152,7 +171,7 @@ export async function POST(req: NextRequest) {
     const { data: certificate, error: certError } = await activeClient
       .from('certificates')
       .insert({
-        student_id: user.id,
+        student_id: targetStudentId,
         course_id: courseId,
         code,
         issued_at: new Date().toISOString(),
@@ -175,7 +194,7 @@ export async function POST(req: NextRequest) {
     // Notify the student that their certificate is available
     try {
       await createNotification({
-        userId: user.id,
+        userId: targetStudentId,
         title: "Certificat disponible !",
         message: `Votre certificat pour la formation "${course.title}" a été généré avec succès.`,
         type: "SUCCESS",

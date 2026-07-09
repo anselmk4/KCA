@@ -20,6 +20,8 @@ import {
   ShieldCheck,
   RefreshCw,
   Loader2,
+  Lock,
+  Check,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
@@ -94,6 +96,10 @@ export default function CourseLearnPage() {
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
   const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+  const [homeworks, setHomeworks] = useState<any[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [activeHomework, setActiveHomework] = useState<any | null>(null);
+  const [lockedReason, setLockedReason] = useState<string | null>(null);
 
   // Quiz taking state
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
@@ -270,6 +276,20 @@ export default function CourseLearnPage() {
       .maybeSingle();
     setHasCertificate(!!cert);
 
+    // 10. Devoirs
+    const { data: homeworksData } = await (supabase as any)
+      .from("homeworks")
+      .select("*")
+      .eq("course_id", courseId);
+    setHomeworks(homeworksData || []);
+
+    // 11. Soumissions
+    const { data: subsData } = await (supabase as any)
+      .from("homework_submissions")
+      .select("*")
+      .eq("student_id", user.id);
+    setSubmissions(subsData || []);
+
     setLoading(false);
   }, [courseId]);
 
@@ -285,6 +305,60 @@ export default function CourseLearnPage() {
     () => new Set(lessonProgress.filter(p => p.completed).map(p => p.lesson_id)),
     [lessonProgress]
   );
+
+  // ─── Vérifier si une section est déverrouillée ──────────────
+  const isSectionUnlocked = useCallback((sectionId: string) => {
+    const sIdx = sections.findIndex(s => s.id === sectionId);
+    if (sIdx <= 0) return true; // Première section toujours accessible
+
+    for (let i = 0; i < sIdx; i++) {
+      const prevSect = sections[i];
+      const prevSectQuizzes = quizzes.filter(q => q.sectionId === prevSect.id);
+      if (prevSectQuizzes.length > 0) {
+        // L'étudiant doit avoir validé au moins un quiz de cette section avec succès
+        const passedQuiz = prevSectQuizzes.some(q => {
+          const attempts = quizAttempts.filter(a => a.quiz_id === q.id);
+          return attempts.some(a => a.passed);
+        });
+        if (!passedQuiz) return false;
+      }
+    }
+    return true;
+  }, [sections, quizzes, quizAttempts]);
+
+  // ─── Gérer le clic sur un élément du programme (cours, quiz, devoir) ──
+  const handleItemClick = (type: "lesson" | "quiz" | "homework", item: any, section: Section) => {
+    const unlocked = isSectionUnlocked(section.id);
+    if (!unlocked) {
+      const sIdx = sections.findIndex(s => s.id === section.id);
+      const prevSectionWithQuiz = sections
+        .slice(0, sIdx)
+        .reverse()
+        .find(s => quizzes.some(q => q.sectionId === s.id));
+      setLockedReason(prevSectionWithQuiz ? prevSectionWithQuiz.title : "le chapitre précédent");
+      setActiveLesson(null);
+      setActiveQuiz(null);
+      setActiveHomework(null);
+      return;
+    }
+
+    setLockedReason(null);
+    if (type === "lesson") {
+      setActiveLesson(item);
+      setActiveQuiz(null);
+      setActiveHomework(null);
+    } else if (type === "quiz") {
+      setActiveQuiz(item);
+      setActiveLesson(null);
+      setActiveHomework(null);
+      setQuizSubmitted(false);
+      setSelectedAnswers({});
+    } else if (type === "homework") {
+      setActiveHomework(item);
+      setActiveLesson(null);
+      setActiveQuiz(null);
+    }
+  };
 
   // ─── Vérifier éligibilité certificat via API serveur ────────
   const checkCertificate = useCallback(async () => {
@@ -538,7 +612,9 @@ export default function CourseLearnPage() {
             {sections.map((section, sIdx) => {
               const sectionLessons = lessons.filter(l => l.sectionId === section.id);
               const sectionQuizzes = quizzes.filter(q => q.sectionId === section.id);
+              const sectionHomeworks = homeworks.filter(h => h.section_id === section.id || h.sectionId === section.id);
               const isSectionOpen = !!expandedSections[section.id];
+              const isUnlocked = isSectionUnlocked(section.id);
 
               return (
                 <div key={section.id}>
@@ -546,7 +622,8 @@ export default function CourseLearnPage() {
                     onClick={() => setExpandedSections(prev => ({ ...prev, [section.id]: !prev[section.id] }))}
                     className="w-full flex items-center justify-between py-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/20 text-left transition-colors cursor-pointer"
                   >
-                    <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider line-clamp-1">
+                    <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider line-clamp-1 flex items-center gap-1.5">
+                      {!isUnlocked && <Lock className="w-3 h-3 text-zinc-400" />}
                       M{sIdx + 1} : {section.title}
                     </span>
                     <ChevronDown className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform duration-200 ${isSectionOpen ? "rotate-180" : ""}`} />
@@ -554,19 +631,19 @@ export default function CourseLearnPage() {
 
                   {isSectionOpen && (
                     <div className="bg-zinc-50/30 dark:bg-zinc-900/40 p-2 space-y-1 border-t border-zinc-100 dark:border-zinc-800">
-                      {sectionLessons.length === 0 && sectionQuizzes.length === 0 && (
+                      {sectionLessons.length === 0 && sectionQuizzes.length === 0 && sectionHomeworks.length === 0 && (
                         <p className="text-[10px] text-zinc-400 p-2 italic text-center">Aucun contenu</p>
                       )}
 
                       {sectionLessons.map((lesson) => {
-                        const isActive = activeLesson?.id === lesson.id && !activeQuiz;
+                        const isActive = activeLesson?.id === lesson.id && !activeQuiz && !activeHomework;
                         const isDone = completedLessons.has(lesson.id);
                         const isToggling = togglingLesson === lesson.id;
 
                         return (
                           <button
                             key={lesson.id}
-                            onClick={() => { setActiveLesson(lesson); setActiveQuiz(null); }}
+                            onClick={() => handleItemClick("lesson", lesson, section)}
                             className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all cursor-pointer ${
                               isActive
                                 ? "bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 font-semibold"
@@ -575,10 +652,15 @@ export default function CourseLearnPage() {
                           >
                             <div className="flex items-start gap-2.5 min-w-0">
                               <div
-                                onClick={(e) => handleToggleComplete(lesson.id, e)}
+                                onClick={(e) => {
+                                  if (!isUnlocked) return;
+                                  handleToggleComplete(lesson.id, e);
+                                }}
                                 className="mt-0.5 shrink-0 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
                               >
-                                {isToggling ? (
+                                {!isUnlocked ? (
+                                  <Lock className="w-3.5 h-3.5 text-zinc-400 mt-0.5" />
+                                ) : isToggling ? (
                                   <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
                                 ) : isDone ? (
                                   <CheckSquare className="w-4 h-4 text-green-500" />
@@ -588,22 +670,21 @@ export default function CourseLearnPage() {
                               </div>
                               <span className="text-xs truncate leading-snug">{lesson.title}</span>
                             </div>
-                            <span className="text-[10px] text-zinc-400 shrink-0 font-mono ml-2">{lesson.durationMin}m</span>
+                            {isUnlocked && (
+                              <span className="text-[10px] text-zinc-400 shrink-0 font-mono ml-2">{lesson.durationMin}m</span>
+                            )}
                           </button>
                         );
                       })}
 
                       {sectionQuizzes.map((quiz) => {
-                        const isActive = activeQuiz?.id === quiz.id;
+                        const isActive = activeQuiz?.id === quiz.id && !activeLesson && !activeHomework;
                         const attempts = quizAttempts.filter(a => a.quiz_id === quiz.id);
                         const isQuizPassed = attempts.some(a => a.passed);
                         return (
                           <button
                             key={quiz.id}
-                            onClick={() => {
-                              setActiveQuiz(quiz); setActiveLesson(null);
-                              setQuizSubmitted(false); setSelectedAnswers({});
-                            }}
+                            onClick={() => handleItemClick("quiz", quiz, section)}
                             className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all cursor-pointer ${
                               isActive
                                 ? "bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400 font-semibold"
@@ -611,12 +692,52 @@ export default function CourseLearnPage() {
                             }`}
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <FileText className={`w-4 h-4 shrink-0 ${isQuizPassed ? "text-green-500" : "text-amber-500"}`} />
+                              {!isUnlocked ? (
+                                <Lock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                              ) : (
+                                <FileText className={`w-4 h-4 shrink-0 ${isQuizPassed ? "text-green-500" : "text-amber-500"}`} />
+                              )}
                               <span className="text-xs truncate font-medium">QCM : {quiz.title}</span>
                             </div>
-                            {isQuizPassed && (
+                            {isUnlocked && isQuizPassed && (
                               <span className="text-[10px] font-bold text-green-500 shrink-0 bg-green-50 dark:bg-green-900/20 px-1.5 py-0.5 rounded">Validé</span>
                             )}
+                          </button>
+                        );
+                      })}
+
+                      {sectionHomeworks.map((hw) => {
+                        const isActive = activeHomework?.id === hw.id && !activeLesson && !activeQuiz;
+                        const sub = submissions.find(s => s.homework_id === hw.id);
+                        const isGraded = sub?.status === "GRADED";
+                        const isSubmitted = sub?.status === "SUBMITTED" || isGraded;
+                        return (
+                          <button
+                            key={hw.id}
+                            onClick={() => handleItemClick("homework", hw, section)}
+                            className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all cursor-pointer ${
+                              isActive
+                                ? "bg-indigo-50 dark:bg-indigo-900/10 text-indigo-600 dark:text-indigo-400 font-semibold"
+                                : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50 text-zinc-700 dark:text-zinc-300"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              {!isUnlocked ? (
+                                <Lock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                              ) : (
+                                <FileText className={`w-4 h-4 shrink-0 ${isGraded ? "text-green-500" : isSubmitted ? "text-blue-500" : "text-indigo-500"}`} />
+                              )}
+                              <span className="text-xs truncate font-medium">Devoir : {hw.title}</span>
+                            </div>
+                            {isUnlocked && (isGraded ? (
+                              <span className="text-[10px] font-bold text-green-500 shrink-0 bg-green-50 dark:bg-green-900/20 px-1.5 py-0.5 rounded">
+                                {sub.grade}/100
+                              </span>
+                            ) : isSubmitted ? (
+                              <span className="text-[10px] font-bold text-blue-500 shrink-0 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
+                                Remis
+                              </span>
+                            ) : null)}
                           </button>
                         );
                       })}
@@ -669,8 +790,23 @@ export default function CourseLearnPage() {
         {/* Right Pane: Content viewer */}
         <div className="lg:col-span-3 space-y-6">
 
-          {/* CASE A: Quiz actif */}
-          {activeQuiz ? (
+          {/* CASE C: Chapitre verrouillé */}
+          {lockedReason ? (
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-8 shadow-sm text-center py-20 animate-in slide-in-from-right-3 duration-300 space-y-6">
+              <div className="inline-flex p-4 rounded-full bg-zinc-50/50 dark:bg-zinc-800/50">
+                <Lock className="w-16 h-16 text-zinc-400" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-xl font-bold text-zinc-900 dark:text-white">🔒 Chapitre Verrouillé</h2>
+                <p className="text-sm text-zinc-500 max-w-md mx-auto leading-relaxed">
+                  Pour débloquer ce chapitre et accéder à son contenu, vous devez d'abord réussir le quiz du chapitre précédent.
+                </p>
+                <p className="text-xs text-amber-600 font-bold bg-amber-50 dark:bg-amber-950/20 px-3 py-1.5 rounded-lg w-fit mx-auto mt-3 border border-amber-200 dark:border-amber-900/30">
+                  Requis : Réussir le Quiz de "{lockedReason}"
+                </p>
+              </div>
+            </div>
+          ) : activeQuiz ? (
             <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-8 shadow-sm space-y-6 animate-in slide-in-from-right-3 duration-300">
               <div className="flex justify-between items-start border-b border-zinc-100 dark:border-zinc-800 pb-4">
                 <div>
@@ -928,12 +1064,185 @@ export default function CourseLearnPage() {
                 </div>
               </div>
             </div>
+          ) : activeHomework ? (
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-8 shadow-sm space-y-6 animate-in slide-in-from-right-3 duration-300">
+              <div className="flex justify-between items-start border-b border-zinc-100 dark:border-zinc-800 pb-4">
+                <div>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold uppercase rounded-md mb-2">
+                    <FileText className="w-3.5 h-3.5" /> Devoir à soumettre
+                  </span>
+                  <h2 className="text-xl font-bold text-zinc-900 dark:text-white">{activeHomework.title}</h2>
+                  {activeHomework.deadline && (
+                    <p className="text-xs text-red-500 mt-1 font-semibold flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      Date limite : {new Date(activeHomework.deadline).toLocaleString("fr-FR")}
+                    </p>
+                  )}
+                </div>
+                {(() => {
+                  const sub = submissions.find(s => s.homework_id === activeHomework.id);
+                  if (!sub) return null;
+                  return (
+                    <div className="text-right shrink-0">
+                      <p className="text-[10px] text-zinc-400 font-bold uppercase">Statut</p>
+                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold ${sub.status === "GRADED" ? "bg-green-500/10 text-green-500 border border-green-500/20" : "bg-blue-500/10 text-blue-500 border border-blue-500/20"}`}>
+                        {sub.status === "GRADED" ? `Corrigé : ${sub.grade}/100` : "Remis"}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="space-y-4">
+                <div className="p-5 bg-zinc-50 dark:bg-zinc-800/25 border border-zinc-150 dark:border-zinc-800 rounded-xl">
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-white mb-2">Consignes et instructions :</p>
+                  <p className="text-xs text-zinc-650 dark:text-zinc-400 whitespace-pre-wrap leading-relaxed">{activeHomework.description || "Aucune consigne spécifique rédigée."}</p>
+                </div>
+
+                {activeHomework.file_url && (
+                  <div className="flex items-center justify-between p-4 bg-indigo-50/20 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-900/30 rounded-xl">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-indigo-500" />
+                      <div>
+                        <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Ressource / Sujet du devoir</p>
+                        <p className="text-[10px] text-zinc-400">Cliquez pour télécharger le document d'instructions.</p>
+                      </div>
+                    </div>
+                    <a
+                      href={activeHomework.file_url}
+                      download={`sujet-${activeHomework.title}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-750 text-white rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer"
+                    >
+                      Télécharger
+                    </a>
+                  </div>
+                )}
+
+                <div className="border-t border-zinc-100 dark:border-zinc-800 pt-6 space-y-4">
+                  <h3 className="font-bold text-sm text-zinc-900 dark:text-white">Votre travail</h3>
+                  
+                  {(() => {
+                    const sub = submissions.find(s => s.homework_id === activeHomework.id);
+                    return (
+                      <div className="space-y-4">
+                        {sub?.feedback && (
+                          <div className="p-4 bg-emerald-50/10 dark:bg-emerald-950/15 border border-emerald-500/20 rounded-xl space-y-1">
+                            <p className="text-xs font-bold text-green-600 dark:text-green-400">Commentaire du formateur :</p>
+                            <p className="text-xs text-zinc-600 dark:text-zinc-400 italic">"{sub.feedback}"</p>
+                          </div>
+                        )}
+
+                        <div className="p-5 bg-zinc-50/50 dark:bg-zinc-800/10 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center text-center py-8">
+                          {sub ? (
+                            <div className="space-y-3 w-full">
+                              <FileText className="w-10 h-10 text-green-500 mx-auto" />
+                              <div>
+                                <p className="text-xs font-bold text-zinc-900 dark:text-white">Fichier soumis avec succès</p>
+                                <p className="text-[10px] text-zinc-400 mt-0.5">Soumis le {new Date(sub.submitted_at || sub.created_at).toLocaleString("fr-FR")}</p>
+                              </div>
+                              {sub.status !== "GRADED" ? (
+                                <div className="pt-2 flex justify-center gap-3">
+                                  <a
+                                    href={sub.file_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-3.5 py-1.5 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 text-zinc-855 dark:text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
+                                  >
+                                    Visualiser ma soumission
+                                  </a>
+                                  <button
+                                    onClick={() => {
+                                      if (confirm("Voulez-vous remplacer votre soumission actuelle ?")) {
+                                        document.getElementById("student-homework-upload")?.click();
+                                      }
+                                    }}
+                                    className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                                  >
+                                    Remplacer le fichier
+                                  </button>
+                                </div>
+                              ) : (
+                                <a
+                                  href={sub.file_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-block px-3.5 py-1.5 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 text-zinc-855 dark:text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
+                                >
+                                  Visualiser ma soumission corrigée
+                                </a>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              <FileText className="w-10 h-10 text-zinc-300 dark:text-zinc-700 mx-auto" />
+                              <div>
+                                <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Aucun travail soumis pour le moment</p>
+                                <p className="text-[10px] text-zinc-500 mt-0.5">Chargez un document PDF, Word ou archive ZIP contenant votre travail.</p>
+                              </div>
+                              <button
+                                onClick={() => document.getElementById("student-homework-upload")?.click()}
+                                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-750 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-500/10 cursor-pointer transition-all flex items-center gap-1.5 mx-auto"
+                              >
+                                Déposer mon devoir
+                              </button>
+                            </div>
+                          )}
+
+                          <input
+                            type="file"
+                            id="student-homework-upload"
+                            accept=".pdf,.doc,.docx,.zip,.txt"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 5 * 1024 * 1024) {
+                                alert("Le document est trop volumineux (Max 5 Mo).");
+                                return;
+                              }
+                              setTogglingLesson("uploading");
+                              const reader = new FileReader();
+                              reader.onloadend = async () => {
+                                try {
+                                  const res = await fetch("/api/homework-submissions", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                      homeworkId: activeHomework.id,
+                                      fileUrl: reader.result as string
+                                    })
+                                  });
+                                  if (res.ok) {
+                                    alert("Devoir soumis avec succès !");
+                                    await loadData();
+                                  } else {
+                                    const err = await res.json();
+                                    alert("Erreur : " + err.error);
+                                  }
+                                } catch (err) {
+                                  alert("Erreur de connexion.");
+                                } finally {
+                                  setTogglingLesson(null);
+                                }
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                            className="hidden"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="text-center py-20 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
               <BookOpen className="w-16 h-16 text-zinc-400 mx-auto mb-4" />
               <h2 className="text-xl font-bold">Bienvenue dans votre espace d&apos;apprentissage</h2>
               <p className="text-zinc-500 max-w-md mx-auto mt-2">
-                Sélectionnez une leçon dans le panneau de gauche pour commencer.
+                Sélectionnez un élément dans le menu de gauche pour commencer.
               </p>
             </div>
           )}
