@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Loader2, Search, SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
 const PLAN_COMMISSION_CONFIG: Record<string, { commissionRate: number; instructorShare: number; label: string }> = {
@@ -30,6 +30,12 @@ interface AdminTransaction {
 export default function AdminTransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<AdminTransaction[]>([]);
+
+  // Filter States
+  const [statusFilter, setStatusFilter] = useState<string>("PAID"); // PAID by default
+  const [pageSize, setPageSize] = useState<number>(25); // 25 by default
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [searchTerm, setSearchTerm] = useState<string>("");
 
   const fetchAdminTransactions = useCallback(async () => {
     setLoading(true);
@@ -144,6 +150,35 @@ export default function AdminTransactionsPage() {
     fetchAdminTransactions();
   }, [fetchAdminTransactions]);
 
+  // Filtering Logic
+  const filtered = transactions.filter((tx) => {
+    // Status Filter
+    const matchesStatus = statusFilter === "ALL" || tx.status === statusFilter;
+    
+    // Search Term Filter (Student Name/Email or Course Title)
+    const normalizedSearch = searchTerm.toLowerCase();
+    const matchesSearch =
+      tx.studentName.toLowerCase().includes(normalizedSearch) ||
+      tx.studentEmail.toLowerCase().includes(normalizedSearch) ||
+      tx.courseTitle.toLowerCase().includes(normalizedSearch) ||
+      tx.instructorName.toLowerCase().includes(normalizedSearch);
+
+    return matchesStatus && matchesSearch;
+  });
+
+  // Pagination Logic
+  const totalItems = filtered.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const paginatedTransactions = filtered.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, pageSize, searchTerm]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -153,19 +188,79 @@ export default function AdminTransactionsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in">
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Suivi des Paiements</h1>
-        <p className="text-zinc-500 dark:text-zinc-400 text-sm">
-          Historique en temps réel des transactions et répartition des commissions.
-        </p>
+    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Suivi des Paiements</h1>
+          <p className="text-zinc-500 dark:text-zinc-400 text-sm">
+            Historique en temps réel des transactions et répartition des commissions.
+          </p>
+        </div>
       </div>
 
+      {/* Control Panel (Filters & Limits) */}
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 md:p-5 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
+        {/* Search */}
+        <div className="relative w-full md:max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-450 dark:text-zinc-500" />
+          <input
+            type="text"
+            placeholder="Rechercher étudiant, cours..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-zinc-900 dark:text-white transition-all"
+          />
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {/* Status filter tabs */}
+          <div className="bg-zinc-100 dark:bg-zinc-800/80 p-0.5 rounded-xl flex">
+            {[
+              { id: "PAID", label: "Complétés" },
+              { id: "PENDING", label: "En attente" },
+              { id: "FAILED", label: "Échoués" },
+              { id: "ALL", label: "Tous" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setStatusFilter(tab.id)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  statusFilter === tab.id
+                    ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-850 dark:hover:text-zinc-200"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800 hidden md:block" />
+
+          {/* Page size limit */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-zinc-500 font-medium">Afficher:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none cursor-pointer"
+            >
+              <option value={25}>25 lignes</option>
+              <option value={50}>50 lignes</option>
+              <option value={100}>100 lignes</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Transactions Table */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          {transactions.length === 0 ? (
+          {paginatedTransactions.length === 0 ? (
             <div className="p-12 text-center text-zinc-500">
-              Aucune transaction n&apos;a été effectuée pour le moment.
+              Aucune transaction trouvée avec les critères sélectionnés.
             </div>
           ) : (
             <table className="w-full text-left font-sans">
@@ -184,12 +279,12 @@ export default function AdminTransactionsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                {transactions.map((tx) => (
+                {paginatedTransactions.map((tx) => (
                   <tr key={tx.orderId} className="text-zinc-900 dark:text-zinc-100 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
                     <td className="px-6 py-4 font-mono text-xs text-zinc-450">{tx.id}</td>
                     <td className="px-6 py-4">
                       <div className="font-semibold">{tx.studentName}</div>
-                      <div className="text-xxs text-zinc-400 font-medium">{tx.studentEmail}</div>
+                      <div className="text-xxs text-zinc-450 dark:text-zinc-400 font-medium">{tx.studentEmail}</div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-semibold">{tx.instructorName}</div>
@@ -207,7 +302,7 @@ export default function AdminTransactionsPage() {
                     <td className="px-6 py-4 text-zinc-500">{new Date(tx.date).toLocaleDateString("fr-FR")}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1.5">
-                        {tx.status === "PAID" && <CheckCircle2 className="w-4 h-4 text-green-500 animate-pulse" />}
+                        {tx.status === "PAID" && <CheckCircle2 className="w-4 h-4 text-green-500" />}
                         {tx.status === "FAILED" && <XCircle className="w-4 h-4 text-red-500" />}
                         {tx.status === "PENDING" && <Clock className="w-4 h-4 text-orange-500" />}
                         <span className={`font-semibold text-xs ${
@@ -224,6 +319,34 @@ export default function AdminTransactionsPage() {
             </table>
           )}
         </div>
+
+        {/* Pagination Footer */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900 flex items-center justify-between">
+            <div className="text-xs text-zinc-500 font-medium">
+              Affichage de {((currentPage - 1) * pageSize) + 1} à {Math.min(currentPage * pageSize, totalItems)} sur {totalItems} transactions
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => prev - 1)}
+                className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-550 disabled:opacity-50 cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-xs text-zinc-800 dark:text-zinc-200 font-bold px-2">
+                Page {currentPage} sur {totalPages}
+              </span>
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => prev + 1)}
+                className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-550 disabled:opacity-50 cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
