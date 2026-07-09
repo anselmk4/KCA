@@ -38,7 +38,9 @@ export default function AdminTransactionsPage() {
   const [searchTerm, setSearchTerm] = useState<string>("");
 
   const fetchAdminTransactions = useCallback(async () => {
-    setLoading(true);
+    if (transactions.length === 0) {
+      setLoading(true);
+    }
     try {
       // 1. Get all payments
       const { data: payments } = await supabase
@@ -174,12 +176,17 @@ export default function AdminTransactionsPage() {
     currentPage * pageSize
   );
 
+  // Totals calculations
+  const totalAmount = filtered.reduce((sum, tx) => sum + tx.amount, 0);
+  const totalCommission = filtered.reduce((sum, tx) => sum + tx.commissionAmount, 0);
+  const totalInstructorShare = filtered.reduce((sum, tx) => sum + tx.instructorShareAmount, 0);
+
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [statusFilter, pageSize, searchTerm]);
 
-  if (loading) {
+  if (transactions.length === 0 && loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="w-10 h-10 text-teal-600 animate-spin" />
@@ -192,7 +199,10 @@ export default function AdminTransactionsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Suivi des Paiements</h1>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2 flex items-center gap-2">
+            Suivi des Paiements
+            {loading && <Loader2 className="w-5 h-5 text-teal-600 animate-spin shrink-0" />}
+          </h1>
           <p className="text-zinc-500 dark:text-zinc-400 text-sm">
             Historique en temps réel des transactions et répartition des commissions.
           </p>
@@ -316,6 +326,15 @@ export default function AdminTransactionsPage() {
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="bg-zinc-100/60 dark:bg-zinc-800/50 text-zinc-900 dark:text-white font-extrabold text-sm border-t-2 border-zinc-200 dark:border-zinc-800">
+                  <td colSpan={4} className="px-6 py-4 text-right">TOTAL :</td>
+                  <td className="px-6 py-4 text-teal-600">{totalAmount.toFixed(2)}$</td>
+                  <td className="px-6 py-4 text-amber-650 dark:text-amber-500">{totalCommission.toFixed(2)}$</td>
+                  <td className="px-6 py-4 text-emerald-600 dark:text-emerald-400">{totalInstructorShare.toFixed(2)}$</td>
+                  <td colSpan={3} className="px-6 py-4"></td>
+                </tr>
+              </tfoot>
             </table>
           )}
         </div>

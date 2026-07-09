@@ -147,6 +147,7 @@ export default function AdminUsersPage() {
         };
       });
 
+      items.sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime());
       setUsers(items);
     } catch (err: any) {
       console.error('[AdminUsers] Error loading from Supabase:', err);
@@ -162,6 +163,7 @@ export default function AdminUsersPage() {
         level: u.level || 'Débutant',
         joinedAt: u.joinedAt,
       }));
+      mapped.sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime());
       setUsers(mapped);
     } finally {
       setLoading(false);

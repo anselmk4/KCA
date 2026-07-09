@@ -37,22 +37,40 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState<OverviewData | null>(null);
 
   const calculateStats = useCallback(async () => {
-    setLoading(true);
+    if (!stats) {
+      setLoading(true);
+    } else {
+      // Background loading indicator
+      setLoading(true);
+    }
     try {
-      // 1. Fetch user profiles
+      // 1. Fetch user profiles & roles separately (RLS safe)
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("id, role:user_roles(roles(name)), status, created_at");
+        .select("id, status, created_at");
+
+      const { data: userRolesData } = await supabase
+        .from("user_roles")
+        .select("user_id, roles(name)");
+
+      const roleMap = new Map<string, string>();
+      userRolesData?.forEach((ur: any) => {
+        const name = ur.roles?.name;
+        if (name) {
+          roleMap.set(ur.user_id, name);
+        }
+      });
 
       const totalMembers = profiles?.length || 0;
-      
-      // Determine student and instructor counts
       let activeStudents = 0;
       let activeInstructors = 0;
-      profiles?.forEach((p: any) => {
-        const roleName = p.role?.[0]?.roles?.name || "STUDENT";
-        if (roleName === "STUDENT") activeStudents++;
-        else if (roleName === "INSTRUCTOR") activeInstructors++;
+      profiles?.forEach((p) => {
+        const roleName = roleMap.get(p.id) || "STUDENT";
+        if (roleName === "STUDENT") {
+          activeStudents++;
+        } else if (roleName === "INSTRUCTOR" || roleName === "SUPER_ADMIN" || roleName === "ADMIN") {
+          activeInstructors++;
+        }
       });
 
       // 2. Fetch courses
@@ -110,7 +128,7 @@ export default function AdminDashboardPage() {
       }
 
       // Fetch order items to match payment with course/instructor
-      const orderIds = payments?.map(p => p.order_id) || [];
+      const orderIds = (payments || []).map(p => p.order_id).filter(Boolean);
       let orderItemMap: Record<string, string> = {};
       if (orderIds.length > 0) {
         const { data: orderItems } = await supabase
@@ -149,23 +167,35 @@ export default function AdminDashboardPage() {
         return pDate >= filterStart && pDate <= filterEnd;
       });
 
+      // Plan configurations mapping (BASE, PRO, MAX courses act as subscription updates, 100% of amount is platform commissions)
+      const planUuidMap: Record<string, string> = {
+        "99999999-9999-9999-9999-999999990001": "BASE",
+        "99999999-9999-9999-9999-999999990002": "PRO",
+        "99999999-9999-9999-9999-999999990003": "MAX",
+      };
+
       // Calculate Revenue, Commissions & Instructor shares
       let totalRevenue = 0;
       let commissions = 0;
       let instructorPayouts = 0;
 
       filteredPayments.forEach(p => {
-        totalRevenue += p.amount || 0;
+        const amount = p.amount || 0;
+        totalRevenue += amount;
         
-        // Find course and instructor to resolve commission rate
-        const courseId = orderItemMap[p.order_id];
-        const courseObj = courses?.find(c => c.id === courseId);
-        const instructorId = courseObj?.instructor_id || "";
-        const instPlan = instructorPlans[instructorId] || "FREE";
-        const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;
+        const courseId = orderItemMap[p.order_id] || "";
+        if (planUuidMap[courseId]) {
+          commissions += amount;
+        } else {
+          // It is a course purchase
+          const courseObj = courses?.find(c => c.id === courseId);
+          const instructorId = courseObj?.instructor_id || "";
+          const instPlan = instructorPlans[instructorId] || "FREE";
+          const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;
 
-        commissions += (p.amount || 0) * commConfig.commissionRate;
-        instructorPayouts += (p.amount || 0) * commConfig.instructorShare;
+          commissions += amount * commConfig.commissionRate;
+          instructorPayouts += amount * commConfig.instructorShare;
+        }
       });
 
       // Extrapolate MRR & ARR
@@ -209,22 +239,27 @@ export default function AdminDashboardPage() {
           ? pDate.toLocaleDateString("fr-FR", { month: "short" })
           : pDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
 
-        // Resolve commission rate
-        const courseId = orderItemMap[p.order_id];
-        const courseObj = courses?.find(c => c.id === courseId);
-        const instructorId = courseObj?.instructor_id || "";
-        const instPlan = instructorPlans[instructorId] || "FREE";
-        const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;
+        const courseId = orderItemMap[p.order_id] || "";
+        let commAmount = 0;
+        if (planUuidMap[courseId]) {
+          commAmount = p.amount || 0;
+        } else {
+          const courseObj = courses?.find(c => c.id === courseId);
+          const instructorId = courseObj?.instructor_id || "";
+          const instPlan = instructorPlans[instructorId] || "FREE";
+          const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;
+          commAmount = (p.amount || 0) * commConfig.commissionRate;
+        }
 
         if (chartMap[label]) {
           chartMap[label].amount += p.amount || 0;
-          chartMap[label].commission += (p.amount || 0) * commConfig.commissionRate;
+          chartMap[label].commission += commAmount;
         } else {
           // If label wasn't pre-filled, dynamically add it
           chartMap[label] = {
             label,
             amount: p.amount || 0,
-            commission: (p.amount || 0) * commConfig.commissionRate
+            commission: commAmount
           };
         }
       });
@@ -252,7 +287,7 @@ export default function AdminDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [timeFilter, startDate, endDate]);
+  }, [timeFilter, startDate, endDate, stats]);
 
   useEffect(() => {
     calculateStats();
@@ -269,7 +304,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  if (loading || !stats) {
+  if (!stats) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="w-10 h-10 text-teal-600 animate-spin" />
@@ -278,7 +313,7 @@ export default function AdminDashboardPage() {
   }
 
   // Calculate maximum value for SVG scaling
-  const maxChartVal = Math.max(...stats.chartData.map(d => d.amount), 50) * 1.15;
+  const maxChartVal = Math.max(...(stats?.chartData?.map(d => d.amount) || []), 50) * 1.15;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in">
@@ -338,10 +373,15 @@ export default function AdminDashboardPage() {
 
           <button
             onClick={calculateStats}
-            className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-850 rounded-xl text-zinc-500 dark:text-zinc-400"
+            disabled={loading}
+            className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-850 rounded-xl text-zinc-500 dark:text-zinc-400 disabled:opacity-50"
             title="Rafraîchir les statistiques"
           >
-            <RefreshCw className="w-4 h-4" />
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
           </button>
         </div>
       </div>

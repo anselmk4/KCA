@@ -25,6 +25,12 @@ import {
   UserCircle,
   Users2,
   Ticket,
+  Info,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { getSimulatedSession, setSimulatedSession, clearSimulatedSession } from "@/lib/rbac";
@@ -59,6 +65,59 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
   const [passwordMsg, setPasswordMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
+  // Notifications State
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notificationsRef = useRef<HTMLDivElement>(null);
+
+  const fetchNotifications = async (uid: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("id, title, message, type, link, is_read, created_at")
+        .eq("user_id", uid)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (!error && data) {
+        setNotifications(data);
+      }
+    } catch (err) {
+      console.error("Error fetching notifications:", err);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    if (!userId) return;
+    try {
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("user_id", userId)
+        .eq("is_read", false);
+      if (!error) {
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      }
+    } catch (err) {
+      console.error("Error marking notifications read:", err);
+    }
+  };
+
+  const handleNotificationClick = async (notif: any) => {
+    try {
+      await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("id", notif.id);
+      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+      setNotificationsOpen(false);
+      if (notif.link) {
+        window.location.href = notif.link;
+      }
+    } catch (err) {
+      console.error("Error clicking notification:", err);
+    }
+  };
+
   useEffect(() => {
     const s = getSimulatedSession();
     if (!s) {
@@ -72,10 +131,11 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
     }
     setSession(s);
 
-    // Fetch academy name and plan from Supabase profile
+    // Fetch academy name, plan and notifications from Supabase profile
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) {
         setUserId(user.id);
+        fetchNotifications(user.id);
         const { data: profile } = await supabase
           .from("profiles")
           .select("academy_name, full_name, plan")
@@ -101,11 +161,14 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
     return () => window.removeEventListener("storage", handleStorage);
   }, [router]);
 
-  // Close profile dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
         setProfileOpen(false);
+      }
+      if (notificationsRef.current && !notificationsRef.current.contains(e.target as Node)) {
+        setNotificationsOpen(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -259,11 +322,82 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
           <div className="flex items-center gap-3">
             <ThemeToggle />
 
-            {/* Notifications */}
-            <button className="relative p-2 rounded-full text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-zinc-900" />
-            </button>
+            {/* Notifications Dropdown */}
+            {userId && (
+              <div ref={notificationsRef} className="relative">
+                <button 
+                  onClick={() => {
+                    setNotificationsOpen(!notificationsOpen);
+                    if (userId) fetchNotifications(userId);
+                  }}
+                  className="relative p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-full hover:bg-zinc-50 text-zinc-650 dark:text-zinc-300 cursor-pointer flex items-center justify-center"
+                >
+                  <Bell className="w-5 h-5 text-zinc-500" />
+                  {notifications.filter(n => !n.is_read).length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center border border-white dark:border-zinc-900 animate-pulse">
+                      {notifications.filter(n => !n.is_read).length}
+                    </span>
+                  )}
+                </button>
+
+                {notificationsOpen && (
+                  <div className="absolute right-0 top-12 w-80 bg-white dark:bg-zinc-900 dark:border-zinc-800 rounded-xl border border-zinc-200 shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="px-4 py-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                      <p className="text-sm font-bold text-zinc-900 dark:text-white">Notifications</p>
+                      {notifications.filter(n => !n.is_read).length > 0 && (
+                        <button 
+                          onClick={handleMarkAllRead}
+                          className="text-xxs text-teal-650 hover:text-teal-500 dark:text-teal-400 font-semibold cursor-pointer"
+                        >
+                          Tout lu
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-64 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800">
+                      {notifications.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-xs text-zinc-400">
+                          Aucune notification
+                        </div>
+                      ) : (
+                        notifications.map((n) => {
+                          let IconComponent = Info;
+                          let iconColor = "text-blue-500 bg-blue-50 dark:bg-blue-900/10";
+                          if (n.type === "SUCCESS") {
+                            IconComponent = CheckCircle;
+                            iconColor = "text-emerald-500 bg-emerald-50 dark:bg-emerald-900/10";
+                          } else if (n.type === "WARNING") {
+                            IconComponent = AlertTriangle;
+                            iconColor = "text-amber-500 bg-amber-50 dark:bg-amber-900/10";
+                          } else if (n.type === "ERROR") {
+                            IconComponent = XCircle;
+                            iconColor = "text-red-500 bg-red-50 dark:bg-red-900/10";
+                          }
+
+                          return (
+                            <div 
+                              key={n.id}
+                              onClick={() => handleNotificationClick(n)}
+                              className={`px-4 py-3 flex gap-3 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-850 transition-colors ${
+                                !n.is_read ? "bg-teal-50/20 dark:bg-teal-900/5 font-medium" : ""
+                              }`}
+                            >
+                              <div className={`p-1.5 rounded-lg shrink-0 h-7 w-7 flex items-center justify-center ${iconColor}`}>
+                                <IconComponent className="w-4 h-4" />
+                              </div>
+                              <div className="space-y-0.5 min-w-0">
+                                <p className="text-xs font-semibold text-zinc-955 dark:text-white truncate">{n.title}</p>
+                                <p className="text-xxs text-zinc-500 dark:text-zinc-400 line-clamp-2">{n.message}</p>
+                                <p className="text-[10px] text-zinc-400 mt-1">{new Date(n.created_at).toLocaleDateString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Profile dropdown */}
             <div className="relative" ref={profileRef}>
