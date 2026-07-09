@@ -5,19 +5,40 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, Mail, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { Captcha } from "@/components/ui/Captcha";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetKey, setCaptchaResetKey] = useState<number>(0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!captchaToken) {
+      setError("Veuillez valider le test de sécurité (CAPTCHA).");
+      return;
+    }
+
     setLoading(true);
 
     try {
+      // Server-side security check (CAPTCHA verification + Rate Limiting)
+      const secRes = await fetch("/api/auth/security-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: captchaToken, action: "forgot-password" })
+      });
+
+      if (!secRes.ok) {
+        const secData = await secRes.json();
+        throw new Error(secData.error || "La vérification de sécurité a échoué.");
+      }
+
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/reset-password`,
       });
@@ -29,11 +50,13 @@ export default function ForgotPasswordPage() {
         } else {
           setError(resetError.message);
         }
+        setCaptchaResetKey(prev => prev + 1); // Reset CAPTCHA on error
       } else {
         setSuccess(true);
       }
     } catch (err: any) {
       setError(err?.message || "Une erreur est survenue.");
+      setCaptchaResetKey(prev => prev + 1); // Reset CAPTCHA on error
     } finally {
       setLoading(false);
     }
@@ -102,9 +125,13 @@ export default function ForgotPasswordPage() {
                 </div>
               </div>
 
+              <div className="py-2">
+                <Captcha onVerify={setCaptchaToken} resetKey={captchaResetKey} />
+              </div>
+
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !captchaToken}
                 className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer text-sm"
               >
                 {loading ? (

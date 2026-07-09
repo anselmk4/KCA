@@ -9,6 +9,7 @@ import { initDB } from "@/lib/db";
 import { setSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
 import { ensureProfile, fetchUserProfile } from "@/lib/supabase/auth-helpers";
+import { Captcha } from "@/components/ui/Captcha";
 
 function RegisterForm() {
   const router = useRouter();
@@ -37,6 +38,8 @@ function RegisterForm() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetKey, setCaptchaResetKey] = useState<number>(0);
 
   useEffect(() => {
     initDB();
@@ -131,14 +134,30 @@ function RegisterForm() {
       setFormError(err.message || "Une erreur est survenue lors de l'authentification Google.");
       setGoogleLoading(false);
     }
-  };
-
-  const handleComplete = async (e: React.FormEvent) => {
+  };  const handleComplete = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
+
+    if (!captchaToken) {
+      setFormError("Veuillez valider le test de sécurité (CAPTCHA).");
+      return;
+    }
+
     setLoading(true);
     
     try {
+      // Server-side security check (CAPTCHA verification + Rate Limiting)
+      const secRes = await fetch("/api/auth/security-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: captchaToken, action: "register" })
+      });
+
+      if (!secRes.ok) {
+        const secData = await secRes.json();
+        throw new Error(secData.error || "La vérification de sécurité a échoué.");
+      }
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -170,6 +189,7 @@ function RegisterForm() {
         } else {
           setFormError(authError.message);
         }
+        setCaptchaResetKey(prev => prev + 1); // Reset CAPTCHA on error
         setLoading(false);
         return;
       }
@@ -177,6 +197,7 @@ function RegisterForm() {
       const sessionUser = authData.user;
       if (!sessionUser) {
         setFormError("Erreur lors de l'inscription. Réessayez.");
+        setCaptchaResetKey(prev => prev + 1); // Reset CAPTCHA on error
         setLoading(false);
         return;
       }
@@ -215,6 +236,7 @@ function RegisterForm() {
             "Intermédiaire": "INTERMEDIATE",
             "Avancé": "ADVANCED",
           };
+
           await supabase.from("profiles").update({
             level: levelMap[studentLevel] || "BEGINNER",
           }).eq("id", sessionUser.id);
@@ -264,6 +286,7 @@ function RegisterForm() {
       }
     } catch (err: any) {
       setFormError(err.message || "Une erreur est survenue.");
+      setCaptchaResetKey(prev => prev + 1); // Reset CAPTCHA on error
     } finally {
       setLoading(false);
     }
@@ -505,6 +528,12 @@ function RegisterForm() {
           )}
           
           {/* Stepper Buttons */}
+          {step === 2 && (
+            <div className="py-2">
+              <Captcha onVerify={setCaptchaToken} resetKey={captchaResetKey} />
+            </div>
+          )}
+
           <div className="flex gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
             <button 
               type="button" 
@@ -516,7 +545,7 @@ function RegisterForm() {
             </button>
             <button 
               type="submit"
-              disabled={loading || googleLoading}
+              disabled={loading || googleLoading || (step === 2 && !captchaToken)}
               className="flex-1 py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer text-sm"
             >
               {loading ? "Création du compte..." : (step === 2 ? "Finaliser et ouvrir mon Espace" : "Suivant")}

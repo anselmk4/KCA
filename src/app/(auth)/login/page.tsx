@@ -9,6 +9,7 @@ import { initDB } from "@/lib/db";
 import { loginWithEmail, fetchUserProfile } from "@/lib/supabase/auth-helpers";
 import { supabase } from "@/lib/supabase/client";
 import { setSimulatedSession } from "@/lib/rbac";
+import { Captcha } from "@/components/ui/Captcha";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,6 +20,8 @@ export default function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutTime, setLockoutTime] = useState(0);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetKey, setCaptchaResetKey] = useState<number>(0);
 
   useEffect(() => {
     initDB();
@@ -76,13 +79,32 @@ export default function LoginPage() {
       return;
     }
     setError(null);
+
+    if (!captchaToken) {
+      setError("Veuillez valider le test de sécurité (CAPTCHA).");
+      return;
+    }
+
     setLoading(true);
     try {
+      // Server-side security check (CAPTCHA verification + Rate Limiting)
+      const secRes = await fetch("/api/auth/security-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: captchaToken, action: "login" })
+      });
+
+      if (!secRes.ok) {
+        const secData = await secRes.json();
+        throw new Error(secData.error || "La vérification de sécurité a échoué.");
+      }
+
       const { redirectTo } = await loginWithEmail(email, password);
       router.push(redirectTo);
     } catch (err: any) {
       setError(err.message || "Une erreur est survenue.");
       setLoading(false);
+      setCaptchaResetKey(prev => prev + 1); // Reset Captcha on error
       setFailedAttempts(prev => {
         const next = prev + 1;
         if (next >= 5) {
@@ -269,9 +291,13 @@ export default function LoginPage() {
               />
             </div>
 
+            <div className="py-2">
+              <Captcha onVerify={setCaptchaToken} resetKey={captchaResetKey} />
+            </div>
+
             <button
               type="submit"
-              disabled={loading || googleLoading}
+              disabled={loading || googleLoading || !captchaToken}
               className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer text-sm"
             >
               {loading ? (

@@ -1,10 +1,5 @@
 User-agent: *
-Disallow: /admin/
-Disallow: /instructor/
-Disallow: /dashboard/
-Disallow: /login
-Disallow: /register
-Disallow: /forgot-password
-Disallow: /reset-password
+Disallow: /api/
+Disallow: /_next/
 
-Sitemap: https://ansella.academy/sitemap.xml
+Sitemap: https://ansella.app/sitemap.xml

@@ -13,7 +13,11 @@ export async function GET(request: Request) {
   const code = searchParams.get('code');
   const tokenHash = searchParams.get('token_hash');
   const type = searchParams.get('type'); // 'signup', 'recovery', 'invite', etc.
-  const next = searchParams.get('next') ?? '/dashboard';
+  let next = searchParams.get('next') ?? '/dashboard';
+  // Prevent Open Redirects: ensure it is a relative path starting with '/' and not '//'
+  if (!next.startsWith('/') || next.startsWith('//')) {
+    next = '/dashboard';
+  }
 
   const supabase = await createClient();
 
