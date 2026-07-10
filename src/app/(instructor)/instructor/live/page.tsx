@@ -55,6 +55,8 @@ export default function LivePage() {
   // Selected User IDs for Private Live
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [liveSearching, setLiveSearching] = useState(false);
+  const [liveSearchError, setLiveSearchError] = useState("");
 
   useEffect(() => {
     loadData();
@@ -357,6 +359,55 @@ export default function LivePage() {
       setSessions(prev => prev.filter(s => s.id !== id));
     } catch (err: any) {
       alert("Erreur de suppression : " + err.message);
+    }
+  };
+
+  const handleSearchLiveGuest = async () => {
+    if (!searchTerm.trim()) return;
+    setLiveSearching(true);
+    setLiveSearchError("");
+    try {
+      const term = searchTerm.trim();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(term);
+      
+      const query = supabase
+        .from("profiles")
+        .select("id, full_name, email");
+
+      const { data, error } = isUuid 
+        ? await query.eq("id", term).maybeSingle()
+        : await query.eq("email", term).maybeSingle();
+
+      if (data) {
+        // Add to profiles if not already there
+        setProfiles(prev => {
+          if (prev.some(p => p.id === data.id)) return prev;
+          
+          return [
+            ...prev,
+            {
+              id: data.id,
+              full_name: data.full_name,
+              email: data.email,
+              type: "student" // default type
+            }
+          ];
+        });
+        
+        // Auto-select
+        setSelectedUserIds(prev => {
+          if (prev.includes(data.id)) return prev;
+          return [...prev, data.id];
+        });
+
+        setLiveSearchError("");
+      } else {
+        setLiveSearchError("Aucun utilisateur trouvé avec cet email ou ID.");
+      }
+    } catch (err: any) {
+      setLiveSearchError("Erreur : " + err.message);
+    } finally {
+      setLiveSearching(false);
     }
   };
 
@@ -756,16 +807,31 @@ export default function LivePage() {
                       </div>
 
                       {/* Search profile input */}
-                      <div className="relative">
-                        <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-3" />
-                        <input 
-                          type="text"
-                          value={searchTerm}
-                          onChange={e => setSearchTerm(e.target.value)}
-                          placeholder="Rechercher par nom ou email..."
-                          className="w-full pl-9 pr-4 py-2 text-xs rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
-                        />
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5" />
+                          <input 
+                            type="text"
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleSearchLiveGuest(); } }}
+                            placeholder="Filtrer ou rechercher par email / ID..."
+                            className="w-full pl-9 pr-4 py-2 text-xs rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleSearchLiveGuest}
+                          disabled={liveSearching}
+                          className="px-3 py-2 text-xs font-semibold rounded-lg bg-teal-600 hover:bg-teal-500 text-white disabled:opacity-50 transition-colors shrink-0"
+                        >
+                          {liveSearching ? "..." : "Rechercher"}
+                        </button>
                       </div>
+
+                      {liveSearchError && (
+                        <p className="text-[10px] text-red-500 mt-1 px-1">⚠️ {liveSearchError}</p>
+                      )}
 
                       {/* Profiles List */}
                       <div className="max-h-48 overflow-y-auto border border-zinc-200 dark:border-zinc-700/80 rounded-xl bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800/80">

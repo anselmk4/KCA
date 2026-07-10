@@ -816,16 +816,24 @@ export default function CourseDetailPage() {
     setInviteError("");
     setInviteFound(null);
     try {
-      const { data } = await supabase
+      const term = inviteEmail.trim();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(term);
+      
+      const query = supabase
         .from("profiles")
-        .select("id, full_name, email")
-        .eq("email", inviteEmail.trim())
-        .maybeSingle();
+        .select("id, full_name, email");
+      
+      const { data, error } = isUuid 
+        ? await query.eq("id", term).maybeSingle()
+        : await query.eq("email", term).maybeSingle();
+
       if (data) {
         setInviteFound(data);
       } else {
-        setInviteError("Aucun compte trouvé avec cet email.");
+        setInviteError("Aucun compte trouvé avec cet email ou ID.");
       }
+    } catch (err: any) {
+      setInviteError("Erreur lors de la recherche : " + err.message);
     } finally { setInviteSearching(false); }
   };
 
@@ -836,27 +844,19 @@ export default function CourseDetailPage() {
 
     setSaving(true);
     try {
-      const { error } = await supabase.from("enrollments").insert({
-        student_id: inviteFound.id,
-        course_id: courseId,
-        status: "ACTIVE",
-        progress_percent: 0,
-        created_at: new Date().toISOString(),
+      const res = await fetch("/api/instructor/students", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentId: inviteFound.id,
+          courseId: courseId,
+        }),
       });
-      if (error) { setInviteError("Erreur : " + error.message); return; }
 
-      // Send notifications to the invited student
-      try {
-        const { createNotification } = await import('@/lib/supabase/notifications-helper');
-        await createNotification({
-          userId: inviteFound.id,
-          title: "Invitation à un cours !",
-          message: `Le formateur vous a invité à rejoindre le cours "${course?.title || 'Formation'}".`,
-          type: "INFO",
-          link: `/dashboard/courses`
-        });
-      } catch (notifErr) {
-        console.error("Error creating student invite notification:", notifErr);
+      const resData = await res.json();
+      if (!res.ok) {
+        setInviteError("Erreur : " + (resData.error || "Une erreur est survenue lors de l'inscription."));
+        return;
       }
 
       setInviteSuccess(true);
@@ -867,6 +867,8 @@ export default function CourseDetailPage() {
         setInviteFound(null);
         loadData(true);
       }, 2000);
+    } catch (err: any) {
+      setInviteError("Erreur : " + err.message);
     } finally { setSaving(false); }
   };
 
@@ -2204,7 +2206,7 @@ export default function CourseDetailPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowInviteModal(false)}>
           <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5 pb-2 border-b border-zinc-100 dark:border-zinc-800">
-              <h2 className="text-base font-bold text-zinc-900 dark:text-white">Inscrire par Email</h2>
+              <h2 className="text-base font-bold text-zinc-900 dark:text-white">Inscrire par Email ou ID</h2>
               <button onClick={() => { setShowInviteModal(false); setInviteEmail(""); setInviteFound(null); setInviteError(""); }} className="p-1 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
@@ -2218,9 +2220,9 @@ export default function CourseDetailPage() {
             ) : (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Email de l'étudiant *</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Email ou ID de l'étudiant *</label>
                   <div className="flex gap-2">
-                    <input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleSearchStudent(); }} placeholder="etudiant@email.com" className="flex-1 px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs focus:ring-1 focus:ring-teal-500 outline-none text-zinc-900 dark:text-white" />
+                    <input type="text" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleSearchStudent(); }} placeholder="etudiant@email.com ou ID utilisateur..." className="flex-1 px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs focus:ring-1 focus:ring-teal-500 outline-none text-zinc-900 dark:text-white" />
                     <button type="button" onClick={handleSearchStudent} disabled={inviteSearching} className="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-800 dark:text-zinc-200 rounded-xl text-xs font-bold transition-colors disabled:opacity-50">
                       {inviteSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : "Chercher"}
                     </button>

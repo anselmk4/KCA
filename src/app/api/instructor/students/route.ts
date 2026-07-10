@@ -274,3 +274,105 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: err.message || "Erreur interne du serveur." }, { status: 500 });
   }
 }
+
+export async function POST(req: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: "Non authentifié. Veuillez vous connecter." }, { status: 401 });
+    }
+
+    // Verify user role
+    const { data: userRoles } = await supabase
+      .from("user_roles")
+      .select("roles(name)")
+      .eq("user_id", user.id);
+
+    const roles = userRoles?.map((ur: any) => ur.roles?.name) || [];
+    const isAuthorized = roles.some(r => ["SUPER_ADMIN", "ADMIN", "INSTRUCTOR"].includes(r));
+    if (!isAuthorized) {
+      return NextResponse.json({ error: "Non autorisé. Rôle insuffisant." }, { status: 403 });
+    }
+
+    const body = await req.json();
+    const { studentId, courseId } = body;
+
+    if (!studentId || !courseId) {
+      return NextResponse.json({ error: "Données manquantes (studentId ou courseId)." }, { status: 400 });
+    }
+
+    // Check if the current user is the instructor of the course
+    // Or if they are admin/super_admin
+    const isAdmin = roles.some(r => ["SUPER_ADMIN", "ADMIN"].includes(r));
+    if (!isAdmin) {
+      const { data: course, error: courseErr } = await supabaseAdmin
+        .from("courses")
+        .select("instructor_id")
+        .eq("id", courseId)
+        .maybeSingle();
+
+      if (courseErr || !course) {
+        return NextResponse.json({ error: "Cours introuvable." }, { status: 404 });
+      }
+
+      if (course.instructor_id !== user.id) {
+        return NextResponse.json({ error: "Vous n'êtes pas le formateur de ce cours." }, { status: 403 });
+      }
+    }
+
+    // Check if already enrolled
+    const { data: existing, error: existErr } = await supabaseAdmin
+      .from("enrollments")
+      .select("id")
+      .eq("student_id", studentId)
+      .eq("course_id", courseId)
+      .maybeSingle();
+
+    if (existing) {
+      return NextResponse.json({ error: "Cet étudiant est déjà inscrit à ce cours." }, { status: 400 });
+    }
+
+    // Insert the enrollment using supabaseAdmin to bypass RLS
+    const { error: insertErr } = await supabaseAdmin
+      .from("enrollments")
+      .insert({
+        student_id: studentId,
+        course_id: courseId,
+        status: "ACTIVE",
+        progress_percent: 0,
+        created_at: new Date().toISOString()
+      });
+
+    if (insertErr) {
+      console.error("[students-api POST] error inserting enrollment:", insertErr);
+      return NextResponse.json({ error: insertErr.message }, { status: 400 });
+    }
+
+    // Send notification to the student
+    try {
+      const { createNotification } = await import('@/lib/supabase/notifications-helper');
+      const { data: courseData } = await supabaseAdmin
+        .from("courses")
+        .select("title")
+        .eq("id", courseId)
+        .maybeSingle();
+
+      await createNotification({
+        userId: studentId,
+        title: "Invitation à un cours !",
+        message: `Le formateur vous a invité à rejoindre le cours "${courseData?.title || 'Formation'}".`,
+        type: "INFO",
+        link: `/dashboard/courses`
+      });
+    } catch (notifErr) {
+      console.error("Error creating student invite notification:", notifErr);
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    console.error("[students-api POST] Error:", err);
+    return NextResponse.json({ error: err.message || "Erreur interne du serveur." }, { status: 500 });
+  }
+}
+
