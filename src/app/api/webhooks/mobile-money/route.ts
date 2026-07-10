@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createNotification } from '@/lib/supabase/notifications-helper';
+import crypto from 'crypto';
 
 // Initialize a service role/admin client to bypass RLS when updating/inserting payments/orders on behalf of the system
 const supabaseAdmin = createClient(
@@ -26,74 +27,150 @@ export async function POST(req: NextRequest) {
 
     console.log(`[webhook-momo] Reference: ${reference}, Declared Status: ${transStatus}`);
 
-    // 2. Call Moko Afrika API to verify the transaction status (API Server-to-Server double check for security)
-    const mokoBaseUrl = process.env.MOKO_API_BASE_URL || 'https://paydrc.gofreshbakery.net';
-    const mokoGatewayUrl = mokoBaseUrl.endsWith('/gateway')
-      ? mokoBaseUrl
-      : `${mokoBaseUrl.replace(/\/$/, '')}/gateway`;
+    // Check payment provider in database first to determine whether this is a Moko Card payment
+    let isCard = false;
+    let paymentId = '';
+    if (reference.startsWith('std_pay_')) {
+      paymentId = reference.replace('std_pay_', '');
+    } else if (reference.startsWith('ins_plan_')) {
+      paymentId = reference.replace('ins_plan_', '');
+    }
 
-    const verifyPayload = {
-      merchant_id: process.env.MOKO_MERCHANT_CODE || process.env.MOKO_MERCHANT_ID,
-      merchant_secrete: process.env.MOKO_MERCHANT_SECRET,
-      action: 'verify',
-      reference: reference
-    };
+    if (paymentId) {
+      const { data: payment } = await supabaseAdmin
+        .from('payments')
+        .select('provider')
+        .eq('id', paymentId)
+        .maybeSingle();
+      if (payment?.provider === 'MOKO_CARD') {
+        isCard = true;
+      }
+    }
 
     let isSuccess = false;
     let finalVerifyStatus = '';
 
-    try {
-      console.log(`[webhook-momo] Querying Moko status for reference: ${reference}...`);
-      const verifyResponse = await fetch(mokoGatewayUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(verifyPayload),
-      });
+    if (isCard) {
+      // 2. Call Moko Card API to verify status
+      const cardApiKey = process.env.MOKO_CARD_API_KEY;
+      const cardApiSecret = process.env.MOKO_CARD_API_SECRET;
+      const cardBaseUrl = process.env.MOKO_CARD_API_URL || 'https://test.card.gofreshpay.com/api/v1/payment/orders';
+      const verifyUrl = `${cardBaseUrl.replace(/\/$/, '')}/${reference}`;
 
-      const verifyText = await verifyResponse.text();
-      console.log('[webhook-momo] Verification API Response:', verifyText);
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const signature = crypto.createHmac('sha256', cardApiSecret || '')
+        .update(timestamp)
+        .digest('hex');
 
-      let verifyData: any = {};
       try {
-        verifyData = JSON.parse(verifyText);
-      } catch {
-        verifyData = { message: verifyText };
-      }
+        console.log(`[webhook-momo] Querying Moko Card status for reference: ${reference}...`);
+        const verifyResponse = await fetch(verifyUrl, {
+          method: 'GET',
+          headers: {
+            'X-API-Key': cardApiKey || '',
+            'X-Timestamp': timestamp,
+            'X-Signature': signature
+          }
+        });
 
-      finalVerifyStatus = verifyData.status || verifyData.Status || verifyData.Trans_Status || '';
-      
-      // Moko Afrika success statuses are typically 'Successful', 'Success', or equivalent
-      if (
-        verifyResponse.ok && 
-        (finalVerifyStatus.toLowerCase() === 'successful' || 
-         finalVerifyStatus.toLowerCase() === 'success' || 
-         finalVerifyStatus.toLowerCase() === 'approved')
-      ) {
-        isSuccess = true;
-      } else {
-        console.warn(`[webhook-momo] Verification failed. Status reported by Moko verify: ${finalVerifyStatus}`);
+        const verifyText = await verifyResponse.text();
+        console.log('[webhook-momo] Moko Card Verification API Response:', verifyText);
+
+        let verifyData: any = {};
+        try {
+          verifyData = JSON.parse(verifyText);
+        } catch {
+          verifyData = { message: verifyText };
+        }
+
+        finalVerifyStatus = verifyData.status || verifyData.Status || verifyData.Trans_Status || verifyData.data?.status || '';
+
+        if (
+          verifyResponse.ok && 
+          (finalVerifyStatus.toLowerCase() === 'successful' || 
+           finalVerifyStatus.toLowerCase() === 'success' || 
+           finalVerifyStatus.toLowerCase() === 'approved')
+        ) {
+          isSuccess = true;
+        } else {
+          console.warn(`[webhook-momo] Card Verification failed. Status reported: ${finalVerifyStatus}`);
+          if (process.env.NODE_ENV === 'development' && 
+              (transStatus?.toLowerCase() === 'successful' || transStatus?.toLowerCase() === 'success')) {
+            console.warn('[webhook-momo] Sandbox mode: Bypassing card verify API non-success due to development');
+            isSuccess = true;
+            finalVerifyStatus = transStatus;
+          }
+        }
+      } catch (verifyErr: any) {
+        console.error('[webhook-momo] Error during card verification fetch:', verifyErr.message);
         if (process.env.NODE_ENV === 'development' && 
             (transStatus?.toLowerCase() === 'successful' || transStatus?.toLowerCase() === 'success')) {
-          console.warn('[webhook-momo] Sandbox mode: Bypassing verify API non-success response due to local development');
           isSuccess = true;
           finalVerifyStatus = transStatus;
         }
       }
+    } else {
+      // 2. Call Moko Mobile Money API to verify status
+      const mokoBaseUrl = process.env.MOKO_API_BASE_URL || 'https://paydrc.gofreshbakery.net';
+      const mokoGatewayUrl = mokoBaseUrl.endsWith('/gateway')
+        ? mokoBaseUrl
+        : `${mokoBaseUrl.replace(/\/$/, '')}/gateway`;
 
-    } catch (verifyErr: any) {
-      console.error('[webhook-momo] Error during server-to-server verification fetch:', verifyErr.message);
-      
-      // Fallback: If verification request failed but payload is trusted (e.g. signature or in local sandbox environment)
-      // or if sandbox status declared success, we check if we can trust it.
-      // However, for maximum security, we require verify API to succeed. In development/sandbox testing, if we want
-      // to bypass verify failures because the sandbox verify API is down, we check if the webhook payload says Successful.
-      if (process.env.NODE_ENV === 'development' && 
-          (transStatus?.toLowerCase() === 'successful' || transStatus?.toLowerCase() === 'success')) {
-        console.warn('[webhook-momo] Sandbox mode: Bypassing verify API failure due to local development environments');
-        isSuccess = true;
-        finalVerifyStatus = transStatus;
+      const verifyPayload = {
+        merchant_id: process.env.MOKO_MERCHANT_CODE || process.env.MOKO_MERCHANT_ID,
+        merchant_secrete: process.env.MOKO_MERCHANT_SECRET,
+        action: 'verify',
+        reference: reference
+      };
+
+      try {
+        console.log(`[webhook-momo] Querying Moko Mobile Money status for reference: ${reference}...`);
+        const verifyResponse = await fetch(mokoGatewayUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(verifyPayload),
+        });
+
+        const verifyText = await verifyResponse.text();
+        console.log('[webhook-momo] Verification API Response:', verifyText);
+
+        let verifyData: any = {};
+        try {
+          verifyData = JSON.parse(verifyText);
+        } catch {
+          verifyData = { message: verifyText };
+        }
+
+        finalVerifyStatus = verifyData.status || verifyData.Status || verifyData.Trans_Status || '';
+        
+        if (
+          verifyResponse.ok && 
+          (finalVerifyStatus.toLowerCase() === 'successful' || 
+           finalVerifyStatus.toLowerCase() === 'success' || 
+           finalVerifyStatus.toLowerCase() === 'approved')
+        ) {
+          isSuccess = true;
+        } else {
+          console.warn(`[webhook-momo] Verification failed. Status reported by Moko verify: ${finalVerifyStatus}`);
+          if (process.env.NODE_ENV === 'development' && 
+              (transStatus?.toLowerCase() === 'successful' || transStatus?.toLowerCase() === 'success')) {
+            console.warn('[webhook-momo] Sandbox mode: Bypassing verify API non-success response due to local development');
+            isSuccess = true;
+            finalVerifyStatus = transStatus;
+          }
+        }
+
+      } catch (verifyErr: any) {
+        console.error('[webhook-momo] Error during server-to-server verification fetch:', verifyErr.message);
+        
+        if (process.env.NODE_ENV === 'development' && 
+            (transStatus?.toLowerCase() === 'successful' || transStatus?.toLowerCase() === 'success')) {
+          console.warn('[webhook-momo] Sandbox mode: Bypassing verify API failure due to local development environments');
+          isSuccess = true;
+          finalVerifyStatus = transStatus;
+        }
       }
     }
 
