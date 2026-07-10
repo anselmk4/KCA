@@ -119,6 +119,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ paym
     const userName = profile?.full_name || user.email || "Client";
     const userEmail = profile?.email || user.email || "";
 
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://ansella.app";
+    const logoUrl = `${appUrl}/logo-dark.png`;
+
     // Generate clean HTML invoice (browser-printable as PDF)
     const html = `<!DOCTYPE html>
 <html lang="fr">
@@ -159,20 +162,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ paym
     .ansella-logo {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 22px;
-      font-weight: 900;
-      letter-spacing: -0.5px;
-      color: #ffffff;
+      height: 35px;
     }
-    .ansella-logo svg {
-      width: 28px;
-      height: 28px;
-    }
-    .ansella-logo span {
-      background: linear-gradient(to right, #38bdf8, #0ea5e9);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+    .ansella-logo img {
+      height: 100%;
+      width: auto;
+      object-fit: contain;
     }
     .academy-info {
       margin-top: 8px;
@@ -298,18 +293,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ paym
     <div class="header">
       <div class="logo-container">
         <div class="ansella-logo">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L2 22H22L12 2Z" fill="url(#logo-grad)" />
-            <path d="M12 6L5 20H19L12 6Z" fill="#0f172a" />
-            <path d="M12 10L8 18H16L12 10Z" fill="url(#logo-grad)" />
-            <defs>
-              <linearGradient id="logo-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                <stop stop-color="#38bdf8" />
-                <stop offset="1" stop-color="#0ea5e9" />
-              </linearGradient>
-            </defs>
-          </svg>
-          <span>ANSELLA</span>
+          <img src="${logoUrl}" alt="ANSELLA" />
         </div>
         ${!isInstructorInvoice ? `
         <div class="academy-info">
