@@ -1,54 +1,16 @@
-const https = require('node:https');
+const { createClient } = require('@supabase/supabase-js');
+const url = 'https://dwhtfoqqbwsycthpksqu.supabase.co';
+const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3aHRmb3FxYndzeWN0aHBrc3F1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDY3ODM3MywiZXhwIjoyMDk2MjU0MzczfQ.o4ZWh-OcFxMGSzrMCBwioCIbwlRnJstoQQNKF4GoR4U';
+const supabase = createClient(url, key);
 
-const SUPABASE_URL = 'dwhtfoqqbwsycthpksqu.supabase.co';
-const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3aHRmb3FxYndzeWN0aHBrc3F1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDY3ODM3MywiZXhwIjoyMDk2MjU0MzczfQ.o4ZWh-OcFxMGSzrMCBwioCIbwlRnJstoQQNKF4GoR4U';
+async function main() {
+  // Let's run a raw query via postgrest to see RLS configuration of coupons table
+  // Since we cannot run raw sql unless we have an RPC, let's see if we have RPCs.
+  // Wait, let's try to query the schema details of coupons table:
+  const { data, error } = await supabase.from('coupons').select('id').limit(1);
+  console.log('Query coupons with service role:', data, 'Error:', error);
 
-function fetchColumns(table) {
-  return new Promise((resolve, reject) => {
-    const path = `/rest/v1/${table}?select=*&limit=0`;
-    const opts = {
-      hostname: SUPABASE_URL,
-      path,
-      method: 'GET',
-      headers: {
-        'apikey': SERVICE_KEY,
-        'Authorization': 'Bearer ' + SERVICE_KEY,
-        'Accept': 'application/json',
-        'Prefer': 'return=representation'
-      }
-    };
-    const req = https.request(opts, (res) => {
-      let data = '';
-      res.on('data', (chunk) => data += chunk);
-      res.on('end', () => {
-        // PostgREST returns column info in Content-Range header + body
-        resolve({ table, status: res.statusCode, headers: res.headers, body: data.substring(0, 300) });
-      });
-    });
-    req.on('error', (e) => reject(e));
-    req.end();
-  });
+  // If there's an error, let's see. If not, it means the service role can query it.
 }
 
-// Also try to get column names via the RPC or a direct INSERT attempt
-async function inspectTables() {
-  const tables = ['enrollments', 'payments', 'orders', 'order_items', 'profiles'];
-  
-  for (const table of tables) {
-    try {
-      const result = await fetchColumns(table);
-      console.log(`\n=== TABLE: ${table} ===`);
-      console.log('Status:', result.status);
-      
-      // Check Content-Profile or Content-Range header for schema info
-      const contentRange = result.headers['content-range'];
-      const expose = result.headers['content-profile'];
-      console.log('Content-Range:', contentRange);
-      console.log('Body:', result.body || '(empty)');
-    } catch (e) {
-      console.log(`ERROR for ${table}:`, e.message);
-    }
-  }
-}
-
-inspectTables();
+main();

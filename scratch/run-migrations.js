@@ -6,11 +6,41 @@ const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
 
-const password = process.argv[2] || process.env.DATABASE_PASSWORD;
+// Manually parse .env.local if it exists
+const envLocalPath = path.join(__dirname, '..', '.env.local');
+if (fs.existsSync(envLocalPath)) {
+  const envContent = fs.readFileSync(envLocalPath, 'utf8');
+  envContent.split(/\r?\n/).forEach(line => {
+    const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+    if (match) {
+      const key = match[1];
+      let value = match[2] || '';
+      if (value.startsWith('"') && value.endsWith('"')) {
+        value = value.substring(1, value.length - 1);
+      } else if (value.startsWith("'") && value.endsWith("'")) {
+        value = value.substring(1, value.length - 1);
+      }
+      process.env[key] = value;
+    }
+  });
+}
+
+let password = process.argv[2] || process.env.DATABASE_PASSWORD;
+
+if (!password && process.env.DATABASE_URL) {
+  // Extract password from postgresql://user:password@host:port/database
+  const match = process.env.DATABASE_URL.match(/postgresql:\/\/([^:]+):([^@]+)@/);
+  if (match) {
+    password = match[2];
+  }
+}
 
 if (!password) {
-  console.error('Error: Please provide the database password as a command line argument.');
-  console.error('Usage: node scratch/run-migrations.js <your_db_password>');
+  console.error('Error: Please provide the database password.');
+  console.error('Either:');
+  console.error('  1. Pass it as an argument: node scratch/run-migrations.js <your_db_password>');
+  console.error('  2. Define DATABASE_PASSWORD in your .env.local file');
+  console.error('  3. Define DATABASE_URL in your .env.local file');
   process.exit(1);
 }
 
