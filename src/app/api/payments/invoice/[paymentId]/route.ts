@@ -54,32 +54,60 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ paym
 
     let itemLabel = "Formation";
     let itemDescription = "";
+    let isInstructorInvoice = false;
+    let academyName = "";
+    let academyTagline = "";
 
     if (orderItems && orderItems.length > 0) {
       const firstItem = orderItems[0];
       const courseId = firstItem.course_id;
 
       const PLAN_MAP: Record<string, { label: string; desc: string }> = {
-        "99999999-9999-9999-9999-999999990001": { label: "Abonnement Formateur — Plan BASE", desc: "Abonnement mensuel à la plateforme Kuettu Crypto Academy" },
-        "99999999-9999-9999-9999-999999990002": { label: "Abonnement Formateur — Plan PRO", desc: "Abonnement mensuel à la plateforme Kuettu Crypto Academy" },
-        "99999999-9999-9999-9999-999999990003": { label: "Abonnement Formateur — Plan MAX", desc: "Abonnement mensuel à la plateforme Kuettu Crypto Academy" },
+        "99999999-9999-9999-9999-999999990001": { label: "Abonnement Formateur — Plan BASE", desc: "Abonnement mensuel à la plateforme ANSELLA" },
+        "99999999-9999-9999-9999-999999990002": { label: "Abonnement Formateur — Plan PRO", desc: "Abonnement mensuel à la plateforme ANSELLA" },
+        "99999999-9999-9999-9999-999999990003": { label: "Abonnement Formateur — Plan MAX", desc: "Abonnement mensuel à la plateforme ANSELLA" },
       };
 
       if (courseId && PLAN_MAP[courseId]) {
         itemLabel = PLAN_MAP[courseId].label;
         itemDescription = PLAN_MAP[courseId].desc;
+        isInstructorInvoice = true;
       } else if (courseId) {
+        // Fetch course and its instructor's academy details
         const { data: course } = await supabaseAdmin
           .from("courses")
-          .select("title")
+          .select("title, instructor_id")
           .eq("id", courseId)
           .maybeSingle();
-        itemLabel = course?.title || "Formation";
-        itemDescription = "Accès complet à la formation en ligne";
+        
+        if (course) {
+          itemLabel = course.title || "Formation";
+          itemDescription = "Accès complet à la formation en ligne";
+          
+          if (course.instructor_id) {
+            const { data: instructorProfile } = await supabaseAdmin
+              .from("profiles")
+              .select("academy_name, academy_tagline")
+              .eq("id", course.instructor_id)
+              .maybeSingle();
+              
+            if (instructorProfile?.academy_name) {
+              academyName = instructorProfile.academy_name;
+              academyTagline = instructorProfile.academy_tagline || "Académie de formation en ligne";
+            }
+          }
+        }
+        
+        // Fallback to "Kuettu Crypto Academy" if no custom academy name is set for the instructor
+        if (!academyName) {
+          academyName = "Kuettu Crypto Academy";
+          academyTagline = "Plateforme d'apprentissage spécialisée";
+        }
       }
     }
 
-    const invoiceNumber = `KCA-${payment.id.substring(0, 8).toUpperCase()}`;
+    const invoicePrefix = isInstructorInvoice ? "ANS" : (academyName === "Kuettu Crypto Academy" ? "KCA" : "ANS");
+    const invoiceNumber = `${invoicePrefix}-${payment.id.substring(0, 8).toUpperCase()}`;
     const invoiceDate = new Date(payment.paid_at || payment.created_at).toLocaleDateString("fr-FR", {
       year: "numeric",
       month: "long",
@@ -97,7 +125,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ paym
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Facture ${invoiceNumber} — Kuettu Crypto Academy</title>
+  <title>Facture ${invoiceNumber} — ${isInstructorInvoice ? 'ANSELLA' : academyName}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -123,13 +151,40 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ paym
       justify-content: space-between;
       align-items: flex-start;
     }
-    .brand-name {
-      font-size: 22px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      color: #38bdf8;
+    .logo-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
-    .brand-tagline { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+    .ansella-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+    }
+    .ansella-logo svg {
+      width: 28px;
+      height: 28px;
+    }
+    .ansella-logo span {
+      background: linear-gradient(to right, #38bdf8, #0ea5e9);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .academy-info {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .brand-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #94a3b8;
+    }
+    .brand-tagline { font-size: 11px; color: #64748b; margin-top: 2px; }
     .invoice-label { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #94a3b8; text-align: right; }
     .invoice-number { font-size: 24px; font-weight: 800; color: white; text-align: right; margin-top: 4px; }
     .body { padding: 40px 48px; }
@@ -241,9 +296,27 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ paym
 <body>
   <div class="invoice">
     <div class="header">
-      <div>
-        <div class="brand-name">Kuettu Crypto Academy</div>
-        <div class="brand-tagline">Plateforme d'apprentissage spécialisée</div>
+      <div class="logo-container">
+        <div class="ansella-logo">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 22H22L12 2Z" fill="url(#logo-grad)" />
+            <path d="M12 6L5 20H19L12 6Z" fill="#0f172a" />
+            <path d="M12 10L8 18H16L12 10Z" fill="url(#logo-grad)" />
+            <defs>
+              <linearGradient id="logo-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#38bdf8" />
+                <stop offset="1" stop-color="#0ea5e9" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <span>ANSELLA</span>
+        </div>
+        ${!isInstructorInvoice ? `
+        <div class="academy-info">
+          <div class="brand-name">${academyName}</div>
+          <div class="brand-tagline">${academyTagline}</div>
+        </div>
+        ` : ''}
       </div>
       <div>
         <div class="invoice-label">Facture N°</div>
@@ -308,7 +381,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ paym
 
     <div class="footer">
       <div>
-        <p>Kuettu Crypto Academy — contact@kuettu.academy</p>
+        <p>${isInstructorInvoice ? 'ANSELLA' : `${academyName} (ANSELLA)`} — info@ansella.app</p>
         <p>Ce document tient lieu de reçu officiel de paiement.</p>
       </div>
       <p style="font-size:12px;font-weight:600;color:#0ea5e9;">Merci de votre confiance 🚀</p>
