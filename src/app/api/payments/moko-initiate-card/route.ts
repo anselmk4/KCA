@@ -126,9 +126,9 @@ export async function POST(req: NextRequest) {
     }
 
     const isSandbox = (process.env.MOKO_API_BASE_URL || '').includes('sandbox') || (process.env.MOKO_API_BASE_URL || '').includes('paydrc');
-    const mokoCardEndpoint = isSandbox 
+    const mokoCardEndpoint = process.env.MOKO_CARD_API_URL || (isSandbox 
       ? 'https://test.card.gofreshpay.com/api/v1/payment/orders' 
-      : 'https://card.gofreshpay.com/api/v1/payment/orders';
+      : 'https://card.gofreshpay.com/api/v1/payment/orders');
 
     const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://ansella.app'}/api/webhooks/mobile-money`;
 
