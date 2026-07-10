@@ -11,6 +11,12 @@ const PLAN_COMMISSION_CONFIG: Record<string, { commissionRate: number; instructo
   MAX: { commissionRate: 0.00, instructorShare: 1.00, label: "Max (0%)" },
 };
 
+const planUuidMap: Record<string, string> = {
+  "99999999-9999-9999-9999-999999990001": "Forfait Formateur BASE",
+  "99999999-9999-9999-9999-999999990002": "Forfait Formateur PRO",
+  "99999999-9999-9999-9999-999999990003": "Forfait Formateur MAX",
+};
+
 interface AdminTransaction {
   id: string;
   orderId: string;
@@ -25,6 +31,7 @@ interface AdminTransaction {
   instructorPlan: string;
   commissionAmount: number;
   instructorShareAmount: number;
+  siteAmount: number;
 }
 
 export default function AdminTransactionsPage() {
@@ -108,17 +115,40 @@ export default function AdminTransactionsPage() {
       const mapped: AdminTransaction[] = payments.map((p) => {
         const profile = profileMap.get(p.user_id);
         const courseId = orderItemMap.get(p.order_id) || "";
-        const courseInfo = courseMap.get(courseId);
-        const courseTitle = courseInfo?.title || "Abonnement ou Autre";
-        const instructorId = courseInfo?.instructorId || "";
-        const instructorInfo = instructorMap.get(instructorId);
+        
+        const planName = planUuidMap[courseId];
+        
+        let courseTitle = "";
+        let commissionAmount = 0;
+        let instructorShareAmount = 0;
+        let siteAmount = 0;
+        let instName = "N/A";
+        let instPlan = "N/A";
 
-        const instName = instructorInfo?.name || "Formateur";
-        const instPlan = instructorInfo?.plan || "FREE";
+        if (planName) {
+          // It is a plan purchase -> 100% goes to site, commission is 0
+          courseTitle = planName;
+          commissionAmount = 0;
+          instructorShareAmount = 0;
+          siteAmount = p.amount || 0;
+          
+          instName = profile?.full_name || "Formateur";
+          instPlan = planName.replace("Forfait Formateur ", "");
+        } else {
+          // It is a course purchase
+          const courseInfo = courseMap.get(courseId);
+          courseTitle = courseInfo?.title || "Abonnement ou Autre";
+          const instructorId = courseInfo?.instructorId || "";
+          const instructorInfo = instructorMap.get(instructorId);
 
-        const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;
-        const commissionAmount = (p.amount || 0) * commConfig.commissionRate;
-        const instructorShareAmount = (p.amount || 0) * commConfig.instructorShare;
+          instName = instructorInfo?.name || "Formateur";
+          instPlan = instructorInfo?.plan || "FREE";
+
+          const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;
+          commissionAmount = (p.amount || 0) * commConfig.commissionRate;
+          instructorShareAmount = (p.amount || 0) * commConfig.instructorShare;
+          siteAmount = commissionAmount; // Site share is just the commission
+        }
 
         let payMethod: string = p.provider || "STRIPE";
         if (payMethod === "MOBILE_MONEY") payMethod = "MoMo";
@@ -137,6 +167,7 @@ export default function AdminTransactionsPage() {
           instructorPlan: instPlan,
           commissionAmount,
           instructorShareAmount,
+          siteAmount,
         };
       });
 
@@ -180,6 +211,7 @@ export default function AdminTransactionsPage() {
   const totalAmount = filtered.reduce((sum, tx) => sum + tx.amount, 0);
   const totalCommission = filtered.reduce((sum, tx) => sum + tx.commissionAmount, 0);
   const totalInstructorShare = filtered.reduce((sum, tx) => sum + tx.instructorShareAmount, 0);
+  const totalSiteAmount = filtered.reduce((sum, tx) => sum + tx.siteAmount, 0);
 
   // Reset page when filters change
   useEffect(() => {
@@ -277,11 +309,12 @@ export default function AdminTransactionsPage() {
               <thead className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-550 dark:text-zinc-400 text-xs uppercase tracking-wider">
                 <tr>
                   <th className="px-6 py-4 font-bold">ID</th>
-                  <th className="px-6 py-4 font-bold">Étudiant</th>
+                  <th className="px-6 py-4 font-bold">Étudiant / Formateur</th>
                   <th className="px-6 py-4 font-bold">Formateur (Forfait)</th>
                   <th className="px-6 py-4 font-bold">Module / Cours</th>
                   <th className="px-6 py-4 font-bold">Montant</th>
                   <th className="px-6 py-4 font-bold text-amber-600 dark:text-amber-400">Com. Site</th>
+                  <th className="px-6 py-4 font-bold text-blue-600 dark:text-blue-400">Montant Site</th>
                   <th className="px-6 py-4 font-bold text-emerald-600 dark:text-emerald-400">Part Prof</th>
                   <th className="px-6 py-4 font-bold">Méthode</th>
                   <th className="px-6 py-4 font-bold">Date</th>
@@ -304,6 +337,9 @@ export default function AdminTransactionsPage() {
                     <td className="px-6 py-4 font-extrabold text-teal-600">{tx.amount}$</td>
                     <td className="px-6 py-4 font-extrabold text-amber-650 dark:text-amber-500">
                       {tx.commissionAmount.toFixed(2)}$
+                    </td>
+                    <td className="px-6 py-4 font-extrabold text-blue-600 dark:text-blue-450">
+                      {tx.siteAmount.toFixed(2)}$
                     </td>
                     <td className="px-6 py-4 font-extrabold text-emerald-600 dark:text-emerald-400">
                       {tx.instructorShareAmount.toFixed(2)}$
@@ -331,7 +367,8 @@ export default function AdminTransactionsPage() {
                   <td colSpan={4} className="px-6 py-4 text-right">TOTAL :</td>
                   <td className="px-6 py-4 text-teal-600">{totalAmount.toFixed(2)}$</td>
                   <td className="px-6 py-4 text-amber-650 dark:text-amber-500">{totalCommission.toFixed(2)}$</td>
-                  <td className="px-6 py-4 text-emerald-600 dark:text-emerald-400">{totalInstructorShare.toFixed(2)}$</td>
+                  <td className="px-6 py-4 text-blue-600 dark:text-blue-450">{totalSiteAmount.toFixed(2)}$</td>
+                  <td className="px-6 py-4 text-emerald-600 dark:text-emerald-450">{totalInstructorShare.toFixed(2)}$</td>
                   <td colSpan={3} className="px-6 py-4"></td>
                 </tr>
               </tfoot>

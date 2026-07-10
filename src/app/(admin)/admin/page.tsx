@@ -27,6 +27,9 @@ interface OverviewData {
   topCourseTitle: string;
   topCourseStudentCount: number;
   chartData: Array<{ label: string; amount: number; commission: number }>;
+  plansRevenue: number;
+  planProportions: { BASE: number; PRO: number; MAX: number; total: number };
+  mostPurchasedPlan: string;
 }
 
 export default function AdminDashboardPage() {
@@ -167,7 +170,7 @@ export default function AdminDashboardPage() {
         return pDate >= filterStart && pDate <= filterEnd;
       });
 
-      // Plan configurations mapping (BASE, PRO, MAX courses act as subscription updates, 100% of amount is platform commissions)
+      // Plan configurations mapping (BASE, PRO, MAX courses act as subscription updates)
       const planUuidMap: Record<string, string> = {
         "99999999-9999-9999-9999-999999990001": "BASE",
         "99999999-9999-9999-9999-999999990002": "PRO",
@@ -178,14 +181,21 @@ export default function AdminDashboardPage() {
       let totalRevenue = 0;
       let commissions = 0;
       let instructorPayouts = 0;
+      let plansRevenue = 0;
+
+      // Plan proportions counters
+      let planCounts = { BASE: 0, PRO: 0, MAX: 0 };
 
       filteredPayments.forEach(p => {
         const amount = p.amount || 0;
         totalRevenue += amount;
         
         const courseId = orderItemMap[p.order_id] || "";
-        if (planUuidMap[courseId]) {
-          commissions += amount;
+        const planName = planUuidMap[courseId];
+        if (planName) {
+          // It is a plan purchase -> 100% platform revenue, 0 commissions on it
+          plansRevenue += amount;
+          planCounts[planName as "BASE" | "PRO" | "MAX"] += 1;
         } else {
           // It is a course purchase
           const courseObj = courses?.find(c => c.id === courseId);
@@ -197,6 +207,18 @@ export default function AdminDashboardPage() {
           instructorPayouts += amount * commConfig.instructorShare;
         }
       });
+
+      // Find most purchased plan
+      let mostPurchasedPlan = "Aucun";
+      let maxCount = 0;
+      Object.entries(planCounts).forEach(([name, count]) => {
+        if (count > maxCount) {
+          maxCount = count;
+          mostPurchasedPlan = name;
+        }
+      });
+
+      const totalPlansCount = planCounts.BASE + planCounts.PRO + planCounts.MAX;
 
       // Extrapolate MRR & ARR
       const mrr = totalRevenue; // Revenue in active filter window
@@ -241,9 +263,8 @@ export default function AdminDashboardPage() {
 
         const courseId = orderItemMap[p.order_id] || "";
         let commAmount = 0;
-        if (planUuidMap[courseId]) {
-          commAmount = p.amount || 0;
-        } else {
+        // On plan purchases, commission is 0 (since it is platform subscription fee, not course sale commission)
+        if (!planUuidMap[courseId]) {
           const courseObj = courses?.find(c => c.id === courseId);
           const instructorId = courseObj?.instructor_id || "";
           const instPlan = instructorPlans[instructorId] || "FREE";
@@ -280,7 +301,15 @@ export default function AdminDashboardPage() {
         coursesInReview,
         topCourseTitle,
         topCourseStudentCount,
-        chartData
+        chartData,
+        plansRevenue,
+        planProportions: {
+          BASE: planCounts.BASE,
+          PRO: planCounts.PRO,
+          MAX: planCounts.MAX,
+          total: totalPlansCount
+        },
+        mostPurchasedPlan
       });
     } catch (err) {
       console.error("Error generating overview stats:", err);
@@ -387,7 +416,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {[
           {
             title: "Membres Inscrits",
@@ -402,6 +431,13 @@ export default function AdminDashboardPage() {
             desc: "Période sélectionnée",
             icon: CreditCard,
             color: "text-emerald-500 bg-emerald-500/10"
+          },
+          {
+            title: "Forfaits Formateurs",
+            value: `${stats.plansRevenue.toFixed(2)}$`,
+            desc: "Abonnements achetés",
+            icon: ShieldCheck,
+            color: "text-amber-500 bg-amber-500/10"
           },
           {
             title: "Revenus Récurrents (MRR / ARR)",
@@ -516,7 +552,7 @@ export default function AdminDashboardPage() {
             </div>
             <div className="flex items-center justify-between pb-3 border-b border-zinc-150 dark:border-zinc-800">
               <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-amber-500" /> Commissions Plateforme
+                <span className="h-2 w-2 rounded-full bg-amber-500" /> Commissions Cours (Site)
               </span>
               <span className="text-sm font-extrabold text-amber-650 dark:text-amber-500">+{stats.commissions.toFixed(2)}$</span>
             </div>
@@ -531,8 +567,8 @@ export default function AdminDashboardPage() {
           {/* Inline Graphic: Mini Visual Balance Line */}
           <div className="space-y-1">
             <div className="flex justify-between text-[10px] text-zinc-550 font-bold uppercase tracking-wider">
-              <span>Frais ({(stats.totalRevenue > 0 ? (stats.commissions / stats.totalRevenue) * 100 : 15).toFixed(0)}%)</span>
-              <span>Formateurs ({(stats.totalRevenue > 0 ? (stats.instructorPayouts / stats.totalRevenue) * 100 : 85).toFixed(0)}%)</span>
+              <span>Cours (Commissions)</span>
+              <span>Formateurs</span>
             </div>
             <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden flex">
               <div
@@ -544,6 +580,155 @@ export default function AdminDashboardPage() {
                 className="h-full bg-emerald-500"
               />
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Plans Analytics Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* SVG Pie Chart for Plan Proportions */}
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-4">
+          <div>
+            <h2 className="text-base font-bold text-zinc-900 dark:text-white">Proportions des Plans Achetés</h2>
+            <p className="text-xxs text-zinc-500">Distribution par type d&apos;abonnement formateur (BASE, PRO, MAX)</p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-around gap-4 py-2">
+            {/* SVG Donut Chart */}
+            <div className="relative w-28 h-28 flex items-center justify-center">
+              {stats.planProportions.total === 0 ? (
+                <div className="text-xxs text-zinc-400 text-center font-semibold">Aucun plan acheté</div>
+              ) : (() => {
+                const basePct = (stats.planProportions.BASE / stats.planProportions.total) * 100;
+                const proPct = (stats.planProportions.PRO / stats.planProportions.total) * 100;
+                const maxPct = (stats.planProportions.MAX / stats.planProportions.total) * 100;
+
+                const circ = 251.2;
+                
+                const baseStroke = (basePct / 100) * circ;
+                const proStroke = (proPct / 100) * circ;
+                const maxStroke = (maxPct / 100) * circ;
+
+                const baseOffset = circ;
+                const proOffset = circ - baseStroke;
+                const maxOffset = circ - baseStroke - proStroke;
+
+                return (
+                  <>
+                    <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="40" className="stroke-zinc-100 dark:stroke-zinc-800 fill-none" strokeWidth="12" />
+                      {baseStroke > 0 && (
+                        <circle
+                          cx="50" cy="50" r="40"
+                          className="stroke-blue-500 fill-none transition-all duration-500"
+                          strokeWidth="12"
+                          strokeDasharray={`${baseStroke} ${circ}`}
+                          strokeDashoffset={baseOffset}
+                          strokeLinecap="round"
+                        />
+                      )}
+                      {proStroke > 0 && (
+                        <circle
+                          cx="50" cy="50" r="40"
+                          className="stroke-indigo-500 fill-none transition-all duration-500"
+                          strokeWidth="12"
+                          strokeDasharray={`${proStroke} ${circ}`}
+                          strokeDashoffset={proOffset}
+                          strokeLinecap="round"
+                        />
+                      )}
+                      {maxStroke > 0 && (
+                        <circle
+                          cx="50" cy="50" r="40"
+                          className="stroke-amber-500 fill-none transition-all duration-500"
+                          strokeWidth="12"
+                          strokeDasharray={`${maxStroke} ${circ}`}
+                          strokeDashoffset={maxOffset}
+                          strokeLinecap="round"
+                        />
+                      )}
+                    </svg>
+                    <div className="absolute flex flex-col items-center justify-center leading-none">
+                      <span className="text-xl font-black text-zinc-900 dark:text-white">{stats.planProportions.total}</span>
+                      <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mt-1">Total</span>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Legend with percentages and counts */}
+            <div className="flex flex-col gap-2 text-xs font-semibold">
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 bg-blue-500 rounded-md shrink-0" />
+                <span className="text-zinc-800 dark:text-zinc-200 text-xxs">BASE: {stats.planProportions.BASE} ({stats.planProportions.total > 0 ? Math.round((stats.planProportions.BASE / stats.planProportions.total) * 100) : 0}%)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 bg-indigo-500 rounded-md shrink-0" />
+                <span className="text-zinc-800 dark:text-zinc-200 text-xxs">PRO: {stats.planProportions.PRO} ({stats.planProportions.total > 0 ? Math.round((stats.planProportions.PRO / stats.planProportions.total) * 100) : 0}%)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 bg-amber-500 rounded-md shrink-0" />
+                <span className="text-zinc-800 dark:text-zinc-200 text-xxs">MAX: {stats.planProportions.MAX} ({stats.planProportions.total > 0 ? Math.round((stats.planProportions.MAX / stats.planProportions.total) * 100) : 0}%)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Most Purchased Plan Summary */}
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+          <div>
+            <h2 className="text-base font-bold text-zinc-900 dark:text-white">Plan le plus acheté</h2>
+            <p className="text-xxs text-zinc-500">Forfait avec le plus grand volume de ventes</p>
+          </div>
+
+          <div className="flex items-center gap-4 py-2">
+            <div className="p-4 bg-indigo-500/10 text-indigo-500 rounded-xl">
+              <ShieldCheck className="w-8 h-8" />
+            </div>
+            <div>
+              <h4 className="text-lg font-black text-zinc-900 dark:text-white">Plan {stats.mostPurchasedPlan}</h4>
+              <p className="text-xxs text-zinc-500 font-medium">
+                Forfait d&apos;abonnement le plus populaire auprès des formateurs sur la période sélectionnée.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-3 border-t border-zinc-150 dark:border-zinc-800">
+            <span className="text-xs font-semibold text-zinc-550 dark:text-zinc-400">Total ventes de ce plan</span>
+            <span className="text-sm font-extrabold text-indigo-600">
+              {stats.mostPurchasedPlan === "BASE" ? stats.planProportions.BASE :
+               stats.mostPurchasedPlan === "PRO" ? stats.planProportions.PRO :
+               stats.mostPurchasedPlan === "MAX" ? stats.planProportions.MAX : 0} ventes
+            </span>
+          </div>
+        </div>
+
+        {/* Plan Revenue Over Time Summary */}
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+          <div>
+            <h2 className="text-base font-bold text-zinc-900 dark:text-white">Abonnements selon le temps</h2>
+            <p className="text-xxs text-zinc-500">Montant accumulé des abonnements formateurs</p>
+          </div>
+
+          <div className="space-y-3 py-2">
+            <div className="flex justify-between text-xs font-semibold pb-2 border-b border-zinc-100 dark:border-zinc-800">
+              <span className="text-zinc-550">Montant total période</span>
+              <span className="text-zinc-900 dark:text-white font-extrabold">{stats.plansRevenue.toFixed(2)}$</span>
+            </div>
+            <div className="flex justify-between text-xs font-semibold">
+              <span className="text-zinc-550">Fréquence moyenne</span>
+              <span className="text-zinc-900 dark:text-white">
+                {stats.planProportions.total > 0 ? `${(stats.plansRevenue / stats.planProportions.total).toFixed(2)}$ / forfait` : '0.00$'}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-3 border-t border-zinc-150 dark:border-zinc-800">
+            <span className="text-xs font-semibold text-zinc-550 dark:text-zinc-400">Frais de gestion site</span>
+            <span className="text-xs bg-green-50 dark:bg-green-950/20 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-lg font-bold uppercase">
+              100% au Site (Sans Com.)
+            </span>
           </div>
         </div>
       </div>

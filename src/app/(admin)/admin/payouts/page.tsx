@@ -24,12 +24,26 @@ interface AdminPayoutItem {
   createdAt: string;
 }
 
+interface FundSourceItem {
+  id: string;
+  date: string;
+  type: 'COURSE_SALE' | 'PLAN_SALE';
+  itemName: string;
+  sourceName: string;
+  amount: number;
+  siteShare: number;
+  instructorShare: number;
+}
+
 export default function AdminPayoutsPage() {
   const [payouts, setPayouts] = useState<AdminPayoutItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalSales, setTotalSales] = useState(0);
   const [platformCommissions, setPlatformCommissions] = useState(0);
   const [instructorShare, setInstructorShare] = useState(0);
+  const [courseCommissions, setCourseCommissions] = useState(0);
+  const [planSales, setPlanSales] = useState(0);
+  const [fundSources, setFundSources] = useState<FundSourceItem[]>([]);
   const [commissionRate, setCommissionRate] = useState(20); // Fallback commission rate
   const [activeTab, setActiveTab] = useState<"ALL" | "PENDING" | "PAID">("PENDING");
 
@@ -59,7 +73,7 @@ export default function AdminPayoutsPage() {
       // 3. Fetch all completed payments
       const { data: paymentsData } = await supabase
         .from('payments')
-        .select('id, order_id, amount, status, user_id')
+        .select('id, order_id, amount, status, user_id, paid_at')
         .eq('status', 'PAID');
 
       const payments = paymentsData || [];
@@ -77,10 +91,11 @@ export default function AdminPayoutsPage() {
       // 5. Fetch courses to identify instructor
       const { data: courses } = await supabase
         .from('courses')
-        .select('id, instructor_id')
+        .select('id, title, instructor_id')
         .in('id', courseIds);
 
-      const courseMap = new Map(courses?.map(c => [c.id, c.instructor_id]) || []);
+      const courseInstructorMap = new Map(courses?.map(c => [c.id, c.instructor_id]) || []);
+      const courseTitleMap = new Map(courses?.map(c => [c.id, c.title]) || []);
 
       // Plan configurations
       const PLAN_COMMISSION_CONFIG: Record<string, { commissionRate: number; instructorShare: number }> = {
@@ -99,30 +114,65 @@ export default function AdminPayoutsPage() {
       let computedTotalSales = 0;
       let computedPlatformCommissions = 0;
       let computedInstructorShare = 0;
+      let computedCourseCommissions = 0;
+      let computedPlanSales = 0;
+      const computedSources: FundSourceItem[] = [];
 
       payments.forEach(p => {
         const amount = p.amount || 0;
         computedTotalSales += amount;
 
+        const studentProfile = profileMap.get(p.user_id) || 'Étudiant';
         const courseId = orderItemMap.get(p.order_id) || "";
         
-        // If it is a subscription plan payment, 100% of revenue goes to platform
-        if (planUuidMap[courseId]) {
+        const planName = planUuidMap[courseId];
+        // If it is a subscription plan payment, 100% of revenue goes to platform, commissions 0
+        if (planName) {
           computedPlatformCommissions += amount;
+          computedPlanSales += amount;
+
+          computedSources.push({
+            id: p.id,
+            date: p.paid_at || new Date().toISOString(),
+            type: 'PLAN_SALE',
+            itemName: `Forfait Formateur ${planName}`,
+            sourceName: `${studentProfile} (Formateur)`,
+            amount,
+            siteShare: amount,
+            instructorShare: 0
+          });
         } else {
           // It is a course purchase
-          const instructorId = courseMap.get(courseId) || "";
+          const instructorId = courseInstructorMap.get(courseId) || "";
           const instPlan = planMap.get(instructorId) || "FREE";
           const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;
 
-          computedPlatformCommissions += amount * commConfig.commissionRate;
-          computedInstructorShare += amount * commConfig.instructorShare;
+          const siteShare = amount * commConfig.commissionRate;
+          const instShare = amount * commConfig.instructorShare;
+
+          computedPlatformCommissions += siteShare;
+          computedCourseCommissions += siteShare;
+          computedInstructorShare += instShare;
+
+          computedSources.push({
+            id: p.id,
+            date: p.paid_at || new Date().toISOString(),
+            type: 'COURSE_SALE',
+            itemName: courseTitleMap.get(courseId) || 'Cours inconnu',
+            sourceName: `${studentProfile} (Étudiant)`,
+            amount,
+            siteShare,
+            instructorShare: instShare
+          });
         }
       });
 
       setTotalSales(Math.round(computedTotalSales));
       setPlatformCommissions(Math.round(computedPlatformCommissions));
       setInstructorShare(Math.round(computedInstructorShare));
+      setCourseCommissions(Math.round(computedCourseCommissions));
+      setPlanSales(Math.round(computedPlanSales));
+      setFundSources(computedSources.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 
       const items: AdminPayoutItem[] = (sbPayouts || []).map((p: any) => ({
         id: p.id,
@@ -142,6 +192,9 @@ export default function AdminPayoutsPage() {
       setTotalSales(rev);
       setPlatformCommissions(Math.round(rev * 0.20));
       setInstructorShare(Math.round(rev * 0.80));
+      setCourseCommissions(Math.round(rev * 0.20));
+      setPlanSales(0);
+      setFundSources([]);
       
       // Fallback fake payouts
       setPayouts([
@@ -212,6 +265,9 @@ export default function AdminPayoutsPage() {
           <div>
             <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Ventes globales (LMS)</p>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">{totalSales}$</h3>
+            <p className="text-xxs text-zinc-450 dark:text-zinc-550 font-bold mt-1">
+              {totalSales - planSales}$ cours + {planSales}$ plans
+            </p>
           </div>
         </div>
 
@@ -222,12 +278,15 @@ export default function AdminPayoutsPage() {
           </div>
           <div className="flex-1">
             <div className="flex justify-between items-center">
-              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Commissions de la plateforme</p>
+              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Fonds totaux du site</p>
               <span className="text-xs bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-lg font-bold">
-                Par Plan
+                Site Share
               </span>
             </div>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">{platformCommissions}$</h3>
+            <p className="text-xxs text-zinc-450 dark:text-zinc-550 font-bold mt-1">
+              {courseCommissions}$ com. cours + {planSales}$ plans
+            </p>
           </div>
         </div>
 
@@ -237,8 +296,11 @@ export default function AdminPayoutsPage() {
             <TrendingUp className="w-8 h-8" />
           </div>
           <div>
-            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Part théorique des Formateurs</p>
+            <p className="text-sm font-medium text-zinc-550 dark:text-zinc-400">Part théorique des Formateurs</p>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">{instructorShare}$</h3>
+            <p className="text-xxs text-zinc-450 dark:text-zinc-550 font-bold mt-1">
+              Uniquement sur les cours vendus
+            </p>
           </div>
         </div>
       </div>
@@ -255,7 +317,7 @@ export default function AdminPayoutsPage() {
             <span className="text-lg font-extrabold text-zinc-800 dark:text-white">20%</span>
           </div>
           <div className="p-3 bg-blue-50/40 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/20 rounded-xl text-center">
-            <span className="text-xxs font-bold text-blue-500 dark:text-blue-400 uppercase block">Plan Base</span>
+            <span className="text-xxs font-bold text-blue-500 dark:text-blue-450 uppercase block">Plan Base</span>
             <span className="text-lg font-extrabold text-blue-700 dark:text-blue-400">10%</span>
           </div>
           <div className="p-3 bg-teal-50/40 dark:bg-teal-900/10 border border-teal-100 dark:border-teal-900/20 rounded-xl text-center">
@@ -266,6 +328,70 @@ export default function AdminPayoutsPage() {
             <span className="text-xxs font-bold text-amber-550 dark:text-amber-400 uppercase block">Plan Max</span>
             <span className="text-lg font-extrabold text-amber-700 dark:text-amber-400">0%</span>
           </div>
+        </div>
+      </div>
+
+      {/* Provenance des Fonds Table */}
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Provenance et Origine des Fonds</h3>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+            Détail de l&apos;origine de chaque transaction complétée (cours vendus ou abonnements de formateurs).
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+          {loading ? (
+            <div className="p-12 text-center space-y-4">
+              <div className="w-8 h-8 border-4 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-zinc-550 dark:text-zinc-400 text-sm">Chargement du détail de provenance des fonds...</p>
+            </div>
+          ) : fundSources.length === 0 ? (
+            <div className="p-12 text-center text-zinc-550 dark:text-zinc-400 font-semibold">
+              Aucune transaction financière enregistrée.
+            </div>
+          ) : (
+            <div className="overflow-x-auto max-h-[400px]">
+              <table className="w-full text-left">
+                <thead className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider sticky top-0 z-10">
+                  <tr>
+                    <th className="px-6 py-3 font-semibold">Date</th>
+                    <th className="px-6 py-3 font-semibold">Type</th>
+                    <th className="px-6 py-3 font-semibold">Article / Description</th>
+                    <th className="px-6 py-3 font-semibold">Provenance (Auteur)</th>
+                    <th className="px-6 py-3 font-semibold">Montant Total</th>
+                    <th className="px-6 py-3 font-semibold text-blue-600 dark:text-blue-400">Part Site</th>
+                    <th className="px-6 py-3 font-semibold text-emerald-600 dark:text-emerald-400">Part Formateur</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-sm">
+                  {fundSources.map((fs) => (
+                    <tr key={fs.id} className="text-zinc-900 dark:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+                      <td className="px-6 py-3 text-xs text-zinc-500 whitespace-nowrap">
+                        {new Date(fs.date).toLocaleDateString("fr-FR")}
+                      </td>
+                      <td className="px-6 py-3 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xxs font-bold uppercase tracking-wider ${
+                          fs.type === 'PLAN_SALE'
+                            ? "bg-amber-100 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400"
+                            : "bg-blue-100 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400"
+                        }`}>
+                          {fs.type === 'PLAN_SALE' ? "Abonnement Prof" : "Vente Cours"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 font-medium truncate max-w-[200px]">{fs.itemName}</td>
+                      <td className="px-6 py-3 text-xs text-zinc-550 dark:text-zinc-400 whitespace-nowrap">{fs.sourceName}</td>
+                      <td className="px-6 py-3 font-extrabold text-zinc-900 dark:text-white whitespace-nowrap">{fs.amount.toFixed(2)}$</td>
+                      <td className="px-6 py-3 font-extrabold text-blue-600 dark:text-blue-400 whitespace-nowrap">+{fs.siteShare.toFixed(2)}$</td>
+                      <td className="px-6 py-3 font-extrabold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                        {fs.instructorShare > 0 ? `+${fs.instructorShare.toFixed(2)}$` : '0.00$'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 

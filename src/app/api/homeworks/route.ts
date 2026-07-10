@@ -24,6 +24,10 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await query.order("created_at", { ascending: true });
     if (error) {
+      if (error.code === "PGRST205" || error.message?.includes("homeworks")) {
+        console.warn("La table public.homeworks n'existe pas encore. Repli sur un tableau vide.");
+        return NextResponse.json({ homeworks: [], warning: "La table 'homeworks' n'existe pas. Veuillez lancer la migration." });
+      }
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
@@ -84,6 +88,11 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
+      if (error.code === "PGRST205" || error.message?.includes("homeworks")) {
+        return NextResponse.json({ 
+          error: "La table 'homeworks' est manquante dans votre base de données Supabase. Veuillez exécuter le script de migration 'node scratch/run-migrations.js <mot_de_passe>' pour la créer." 
+        }, { status: 400 });
+      }
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 

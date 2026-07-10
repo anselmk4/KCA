@@ -706,19 +706,39 @@ export default function CourseDetailPage() {
     setSaving(true);
     try {
       const slug = descForm.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-      const { error } = await (supabase as any)
+      const updatePayload: any = {
+        title: descForm.title,
+        slug,
+        category_id: descForm.category_id || null,
+        level: descForm.level as "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "EXPERT",
+        description: descForm.description,
+        benefits: benefits || null,
+        thumbnail_url: thumbnailUrl || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      let { error } = await (supabase as any)
         .from("courses")
-        .update({
-          title: descForm.title,
-          slug,
-          category_id: descForm.category_id || null,
-          level: descForm.level as "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "EXPERT",
-          description: descForm.description,
-          benefits: benefits || null,
-          thumbnail_url: thumbnailUrl || null,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq("id", courseId);
+
+      // Graceful fallback if benefits column is missing in Supabase
+      if (error && (error.message?.includes("benefits") || error.code === "PGRST205" || error.code === "PGRST211")) {
+        console.warn("La colonne 'benefits' semble manquante dans Supabase. Tentative de sauvegarde sans ce champ...");
+        delete updatePayload.benefits;
+        const retryResult = await (supabase as any)
+          .from("courses")
+          .update(updatePayload)
+          .eq("id", courseId);
+        
+        if (!retryResult.error) {
+          alert("Sauvegarde réussie, mais les 'Bénéfices' n'ont pas pu être enregistrés car la base de données n'est pas à jour. Veuillez exécuter le script de migration (node scratch/run-migrations.js <mot_de_passe>).");
+          error = null;
+        } else {
+          error = retryResult.error;
+        }
+      }
+
       if (error) { alert("Erreur : " + error.message); return; }
       setDescForm({
         title: descForm.title,
