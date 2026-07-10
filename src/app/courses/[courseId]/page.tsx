@@ -249,7 +249,10 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                 </span>
               )}
               <h1 className="text-3xl md:text-4xl font-extrabold mb-4 leading-tight">{course.title}</h1>
-              <p className="text-zinc-300 text-base leading-relaxed mb-6">{course.description}</p>
+              <div
+                className="text-zinc-300 text-base leading-relaxed mb-6 prose prose-invert prose-sm max-w-none [&>p]:mb-3 [&>ul]:list-disc [&>ul]:pl-5 [&>ol]:list-decimal [&>ol]:pl-5 [&>h1]:text-xl [&>h2]:text-lg [&>h3]:text-base [&>strong]:text-white"
+                dangerouslySetInnerHTML={{ __html: course.description }}
+              />
 
               {/* Meta */}
               <div className="flex flex-wrap gap-4 text-sm text-zinc-400">

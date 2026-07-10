@@ -9,6 +9,12 @@ import { Search, Loader2, BookOpen, Clock, ArrowRight, Star, Sparkles, Graduatio
 import { motion, Variants } from "framer-motion";
 import { supabase } from "@/lib/supabase/client";
 
+/** Strip HTML tags and decode entities for clean text display */
+function stripHtml(html: string | null | undefined): string {
+  if (!html) return "";
+  return html.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").trim();
+}
+
 interface Course {
   id: string;
   title: string;
@@ -47,7 +53,7 @@ export default function CoursesPage() {
             return {
               id: item.id,
               title: item.title,
-              description: item.short_description || item.description || "",
+              description: stripHtml(item.short_description || item.description || ""),
               image: item.thumbnail_url || "",
               category: item.categories?.name || "Général",
               price: item.price || 0,
