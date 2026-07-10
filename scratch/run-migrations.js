@@ -6,24 +6,27 @@ const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
 
-// Manually parse .env.local if it exists
-const envLocalPath = path.join(__dirname, '..', '.env.local');
-if (fs.existsSync(envLocalPath)) {
-  const envContent = fs.readFileSync(envLocalPath, 'utf8');
-  envContent.split(/\r?\n/).forEach(line => {
-    const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
-    if (match) {
-      const key = match[1];
-      let value = match[2] || '';
-      if (value.startsWith('"') && value.endsWith('"')) {
-        value = value.substring(1, value.length - 1);
-      } else if (value.startsWith("'") && value.endsWith("'")) {
-        value = value.substring(1, value.length - 1);
+// Manually parse .env and .env.local if they exist
+const envFiles = ['.env', '.env.local'];
+envFiles.forEach(file => {
+  const envPath = path.join(__dirname, '..', file);
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    envContent.split(/\r?\n/).forEach(line => {
+      const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+      if (match) {
+        const key = match[1];
+        let value = match[2] || '';
+        if (value.startsWith('"') && value.endsWith('"')) {
+          value = value.substring(1, value.length - 1);
+        } else if (value.startsWith("'") && value.endsWith("'")) {
+          value = value.substring(1, value.length - 1);
+        }
+        process.env[key] = value;
       }
-      process.env[key] = value;
-    }
-  });
-}
+    });
+  }
+});
 
 let password = process.argv[2] || process.env.DATABASE_PASSWORD;
 
@@ -79,25 +82,68 @@ async function runMigrations() {
         continue;
       }
       const sql = fs.readFileSync(sqlPath, 'utf8');
-      
-      // Clean up notifications reload schema if it exists since we do it at the end
-      const queries = sql
-        .replace(/NOTIFY pgrst, 'reload schema';/g, '')
-        .split(';')
-        .map(q => q.trim())
-        .filter(q => q.length > 0);
 
-      for (let query of queries) {
-        // Execute block queries (DO $$ ... END $$) as a single execution
-        try {
-          await client.query(query);
-        } catch (err) {
-          // If RLS policy already exists or some other harmless error, log it
-          if (err.message.includes('already exists') || err.message.includes('already a member')) {
-            console.log(`[OK/Info] Query skipped: ${err.message}`);
-          } else {
-            console.error(`[Error] Query failed: "${query.substring(0, 100)}..." \nReason: ${err.message}`);
+      // For RLS policies, run queries one-by-one to catch "already exists" policy errors cleanly
+      if (filename === 'supabase-rls-policies.sql') {
+        const cleanedSql = sql.replace(/NOTIFY pgrst, 'reload schema';/g, '');
+        const queries = [];
+        let current = '';
+        let inDollarQuote = false;
+        let inSingleQuote = false;
+        let inDoubleQuote = false;
+
+        for (let i = 0; i < cleanedSql.length; i++) {
+          const char = cleanedSql[i];
+          const nextChar = cleanedSql[i + 1] || '';
+          
+          if (char === '$' && nextChar === '$') {
+            inDollarQuote = !inDollarQuote;
+            current += '$$';
+            i++;
+            continue;
           }
+          if (char === "'" && !inDollarQuote) {
+            inSingleQuote = !inSingleQuote;
+          }
+          if (char === '"' && !inDollarQuote) {
+            inDoubleQuote = !inDoubleQuote;
+          }
+          if (char === ';' && !inDollarQuote && !inSingleQuote && !inDoubleQuote) {
+            const trimmed = current.trim();
+            if (trimmed.length > 0) {
+              queries.push(trimmed);
+            }
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        
+        const finalTrimmed = current.trim();
+        if (finalTrimmed.length > 0) {
+          queries.push(finalTrimmed);
+        }
+
+        for (let query of queries) {
+          try {
+            await client.query(query);
+          } catch (err) {
+            if (err.message.includes('already exists') || err.message.includes('already a member')) {
+              console.log(`[OK/Info] Query skipped: ${err.message}`);
+            } else {
+              console.error(`[Error] Query failed: "${query.substring(0, 80)}..." \nReason: ${err.message}`);
+            }
+          }
+        }
+      } else {
+        // For DDL tables and category inserts, execute the entire file in one fast batch to prevent ECONNRESET
+        try {
+          const cleanedSql = sql.replace(/NOTIFY pgrst, 'reload schema';/g, '');
+          await client.query(cleanedSql);
+          console.log(`[OK] Batch execution of ${filename} completed successfully.`);
+        } catch (err) {
+          console.error(`[Error] Batch execution of ${filename} failed: ${err.message}`);
+          process.exit(1);
         }
       }
       console.log(`Finished ${filename} successfully!`);
