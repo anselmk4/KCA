@@ -223,15 +223,24 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
                             <div className={`p-1.5 rounded-lg shrink-0 h-7 w-7 flex items-center justify-center ${iconColor}`}>
                               <IconComponent className="w-4 h-4" />
                             </div>
-                            <div className="space-y-0.5 min-w-0">
-                              <p className="text-xs font-semibold text-zinc-950 dark:text-white truncate">{n.title}</p>
-                              <p className="text-xxs text-zinc-500 line-clamp-2">{n.message}</p>
+                            <div className="space-y-0.5 min-w-0 flex-1">
+                              <p className="text-xs font-bold text-zinc-950 dark:text-white leading-normal break-words">{n.title}</p>
+                              <p className="text-xxs text-zinc-500 dark:text-zinc-400 leading-relaxed break-words">{n.message}</p>
                               <p className="text-[10px] text-zinc-400 mt-1">{new Date(n.created_at).toLocaleDateString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p>
                             </div>
                           </div>
                         );
                       })
                     )}
+                  </div>
+                  <div className="border-t border-zinc-100 dark:border-zinc-800 p-2 text-center">
+                    <Link
+                      href={role === "instructor" ? "/instructor/notifications" : "/dashboard/notifications"}
+                      onClick={() => setNotificationsOpen(false)}
+                      className="inline-block text-[11px] font-bold text-teal-600 hover:text-teal-700 dark:text-teal-400 transition-colors cursor-pointer w-full py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 rounded-lg"
+                    >
+                      Voir toutes les notifications
+                    </Link>
                   </div>
                 </div>
               )}

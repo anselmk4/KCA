@@ -252,7 +252,7 @@ export async function POST(req: NextRequest) {
           }
           console.log(`[webhook-momo] Student ${payment.user_id} successfully enrolled in course ${courseId}`);
 
-          // Trigger notifications
+          // Trigger notifications and email alerts
           try {
             const { data: courseData } = await supabaseAdmin
               .from('courses')
@@ -271,15 +271,30 @@ export async function POST(req: NextRequest) {
               link: `/dashboard/courses`
             });
 
-            // Instructor Notification
-            if (courseData?.instructor_id) {
-              const { data: studentProfile } = await supabaseAdmin
-                .from('profiles')
-                .select('full_name')
-                .eq('id', payment.user_id)
-                .maybeSingle();
+            // Fetch Student Profile
+            const { data: studentProfile } = await supabaseAdmin
+              .from('profiles')
+              .select('full_name, email')
+              .eq('id', payment.user_id)
+              .maybeSingle();
 
-              const studentName = studentProfile?.full_name || 'Un apprenant';
+            const studentName = studentProfile?.full_name || 'Un apprenant';
+            const studentEmail = studentProfile?.email;
+
+            // Instructor Notification
+            let instructorEmail = "";
+            let instructorName = "Formateur";
+            if (courseData?.instructor_id) {
+              const { data: instructorProfile } = await supabaseAdmin
+                .from('profiles')
+                .select('full_name, email')
+                .eq('id', courseData.instructor_id)
+                .maybeSingle();
+              
+              if (instructorProfile) {
+                instructorEmail = instructorProfile.email || "";
+                instructorName = instructorProfile.full_name || "Formateur";
+              }
 
               await createNotification({
                 userId: courseData.instructor_id,
@@ -288,6 +303,38 @@ export async function POST(req: NextRequest) {
                 type: "SUCCESS",
                 link: `/instructor/students`
               });
+            }
+
+            // Send Invoice Email to student
+            if (studentEmail) {
+              const { sendInvoiceEmail } = await import("@/lib/email");
+              const { data: orderData } = await supabaseAdmin
+                .from("orders")
+                .select("order_number")
+                .eq("id", payment.order_id)
+                .maybeSingle();
+              const orderNumber = orderData?.order_number || `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+              await sendInvoiceEmail(
+                studentEmail,
+                studentName,
+                orderNumber,
+                payment.amount,
+                courseTitle,
+                "Accès complet et illimité à la formation."
+              );
+            }
+
+            // Send purchased email alert to instructor
+            if (instructorEmail) {
+              const { sendInstructorCoursePurchasedEmail } = await import("@/lib/email");
+              await sendInstructorCoursePurchasedEmail(
+                instructorEmail,
+                instructorName,
+                studentName,
+                courseTitle,
+                payment.amount
+              );
             }
           } catch (notifErr) {
             console.error('[webhook-momo] Error triggering notifications:', notifErr);
@@ -365,6 +412,34 @@ export async function POST(req: NextRequest) {
               type: "SUCCESS",
               link: `/instructor/billing`
             });
+
+            // Fetch Instructor Profile & Send invoice email
+            const { data: instructorProfile } = await supabaseAdmin
+              .from('profiles')
+              .select('full_name, email')
+              .eq('id', payment.user_id)
+              .maybeSingle();
+
+            if (instructorProfile?.email) {
+              const { sendInvoiceEmail } = await import("@/lib/email");
+              const { data: orderData } = await supabaseAdmin
+                .from("orders")
+                .select("order_number, total")
+                .eq("id", payment.order_id)
+                .maybeSingle();
+              
+              const orderNumber = orderData?.order_number || `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+              const totalAmount = orderData?.total || 19.00;
+
+              await sendInvoiceEmail(
+                instructorProfile.email,
+                instructorProfile.full_name || "Formateur",
+                orderNumber,
+                totalAmount,
+                `Abonnement Formateur — Plan ${planName}`,
+                "Mise à niveau et accès illimité aux fonctionnalités formateur."
+              );
+            }
           } catch (notifErr) {
             console.error('[webhook-momo] Error triggering plan notification:', notifErr);
           }

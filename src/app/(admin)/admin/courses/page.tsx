@@ -166,48 +166,15 @@ export default function AdminCoursesPage() {
 
   const handleUpdateStatus = async (courseId: string, nextStatus: AdminCourseItem['status']) => {
     try {
-      const { error } = await supabase
-        .from('courses')
-        .update({ status: nextStatus })
-        .eq('id', courseId);
+      const res = await fetch("/api/admin/courses/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseId, nextStatus })
+      });
 
-      if (error) throw error;
-
-      // Trigger notification for the instructor
-      const course = courses.find(c => c.id === courseId);
-      if (course && course.instructorId) {
-        let notifTitle = "";
-        let notifMessage = "";
-        let notifType: "SUCCESS" | "WARNING" | "INFO" = "INFO";
-
-        if (nextStatus === 'PUBLISHED') {
-          notifTitle = "Cours publié !";
-          notifMessage = `Votre cours "${course.title}" a été validé et publié par l'administrateur.`;
-          notifType = "SUCCESS";
-        } else if (nextStatus === 'ARCHIVED') {
-          notifTitle = "Cours archivé";
-          notifMessage = `Votre cours "${course.title}" a été archivé par l'administrateur.`;
-          notifType = "WARNING";
-        } else if (nextStatus === 'DRAFT') {
-          notifTitle = "Cours renvoyé en brouillon";
-          notifMessage = `Votre cours "${course.title}" a été renvoyé en brouillon par l'administrateur.`;
-          notifType = "INFO";
-        }
-
-        if (notifTitle) {
-          try {
-            const { createNotification } = await import('@/lib/supabase/notifications-helper');
-            await createNotification({
-              userId: course.instructorId,
-              title: notifTitle,
-              message: notifMessage,
-              type: notifType,
-              link: `/instructor/courses`
-            });
-          } catch (notifErr) {
-            console.error('Error triggering course status update notification:', notifErr);
-          }
-        }
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Erreur serveur");
       }
 
       setCourses(prev => prev.map(c => c.id === courseId ? { ...c, status: nextStatus } : c));

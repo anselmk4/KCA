@@ -226,8 +226,14 @@ export async function POST(req: NextRequest) {
           link: `/dashboard/courses`
         });
 
-        // Instructor Notification
+        // Instructor Notification + Email
         if (course.instructor_id) {
+          const { data: instructorProfile } = await dbClient
+            .from("profiles")
+            .select("full_name, email")
+            .eq("id", course.instructor_id)
+            .maybeSingle();
+
           const { data: studentProfile } = await dbClient
             .from("profiles")
             .select("full_name")
@@ -243,7 +249,30 @@ export async function POST(req: NextRequest) {
             type: "SUCCESS",
             link: `/instructor/students`
           });
+
+          // Send purchase alert to instructor
+          if (instructorProfile?.email) {
+            const { sendInstructorCoursePurchasedEmail } = await import("@/lib/email");
+            await sendInstructorCoursePurchasedEmail(
+              instructorProfile.email,
+              instructorProfile.full_name || "Formateur",
+              studentName,
+              course.title,
+              amountCaptured
+            );
+          }
         }
+
+        // Send invoice to student
+        const { sendInvoiceEmail } = await import("@/lib/email");
+        await sendInvoiceEmail(
+          user.email || "",
+          user.user_metadata?.full_name || user.email?.split("@")[0] || "Apprenant",
+          orderNumber,
+          amountCaptured,
+          course.title,
+          "Accès complet et illimité à la formation."
+        );
       } catch (notifErr) {
         console.error("[paypal-capture-order] Error triggering purchase notifications:", notifErr);
       }
@@ -340,7 +369,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Impossible de mettre à jour votre plan: ${profileErr.message}` }, { status: 500 });
       }
 
-      // Trigger notification
+      // Trigger notification + Email invoice
       try {
         const { createNotification } = await import("@/lib/supabase/notifications-helper");
         await createNotification({
@@ -350,6 +379,17 @@ export async function POST(req: NextRequest) {
           type: "SUCCESS",
           link: `/instructor/billing`
         });
+
+        // Send invoice to instructor
+        const { sendInvoiceEmail } = await import("@/lib/email");
+        await sendInvoiceEmail(
+          user.email || "",
+          user.user_metadata?.full_name || user.email?.split("@")[0] || "Formateur",
+          orderNumber,
+          amountCaptured,
+          `Abonnement Formateur — Plan ${planName}`,
+          "Mise à niveau et accès illimité aux fonctionnalités formateur."
+        );
       } catch (notifErr) {
         console.error("[paypal-capture-order] Error triggering plan notification:", notifErr);
       }

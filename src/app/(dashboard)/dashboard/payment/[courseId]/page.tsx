@@ -525,6 +525,22 @@ export default function PaymentPage() {
           method: payProvider,
           paid_at: new Date().toISOString()
         } as any);
+
+        // Trigger Receipt and Alert Email sending on server-side
+        try {
+          await fetch("/api/payments/send-receipt", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              orderId,
+              userId: user.id,
+              courseId: course.id,
+              amount: discountedAmount
+            })
+          });
+        } catch (mailApiErr) {
+          console.warn('[payment] Email notification warning:', mailApiErr);
+        }
       } catch (receiptErr) {
         console.warn('[payment] Order/Payment receipt insert warning (non-blocking):', receiptErr);
       }

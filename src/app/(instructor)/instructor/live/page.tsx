@@ -243,6 +243,23 @@ export default function LivePage() {
         throw new Error(error.message);
       }
 
+      // Send email notifications via server-side API
+      try {
+        await fetch("/api/instructor/live/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: form.title,
+            date: form.date,
+            meetingUrl: liveLink,
+            guestIds: selectedUserIds,
+            isPublic: form.isPublic
+          })
+        });
+      } catch (emailErr) {
+        console.error("Error triggering live session email notifications:", emailErr);
+      }
+
       // Send notifications to invited guests
       try {
         const { createNotification } = await import('@/lib/supabase/notifications-helper');
