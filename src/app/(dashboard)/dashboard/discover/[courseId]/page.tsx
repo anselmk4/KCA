@@ -13,6 +13,7 @@ interface Course {
   title: string;
   slug: string;
   description: string;
+  benefits?: string | null;
   price: number;
   status: string;
   instructorId: string;
@@ -165,6 +166,7 @@ export default function CoursePreviewPage() {
         title: courseData.title,
         slug: courseData.slug || "",
         description: courseData.description || "",
+        benefits: courseData.benefits || null,
         price: courseData.price || 0,
         status: courseData.status || "DRAFT",
         instructorId: courseData.instructor_id,
@@ -313,6 +315,15 @@ export default function CoursePreviewPage() {
                     <div 
                       className="prose dark:prose-invert max-w-none text-zinc-650 dark:text-zinc-400 space-y-4"
                       dangerouslySetInnerHTML={{ __html: course.description }}
+                    />
+                  </div>
+                )}
+                {course.benefits && (
+                  <div className="mt-6 pt-6 border-t border-zinc-150 dark:border-zinc-800">
+                    <p className="font-bold text-zinc-850 dark:text-zinc-155 mb-2">Bénéfices du cours / Ce que vous allez apprendre :</p>
+                    <div 
+                      className="prose dark:prose-invert max-w-none text-zinc-650 dark:text-zinc-400 space-y-4"
+                      dangerouslySetInnerHTML={{ __html: course.benefits }}
                     />
                   </div>
                 )}

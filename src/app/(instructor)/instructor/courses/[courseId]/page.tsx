@@ -235,10 +235,16 @@ export default function CourseDetailPage() {
         .order("name");
       setCategories(catData || []);
 
+      const levelMap: Record<string, string> = {
+        'BEGINNER': 'Débutant',
+        'INTERMEDIATE': 'Intermédiaire',
+        'ADVANCED': 'Avancé',
+        'EXPERT': 'Expert',
+      };
       setDescForm({
         title: courseData.title || "",
         category_id: courseData.category_id || "",
-        level: courseData.level || "Débutant",
+        level: levelMap[courseData.level || ''] || courseData.level || "Débutant",
         description: courseData.description || "",
       });
       setBenefits((cd.benefits as string) || "");
@@ -706,11 +712,19 @@ export default function CourseDetailPage() {
     setSaving(true);
     try {
       const slug = descForm.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+      const labelToLevel: Record<string, string> = {
+        'Débutant': 'BEGINNER',
+        'Intermédiaire': 'INTERMEDIATE',
+        'Avancé': 'ADVANCED',
+        'Expert': 'EXPERT',
+      };
+      const mappedLevel = labelToLevel[descForm.level] || descForm.level || 'BEGINNER';
+
       const updatePayload: any = {
         title: descForm.title,
         slug,
         category_id: descForm.category_id || null,
-        level: descForm.level as "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "EXPERT",
+        level: mappedLevel as "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "EXPERT",
         description: descForm.description,
         benefits: benefits || null,
         thumbnail_url: thumbnailUrl || null,
