@@ -246,6 +246,12 @@ function RegisterForm() {
     const queryPlan = searchParams.get("plan")?.toUpperCase();
     const queryModule = searchParams.get("module")?.toLowerCase();
     const queryRole = searchParams.get("role")?.toUpperCase();
+    const queryRef = searchParams.get("ref");
+
+    // Store referral code in localStorage for use after signup
+    if (queryRef) {
+      localStorage.setItem("ansella_referral_code", queryRef.toUpperCase());
+    }
 
     if (queryPlan === "FREE" || queryPlan === "BASE" || queryPlan === "PRO" || queryPlan === "MAX") {
       setRole("INSTRUCTOR");
@@ -445,6 +451,22 @@ function RegisterForm() {
 
       if (hasActiveSession) {
         await ensureProfile(sessionUser.id, email, name, role || "STUDENT");
+
+        // Register affiliation if a referral code was stored
+        const storedRef = localStorage.getItem("ansella_referral_code");
+        if (storedRef) {
+          try {
+            await fetch("/api/affiliate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ referredId: sessionUser.id, referralCode: storedRef }),
+            });
+          } catch (err) {
+            console.warn("[Register] Affiliation registration failed:", err);
+          } finally {
+            localStorage.removeItem("ansella_referral_code");
+          }
+        }
 
         const profileUpdate: any = {
           country,

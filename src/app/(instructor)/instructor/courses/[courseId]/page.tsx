@@ -205,6 +205,8 @@ export default function CourseDetailPage() {
 
   // ─── Settings tab states ──────────────────────────────────
   const [statusSavedMessage, setStatusSavedMessage] = useState(false);
+  const [requireSectionQuiz, setRequireSectionQuiz] = useState(true);
+  const [quizSettingSaved, setQuizSettingSaved] = useState(false);
 
   // ─── Load all data from Supabase ──────────────────────────
   const loadData = useCallback(async (silent = false) => {
@@ -252,6 +254,7 @@ export default function CourseDetailPage() {
       setCoursePrice(String(courseData.price || 0));
       setAllowInstallments(Boolean(cd.allow_installments));
       setInstallmentsCount(Number(cd.installments_count) || 2);
+      setRequireSectionQuiz(cd.require_section_quiz !== undefined ? Boolean(cd.require_section_quiz) : true);
 
       // Sections
       const { data: sectionsData } = await supabase
@@ -363,7 +366,7 @@ export default function CourseDetailPage() {
   // ─── SECTION CRUD ─────────────────────────────────────────
   const handleAddSection = async () => {
     if (!newSectionTitle.trim()) return;
-    if (sections.length > 0) {
+    if (requireSectionQuiz && sections.length > 0) {
       const lastSection = sections[sections.length - 1];
       const lastSectionQuizzes = quizzes.filter((q) => q.section_id === lastSection.id);
       if (lastSectionQuizzes.length === 0) {
@@ -2123,6 +2126,65 @@ export default function CourseDetailPage() {
               </div>
             </div>
 
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm space-y-4">
+              <div className="pb-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-zinc-900 dark:text-white text-base">Progression par chapitres</h3>
+                  <p className="text-zinc-400 text-xs mt-0.5">Définissez si un quiz est requis avant de créer un nouveau chapitre.</p>
+                </div>
+                {quizSettingSaved && (
+                  <span className="text-xs font-semibold text-emerald-600 animate-in fade-in flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-900/30">
+                    <CheckCircle2 className="w-4 h-4" /> Enregistré !
+                  </span>
+                )}
+              </div>
+              <div className="flex items-start gap-4 p-4 bg-zinc-50 dark:bg-zinc-850/60 rounded-xl border border-zinc-150 dark:border-zinc-800">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={requireSectionQuiz}
+                  onClick={() => setRequireSectionQuiz(v => !v)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                    requireSectionQuiz ? "bg-teal-600" : "bg-zinc-300 dark:bg-zinc-600"
+                  }`}
+                >
+                  <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform duration-200 ${
+                    requireSectionQuiz ? "translate-x-5" : "translate-x-0"
+                  }`} />
+                </button>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
+                    {requireSectionQuiz ? "Quiz obligatoire entre chapitres" : "Chapitres libres (sans quiz requis)"}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                    {requireSectionQuiz
+                      ? "Un quiz doit être ajouté à chaque chapitre avant de pouvoir créer le suivant. Recommandé pour garantir la progression des apprenants."
+                      : "Vous pouvez créer autant de chapitres que vous souhaitez sans être bloqué par l'ajout d'un quiz."}
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={async () => {
+                    setSaving(true);
+                    const { error } = await (supabase
+                      .from("courses") as any)
+                      .update({ require_section_quiz: requireSectionQuiz })
+                      .eq("id", courseId);
+                    setSaving(false);
+                    if (!error) {
+                      setQuizSettingSaved(true);
+                      setTimeout(() => setQuizSettingSaved(false), 3000);
+                    }
+                  }}
+                  disabled={saving}
+                  className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 transition-colors"
+                >
+                  Enregistrer le paramètre
+                </button>
+              </div>
+            </div>
+
             <div className="bg-red-50/30 dark:bg-red-950/10 rounded-2xl border-2 border-dashed border-red-200 dark:border-red-900/30 p-6 space-y-4">
               <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
                 <AlertTriangle className="w-5 h-5" />
@@ -2137,6 +2199,7 @@ export default function CourseDetailPage() {
             </div>
           </div>
         )}
+
       </div>
 
       {/* ── MODAL: Create Quiz ── */}

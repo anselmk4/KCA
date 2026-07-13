@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { User, Mail, Shield, Bell, CreditCard, Check, Settings, Phone, Globe, MapPin, KeyRound, Eye, EyeOff, Camera, Loader2 } from "lucide-react";
+import { User, Mail, Shield, Bell, CreditCard, Check, Settings, Phone, Globe, MapPin, KeyRound, Eye, EyeOff, Camera, Loader2, Plus, Trash2, Star, Save, CheckCircle2 } from "lucide-react";
 import { getDB, saveDB } from "@/lib/db";
 import { getSimulatedSession, setSimulatedSession } from "@/lib/rbac";
 
-type SettingsTab = "profile" | "security" | "notifications" | "billing";
+type SettingsTab = "profile" | "security" | "notifications" | "billing" | "payment";
 
 export default function StudentSettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
@@ -36,6 +36,18 @@ export default function StudentSettingsPage() {
   const [notifLive, setNotifLive] = useState(true);
   const [notifCert, setNotifCert] = useState(true);
 
+  // Payment methods states
+  type PaymentMethod = { id: string; type: "mobile_money" | "paypal"; label?: string; phone?: string; email?: string; country?: string };
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [preferredMethod, setPreferredMethod] = useState<string | null>(null);
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [paymentSaved, setPaymentSaved] = useState(false);
+  const [newPaymentType, setNewPaymentType] = useState<"mobile_money" | "paypal">("mobile_money");
+  const [newPaymentLabel, setNewPaymentLabel] = useState("");
+  const [newPaymentPhone, setNewPaymentPhone] = useState("");
+  const [newPaymentEmail, setNewPaymentEmail] = useState("");
+  const [newPaymentCountry, setNewPaymentCountry] = useState("");
+
   // Load user details
   useEffect(() => {
     const currentSession = getSimulatedSession();
@@ -63,6 +75,8 @@ export default function StudentSettingsPage() {
           setCountry(profile.nationality || localStorage.getItem("kuettu_settings_country") || "");
           setCity(localStorage.getItem("kuettu_settings_city") || "");
           setPhone(localStorage.getItem("kuettu_settings_phone") || "");
+          if (Array.isArray(profile.payment_methods)) setPaymentMethods(profile.payment_methods);
+          setPreferredMethod(profile.preferred_payment_method || null);
         }
       }
     }).catch(console.error);
@@ -175,6 +189,17 @@ export default function StudentSettingsPage() {
           >
             <CreditCard className="w-4 h-4" />
             <span>Facturation & Plan</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("payment")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm font-semibold transition-all cursor-pointer ${
+              activeTab === "payment"
+                ? "bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 font-bold"
+                : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-900"
+            }`}
+          >
+            <Phone className="w-4 h-4" />
+            <span>Moyens de paiement</span>
           </button>
         </div>
 
@@ -586,6 +611,195 @@ export default function StudentSettingsPage() {
                 </div>
 
               </div>
+            </div>
+          )}
+
+          {/* TAB PAYMENT */}
+          {activeTab === "payment" && (
+            <div className="p-6 space-y-6">
+              <div>
+                <h2 className="font-bold text-base text-zinc-900 dark:text-white">Moyens de paiement</h2>
+                <p className="text-xs text-zinc-500 mt-0.5">Définissez vos numéros Mobile Money ou PayPal pour les paiements automatiques.</p>
+              </div>
+
+              {paymentSaved && (
+                <div className="flex items-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-xl">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Moyens de paiement enregistrés !</p>
+                </div>
+              )}
+
+              {/* Type selector */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setNewPaymentType("mobile_money")}
+                  className={`flex-1 py-3 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    newPaymentType === "mobile_money"
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-zinc-50 dark:bg-zinc-800 text-zinc-600 border-zinc-200 dark:border-zinc-700"
+                  }`}
+                >
+                  <Phone className="w-4 h-4" /> Mobile Money
+                </button>
+                <button
+                  onClick={() => setNewPaymentType("paypal")}
+                  className={`flex-1 py-3 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    newPaymentType === "paypal"
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-zinc-50 dark:bg-zinc-800 text-zinc-600 border-zinc-200 dark:border-zinc-700"
+                  }`}
+                >
+                  <CreditCard className="w-4 h-4" /> PayPal
+                </button>
+              </div>
+
+              {newPaymentType === "mobile_money" && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Opérateur</label>
+                    <select
+                      value={newPaymentLabel}
+                      onChange={(e) => setNewPaymentLabel(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
+                      <option value="">Choisir un opérateur</option>
+                      {["MTN Mobile Money", "Orange Money", "Wave", "Airtel Money", "M-Pesa", "Moov Money", "Autre"].map(op => (
+                        <option key={op} value={op}>{op}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Numéro de téléphone</label>
+                    <input
+                      type="tel"
+                      value={newPaymentPhone}
+                      onChange={(e) => setNewPaymentPhone(e.target.value)}
+                      placeholder="+237 6XX XXX XXX"
+                      className="w-full px-3 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Pays</label>
+                    <input
+                      type="text"
+                      value={newPaymentCountry}
+                      onChange={(e) => setNewPaymentCountry(e.target.value)}
+                      placeholder="Ex: CM, SN, CI"
+                      className="w-full px-3 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {newPaymentType === "paypal" && (
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Adresse email PayPal</label>
+                  <input
+                    type="email"
+                    value={newPaymentEmail}
+                    onChange={(e) => setNewPaymentEmail(e.target.value)}
+                    placeholder="paypal@email.com"
+                    className="w-full px-3 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+              )}
+
+              <button
+                onClick={() => {
+                  if (newPaymentType === "mobile_money" && (!newPaymentLabel || !newPaymentPhone)) return;
+                  if (newPaymentType === "paypal" && !newPaymentEmail) return;
+                  const newMethod: PaymentMethod = {
+                    id: crypto.randomUUID(),
+                    type: newPaymentType,
+                    label: newPaymentType === "mobile_money" ? newPaymentLabel : "PayPal",
+                    phone: newPaymentPhone || undefined,
+                    email: newPaymentEmail || undefined,
+                    country: newPaymentCountry || undefined,
+                  };
+                  setPaymentMethods(prev => [...prev, newMethod]);
+                  setNewPaymentLabel(""); setNewPaymentPhone(""); setNewPaymentEmail(""); setNewPaymentCountry("");
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold cursor-pointer transition-colors"
+              >
+                <Plus className="w-4 h-4" /> Ajouter
+              </button>
+
+              {paymentMethods.length > 0 && (
+                <div className="space-y-3 border-t border-zinc-100 dark:border-zinc-800 pt-4">
+                  <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Moyens enregistrés</h3>
+                  {paymentMethods.map((method) => (
+                    <div
+                      key={method.id}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        preferredMethod === method.id
+                          ? "border-blue-500 bg-blue-50/50 dark:bg-blue-950/20"
+                          : "border-zinc-200 dark:border-zinc-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                            method.type === "paypal" ? "bg-blue-100 dark:bg-blue-950/30 text-blue-600" : "bg-teal-100 dark:bg-teal-950/30 text-teal-600"
+                          }`}>
+                            {method.type === "paypal" ? <CreditCard className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                              {method.label}
+                              {preferredMethod === method.id && (
+                                <span className="text-[9px] font-extrabold uppercase bg-blue-500 text-white px-1.5 py-0.5 rounded-full">Préféré</span>
+                              )}
+                            </p>
+                            <p className="text-xs text-zinc-500">
+                              {method.type === "paypal" ? method.email : `${method.phone}${method.country ? " • " + method.country : ""}`}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {preferredMethod !== method.id && (
+                            <button
+                              onClick={() => setPreferredMethod(method.id)}
+                              className="px-2.5 py-1 text-xs font-semibold text-blue-600 border border-blue-200 dark:border-blue-800 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors"
+                            >
+                              Définir préféré
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setPaymentMethods(prev => prev.filter(m => m.id !== method.id));
+                              if (preferredMethod === method.id) setPreferredMethod(null);
+                            }}
+                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      onClick={async () => {
+                        setSavingPayment(true);
+                        try {
+                          const res = await fetch("/api/profile", {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ payment_methods: paymentMethods, preferred_payment_method: preferredMethod }),
+                          });
+                          if (res.ok) { setPaymentSaved(true); setTimeout(() => setPaymentSaved(false), 3000); }
+                        } finally { setSavingPayment(false); }
+                      }}
+                      disabled={savingPayment}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-xl transition-colors"
+                    >
+                      {savingPayment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      Enregistrer
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

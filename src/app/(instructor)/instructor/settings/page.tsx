@@ -5,10 +5,11 @@ import { getSimulatedSession, setSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
 import {
   User, Globe, Bell, Shield, Save, CheckCircle2, Camera,
-  Share2, Link as LinkIcon, Video as VideoIcon, ExternalLink, GraduationCap, Award, Loader2
+  Share2, Link as LinkIcon, Video as VideoIcon, ExternalLink, GraduationCap, Award, Loader2,
+  CreditCard, Phone, Trash2, Plus, Star,
 } from "lucide-react";
 
-type Tab = "profile" | "academy" | "social" | "notifications" | "security";
+type Tab = "profile" | "academy" | "social" | "notifications" | "security" | "payment";
 
 export default function InstructorSettingsPage() {
   const [session, setSession] = useState<any>(null);
@@ -48,6 +49,17 @@ export default function InstructorSettingsPage() {
     marketingEmails: false,
   });
 
+  type PaymentMethod = { id: string; type: "mobile_money" | "paypal"; label?: string; phone?: string; email?: string; country?: string };
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [preferredMethod, setPreferredMethod] = useState<string | null>(null);
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [paymentSaved, setPaymentSaved] = useState(false);
+  const [newPaymentType, setNewPaymentType] = useState<"mobile_money" | "paypal">("mobile_money");
+  const [newPaymentLabel, setNewPaymentLabel] = useState("");
+  const [newPaymentPhone, setNewPaymentPhone] = useState("");
+  const [newPaymentEmail, setNewPaymentEmail] = useState("");
+  const [newPaymentCountry, setNewPaymentCountry] = useState("");
+
   useEffect(() => {
     const s = getSimulatedSession();
     setSession(s);
@@ -83,6 +95,8 @@ export default function InstructorSettingsPage() {
             academy_name: profile.academy_name || "",
             academy_tagline: profile.academy_tagline || "",
           });
+          if (Array.isArray(profile.payment_methods)) setPaymentMethods(profile.payment_methods);
+          setPreferredMethod(profile.preferred_payment_method || null);
         }
       }
     } catch (err) {
@@ -152,6 +166,7 @@ export default function InstructorSettingsPage() {
     { key: "academy", label: "Académie", icon: <GraduationCap className="w-4 h-4" /> },
     { key: "social", label: "Réseaux sociaux", icon: <Globe className="w-4 h-4" /> },
     { key: "notifications", label: "Notifications", icon: <Bell className="w-4 h-4" /> },
+    { key: "payment", label: "Paiement", icon: <CreditCard className="w-4 h-4" /> },
     { key: "security", label: "Sécurité", icon: <Shield className="w-4 h-4" /> },
   ];
 
@@ -376,6 +391,212 @@ export default function InstructorSettingsPage() {
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {activeTab === "payment" && (
+        <div className="space-y-6">
+          {/* Add new method */}
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-zinc-900 dark:text-white">Ajouter un moyen de paiement</h2>
+                <p className="text-xs text-zinc-400 mt-0.5">Ces informations seront utilisées pour les paiements automatiques (abonnements, versements).</p>
+              </div>
+              {paymentSaved && (
+                <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-900/30">
+                  <CheckCircle2 className="w-4 h-4" /> Enregistré !
+                </span>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setNewPaymentType("mobile_money")}
+                className={`flex-1 py-3 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  newPaymentType === "mobile_money"
+                    ? "bg-teal-600 text-white border-teal-600"
+                    : "bg-zinc-50 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:border-teal-400"
+                }`}
+              >
+                <Phone className="w-4 h-4" /> Mobile Money
+              </button>
+              <button
+                onClick={() => setNewPaymentType("paypal")}
+                className={`flex-1 py-3 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  newPaymentType === "paypal"
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-zinc-50 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:border-blue-400"
+                }`}
+              >
+                <CreditCard className="w-4 h-4" /> PayPal
+              </button>
+            </div>
+
+            {newPaymentType === "mobile_money" && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Opérateur</label>
+                  <select
+                    value={newPaymentLabel}
+                    onChange={(e) => setNewPaymentLabel(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                  >
+                    <option value="">Choisir un opérateur</option>
+                    {["MTN Mobile Money", "Orange Money", "Wave", "Airtel Money", "M-Pesa", "Moov Money", "Autre"].map(op => (
+                      <option key={op} value={op}>{op}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Numéro de téléphone</label>
+                  <input
+                    type="tel"
+                    value={newPaymentPhone}
+                    onChange={(e) => setNewPaymentPhone(e.target.value)}
+                    placeholder="+237 6XX XXX XXX"
+                    className="w-full px-3 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Pays</label>
+                  <input
+                    type="text"
+                    value={newPaymentCountry}
+                    onChange={(e) => setNewPaymentCountry(e.target.value)}
+                    placeholder="Ex: CM, SN, CI"
+                    className="w-full px-3 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {newPaymentType === "paypal" && (
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Adresse email PayPal</label>
+                <input
+                  type="email"
+                  value={newPaymentEmail}
+                  onChange={(e) => setNewPaymentEmail(e.target.value)}
+                  placeholder="paypal@email.com"
+                  className="w-full px-3 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+            )}
+
+            <button
+              onClick={() => {
+                if (newPaymentType === "mobile_money" && (!newPaymentLabel || !newPaymentPhone)) return;
+                if (newPaymentType === "paypal" && !newPaymentEmail) return;
+                const newMethod: PaymentMethod = {
+                  id: crypto.randomUUID(),
+                  type: newPaymentType,
+                  label: newPaymentType === "mobile_money" ? newPaymentLabel : "PayPal",
+                  phone: newPaymentPhone || undefined,
+                  email: newPaymentEmail || undefined,
+                  country: newPaymentCountry || undefined,
+                };
+                setPaymentMethods(prev => [...prev, newMethod]);
+                setNewPaymentLabel(""); setNewPaymentPhone(""); setNewPaymentEmail(""); setNewPaymentCountry("");
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl text-sm font-bold cursor-pointer hover:bg-zinc-700 dark:hover:bg-zinc-100 transition-colors"
+            >
+              <Plus className="w-4 h-4" /> Ajouter ce moyen de paiement
+            </button>
+          </div>
+
+          {/* Current methods */}
+          {paymentMethods.length > 0 && (
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-zinc-900 dark:text-white">Moyens de paiement enregistrés</h2>
+                <span className="text-xs text-zinc-400">{paymentMethods.length} moyen(s)</span>
+              </div>
+              <div className="space-y-3">
+                {paymentMethods.map((method) => (
+                  <div
+                    key={method.id}
+                    className={`p-4 rounded-xl border-2 transition-all ${
+                      preferredMethod === method.id
+                        ? "border-teal-500 bg-teal-50/50 dark:bg-teal-950/20"
+                        : "border-zinc-200 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/30"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                          method.type === "paypal" ? "bg-blue-100 dark:bg-blue-950/30 text-blue-600" : "bg-teal-100 dark:bg-teal-950/30 text-teal-600"
+                        }`}>
+                          {method.type === "paypal" ? <CreditCard className="w-5 h-5" /> : <Phone className="w-5 h-5" />}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                            {method.label}
+                            {preferredMethod === method.id && (
+                              <span className="text-[9px] font-extrabold uppercase bg-teal-500 text-white px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <Star className="w-2.5 h-2.5" /> Préféré
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-zinc-500 mt-0.5">
+                            {method.type === "paypal" ? method.email : `${method.phone}${method.country ? " • " + method.country : ""}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {preferredMethod !== method.id && (
+                          <button
+                            onClick={() => setPreferredMethod(method.id)}
+                            className="px-3 py-1.5 text-xs font-semibold text-teal-600 border border-teal-200 dark:border-teal-800 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950/20 transition-colors cursor-pointer"
+                          >
+                            Définir comme préféré
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            setPaymentMethods(prev => prev.filter(m => m.id !== method.id));
+                            if (preferredMethod === method.id) setPreferredMethod(null);
+                          }}
+                          className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-end">
+                <button
+                  onClick={async () => {
+                    setSavingPayment(true);
+                    try {
+                      const res = await fetch("/api/profile", {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          payment_methods: paymentMethods,
+                          preferred_payment_method: preferredMethod,
+                        }),
+                      });
+                      if (res.ok) {
+                        setPaymentSaved(true);
+                        setTimeout(() => setPaymentSaved(false), 3000);
+                      }
+                    } finally {
+                      setSavingPayment(false);
+                    }
+                  }}
+                  disabled={savingPayment}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white font-semibold rounded-xl transition-colors shadow-lg shadow-teal-500/20"
+                >
+                  {savingPayment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Enregistrer les moyens de paiement
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

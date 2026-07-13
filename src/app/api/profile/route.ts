@@ -53,6 +53,8 @@ export async function PUT(req: NextRequest) {
       academy_tagline: 'academy_tagline',
       academic_background: 'academic_background',
       certifications: 'certifications',
+      payment_methods: 'payment_methods',
+      preferred_payment_method: 'preferred_payment_method',
     };
 
     const updates: Record<string, any> = {};

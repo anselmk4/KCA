@@ -31,6 +31,7 @@ import {
   XCircle,
   Trash2,
   Loader2,
+  Share2,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { getSimulatedSession, setSimulatedSession, clearSimulatedSession } from "@/lib/rbac";
@@ -46,6 +47,7 @@ const menuItems = [
   { icon: Video, label: "Sessions live", href: "/instructor/live" },
   { icon: BarChart3, label: "Analytique", href: "/instructor/analytics" },
   { icon: Wallet, label: "Revenus", href: "/instructor/earnings" },
+  { icon: Share2, label: "Affiliation", href: "/instructor/affiliate" },
   { icon: CreditCard, label: "Abonnement", href: "/instructor/billing" },
   { icon: MessageSquare, label: "Messages", href: "/instructor/messages" },
   { icon: Users2, label: "Communauté", href: "/instructor/community" },
