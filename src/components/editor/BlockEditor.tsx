@@ -217,13 +217,13 @@ export function serializeBlocksToHtml(blocks: Block[]): string {
             const ytReg = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
             const match = url.match(ytReg);
             if (match && match[1]) {
-              embedSrc = `https://www.youtube.com/embed/${match[1]}`;
+              embedSrc = `https://www.youtube.com/embed/${match[1]}?modestbranding=1&rel=0`;
             }
           } else if (vType === "dailymotion") {
             const dmReg = /dailymotion\.com\/(?:video|embed\/video)\/([a-zA-Z0-9]+)/i;
             const match = url.match(dmReg);
             if (match && match[1]) {
-              embedSrc = `https://www.dailymotion.com/embed/video/${match[1]}`;
+              embedSrc = `https://www.dailymotion.com/embed/video/${match[1]}?ui-logo=0&ui-start-screen-info=0`;
             }
           }
 

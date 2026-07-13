@@ -82,7 +82,7 @@ function getVideoEmbedInfo(url: string) {
   if (ytMatch && ytMatch[1]) {
     return {
       type: "youtube",
-      embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}`,
+      embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}?modestbranding=1&rel=0`,
     };
   }
 
@@ -92,7 +92,7 @@ function getVideoEmbedInfo(url: string) {
   if (vimeoMatch && vimeoMatch[1]) {
     return {
       type: "vimeo",
-      embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}`,
+      embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}?title=0&byline=0&portrait=0`,
     };
   }
 
@@ -102,7 +102,7 @@ function getVideoEmbedInfo(url: string) {
   if (dmMatch && dmMatch[1]) {
     return {
       type: "dailymotion",
-      embedUrl: `https://www.dailymotion.com/embed/video/${dmMatch[1]}`,
+      embedUrl: `https://www.dailymotion.com/embed/video/${dmMatch[1]}?ui-logo=0&ui-start-screen-info=0`,
     };
   }
 
