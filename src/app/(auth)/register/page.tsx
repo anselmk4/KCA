@@ -196,6 +196,7 @@ function RegisterForm() {
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
@@ -289,9 +290,34 @@ function RegisterForm() {
     return true;
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     setSuccessMessage(null);
     if (!validateStep()) return;
+
+    if (step === 1) {
+      setCheckingEmail(true);
+      try {
+        const checkRes = await fetch("/api/auth/check-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+
+        if (checkRes.ok) {
+          const checkData = await checkRes.json();
+          if (checkData.exists) {
+            setFormError("Cet email est déjà utilisé. Essayez de vous connecter.");
+            setCheckingEmail(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Error checking email availability:", err);
+      } finally {
+        setCheckingEmail(false);
+      }
+    }
+
     setStep((s) => s + 1);
   };
 
@@ -336,6 +362,19 @@ function RegisterForm() {
     setLoading(true);
 
     try {
+      // Check email uniqueness before calling signUp (since signUp returns a fake success if enumeration protection is on)
+      const emailCheckRes = await fetch("/api/auth/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (emailCheckRes.ok) {
+        const emailCheckData = await emailCheckRes.json();
+        if (emailCheckData.exists) {
+          throw new Error("Cet email est déjà utilisé. Essayez de vous connecter.");
+        }
+      }
+
       // Security check (CAPTCHA + rate limit)
       const secRes = await fetch("/api/auth/security-check", {
         method: "POST",
@@ -603,7 +642,7 @@ function RegisterForm() {
       ) : (
         /* ── Multi-step Form ── */
         <form
-          onSubmit={step === TOTAL_STEPS ? handleComplete : (e) => { e.preventDefault(); handleNext(); }}
+          onSubmit={step === TOTAL_STEPS ? handleComplete : async (e) => { e.preventDefault(); await handleNext(); }}
           className="space-y-4"
         >
           {/* Error / Success banners */}
@@ -708,7 +747,7 @@ function RegisterForm() {
 
               <button
                 type="button"
-                disabled={loading || googleLoading}
+                disabled={loading || checkingEmail || googleLoading}
                 onClick={handleGoogleRegister}
                 className="w-full py-3 px-4 bg-white hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-bold rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-70 cursor-pointer text-xs"
               >
@@ -1054,20 +1093,20 @@ function RegisterForm() {
             <button
               type="button"
               onClick={handlePrev}
-              disabled={loading}
+              disabled={loading || checkingEmail}
               className="px-4 py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-bold rounded-xl transition-all disabled:opacity-50 cursor-pointer"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <button
               type="submit"
-              disabled={loading || googleLoading || (step === TOTAL_STEPS && !captchaToken)}
+              disabled={loading || checkingEmail || googleLoading || (step === TOTAL_STEPS && !captchaToken)}
               className="flex-1 py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer text-sm"
             >
-              {loading ? (
+              {loading || checkingEmail ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Création du compte...
+                  {checkingEmail ? "Vérification..." : "Création du compte..."}
                 </>
               ) : step === TOTAL_STEPS ? (
                 "Finaliser et ouvrir mon Espace"
