@@ -28,7 +28,7 @@ import { supabase } from "@/lib/supabase/client";
 // ─────────────────────────────────────────────────────────
 // Types locaux (sync avec sync.ts)
 // ─────────────────────────────────────────────────────────
-type Course = { id: string; title: string; description: string; instructorName: string };
+type Course = { id: string; title: string; description: string; instructorName: string; thumbnailUrl?: string | null };
 type Section = { id: string; courseId: string; title: string; order: number };
 type Lesson = {
   id: string; sectionId: string; title: string;
@@ -79,6 +79,26 @@ function getVideoEmbedInfo(url: string) {
   };
 }
 
+function getVideoThumbnail(url: string, fallback: string) {
+  if (!url) return fallback;
+
+  // YouTube
+  const ytRegex = /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  const ytMatch = url.match(ytRegex);
+  if (ytMatch && ytMatch[1]) {
+    return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
+  }
+
+  // Dailymotion
+  const dmRegex = /^(?:https?:\/\/)?(?:www\.)?(?:dailymotion\.com\/(?:video|embed\/video)\/|dai\.ly\/)([a-zA-Z0-9]+)/;
+  const dmMatch = url.match(dmRegex);
+  if (dmMatch && dmMatch[1]) {
+    return `https://www.dailymotion.com/thumbnail/video/${dmMatch[1]}`;
+  }
+
+  return fallback;
+}
+
 export default function CourseLearnPage() {
   const params = useParams();
   const router = useRouter();
@@ -114,6 +134,11 @@ export default function CourseLearnPage() {
 
   const [progressPercent, setProgressPercent] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [videoPlaying, setVideoPlaying] = useState(false);
+
+  useEffect(() => {
+    setVideoPlaying(false);
+  }, [activeLesson]);
   const [notAuthorized, setNotAuthorized] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -161,7 +186,7 @@ export default function CourseLearnPage() {
     // 3. Charger le cours
     const { data: courseData } = await supabase
       .from("courses")
-      .select("id, title, description, instructor_id, profiles!instructor_id(full_name)")
+      .select("id, title, description, instructor_id, thumbnail_url, profiles!instructor_id(full_name)")
       .eq("id", courseId)
       .maybeSingle();
 
@@ -175,6 +200,7 @@ export default function CourseLearnPage() {
       title: courseData.title,
       description: courseData.description || "",
       instructorName: (courseData as any).profiles?.full_name || "Instructeur",
+      thumbnailUrl: courseData.thumbnail_url || null,
     });
 
     // 4. Sections
@@ -936,25 +962,57 @@ export default function CourseLearnPage() {
             /* CASE B: Leçon active */
             <div className="space-y-6">
               {activeLesson.videoUrl && (
-                <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-black shadow-lg">
+                <div className="relative aspect-video w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-black shadow-lg group">
                   {(() => {
                     const embedInfo = getVideoEmbedInfo(activeLesson.videoUrl);
                     if (!embedInfo) return null;
-                    
-                    return embedInfo.type === "direct" ? (
-                      <video
-                        src={embedInfo.embedUrl}
-                        controls
-                        className="absolute inset-0 w-full h-full object-contain"
-                      />
+
+                    const thumbnail = getVideoThumbnail(activeLesson.videoUrl, course?.thumbnailUrl || "/images/courses/web3.png");
+
+                    return !videoPlaying && embedInfo.type !== "direct" ? (
+                      <div 
+                        onClick={() => setVideoPlaying(true)}
+                        className="absolute inset-0 w-full h-full cursor-pointer select-none"
+                      >
+                        <img 
+                          src={thumbnail} 
+                          alt={activeLesson.title}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-103"
+                        />
+                        <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors duration-300 flex items-center justify-center" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-16 h-16 rounded-full bg-white/95 dark:bg-zinc-900/95 flex items-center justify-center shadow-2xl transition-all duration-300 transform group-hover:scale-110 group-active:scale-95 group-hover:bg-teal-600 dark:group-hover:bg-teal-500 group-hover:text-white text-zinc-900 dark:text-white border border-white/20">
+                            <svg className="w-8 h-8 fill-current ml-1" viewBox="0 0 24 24">
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
                     ) : (
-                      <iframe
-                        src={embedInfo.embedUrl}
-                        className="absolute inset-0 w-full h-full border-0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        title={activeLesson.title}
-                      />
+                      <>
+                        {(() => {
+                          const finalUrl = embedInfo.type !== "direct" 
+                            ? `${embedInfo.embedUrl}${embedInfo.embedUrl.includes('?') ? '&' : '?'}autoplay=1` 
+                            : embedInfo.embedUrl;
+
+                          return embedInfo.type === "direct" ? (
+                            <video
+                              src={finalUrl}
+                              controls
+                              autoPlay
+                              className="absolute inset-0 w-full h-full object-contain"
+                            />
+                          ) : (
+                            <iframe
+                              src={finalUrl}
+                              className="absolute inset-0 w-full h-full border-0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                              title={activeLesson.title}
+                            />
+                          );
+                        })()}
+                      </>
                     );
                   })()}
                 </div>
