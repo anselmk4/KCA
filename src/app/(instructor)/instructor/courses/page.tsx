@@ -72,7 +72,7 @@ export default function InstructorCoursesPage() {
       // 1. Fetch courses owned by the instructor
       const { data: coursesData } = await supabase
         .from("courses")
-        .select("id, title, description, status, price, level")
+        .select("id, title, description, status, price, level, thumbnail_url")
         .eq("instructor_id", instructorId);
 
       const coursesList = coursesData || [];
@@ -391,9 +391,15 @@ export default function InstructorCoursesPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 px-6 py-5 items-center">
                   {/* Course Info */}
                   <div className="col-span-4 flex items-center gap-3">
-                    <div className="shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center shadow-sm">
-                      <BookOpen className="w-5 h-5 text-white" />
-                    </div>
+                    {course.thumbnail_url ? (
+                      <div className="shrink-0 w-11 h-11 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 relative bg-zinc-100 dark:bg-zinc-800">
+                        <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center shadow-sm">
+                        <BookOpen className="w-5 h-5 text-white" />
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <p className="font-semibold text-zinc-900 dark:text-white text-sm truncate">{course.title}</p>
                       {cleanDesc && (

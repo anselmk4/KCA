@@ -21,6 +21,7 @@ interface Course {
   level: string;
   allowInstallments: boolean;
   installmentsCount: number;
+  thumbnailUrl?: string | null;
 }
 
 export default function CoursePreviewPage() {
@@ -146,6 +147,7 @@ export default function CoursePreviewPage() {
         level: levelLabel,
         allowInstallments: courseData.allow_installments || false,
         installmentsCount: courseData.installments_count || 2,
+        thumbnailUrl: courseData.thumbnail_url || null,
       });
 
     } catch (err) {
@@ -180,14 +182,16 @@ export default function CoursePreviewPage() {
   }
 
   // Cover image fallback
-  let courseImg = `/images/courses/web3.png`;
-  if (course.id === "blockchain") courseImg = `/images/courses/blockchain-dev.png`;
-  else if (course.id === "trading") courseImg = `/images/courses/trading.png`;
-  else if (course.id === "ai") courseImg = `/images/courses/ai.png`;
-  else if (course.id === "web3") courseImg = `/images/courses/web3.png`;
-  else if (course.id === "blockchain-consulting") courseImg = `/images/courses/blockchain-consulting.png`;
-  else if (course.id === "blockchain-dev") courseImg = `/images/courses/blockchain-dev.png`;
-  else if (course.id === "defi") courseImg = `/images/courses/defi.png`;
+  let courseImg = course.thumbnailUrl || `/images/courses/web3.png`;
+  if (!course.thumbnailUrl) {
+    if (course.id === "blockchain") courseImg = `/images/courses/blockchain-dev.png`;
+    else if (course.id === "trading") courseImg = `/images/courses/trading.png`;
+    else if (course.id === "ai") courseImg = `/images/courses/ai.png`;
+    else if (course.id === "web3") courseImg = `/images/courses/web3.png`;
+    else if (course.id === "blockchain-consulting") courseImg = `/images/courses/blockchain-consulting.png`;
+    else if (course.id === "blockchain-dev") courseImg = `/images/courses/blockchain-dev.png`;
+    else if (course.id === "defi") courseImg = `/images/courses/defi.png`;
+  }
 
   const handleActionClick = () => {
     if (isEnrolled) {

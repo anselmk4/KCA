@@ -59,7 +59,7 @@ export default function InstructorDashboardPage() {
         // 1. Fetch courses owned by the instructor
         const { data: coursesData } = await supabase
           .from("courses")
-          .select("id, title, status, price, level")
+          .select("id, title, status, price, level, thumbnail_url")
           .eq("instructor_id", instructorId);
 
         const coursesList = coursesData || [];
@@ -348,17 +348,28 @@ export default function InstructorDashboardPage() {
                   key={course.id}
                   className="px-6 py-4 flex items-center justify-between hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors"
                 >
-                  <div className="flex-1 min-w-0 text-left">
-                    <h3 className="text-sm font-medium text-zinc-900 dark:text-white truncate">
-                      {course.title}
-                    </h3>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="text-xs text-zinc-500 flex items-center gap-1">
-                        <Users className="w-3 h-3" /> {stat.enrollCount} inscrit{stat.enrollCount > 1 ? "s" : ""}
-                      </span>
-                      <span className="text-xs text-zinc-500 flex items-center gap-1">
-                        <DollarSign className="w-3 h-3" /> {stat.revenue.toLocaleString()}$
-                      </span>
+                  <div className="flex-1 min-w-0 flex items-center gap-3 text-left">
+                    {course.thumbnail_url ? (
+                      <div className="shrink-0 w-11 h-7 rounded overflow-hidden border border-zinc-200 dark:border-zinc-800 relative bg-zinc-100 dark:bg-zinc-800">
+                        <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="shrink-0 w-11 h-7 rounded bg-teal-100 dark:bg-teal-900/20 flex items-center justify-center">
+                        <BookOpen className="w-4 h-4 text-teal-600" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-medium text-zinc-900 dark:text-white truncate">
+                        {course.title}
+                      </h3>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-xs text-zinc-500 flex items-center gap-1">
+                          <Users className="w-3 h-3" /> {stat.enrollCount} inscrit{stat.enrollCount > 1 ? "s" : ""}
+                        </span>
+                        <span className="text-xs text-zinc-500 flex items-center gap-1">
+                          <DollarSign className="w-3 h-3" /> {stat.revenue.toLocaleString()}$
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <span

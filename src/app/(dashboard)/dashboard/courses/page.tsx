@@ -28,6 +28,7 @@ interface CourseData {
   price: number;
   status: string;
   instructor_id: string;
+  thumbnail_url?: string | null;
 }
 
 interface EnrollmentData {
@@ -82,7 +83,7 @@ export default function MyCoursesPage() {
       // Enrollments with courses
       const { data: enrollData } = await supabase
         .from("enrollments")
-        .select("id, student_id, course_id, status, progress_percent, created_at, courses(id, title, category_id, level, price, status, categories(name))")
+        .select("id, student_id, course_id, status, progress_percent, created_at, courses(id, title, category_id, level, price, status, thumbnail_url, categories(name))")
         .eq("student_id", user.id);
 
       const all = (enrollData || []) as unknown as EnrollmentData[];
@@ -97,7 +98,7 @@ export default function MyCoursesPage() {
       const enrolledIds = new Set(all.map((e) => e.course_id));
       const { data: coursesData } = await supabase
         .from("courses")
-        .select("id, title, category_id, level, price, status, categories(name)")
+        .select("id, title, category_id, level, price, status, thumbnail_url, categories(name)")
         .eq("status", "PUBLISHED");
 
       const available = ((coursesData || []) as unknown as CourseData[]).filter((c) => !enrolledIds.has(c.id));
@@ -157,9 +158,15 @@ export default function MyCoursesPage() {
                   return (
                     <div key={enr.id} className={`bg-white dark:bg-zinc-900 rounded-2xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col h-full hover:shadow-md transition-all ${styles.borderHover}`}>
                       <div className="mb-5 flex justify-between items-start">
-                        <div className={`w-13 h-13 ${styles.bgColor} rounded-2xl flex items-center justify-center`}>
-                          <CourseIcon category={catName} className={`w-7 h-7 ${styles.color}`} />
-                        </div>
+                        {course.thumbnail_url ? (
+                          <div className="w-20 h-12 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 relative bg-zinc-100 dark:bg-zinc-800 shrink-0">
+                            <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className={`w-13 h-13 ${styles.bgColor} rounded-2xl flex items-center justify-center shrink-0`}>
+                            <CourseIcon category={catName} className={`w-7 h-7 ${styles.color}`} />
+                          </div>
+                        )}
                         <span className="px-3 py-1 bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 text-[10px] font-bold uppercase tracking-wider rounded-full flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
                           En cours
@@ -208,9 +215,15 @@ export default function MyCoursesPage() {
                   return (
                     <div key={enr.id} className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-11 h-11 ${styles.bgColor} rounded-xl flex items-center justify-center shrink-0`}>
-                          <CourseIcon category={catName} className={`w-5 h-5 ${styles.color}`} />
-                        </div>
+                        {course.thumbnail_url ? (
+                          <div className="w-14 h-9 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 shrink-0 relative bg-zinc-100 dark:bg-zinc-800">
+                            <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className={`w-11 h-11 ${styles.bgColor} rounded-xl flex items-center justify-center shrink-0`}>
+                            <CourseIcon category={catName} className={`w-5 h-5 ${styles.color}`} />
+                          </div>
+                        )}
                         <div className="min-w-0">
                           <h3 className="font-bold text-zinc-900 dark:text-white text-sm truncate">{course.title}</h3>
                           <p className="text-[11px] text-zinc-400 mt-0.5">{catName} · 100%</p>
@@ -260,9 +273,15 @@ export default function MyCoursesPage() {
                     className={`block bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all ${styles.borderHover} flex items-center justify-between group`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-10 h-10 ${styles.bgColor} rounded-xl flex items-center justify-center shrink-0`}>
-                        <CourseIcon category={catName} className={`w-5 h-5 ${styles.color}`} />
-                      </div>
+                      {course.thumbnail_url ? (
+                        <div className="w-14 h-9 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 shrink-0 relative bg-zinc-100 dark:bg-zinc-800">
+                          <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className={`w-10 h-10 ${styles.bgColor} rounded-xl flex items-center justify-center shrink-0`}>
+                          <CourseIcon category={catName} className={`w-5 h-5 ${styles.color}`} />
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <h4 className="font-bold text-xs text-zinc-900 dark:text-white truncate">{course.title}</h4>
                         <p className="text-[10px] text-zinc-400 mt-0.5">{course.price > 0 ? `$${course.price}` : "Gratuit"} · {catName}</p>

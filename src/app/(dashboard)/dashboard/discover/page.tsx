@@ -19,6 +19,7 @@ type DiscoverCourse = {
   rating: number;
   category: string;
   level: string;
+  thumbnailUrl?: string | null;
 };
 
 const CATEGORY_UUID_MAP: Record<string, string> = {
@@ -63,7 +64,7 @@ export default function DiscoverPage() {
         // Fetch published courses directly from Supabase — bypasses localStorage
         const { data: sbCourses, error: coursesError } = await supabase
           .from('courses')
-          .select('id, title, slug, description, price, status, instructor_id, category_id, level, rating_avg, created_at')
+          .select('id, title, slug, description, price, status, instructor_id, category_id, level, rating_avg, created_at, thumbnail_url')
           .eq('status', 'PUBLISHED')
           .order('created_at', { ascending: false });
 
@@ -127,6 +128,7 @@ export default function DiscoverPage() {
           rating: c.rating_avg || 0,
           category: categoryNameMap.get(c.category_id ?? '') || getCategoryLabel(c.category_id) || '',
           level: getLevelLabel(c.level),
+          thumbnailUrl: c.thumbnail_url || null,
         }));
 
         setCourses(mapped);
@@ -232,12 +234,14 @@ export default function DiscoverPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {filtered.map((course) => {
             // Map course ID to specific image asset if exists, otherwise placeholder
-            let courseImg = `/images/courses/web3.png`;
-            if (course.id === "blockchain" || course.slug?.includes("blockchain")) courseImg = `/images/courses/blockchain-dev.png`;
-            else if (course.id === "trading" || course.slug?.includes("trading")) courseImg = `/images/courses/trading.png`;
-            else if (course.id === "ai" || course.slug?.includes("artificielle") || course.slug?.includes("ai")) courseImg = `/images/courses/ai.png`;
-            else if (course.id === "web3" || course.slug?.includes("web3")) courseImg = `/images/courses/web3.png`;
-            else if (course.slug?.includes("defi")) courseImg = `/images/courses/defi.png`;
+            let courseImg = course.thumbnailUrl || `/images/courses/web3.png`;
+            if (!course.thumbnailUrl) {
+              if (course.id === "blockchain" || course.slug?.includes("blockchain")) courseImg = `/images/courses/blockchain-dev.png`;
+              else if (course.id === "trading" || course.slug?.includes("trading")) courseImg = `/images/courses/trading.png`;
+              else if (course.id === "ai" || course.slug?.includes("artificielle") || course.slug?.includes("ai")) courseImg = `/images/courses/ai.png`;
+              else if (course.id === "web3" || course.slug?.includes("web3")) courseImg = `/images/courses/web3.png`;
+              else if (course.slug?.includes("defi")) courseImg = `/images/courses/defi.png`;
+            }
 
             const enrolledCount = enrollmentCounts[course.id] || 0;
 

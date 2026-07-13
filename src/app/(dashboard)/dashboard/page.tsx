@@ -37,6 +37,7 @@ interface CourseData {
   price: number;
   status: string;
   description: string;
+  thumbnail_url?: string | null;
 }
 
 interface EnrollmentData {
@@ -92,14 +93,15 @@ export default function DashboardPage() {
       // Enrollments with course data
       const { data: enrollData } = await (supabase as any)
         .from("enrollments")
-        .select("id, student_id, course_id, status, progress_percent, created_at, courses(id, title, category_id, level, price, status, description, categories(name))")
+        .select("id, student_id, course_id, status, progress_percent, created_at, courses(id, title, category_id, level, price, status, description, thumbnail_url, categories(name))")
         .eq("student_id", user.id);
 
       const all = (enrollData || []).map((e: any) => ({
         ...e,
         courses: e.courses ? {
           ...e.courses,
-          category: e.courses.categories?.name || "Général"
+          category: e.courses.categories?.name || "Général",
+          thumbnail_url: e.courses.thumbnail_url
         } : undefined
       })) as unknown as EnrollmentData[];
 
@@ -119,12 +121,13 @@ export default function DashboardPage() {
       const enrolledIds = new Set(all.map((e) => e.course_id));
       const { data: coursesData } = await (supabase as any)
         .from("courses")
-        .select("id, title, category_id, level, price, status, description, categories(name)")
+        .select("id, title, category_id, level, price, status, description, thumbnail_url, categories(name)")
         .eq("status", "PUBLISHED");
 
       const available = ((coursesData || []).map((c: any) => ({
         ...c,
-        category: c.categories?.name || "Général"
+        category: c.categories?.name || "Général",
+        thumbnail_url: c.thumbnail_url
       })) as unknown as CourseData[]).filter((c) => !enrolledIds.has(c.id)).slice(0, 3);
       setAvailableCourses(available);
     } catch (err) {
@@ -272,9 +275,15 @@ export default function DashboardPage() {
                       }`}
                     >
                       <div className="flex items-start gap-4">
-                        <div className={`w-12 h-12 ${styles.bgColor} rounded-xl flex items-center justify-center shrink-0`}>
-                          {styles.icon}
-                        </div>
+                        {course.thumbnail_url ? (
+                          <div className="w-16 h-10 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 shrink-0 relative bg-zinc-150">
+                            <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className={`w-12 h-12 ${styles.bgColor} rounded-xl flex items-center justify-center shrink-0`}>
+                            {styles.icon}
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2 mb-1">
                             <h3 className="font-bold text-sm text-zinc-900 dark:text-white line-clamp-1">{course.title}</h3>
@@ -325,9 +334,15 @@ export default function DashboardPage() {
                   return (
                     <div key={enr.id} className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-11 h-11 ${styles.bgColor} rounded-xl flex items-center justify-center shrink-0`}>
-                          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                        </div>
+                        {course.thumbnail_url ? (
+                          <div className="w-14 h-9 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 shrink-0 relative bg-zinc-150">
+                            <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className={`w-11 h-11 ${styles.bgColor} rounded-xl flex items-center justify-center shrink-0`}>
+                            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                          </div>
+                        )}
                         <div className="min-w-0">
                           <h3 className="font-bold text-sm text-zinc-900 dark:text-white truncate">{course.title}</h3>
                           <p className="text-[11px] text-zinc-400 mt-0.5">{course.category} · 100%</p>
@@ -363,8 +378,14 @@ export default function DashboardPage() {
                     href={`/dashboard/discover/${course.id}`}
                     className={`block bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all group ${styles.borderHover}`}
                   >
-                    <div className={`h-24 ${styles.bgColor} rounded-xl mb-4 flex items-center justify-center`}>
-                      {styles.icon}
+                    <div className="h-24 rounded-xl mb-4 overflow-hidden relative bg-zinc-100 dark:bg-zinc-800">
+                      {course.thumbnail_url ? (
+                        <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className={`w-full h-full ${styles.bgColor} flex items-center justify-center`}>
+                          {styles.icon}
+                        </div>
+                      )}
                     </div>
                     <h4 className="font-bold text-zinc-900 dark:text-white mb-1 line-clamp-2 text-sm">{course.title}</h4>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4 line-clamp-2">{course.description}</p>
