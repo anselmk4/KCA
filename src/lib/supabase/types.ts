@@ -1158,6 +1158,9 @@ export type Database = {
           academy_tagline: string | null
           academic_background: string | null
           certifications: string | null
+          country: string | null
+          phone_number: string | null
+          gender: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -1187,6 +1190,9 @@ export type Database = {
           academy_tagline?: string | null
           academic_background?: string | null
           certifications?: string | null
+          country?: string | null
+          phone_number?: string | null
+          gender?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -1216,6 +1222,9 @@ export type Database = {
           academy_tagline?: string | null
           academic_background?: string | null
           certifications?: string | null
+          country?: string | null
+          phone_number?: string | null
+          gender?: string | null
         }
         Relationships: []
       }
