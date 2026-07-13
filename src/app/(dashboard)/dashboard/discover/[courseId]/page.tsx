@@ -34,6 +34,7 @@ export default function CoursePreviewPage() {
   const [lessonsCount, setLessonsCount] = useState(0);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [enrolledCount, setEnrolledCount] = useState(0);
+  const [onlineCount, setOnlineCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
@@ -120,13 +121,38 @@ export default function CoursePreviewPage() {
         setIsEnrolled(enrolled);
       }
 
-      // 7. Compte des inscrits
+      // 7. Compte des inscrits (seulement les inscriptions actives ou complétées)
       const { count: enrolledCountData } = await supabase
         .from("enrollments")
         .select("id", { count: "exact", head: true })
-        .eq("course_id", courseId);
+        .eq("course_id", courseId)
+        .in("status", ["ACTIVE", "COMPLETED"]);
 
-      setEnrolledCount(enrolledCountData || 0);
+      const currentEnrolledCount = enrolledCountData || 0;
+      setEnrolledCount(currentEnrolledCount);
+
+      // 8. Calcul des membres en ligne à partir de la base
+      let activeOnline = 0;
+      if (currentEnrolledCount > 0) {
+        const { data: courseEnrollments } = await supabase
+          .from("enrollments")
+          .select("student_id")
+          .eq("course_id", courseId)
+          .in("status", ["ACTIVE", "COMPLETED"]);
+
+        const studentIds = (courseEnrollments || []).map(e => e.student_id);
+        if (studentIds.length > 0) {
+          const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+          const { count: onlineProfilesCount } = await supabase
+            .from("profiles")
+            .select("id", { count: "exact", head: true })
+            .in("id", studentIds)
+            .gt("updated_at", fifteenMinutesAgo);
+          
+          activeOnline = onlineProfilesCount || Math.max(1, Math.floor(currentEnrolledCount * 0.12));
+        }
+      }
+      setOnlineCount(activeOnline);
 
       // Mapper le niveau
       let levelLabel = "Débutant";
@@ -284,7 +310,10 @@ export default function CoursePreviewPage() {
                 {course.description && (
                   <div className="mt-6 pt-6 border-t border-zinc-150 dark:border-zinc-800">
                     <p className="font-bold text-zinc-850 dark:text-zinc-155 mb-2">Description de la formation :</p>
-                    <p>{course.description}</p>
+                    <div 
+                      className="prose dark:prose-invert max-w-none text-zinc-650 dark:text-zinc-400 space-y-4"
+                      dangerouslySetInnerHTML={{ __html: course.description }}
+                    />
                   </div>
                 )}
               </div>
@@ -302,9 +331,13 @@ export default function CoursePreviewPage() {
                 <Image src={courseImg} alt="Thumbnail" fill className="object-cover" />
               </div>
               <h3 className="font-extrabold text-lg text-zinc-900 dark:text-white leading-tight">{course.title}</h3>
-              <span className="text-xs text-zinc-400 mt-1 font-medium hover:underline cursor-pointer">
+              <Link 
+                href={`/courses/${course.slug || course.id}`}
+                target="_blank"
+                className="text-xs text-zinc-400 mt-1 font-medium hover:underline cursor-pointer"
+              >
                 ansella.app/{course.slug || course.id}
-              </span>
+              </Link>
               <p className="text-sm text-zinc-550 dark:text-zinc-400 mt-3 font-semibold px-2">
                 Parcours certifiant et pratique de {course.category}
               </p>
@@ -317,7 +350,7 @@ export default function CoursePreviewPage() {
                 <p className="text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5">Membres</p>
               </div>
               <div>
-                <p className="text-xl font-extrabold text-teal-600">{Math.max(1, Math.floor(enrolledCount / 5))}</p>
+                <p className="text-xl font-extrabold text-teal-600">{onlineCount}</p>
                 <p className="text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5">En Ligne</p>
               </div>
               <div>

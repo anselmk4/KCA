@@ -50,6 +50,19 @@ function getLevelLabel(level: string | undefined | null): string {
   return LEVEL_MAP[level] || level;
 }
 
+function stripHtml(html: string | null | undefined): string {
+  if (!html) return "";
+  return html
+    .replace(/<[^>]*>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+}
+
 export default function DiscoverPage() {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
@@ -101,12 +114,13 @@ export default function DiscoverPage() {
           categoryNameMap = new Map(categories?.map(c => [c.id, c.name]) || []);
         }
 
-        // Fetch enrollment counts per course
+        // Fetch active/completed enrollment counts per course
         const courseIds = sbCourses.map(c => c.id);
         const { data: enrollments } = await supabase
           .from('enrollments')
           .select('course_id')
-          .in('course_id', courseIds);
+          .in('course_id', courseIds)
+          .in('status', ['ACTIVE', 'COMPLETED']);
 
         const counts: Record<string, number> = {};
         enrollments?.forEach(e => {
@@ -270,7 +284,7 @@ export default function DiscoverPage() {
                     {course.title}
                   </h2>
                   <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-3 line-clamp-3 flex-grow">
-                    {course.description}
+                    {stripHtml(course.description)}
                   </p>
                   
                   {/* Instructor name */}
