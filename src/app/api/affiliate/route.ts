@@ -10,24 +10,54 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    // Récupérer le profil du formateur (referral_code + points)
-    const { data: profile, error: profileErr } = await (supabase
+    // Récupérer le profil du formateur (sélectionner '*' pour tolérer l'absence de colonnes d'affiliation si la migration est en attente)
+    let { data: profile, error: profileErr } = await (supabase
       .from("profiles")
-      .select("referral_code, affiliate_points, full_name, role") as any)
+      .select("*") as any)
       .eq("id", user.id)
       .single();
 
     if (profileErr || !profile) {
-      return NextResponse.json({ error: "Profil introuvable" }, { status: 404 });
+      console.warn("[/api/affiliate GET] Profile missing. Attempting auto-repair...");
+      const email = user.email || `${user.id}@ansella.com`;
+      const name = user.user_metadata?.full_name || email.split("@")[0];
+      const { error: insertErr } = await (supabase.from("profiles") as any).insert({
+        id: user.id,
+        email,
+        full_name: name,
+        status: "ACTIVE",
+        plan: "FREE",
+      });
+      if (insertErr) {
+        console.error("[/api/affiliate GET] Auto-repair failed:", insertErr.message);
+        return NextResponse.json({ error: "Profil introuvable", details: profileErr?.message || insertErr.message }, { status: 404 });
+      }
+
+      // Réessayer de charger le profil
+      const { data: newProfile, error: refetchErr } = await (supabase
+        .from("profiles")
+        .select("*") as any)
+        .eq("id", user.id)
+        .single();
+
+      if (refetchErr || !newProfile) {
+        console.error("[/api/affiliate GET] Refetch failed:", refetchErr?.message);
+        return NextResponse.json({ error: "Profil introuvable", details: refetchErr?.message }, { status: 404 });
+      }
+      profile = newProfile;
     }
 
     // Générer un code si absent
     let referralCode = (profile as any).referral_code as string | null;
     if (!referralCode) {
       referralCode = user.id.replace(/-/g, "").substring(0, 12).toUpperCase();
-      await (supabase.from("profiles") as any)
-        .update({ referral_code: referralCode })
-        .eq("id", user.id);
+      try {
+        await (supabase.from("profiles") as any)
+          .update({ referral_code: referralCode })
+          .eq("id", user.id);
+      } catch (updateErr: any) {
+        console.warn("[/api/affiliate GET] Could not update referral_code:", updateErr?.message);
+      }
     }
 
     // Récupérer la liste des affiliés

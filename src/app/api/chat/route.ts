@@ -118,7 +118,7 @@ function getRuleBasedResponse(userMessage: string): string {
   }
   
   if (msg.includes("plan") || msg.includes("abonnement") || msg.includes("base") || msg.includes("pro") || msg.includes("max") || msg.includes("tarif") || msg.includes("upgrade")) {
-    return "Voici les forfaits disponibles pour les formateurs dans l'onglet **Facturation** :\n- **FREE** (Gratuit) : Limité à 1 cours actif, 15 apprenants, et 50% de commission.\n- **BASE** (19$/mois) : Cours/élèves illimités, 10% de commission.\n- **PRO** (49$/mois) : Commission à 5% et accès aux outils marketing avancés.\n- **MAX** (99$/mois) : Commission à 0% et sessions de cours live interactives.";
+    return "Voici les forfaits disponibles pour les formateurs dans l'onglet **Facturation** :\n- **FREE** (Gratuit) : Limité à 1 cours actif, 15 apprenants, et 20% de commission.\n- **BASE** (19$/mois) : Cours/élèves illimités, 10% de commission.\n- **PRO** (49$/mois) : Commission à 5% et accès aux outils marketing avancés.\n- **MAX** (99$/mois) : Commission à 0% et sessions de cours live interactives.";
   }
   
   if (msg.includes("certificat") || msg.includes("diplome") || msg.includes("qr") || msg.includes("télécharger") || msg.includes("telecharger")) {

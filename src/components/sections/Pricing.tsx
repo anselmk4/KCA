@@ -17,7 +17,7 @@ export function Pricing() {
         "Jusqu'à 15 apprenants inscrits",
         "Quiz de validation simples",
         "Encaissement Mobile Money & Carte",
-        "Frais de transaction : 50%",
+        "Frais de transaction : 20%",
         "Support communautaire"
       ],
       popular: false,

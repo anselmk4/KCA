@@ -112,7 +112,7 @@ export default function BillingPage() {
   }, [loadBillingData]);
 
   const limits = {
-    FREE: { courses: 1, students: 15, fee: "50%" },
+    FREE: { courses: 1, students: 15, fee: "20%" },
     BASE: { courses: 3, students: 50, fee: "10%" },
     PRO: { courses: 10, students: 200, fee: "5%" },
     MAX: { courses: Infinity, students: Infinity, fee: "0%" },
@@ -345,7 +345,7 @@ export default function BillingPage() {
                   <Check className="w-4 h-4 text-teal-600" /> 15 apprenants max
                 </li>
                 <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
-                  <Check className="w-4 h-4 text-teal-600" /> 50% frais de transaction
+                  <Check className="w-4 h-4 text-teal-600" /> 20% frais de transaction
                 </li>
               </ul>
             </div>
