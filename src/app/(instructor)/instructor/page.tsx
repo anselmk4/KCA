@@ -302,7 +302,7 @@ export default function InstructorDashboardPage() {
             </h2>
             <p className="text-sm text-teal-50/90 leading-relaxed font-medium">
               Conformément à notre promesse, votre premier cours sur la plateforme est entièrement gratuit. 
-              Partagez votre expertise en Blockchain, Cryptomonnaies ou Intelligence Artificielle et commencez à enseigner dès aujourd'hui. 
+              Partagez votre expertise dans le domaine de votre choix et commencez à enseigner dès aujourd'hui. 
               Vous disposez de tous les outils nécessaires pour structurer vos chapitres, ajouter des leçons, et évaluer vos premiers élèves.
             </p>
             <div className="pt-2 flex flex-wrap gap-4">

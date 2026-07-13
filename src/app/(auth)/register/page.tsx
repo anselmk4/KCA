@@ -103,6 +103,7 @@ const INSTRUCTOR_DOMAINS = [
   { value: "security", label: "Cybersécurité & Audit", icon: "🔒" },
   { value: "development", label: "Développement Blockchain", icon: "💻" },
   { value: "entrepreneurship", label: "Entrepreneuriat & Startups", icon: "🚀" },
+  { value: "other", label: "Autre / Personnalisé", icon: "✏️" },
 ];
 
 const TOTAL_STEPS = 4;
@@ -186,6 +187,7 @@ function RegisterForm() {
   // Instructor
   const [academyName, setAcademyName] = useState("");
   const [thematic, setThematic] = useState("blockchain");
+  const [customThematic, setCustomThematic] = useState("");
   const [bio, setBio] = useState("");
   const [selectedPlan] = useState<"FREE" | "BASE" | "PRO" | "MAX">("FREE");
   // Student
@@ -285,6 +287,7 @@ function RegisterForm() {
     }
     if (step === 3 && role === "INSTRUCTOR") {
       if (!academyName.trim()) { setFormError("Le nom de votre académie est requis."); return false; }
+      if (thematic === "other" && !customThematic.trim()) { setFormError("Veuillez spécifier votre domaine d'enseignement."); return false; }
       if (!bio.trim()) { setFormError("Une courte bio est requise."); return false; }
     }
     return true;
@@ -401,7 +404,7 @@ function RegisterForm() {
             // Instructor
             academy_name: academyName || null,
             bio: bio || null,
-            thematic: role === "INSTRUCTOR" ? thematic : null,
+            thematic: role === "INSTRUCTOR" ? (thematic === "other" ? customThematic : thematic) : null,
             // Student
             student_level: studentLevel || null,
             interest_course: interestCourse || null,
@@ -454,7 +457,7 @@ function RegisterForm() {
             plan: "FREE",
             academy_name: academyName || "Mon Académie",
             bio,
-            specialty: thematic,
+            specialty: thematic === "other" ? customThematic : thematic,
           });
 
           await supabase.from("profiles").update(profileUpdate).eq("id", sessionUser.id);
@@ -935,6 +938,22 @@ function RegisterForm() {
                 </div>
               </div>
 
+              {thematic === "other" && (
+                <div className="mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <label className="block text-xs font-bold text-zinc-650 dark:text-zinc-400 mb-1.5 uppercase tracking-wider">
+                    Spécifiez votre domaine d&apos;enseignement
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    value={customThematic}
+                    onChange={(e) => setCustomThematic(e.target.value)}
+                    placeholder="Ex: Marketing Digital, Photographie, Anglais..."
+                    className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white"
+                  />
+                </div>
+              )}
+
               {/* Bio */}
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
@@ -1054,7 +1073,7 @@ function RegisterForm() {
                     ...(role === "INSTRUCTOR"
                       ? [
                           { label: "Académie", value: academyName },
-                          { label: "Domaine", value: INSTRUCTOR_DOMAINS.find((d) => d.value === thematic)?.label || thematic },
+                          { label: "Domaine", value: thematic === "other" ? customThematic : (INSTRUCTOR_DOMAINS.find((d) => d.value === thematic)?.label || thematic) },
                         ]
                       : [
                           { label: "Niveau", value: studentLevel },
