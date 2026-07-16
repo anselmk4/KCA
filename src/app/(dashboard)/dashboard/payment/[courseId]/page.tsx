@@ -6,6 +6,7 @@ import Link from "next/link";
 import Script from "next/script";
 import { ChevronLeft, CreditCard, Smartphone, ShieldCheck, QrCode, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { getPawaPayConfigForCountry } from "@/lib/pawapay";
 
 declare global {
   interface Window {
@@ -48,8 +49,21 @@ export default function PaymentPage() {
   const [simulating, setSimulating] = useState(false);
 
   // MOMO state
-  const [momoProvider, setMomoProvider] = useState("mpesa");
+  const [userCountry, setUserCountry] = useState("CD");
+  const [momoProvider, setMomoProvider] = useState("VODACOM_MPESA_COD");
   const [momoPhone, setMomoPhone] = useState("");
+
+  const countryConfig = getPawaPayConfigForCountry(userCountry) || getPawaPayConfigForCountry("CD")!;
+
+  useEffect(() => {
+    if (countryConfig?.operators?.length > 0) {
+      // Default to first operator in list if current isn't in this country's operator list
+      const isValid = countryConfig.operators.some(op => op.id === momoProvider);
+      if (!isValid) {
+        setMomoProvider(countryConfig.operators[0].id);
+      }
+    }
+  }, [userCountry, countryConfig]);
 
   // CARD state
   const [cardName, setCardName] = useState("");
@@ -199,10 +213,24 @@ export default function PaymentPage() {
 
     loadCourse();
 
-    // Pré-remplir l'email utilisateur si connecté
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    // Pré-remplir l'email et les infos utilisateur si connecté
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user?.email) {
         setPaypalEmail(user.email);
+        
+        // Fetch profile to get country & phone_number
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("country, phone_number")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profile?.country) {
+          setUserCountry(profile.country);
+        }
+        if (profile?.phone_number) {
+          setMomoPhone(profile.phone_number);
+        }
       }
     });
   }, [courseId]);
@@ -257,15 +285,23 @@ export default function PaymentPage() {
     if (!paymentId) return;
     setSimulating(true);
     try {
-      const response = await fetch("/api/webhooks/mobile-money", {
+      const response = await fetch("/api/webhooks/pawapay", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          reference: `std_pay_${paymentId}`,
-          status: "Successful",
-        }),
+        body: JSON.stringify([{
+          depositId: paymentId,
+          status: "COMPLETED",
+          amount: discountedAmount.toString(),
+          currency: countryConfig.currency,
+          payer: {
+            type: "MSISDN",
+            address: {
+              value: momoPhone
+            }
+          }
+        }]),
       });
 
       if (!response.ok) {
@@ -401,7 +437,7 @@ export default function PaymentPage() {
 
       if (method === 'momo') {
         try {
-          const response = await fetch('/api/payments/moko-initiate', {
+          const response = await fetch('/api/payments/pawapay-initiate', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -421,7 +457,7 @@ export default function PaymentPage() {
             throw new Error(resData.error || "Une erreur est survenue lors de l'initiation du paiement.");
           }
 
-          setPaymentId(resData.paymentId);
+          setPaymentId(resData.depositId);
           setShowPendingState(true);
         } catch (momoErr: any) {
           alert(momoErr.message || "Une erreur est survenue avec le service Mobile Money.");
@@ -648,7 +684,7 @@ export default function PaymentPage() {
                     <span>Simulation en cours...</span>
                   </>
                 ) : (
-                  <span>[Mode Test] Simuler validation Moko</span>
+                  <span>[Mode Test] Simuler validation PawaPay</span>
                 )}
               </button>
             )}
@@ -700,6 +736,7 @@ export default function PaymentPage() {
                 <Smartphone className="w-5 h-5" />
                 <span className="text-xs">Mobile Money</span>
               </button>
+              {/* CARD OPTION - ARCHIVED WITH MOKO AFRIKA CARD SYSTEM
               <button
                 type="button"
                 onClick={() => setMethod("card")}
@@ -712,6 +749,7 @@ export default function PaymentPage() {
                 <CreditCard className="w-5 h-5" />
                 <span className="text-xs">Carte bancaire</span>
               </button>
+              */}
               <button
                 type="button"
                 onClick={() => setMethod("paypal")}
@@ -760,13 +798,14 @@ export default function PaymentPage() {
               {method === "momo" && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Opérateur</label>
-                    <div className="grid grid-cols-3 gap-3">
-                      {[
-                        { id: "mpesa", label: "M-Pesa (Vodacom)" },
-                        { id: "orange", label: "Orange Money" },
-                        { id: "airtel", label: "Airtel Money" }
-                      ].map(provider => (
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Opérateur Mobile</label>
+                      <span className="text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-650 px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-750">
+                        Pays : {userCountry.toUpperCase()} ({countryConfig.currency})
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {countryConfig.operators.map(provider => (
                         <button
                           key={provider.id}
                           type="button"
@@ -777,21 +816,26 @@ export default function PaymentPage() {
                               : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-400"
                           }`}
                         >
-                          {provider.label}
+                          {provider.name}
                         </button>
                       ))}
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Numéro de téléphone</label>
-                    <input
-                      type="tel"
-                      required
-                      placeholder="Ex: +243990000000"
-                      value={momoPhone}
-                      onChange={(e) => setMomoPhone(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-sm text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/40"
-                    />
+                    <div className="flex gap-2">
+                      <span className="bg-zinc-100 dark:bg-zinc-800 px-3.5 py-3 rounded-xl text-sm text-zinc-500 font-semibold border border-zinc-200 dark:border-zinc-800 flex items-center justify-center">
+                        +{countryConfig.phonePrefix}
+                      </span>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="Ex: 812345678"
+                        value={momoPhone.startsWith(countryConfig.phonePrefix) ? momoPhone.substring(countryConfig.phonePrefix.length) : momoPhone}
+                        onChange={(e) => setMomoPhone(e.target.value.replace(/\D/g, ''))}
+                        className="flex-1 px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-sm text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/40"
+                      />
+                    </div>
                     <p className="text-xxs text-zinc-400 mt-1">Vous recevrez une demande de confirmation de code PIN sur votre téléphone.</p>
                   </div>
                 </div>

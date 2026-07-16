@@ -1,3 +1,11 @@
+// ARCHIVÉ : Ancien système Moko Afrika - Remplacé par PawaPay
+export async function GET() {
+  return new Response("Archived", { status: 404 });
+}
+export async function POST() {
+  return new Response("Archived", { status: 404 });
+}
+/*
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createNotification } from '@/lib/supabase/notifications-helper';
@@ -496,3 +504,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 });
   }
 }
+*/

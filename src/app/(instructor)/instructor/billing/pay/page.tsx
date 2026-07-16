@@ -15,6 +15,7 @@ import {
 import Link from "next/link";
 import Script from "next/script";
 import { supabase } from "@/lib/supabase/client";
+import { getPawaPayConfigForCountry } from "@/lib/pawapay";
 
 declare global {
   interface Window {
@@ -29,7 +30,7 @@ function PaymentContent() {
   const searchParams = useSearchParams();
   const [plan, setPlan] = useState<"BASE" | "PRO" | "MAX">("PRO");
   const [userId, setUserId] = useState<string | null>(null);
-  const [method, setMethod] = useState<PaymentMethod>("mastercard");
+  const [method, setMethod] = useState<PaymentMethod>("mobile_money");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [showPendingState, setShowPendingState] = useState(false);
@@ -45,8 +46,20 @@ function PaymentContent() {
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvc, setCardCvc] = useState("");
 
+  const [userCountry, setUserCountry] = useState("CD");
   const [phone, setPhone] = useState("");
-  const [carrier, setCarrier] = useState("mpesa");
+  const [carrier, setCarrier] = useState("VODACOM_MPESA_COD");
+
+  const countryConfig = getPawaPayConfigForCountry(userCountry) || getPawaPayConfigForCountry("CD")!;
+
+  useEffect(() => {
+    if (countryConfig?.operators?.length > 0) {
+      const isValid = countryConfig.operators.some(op => op.id === carrier);
+      if (!isValid) {
+        setCarrier(countryConfig.operators[0].id);
+      }
+    }
+  }, [userCountry, countryConfig]);
 
   const [cryptoCoin, setCryptoCoin] = useState("usdt");
   const [cryptoTxId, setCryptoTxId] = useState("");
@@ -60,8 +73,24 @@ function PaymentContent() {
     } else {
       setPlan("PRO");
     }
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserId(user.id);
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (user) {
+        setUserId(user.id);
+        
+        // Fetch profile to get country & phone_number
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("country, phone_number")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profile?.country) {
+          setUserCountry(profile.country);
+        }
+        if (profile?.phone_number) {
+          setPhone(profile.phone_number);
+        }
+      }
     });
   }, [searchParams]);
 
@@ -119,15 +148,23 @@ function PaymentContent() {
     if (!paymentId) return;
     setSimulating(true);
     try {
-      const response = await fetch("/api/webhooks/mobile-money", {
+      const response = await fetch("/api/webhooks/pawapay", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          reference: `ins_plan_${paymentId}`,
-          status: "Successful",
-        }),
+        body: JSON.stringify([{
+          depositId: paymentId,
+          status: "COMPLETED",
+          amount: currentPlanDetails.price.toString(),
+          currency: countryConfig.currency,
+          payer: {
+            type: "MSISDN",
+            address: {
+              value: phone
+            }
+          }
+        }]),
       });
 
       if (!response.ok) {
@@ -253,7 +290,7 @@ function PaymentContent() {
 
     if (method === "mobile_money") {
       try {
-        const response = await fetch("/api/payments/moko-initiate", {
+        const response = await fetch("/api/payments/pawapay-initiate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -270,7 +307,7 @@ function PaymentContent() {
           throw new Error(resData.error || "Une erreur est survenue lors de l'initiation du paiement.");
         }
 
-        setPaymentId(resData.paymentId);
+        setPaymentId(resData.depositId);
         setShowPendingState(true);
       } catch (err: any) {
         alert(err.message || "Une erreur est survenue lors de l'appel de la passerelle.");
@@ -376,7 +413,7 @@ function PaymentContent() {
           
           <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl border border-zinc-150 dark:border-zinc-800 text-left text-xs space-y-1.5 text-zinc-500 max-w-sm mx-auto">
             <p><strong>Opérateur :</strong> {carrier.toUpperCase()}</p>
-            <p><strong>Téléphone :</strong> +243 {phone}</p>
+            <p><strong>Téléphone :</strong> +{countryConfig.phonePrefix} {phone}</p>
             <p><strong>ID Transaction :</strong> {paymentId}</p>
           </div>
 
@@ -410,7 +447,7 @@ function PaymentContent() {
                     <span>Simulation en cours...</span>
                   </>
                 ) : (
-                  <span>[Mode Test] Simuler validation Moko</span>
+                  <span>[Mode Test] Simuler validation PawaPay</span>
                 )}
               </button>
             )}
@@ -460,9 +497,8 @@ function PaymentContent() {
             <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-4">
               <h3 className="font-bold text-zinc-900 dark:text-white mb-4">Moyens de paiement</h3>
               
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                  { id: "mastercard", label: "Carte bancaire", icon: <CreditCard className="w-5 h-5" /> },
                   { id: "stripe", label: "Stripe", icon: <ShieldCheck className="w-5 h-5 text-indigo-500" /> },
                   { id: "paypal", label: "PayPal", icon: <DollarSign className="w-5 h-5 text-blue-500" /> },
                   { id: "crypto", label: "Crypto", icon: <Coins className="w-5 h-5 text-amber-500" /> },
@@ -595,20 +631,21 @@ function PaymentContent() {
               {/* 5. Mobile Money Form */}
               {method === "mobile_money" && (
                 <div className="space-y-4 animate-in fade-in duration-200">
-                  <h4 className="font-bold text-sm text-zinc-900 dark:text-white mb-2">Paiement Mobile Money local</h4>
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-bold text-sm text-zinc-900 dark:text-white">Paiement Mobile Money local</h4>
+                    <span className="text-[10px] font-bold bg-zinc-150 dark:bg-zinc-800 text-zinc-600 px-2.5 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700">
+                      Pays : {userCountry.toUpperCase()} ({countryConfig.currency})
+                    </span>
+                  </div>
                   
-                  <div className="grid grid-cols-3 gap-2 mb-4">
-                    {[
-                      { id: "mpesa", name: "M-Pesa", color: "border-red-500 bg-red-50/10 text-red-500" },
-                      { id: "orange", name: "Orange Money", color: "border-orange-500 bg-orange-50/10 text-orange-500" },
-                      { id: "airtel", name: "Airtel Money", color: "border-rose-500 bg-rose-50/10 text-rose-500" }
-                    ].map((item) => (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                    {countryConfig.operators.map((item) => (
                       <div 
                         key={item.id}
                         onClick={() => setCarrier(item.id)}
                         className={`p-2.5 rounded-lg border text-xs font-bold cursor-pointer text-center transition-all ${
                           carrier === item.id 
-                            ? item.color 
+                            ? "border-teal-500 bg-teal-50/15 text-teal-650 font-bold" 
                             : "border-zinc-150 dark:border-zinc-800 hover:border-zinc-300 text-zinc-500"
                         }`}
                       >
@@ -620,11 +657,13 @@ function PaymentContent() {
                   <div>
                     <label className="block text-[11px] font-medium text-zinc-400 uppercase mb-1">Numéro de téléphone associé</label>
                     <div className="flex gap-2">
-                      <span className="bg-zinc-100 dark:bg-zinc-800 px-3 py-2.5 rounded-lg text-sm text-zinc-500 font-semibold flex items-center justify-center">+243</span>
+                      <span className="bg-zinc-100 dark:bg-zinc-800 px-3.5 py-2.5 rounded-lg text-sm text-zinc-500 font-semibold flex items-center justify-center border border-zinc-200 dark:border-zinc-800">
+                        +{countryConfig.phonePrefix}
+                      </span>
                       <input 
                         required
                         type="tel" 
-                        value={phone}
+                        value={phone.startsWith(countryConfig.phonePrefix) ? phone.substring(countryConfig.phonePrefix.length) : phone}
                         onChange={e => setPhone(e.target.value.replace(/\D/g, ""))}
                         placeholder="812345678"
                         className="flex-1 px-4 py-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border-transparent text-sm focus:ring-1 focus:ring-teal-500 outline-none text-zinc-900 dark:text-white font-semibold"
