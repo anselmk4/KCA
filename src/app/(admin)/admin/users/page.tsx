@@ -23,7 +23,8 @@ import {
   Loader2,
   CreditCard,
   Activity,
-  Lock
+  Lock,
+  Trash2
 } from "lucide-react";
 
 type RoleName = 'STUDENT' | 'INSTRUCTOR' | 'ADMIN' | 'SUPER_ADMIN';
@@ -334,6 +335,37 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleDeleteUser = async (userId: string, name: string) => {
+    const confirmDelete = window.confirm(
+      `Êtes-vous sûr de vouloir supprimer définitivement l'utilisateur "${name}" ? Cette action effacera ses rôles, inscriptions, paiements et son compte d'authentification. Elle est irréversible.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      const response = await fetch("/api/admin/users/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ targetUserId: userId }),
+      });
+
+      const resData = await response.json();
+      if (!response.ok) {
+        throw new Error(resData.error || "Une erreur est survenue lors de la suppression.");
+      }
+
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      if (selectedUser?.id === userId) {
+        setSelectedUser(null);
+      }
+      alert(`L'utilisateur "${name}" a été supprimé avec succès.`);
+    } catch (err: any) {
+      console.error("Error deleting user:", err);
+      alert("Erreur lors de la suppression de l'utilisateur : " + err.message);
+    }
+  };
+
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUser.email || !newUser.name) return;
@@ -576,6 +608,15 @@ export default function AdminUsersPage() {
                             title="Modifier le plan d'abonnement"
                           >
                             <Sparkles className="w-4 h-4" />
+                          </button>
+
+                          {/* Delete User */}
+                          <button
+                            onClick={() => handleDeleteUser(user.id, user.name)}
+                            className="p-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:scale-105 hover:bg-red-100 transition-all cursor-pointer"
+                            title="Supprimer l'utilisateur"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -1088,6 +1129,15 @@ export default function AdminUsersPage() {
                     >
                       <KeyRound className="w-4 h-4" />
                       Nouveau mot de passe
+                    </button>
+
+                    {/* Supprimer Utilisateur */}
+                    <button
+                      onClick={() => handleDeleteUser(openUser.id, openUser.name)}
+                      className="col-span-2 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-red-200 bg-red-600 text-white hover:bg-red-700 text-xs font-bold transition-all cursor-pointer mt-1 shadow-sm"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Supprimer définitivement l'utilisateur
                     </button>
 
                   </div>
