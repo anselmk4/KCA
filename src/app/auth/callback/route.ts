@@ -209,7 +209,12 @@ async function bootstrapUserAndGetRole(user: any): Promise<string> {
     }
   }
 
-  // 4. Resolve the final role name from user_roles
+  // 4. Resolve the final role name
+  // Trust targetRole from metadata first as it represents the registration intention
+  if (['INSTRUCTOR', 'TEACHING_ASSISTANT', 'ADMIN', 'SUPER_ADMIN', 'FINANCE_ADMIN', 'ACADEMIC_ADMIN', 'SUPPORT_AGENT'].includes(targetRole)) {
+    return targetRole;
+  }
+
   const { data: userRoles } = await supabaseAdmin
     .from('user_roles')
     .select('roles(name)')

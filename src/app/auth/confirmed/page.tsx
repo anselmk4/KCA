@@ -132,13 +132,10 @@ function ConfirmedContent() {
           setStatusText("Chargement de votre profil...");
           const profile = await fetchUserProfile(user.id);
 
+          // Force intendedRole to take precedence over DB role to prevent regression
           let finalRole = intendedRole;
           if (profile) {
-            // If DB still shows STUDENT but intended was not STUDENT → trust intendedRole
-            finalRole =
-              profile.role === "STUDENT" && intendedRole !== "STUDENT"
-                ? intendedRole
-                : profile.role;
+            finalRole = intendedRole !== "STUDENT" ? intendedRole : (profile.role || "STUDENT");
 
             setSimulatedSession({
               userId: profile.id,
@@ -155,6 +152,17 @@ function ConfirmedContent() {
                 | "SUPPORT_AGENT",
               status: profile.status === "ACTIVE" ? "ACTIVE" : "INACTIVE",
               plan: profile.plan,
+            });
+            localStorage.setItem("kuettu_unconfirmed_email", "false");
+          } else {
+            // Simulated session fallback even if DB profile is slow to propagate
+            setSimulatedSession({
+              userId: user.id,
+              name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Formateur",
+              email: user.email || "",
+              role: finalRole as any,
+              status: "ACTIVE",
+              plan: "FREE",
             });
             localStorage.setItem("kuettu_unconfirmed_email", "false");
           }
