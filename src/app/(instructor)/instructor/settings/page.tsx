@@ -23,6 +23,8 @@ export default function InstructorSettingsPage() {
     bio: "",
     specialty: "",
     nationality: "",
+    phone: "",
+    gender: "",
     academic_background: "",
     certifications: "",
     avatar_url: "",
@@ -80,6 +82,8 @@ export default function InstructorSettingsPage() {
             bio: profile.bio || "",
             specialty: profile.specialty || "",
             nationality: profile.nationality || "",
+            phone: profile.phone || "",
+            gender: profile.gender || "",
             academic_background: profile.academic_background || "",
             certifications: profile.certifications || "",
             avatar_url: profile.avatar_url || "",
@@ -113,6 +117,8 @@ export default function InstructorSettingsPage() {
         bio: form.bio,
         specialty: form.specialty,
         nationality: form.nationality,
+        phone: form.phone,
+        gender: form.gender,
         academic_background: form.academic_background,
         certifications: form.certifications,
         avatar_url: form.avatar_url,
@@ -246,7 +252,6 @@ export default function InstructorSettingsPage() {
                 { label: "Nom complet", key: "name", type: "text" },
                 { label: "Adresse Email", key: "email", type: "email" },
                 { label: "Spécialité", key: "specialty", type: "text", placeholder: "ex: Blockchain & DeFi" },
-                { label: "Nationalité / Pays", key: "nationality", type: "text", placeholder: "ex: Sénégalais, France…" },
               ].map(({ label, key, type, placeholder }) => (
                 <div key={key}>
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">{label}</label>
@@ -257,6 +262,68 @@ export default function InstructorSettingsPage() {
                   />
                 </div>
               ))}
+
+              {/* Pays de résidence */}
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Pays de résidence <span className="text-red-500">*</span></label>
+                <select
+                  value={form.nationality}
+                  onChange={e => setForm(f => ({ ...f, nationality: e.target.value }))}
+                  required
+                  className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white border-transparent focus:ring-2 focus:ring-teal-500 outline-none text-sm transition-all"
+                >
+                  <option value="">Sélectionner un pays</option>
+                  <option value="CD">🇨🇩 Congo (RDC)</option>
+                  <option value="CM">🇨🇲 Cameroun</option>
+                  <option value="CI">🇨🇮 Côte d'Ivoire</option>
+                  <option value="SN">🇸🇳 Sénégal</option>
+                  <option value="RW">🇷🇼 Rwanda</option>
+                  <option value="UG">🇺🇬 Ouganda</option>
+                  <option value="BJ">🇧🇯 Bénin</option>
+                  <option value="BF">🇧🇫 Burkina Faso</option>
+                  <option value="GA">🇬🇦 Gabon</option>
+                  <option value="GN">🇬🇳 Guinée</option>
+                  <option value="ML">🇲🇱 Mali</option>
+                  <option value="NE">🇳🇪 Niger</option>
+                  <option value="TG">🇹🇬 Togo</option>
+                  <option value="TD">🇹🇩 Tchad</option>
+                  <option value="CG">🇨🇬 Congo-Brazzaville</option>
+                  <option value="MG">🇲🇬 Madagascar</option>
+                  <option value="FR">🇫🇷 France</option>
+                  <option value="BE">🇧🇪 Belgique</option>
+                  <option value="CA">🇨🇦 Canada</option>
+                  <option value="OTHER">Autre</option>
+                </select>
+              </div>
+
+              {/* Téléphone */}
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5 flex items-center gap-1.5">
+                  <Phone className="w-4 h-4 text-zinc-400" /> Téléphone <span className="text-red-500">*</span>
+                </label>
+                <input type="tel" placeholder="ex: +243812345678"
+                  value={form.phone}
+                  onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                  required
+                  className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white border-transparent focus:ring-2 focus:ring-teal-500 outline-none text-sm transition-all"
+                />
+              </div>
+
+              {/* Genre */}
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Genre <span className="text-red-500">*</span></label>
+                <select
+                  value={form.gender}
+                  onChange={e => setForm(f => ({ ...f, gender: e.target.value }))}
+                  required
+                  className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white border-transparent focus:ring-2 focus:ring-teal-500 outline-none text-sm transition-all"
+                >
+                  <option value="">Sélectionner</option>
+                  <option value="male">Homme</option>
+                  <option value="female">Femme</option>
+                  <option value="other">Autre</option>
+                </select>
+              </div>
             </div>
 
             <div className="mt-4">
