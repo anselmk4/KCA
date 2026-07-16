@@ -181,7 +181,7 @@ function RegisterForm() {
   const [country, setCountry] = useState("");
   const [dialCode, setDialCode] = useState("+243");
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [gender, setGender] = useState<"" | "male" | "female" | "other">("");
+  const [gender, setGender] = useState<"" | "male" | "female">("");;
 
   // Step 3 — Role-specific
   // Instructor
@@ -843,11 +843,10 @@ function RegisterForm() {
                   <User2 className="w-3.5 h-3.5" /> Genre
                   <span className="text-red-500 ml-0.5">*</span>
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {[
                     { value: "male", label: "Homme", emoji: "👨" },
                     { value: "female", label: "Femme", emoji: "👩" },
-                    { value: "other", label: "Autre", emoji: "🧑" },
                   ].map((opt) => (
                     <button
                       key={opt.value}

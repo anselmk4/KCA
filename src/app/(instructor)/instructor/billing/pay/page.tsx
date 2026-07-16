@@ -77,18 +77,57 @@ function PaymentContent() {
       if (user) {
         setUserId(user.id);
         
-        // Fetch profile to get country & phone_number
-        const { data: profile } = await supabase
+        // Fetch profile to get country, phone & payment preferences
+        const { data: profile } = await (supabase
           .from("profiles")
-          .select("country, phone_number")
+          .select("country, phone_number, nationality, phone, payment_methods, preferred_payment_method") as any)
           .eq("id", user.id)
           .maybeSingle();
 
-        if (profile?.country) {
-          setUserCountry(profile.country);
+        const resolvedCountry = profile?.nationality || profile?.country;
+        const resolvedPhone = profile?.phone || profile?.phone_number;
+
+        // Check if user has a preferred payment method
+        const preferredId = profile?.preferred_payment_method;
+        const methods = profile?.payment_methods;
+        let preferredApplied = false;
+
+        if (preferredId && Array.isArray(methods)) {
+          const preferred = methods.find((m: any) => m.id === preferredId);
+          if (preferred) {
+            if (preferred.type === "mobile_money") {
+              setMethod("mobile_money");
+              if (preferred.phone) setPhone(preferred.phone);
+              if (preferred.country) setUserCountry(preferred.country);
+              
+              const cleanLabel = (preferred.label || "").toLowerCase();
+              const targetCountry = preferred.country || resolvedCountry || "CD";
+              const targetConfig = getPawaPayConfigForCountry(targetCountry);
+              if (targetConfig) {
+                const matchedOp = targetConfig.operators.find(op => 
+                  cleanLabel.includes(op.name.toLowerCase()) || 
+                  op.name.toLowerCase().includes(cleanLabel)
+                );
+                if (matchedOp) {
+                  setCarrier(matchedOp.id);
+                } else if (targetConfig.operators.length > 0) {
+                  setCarrier(targetConfig.operators[0].id);
+                }
+              }
+            } else if (preferred.type === "paypal") {
+              setMethod("paypal");
+            }
+            preferredApplied = true;
+          }
         }
-        if (profile?.phone_number) {
-          setPhone(profile.phone_number);
+
+        if (!preferredApplied) {
+          if (resolvedCountry) {
+            setUserCountry(resolvedCountry);
+          }
+          if (resolvedPhone) {
+            setPhone(resolvedPhone);
+          }
         }
       }
     });
@@ -299,6 +338,7 @@ function PaymentContent() {
             carrier: carrier,
             type: "INSTRUCTOR_PLAN",
             itemId: plan,
+            country: userCountry,
           }),
         });
 
@@ -631,10 +671,25 @@ function PaymentContent() {
               {/* 5. Mobile Money Form */}
               {method === "mobile_money" && (
                 <div className="space-y-4 animate-in fade-in duration-200">
+                  <div>
+                    <label className="block text-[11px] font-medium text-zinc-400 uppercase mb-1">Pays de paiement</label>
+                    <select
+                      value={userCountry}
+                      onChange={(e) => setUserCountry(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-800 text-sm text-zinc-900 dark:text-white outline-none focus:ring-1 focus:ring-teal-500 transition-all mb-3"
+                    >
+                      <option value="CD">🇨🇩 Congo (RDC)</option>
+                      <option value="CM">🇨🇲 Cameroun</option>
+                      <option value="CI">🇨🇮 Côte d'Ivoire</option>
+                      <option value="SN">🇸🇳 Sénégal</option>
+                      <option value="RW">🇷🇼 Rwanda</option>
+                      <option value="UG">🇺🇬 Ouganda</option>
+                    </select>
+                  </div>
                   <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-bold text-sm text-zinc-900 dark:text-white">Paiement Mobile Money local</h4>
+                    <h4 className="font-bold text-sm text-zinc-900 dark:text-white">Opérateur Mobile Money</h4>
                     <span className="text-[10px] font-bold bg-zinc-150 dark:bg-zinc-800 text-zinc-600 px-2.5 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700">
-                      Pays : {userCountry.toUpperCase()} ({countryConfig.currency})
+                      Devise : {countryConfig.currency}
                     </span>
                   </div>
                   

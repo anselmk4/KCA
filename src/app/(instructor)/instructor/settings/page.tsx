@@ -321,7 +321,6 @@ export default function InstructorSettingsPage() {
                   <option value="">Sélectionner</option>
                   <option value="male">Homme</option>
                   <option value="female">Femme</option>
-                  <option value="other">Autre</option>
                 </select>
               </div>
             </div>

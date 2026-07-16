@@ -20,6 +20,7 @@ export default function StudentSettingsPage() {
   const [country, setCountry] = useState("");
   const [city, setCity] = useState("");
   const [nationality, setNationality] = useState("");
+  const [gender, setGender] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
@@ -71,6 +72,7 @@ export default function StudentSettingsPage() {
           setEmail(profile.email || "");
           setBio(profile.bio || "");
           setNationality(profile.nationality || "");
+          setGender(profile.gender || "");
           setAvatarUrl(profile.avatar_url || "");
           setCountry(profile.nationality || localStorage.getItem("kuettu_settings_country") || "");
           setCity(localStorage.getItem("kuettu_settings_city") || "");
@@ -96,6 +98,7 @@ export default function StudentSettingsPage() {
           bio,
           nationality: country,
           phone: phone,
+          gender: gender,
           avatar_url: avatarUrl
         }),
       });
@@ -312,19 +315,40 @@ export default function StudentSettingsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Pays / Nationalité</label>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Pays de résidence <span className="text-red-500">*</span></label>
                     <div className="relative">
                       <Globe className="w-4 h-4 absolute left-3 top-3.5 text-zinc-400" />
-                      <input
-                        type="text"
-                        value={nationality}
+                      <select
+                        value={country}
                         onChange={e => {
-                          setNationality(e.target.value);
                           setCountry(e.target.value);
+                          setNationality(e.target.value);
                         }}
-                        placeholder="ex: Sénégalais"
-                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-800 text-sm text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all"
-                      />
+                        required
+                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-800 text-sm text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all appearance-none cursor-pointer"
+                      >
+                        <option value="">Sélectionner un pays</option>
+                        <option value="CD">🇨🇩 Congo (RDC)</option>
+                        <option value="CM">🇨🇲 Cameroun</option>
+                        <option value="CI">🇨🇮 Côte d'Ivoire</option>
+                        <option value="SN">🇸🇳 Sénégal</option>
+                        <option value="RW">🇷🇼 Rwanda</option>
+                        <option value="UG">🇺🇬 Ouganda</option>
+                        <option value="BJ">🇧🇯 Bénin</option>
+                        <option value="BF">🇧🇫 Burkina Faso</option>
+                        <option value="GA">🇬🇦 Gabon</option>
+                        <option value="GN">🇬🇳 Guinée</option>
+                        <option value="ML">🇲🇱 Mali</option>
+                        <option value="NE">🇳🇪 Niger</option>
+                        <option value="TG">🇹🇬 Togo</option>
+                        <option value="TD">🇹🇩 Tchad</option>
+                        <option value="CG">🇨🇬 Congo-Brazzaville</option>
+                        <option value="MG">🇲🇬 Madagascar</option>
+                        <option value="FR">🇫🇷 France</option>
+                        <option value="BE">🇧🇪 Belgique</option>
+                        <option value="CA">🇨🇦 Canada</option>
+                        <option value="OTHER">Autre</option>
+                      </select>
                     </div>
                   </div>
 
@@ -339,6 +363,20 @@ export default function StudentSettingsPage() {
                         className="w-full pl-10 pr-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-800 text-sm text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">Genre <span className="text-red-500">*</span></label>
+                    <select
+                      value={gender}
+                      onChange={e => setGender(e.target.value)}
+                      required
+                      className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-800 text-sm text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all"
+                    >
+                      <option value="">Sélectionner</option>
+                      <option value="male">Homme</option>
+                      <option value="female">Femme</option>
+                    </select>
                   </div>
                 </div>
 
