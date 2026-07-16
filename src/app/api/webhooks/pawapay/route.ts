@@ -29,10 +29,10 @@ export async function POST(req: NextRequest) {
       // depositId corresponds to paymentId in our database
       const paymentId = depositId;
 
-      // 1. Fetch current payment and order details
+      // 1. Fetch current payment and order details (include method for type resolution)
       const { data: payment, error: fetchErr } = await supabaseAdmin
         .from('payments')
-        .select('order_id, user_id, amount, status')
+        .select('order_id, user_id, amount, status, method')
         .eq('id', paymentId)
         .maybeSingle();
 
@@ -72,197 +72,188 @@ export async function POST(req: NextRequest) {
 
         if (orderUpdateErr) console.error('[webhook-pawapay] Order update error:', orderUpdateErr.message);
 
-        // Fetch order item to determine product type
-        const { data: orderItem } = await supabaseAdmin
-          .from('order_items')
-          .select('course_id')
-          .eq('order_id', payment.order_id)
-          .maybeSingle();
+        // Parse method field: CARRIER::TYPE::ITEM_ID
+        const methodParts = (payment.method || '').split('::');
+        const paymentType = methodParts[1] || '';
+        const itemId = methodParts[2] || '';
 
-        if (orderItem) {
-          const courseId = orderItem.course_id;
+        const isPlan = paymentType === 'INSTRUCTOR_PLAN';
 
-          // Plan list IDs
-          const planUuidMap: Record<string, string> = {
-            "99999999-9999-9999-9999-999999990001": "BASE",
-            "99999999-9999-9999-9999-999999990002": "PRO",
-            "99999999-9999-9999-9999-999999990003": "MAX",
-          };
+        if (isPlan && itemId) {
+          // --- Instructor Plan Activation ---
+          const planVal = itemId.toUpperCase(); // BASE, PRO, MAX
 
-          const planVal = planUuidMap[courseId];
-          if (planVal) {
-            // Upgrade profile plan
-            const { error: planErr } = await supabaseAdmin
+          const { error: planErr } = await supabaseAdmin
+            .from('profiles')
+            .update({ plan: planVal } as any)
+            .eq('id', payment.user_id);
+
+          if (planErr) console.error('[webhook-pawapay] Error updating instructor plan:', planErr.message);
+
+          // Notify instructor
+          await createNotification({
+            userId: payment.user_id,
+            title: "Abonnement activé !",
+            message: `Félicitations, votre abonnement Ansella au plan ${planVal} est maintenant activé !`,
+            type: "SUCCESS",
+            link: `/instructor/billing`
+          });
+
+          // Invoice email to instructor
+          try {
+            const { data: instructorProfile } = await supabaseAdmin
               .from('profiles')
-              .update({ plan: planVal } as any)
-              .eq('id', payment.user_id);
+              .select('full_name, email')
+              .eq('id', payment.user_id)
+              .maybeSingle();
 
-            if (planErr) console.error('[webhook-pawapay] Error updating instructor plan:', planErr.message);
+            if (instructorProfile?.email) {
+              const { sendInvoiceEmail } = await import("@/lib/email");
+              const { data: orderData } = await supabaseAdmin
+                .from("orders")
+                .select("order_number")
+                .eq("id", payment.order_id)
+                .maybeSingle();
+              
+              const orderNumber = orderData?.order_number || `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-            // Notify instructor of subscription
+              await sendInvoiceEmail(
+                instructorProfile.email,
+                instructorProfile.full_name || "Formateur",
+                orderNumber,
+                payment.amount,
+                `Abonnement Formateur — Plan ${planVal}`,
+                `Référence : ${orderNumber} — Accès illimité aux fonctionnalités Formateur Plan ${planVal}.`
+              );
+            }
+          } catch (emailErr) {
+            console.error('[webhook-pawapay] Error sending instructor invoice:', emailErr);
+          }
+
+        } else if (paymentType === 'STUDENT_COURSE' && itemId) {
+          // --- Student Course Enrollment Activation ---
+          const courseId = itemId;
+
+          const { error: enrollUpdateErr } = await supabaseAdmin
+            .from('enrollments')
+            .update({ status: 'ACTIVE' } as any)
+            .eq('student_id', payment.user_id)
+            .eq('course_id', courseId);
+
+          if (enrollUpdateErr) {
+            console.error('[webhook-pawapay] Enrollment activate error, trying upsert:', enrollUpdateErr.message);
+            await supabaseAdmin.from('enrollments').upsert({
+              student_id: payment.user_id,
+              course_id: courseId,
+              progress_percent: 0,
+              status: 'ACTIVE',
+              enrolled_at: new Date().toISOString()
+            } as any);
+          }
+
+          // Notifications & Emails
+          try {
+            const { data: courseData } = await supabaseAdmin
+              .from('courses')
+              .select('title, instructor_id')
+              .eq('id', courseId)
+              .maybeSingle();
+
+            const courseTitle = courseData?.title || 'Formation';
+
+            // Notify student
             await createNotification({
               userId: payment.user_id,
-              title: "Abonnement activé !",
-              message: `Félicitations, votre abonnement Ansella au plan ${planVal} est maintenant activé !`,
+              title: "Paiement validé !",
+              message: `Votre paiement de ${payment.amount}$ pour le cours "${courseTitle}" a été validé.`,
               type: "SUCCESS",
-              link: `/instructor/billing`
+              link: `/dashboard/courses`
             });
 
-            // Send Invoice Email to instructor
-            try {
+            // Fetch student profile
+            const { data: studentProfile } = await supabaseAdmin
+              .from('profiles')
+              .select('full_name, email')
+              .eq('id', payment.user_id)
+              .maybeSingle();
+
+            const studentName = studentProfile?.full_name || 'Un apprenant';
+            const studentEmail = studentProfile?.email;
+
+            // Instructor notifications & payout
+            let instructorEmail = "";
+            let instructorName = "Formateur";
+            if (courseData?.instructor_id) {
               const { data: instructorProfile } = await supabaseAdmin
                 .from('profiles')
-                .select('full_name, email')
-                .eq('id', payment.user_id)
+                .select('full_name, email, plan')
+                .eq('id', courseData.instructor_id)
                 .maybeSingle();
+              
+              if (instructorProfile) {
+                instructorEmail = instructorProfile.email || "";
+                instructorName = instructorProfile.full_name || "Formateur";
 
-              if (instructorProfile?.email) {
-                const { sendInvoiceEmail } = await import("@/lib/email");
-                const { data: orderData } = await supabaseAdmin
-                  .from("orders")
-                  .select("order_number")
-                  .eq("id", payment.order_id)
-                  .maybeSingle();
-                
-                const orderNumber = orderData?.order_number || `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+                const instPlan = instructorProfile.plan || 'FREE';
+                const commissionRate = instPlan === 'FREE' ? 0.20 : (instPlan === 'BASE' ? 0.10 : 0.0);
+                const platformFee = payment.amount * commissionRate;
+                const instructorEarnings = payment.amount - platformFee;
 
-                await sendInvoiceEmail(
-                  instructorProfile.email,
-                  instructorProfile.full_name || "Formateur",
-                  orderNumber,
-                  payment.amount,
-                  `Abonnement Formateur — Plan ${planVal}`,
-                  "Mise à niveau et accès illimité aux fonctionnalités formateur."
-                );
+                await supabaseAdmin.from('payouts').insert({
+                  id: crypto.randomUUID(),
+                  instructor_id: courseData.instructor_id,
+                  amount: instructorEarnings,
+                  status: 'PENDING',
+                  payment_method: 'MOBILE_MONEY',
+                  created_at: new Date().toISOString()
+                } as any);
+
+                await createNotification({
+                  userId: courseData.instructor_id,
+                  title: "Nouvelle inscription !",
+                  message: `"${studentName}" s'est inscrit à votre cours "${courseTitle}". Vos gains : $${instructorEarnings.toFixed(2)}.`,
+                  type: "SUCCESS",
+                  link: `/instructor/students`
+                });
               }
-            } catch (emailErr) {
-              console.error('[webhook-pawapay] Error sending instructor invoice:', emailErr);
             }
 
-          } else {
-            // Activate student course enrollment
-            const { error: enrollUpdateErr } = await supabaseAdmin
-              .from('enrollments')
-              .update({ status: 'ACTIVE' } as any)
-              .eq('student_id', payment.user_id)
-              .eq('course_id', courseId);
+            // Invoice email to student
+            if (studentEmail) {
+              const { sendInvoiceEmail } = await import("@/lib/email");
+              const { data: orderData } = await supabaseAdmin
+                .from("orders")
+                .select("order_number")
+                .eq("id", payment.order_id)
+                .maybeSingle();
+              const orderNumber = orderData?.order_number || `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-            if (enrollUpdateErr) {
-              console.error('[webhook-pawapay] Enrollment activate error, trying upsert:', enrollUpdateErr.message);
-              await supabaseAdmin.from('enrollments').upsert({
-                student_id: payment.user_id,
-                course_id: courseId,
-                progress_percent: 0,
-                status: 'ACTIVE',
-                enrolled_at: new Date().toISOString()
-              } as any);
+              await sendInvoiceEmail(
+                studentEmail,
+                studentName,
+                orderNumber,
+                payment.amount,
+                courseTitle,
+                "Accès complet et illimité à la formation."
+              );
             }
 
-            // Notifications & Emails
-            try {
-              const { data: courseData } = await supabaseAdmin
-                .from('courses')
-                .select('title, instructor_id')
-                .eq('id', courseId)
-                .maybeSingle();
-
-              const courseTitle = courseData?.title || 'Formation';
-
-              // Notify student
-              await createNotification({
-                userId: payment.user_id,
-                title: "Paiement validé !",
-                message: `Votre paiement de ${payment.amount}$ pour le cours "${courseTitle}" a été validé.`,
-                type: "SUCCESS",
-                link: `/dashboard/courses`
-              });
-
-              // Fetch Student Profile
-              const { data: studentProfile } = await supabaseAdmin
-                .from('profiles')
-                .select('full_name, email')
-                .eq('id', payment.user_id)
-                .maybeSingle();
-
-              const studentName = studentProfile?.full_name || 'Un apprenant';
-              const studentEmail = studentProfile?.email;
-
-              // Notify instructor & compute payout earnings
-              let instructorEmail = "";
-              let instructorName = "Formateur";
-              if (courseData?.instructor_id) {
-                const { data: instructorProfile } = await supabaseAdmin
-                  .from('profiles')
-                  .select('full_name, email, plan')
-                  .eq('id', courseData.instructor_id)
-                  .maybeSingle();
-                
-                if (instructorProfile) {
-                  instructorEmail = instructorProfile.email || "";
-                  instructorName = instructorProfile.full_name || "Formateur";
-
-                  // Commission logic (20% for FREE plan, 10% for BASE, 0% for PRO/MAX)
-                  const instPlan = instructorProfile.plan || 'FREE';
-                  const commissionRate = instPlan === 'FREE' ? 0.20 : (instPlan === 'BASE' ? 0.10 : 0.0);
-                  const platformFee = payment.amount * commissionRate;
-                  const instructorEarnings = payment.amount - platformFee;
-
-                  // Insert payout record
-                  await supabaseAdmin.from('payouts').insert({
-                    id: crypto.randomUUID(),
-                    instructor_id: courseData.instructor_id,
-                    amount: instructorEarnings,
-                    status: 'PENDING',
-                    payment_method: 'MOBILE_MONEY',
-                    created_at: new Date().toISOString()
-                  } as any);
-
-                  // Send notification to instructor
-                  await createNotification({
-                    userId: courseData.instructor_id,
-                    title: "Nouvelle inscription !",
-                    message: `"${studentName}" s'est inscrit à votre cours "${courseTitle}". Vos gains : $${instructorEarnings.toFixed(2)}.`,
-                    type: "SUCCESS",
-                    link: `/instructor/students`
-                  });
-                }
-              }
-
-              // Send Invoice Email to student
-              if (studentEmail) {
-                const { sendInvoiceEmail } = await import("@/lib/email");
-                const { data: orderData } = await supabaseAdmin
-                  .from("orders")
-                  .select("order_number")
-                  .eq("id", payment.order_id)
-                  .maybeSingle();
-                const orderNumber = orderData?.order_number || `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-
-                await sendInvoiceEmail(
-                  studentEmail,
-                  studentName,
-                  orderNumber,
-                  payment.amount,
-                  courseTitle,
-                  "Accès complet et illimité à la formation."
-                );
-              }
-
-              // Send purchased email alert to instructor
-              if (instructorEmail) {
-                const { sendInstructorCoursePurchasedEmail } = await import("@/lib/email");
-                await sendInstructorCoursePurchasedEmail(
-                  instructorEmail,
-                  instructorName,
-                  studentName,
-                  courseTitle,
-                  payment.amount
-                );
-              }
-            } catch (notifErr) {
-              console.error('[webhook-pawapay] Error triggering course notifications:', notifErr);
+            // Alert email to instructor
+            if (instructorEmail) {
+              const { sendInstructorCoursePurchasedEmail } = await import("@/lib/email");
+              await sendInstructorCoursePurchasedEmail(
+                instructorEmail,
+                instructorName,
+                studentName,
+                courseTitle,
+                payment.amount
+              );
             }
+          } catch (notifErr) {
+            console.error('[webhook-pawapay] Error triggering course notifications:', notifErr);
           }
+        } else {
+          console.warn(`[webhook-pawapay] Unknown payment type in method field: "${payment.method}". No activation performed.`);
         }
       } else if (status === 'FAILED') {
         console.log(`[webhook-pawapay] Deposit ${depositId} has FAILED. Marking payment as FAILED.`);

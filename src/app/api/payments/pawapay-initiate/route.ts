@@ -105,8 +105,9 @@ export async function POST(req: NextRequest) {
         amount: amount,
         currency: 'USD',
         status: 'PENDING',
-        provider: 'MOBILE_MONEY', // Replaced 'PAWAPAY' with valid DB enum value 'MOBILE_MONEY'
-        method: carrier,
+        provider: 'MOBILE_MONEY',
+        // Encode carrier, type and itemId for webhook resolution (no schema change needed)
+        method: `${carrier}::${type}::${itemId}`,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       } as any);

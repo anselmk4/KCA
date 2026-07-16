@@ -40,7 +40,7 @@ export async function GET(_req: NextRequest) {
     // Fetch all payments made by this instructor (includes their plan subscriptions)
     const { data: paymentsData, error: paymentsError } = await dbClient
       .from("payments")
-      .select("id, order_id, amount, currency, status, provider, provider_transaction_id, paid_at, created_at")
+      .select("id, order_id, amount, currency, status, provider, provider_transaction_id, method, paid_at, created_at")
       .eq("user_id", user.id)
       .eq("status", "PAID")
       .order("paid_at", { ascending: false });
@@ -54,36 +54,38 @@ export async function GET(_req: NextRequest) {
       return NextResponse.json({ payments: [] });
     }
 
-    const orderIds = payments.map((p) => p.order_id).filter(Boolean);
-
-    // Fetch order items to get course_id for each order
-    const { data: orderItems } = await dbClient
-      .from("order_items")
-      .select("order_id, course_id")
-      .in("order_id", orderIds);
-
-    const orderItemMap = new Map((orderItems || []).map((oi) => [oi.order_id, oi.course_id]));
+    const PLAN_LABELS: Record<string, string> = {
+      BASE: "Abonnement Formateur — Plan Base",
+      PRO: "Abonnement Formateur — Plan Pro",
+      MAX: "Abonnement Formateur — Plan Max",
+    };
 
     const result = await Promise.all(
       payments.map(async (p) => {
-        const courseId = orderItemMap.get(p.order_id) || "";
-        let label = "Formation";
+        // Parse encoded method: CARRIER::TYPE::ITEM_ID
+        const methodParts = (p.method || '').split('::');
+        const paymentType = methodParts[1] || '';
+        const itemId = methodParts[2] || '';
 
-        const PLAN_LABELS: Record<string, string> = {
-          "99999999-9999-9999-9999-999999990001": "Abonnement Plan Base",
-          "99999999-9999-9999-9999-999999990002": "Abonnement Plan Pro",
-          "99999999-9999-9999-9999-999999990003": "Abonnement Plan Max",
-        };
+        let label = "Achat";
 
-        if (courseId && PLAN_LABELS[courseId]) {
-          label = PLAN_LABELS[courseId];
-        } else if (courseId) {
+        if (paymentType === 'INSTRUCTOR_PLAN' && itemId) {
+          label = PLAN_LABELS[itemId.toUpperCase()] || `Abonnement Plan ${itemId.toUpperCase()}`;
+        } else if (paymentType === 'STUDENT_COURSE' && itemId) {
           const { data: course } = await dbClient
             .from("courses")
             .select("title")
-            .eq("id", courseId)
+            .eq("id", itemId)
             .maybeSingle();
           label = course?.title || "Formation";
+        } else if (itemId) {
+          // Legacy payments without encoded type — try to resolve via course title
+          const { data: course } = await dbClient
+            .from("courses")
+            .select("title")
+            .eq("id", itemId)
+            .maybeSingle();
+          label = course?.title || "Paiement";
         }
 
         return {
