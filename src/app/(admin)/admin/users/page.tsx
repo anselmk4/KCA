@@ -19,7 +19,11 @@ import {
   Plus,
   KeyRound,
   Check,
-  Sparkles
+  Sparkles,
+  Loader2,
+  CreditCard,
+  Activity,
+  Lock
 } from "lucide-react";
 
 type RoleName = 'STUDENT' | 'INSTRUCTOR' | 'ADMIN' | 'SUPER_ADMIN';
@@ -53,6 +57,65 @@ export default function AdminUsersPage() {
   const [newPlanVal, setNewPlanVal] = useState<"FREE" | "BASE" | "PRO" | "MAX">("FREE");
   const [modalLoading, setModalLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Drawer states
+  const [selectedUser, setSelectedUser] = useState<AdminUserItem | null>(null);
+  const [drawerLoading, setDrawerLoading] = useState(false);
+  const [drawerCourses, setDrawerCourses] = useState<any[]>([]);
+  const [drawerEnrollments, setDrawerEnrollments] = useState<any[]>([]);
+  const [drawerPayments, setDrawerPayments] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!selectedUser) {
+      setDrawerCourses([]);
+      setDrawerEnrollments([]);
+      setDrawerPayments([]);
+      return;
+    }
+
+    const loadDetails = async () => {
+      setDrawerLoading(true);
+      try {
+        if (selectedUser.role === "INSTRUCTOR") {
+          const { data: courses } = await supabase
+            .from("courses")
+            .select("id, title, status, price, created_at")
+            .eq("instructor_id", selectedUser.id)
+            .order("created_at", { ascending: false });
+          setDrawerCourses(courses || []);
+        } else if (selectedUser.role === "STUDENT") {
+          const { data: enrollments } = await supabase
+            .from("enrollments")
+            .select(`
+              id,
+              progress_percent,
+              status,
+              enrolled_at,
+              courses (
+                title,
+                price
+              )
+            `)
+            .eq("student_id", selectedUser.id)
+            .order("enrolled_at", { ascending: false });
+          setDrawerEnrollments(enrollments || []);
+
+          const { data: payments } = await supabase
+            .from("payments")
+            .select("id, amount, status, provider, paid_at, created_at")
+            .eq("user_id", selectedUser.id)
+            .order("paid_at", { ascending: false });
+          setDrawerPayments(payments || []);
+        }
+      } catch (err) {
+        console.error("Error loading drawer details:", err);
+      } finally {
+        setDrawerLoading(false);
+      }
+    };
+
+    loadDetails();
+  }, [selectedUser?.id, selectedUser?.role]);
 
   const handleUpdatePlan = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -378,7 +441,14 @@ export default function AdminUsersPage() {
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-sm">
                 {filtered.map((user) => (
                   <tr key={user.id} className="text-zinc-900 dark:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-                    <td className="px-6 py-4 font-semibold">{user.name}</td>
+                     <td className="px-6 py-4 font-semibold">
+                      <button
+                        onClick={() => setSelectedUser(user)}
+                        className="text-zinc-900 dark:text-zinc-100 hover:text-red-600 dark:hover:text-red-400 font-semibold transition-colors cursor-pointer text-left"
+                      >
+                        {user.name}
+                      </button>
+                    </td>
                     <td className="px-6 py-4 font-mono text-xs text-zinc-500 dark:text-zinc-400">{user.email}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
@@ -637,6 +707,268 @@ export default function AdminUsersPage() {
           </div>
         </div>
       )}
+
+      {/* Right Sliding Drawer Details */}
+      {selectedUser && (() => {
+        // Always read the latest status/plan/role from the parent users state to keep drawer reactively in sync
+        const openUser = users.find(u => u.id === selectedUser.id) || selectedUser;
+        const initials = openUser.name
+          ? openUser.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()
+          : "US";
+
+        return (
+          <>
+            {/* Backdrop overlay */}
+            <div
+              onClick={() => setSelectedUser(null)}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity duration-300 animate-in fade-in"
+            />
+
+            {/* Sliding Drawer Container */}
+            <div className="fixed top-0 right-0 h-full w-[460px] sm:w-[520px] max-w-full bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl z-50 flex flex-col transform transition-transform duration-300 animate-in slide-in-from-right font-sans">
+              
+              {/* Header */}
+              <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-red-50 dark:bg-red-950/20 text-red-600 rounded-xl">
+                    <UsersIcon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-zinc-900 dark:text-white text-base">Fiche Utilisateur</h3>
+                    <p className="text-xxs text-zinc-400 dark:text-zinc-500">Consultez l'historique et gérez les accès</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedUser(null)}
+                  className="p-2 rounded-xl text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Scrollable content */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                
+                {/* General profile info box */}
+                <div className="flex items-center gap-4 bg-zinc-50 dark:bg-zinc-900/50 p-5 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+                  <div className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-xl text-white shadow-md shrink-0 ${
+                    openUser.role === 'INSTRUCTOR' ? 'bg-blue-600' : openUser.role === 'ADMIN' || openUser.role === 'SUPER_ADMIN' ? 'bg-red-605 text-white bg-red-650' : 'bg-zinc-500'
+                  }`}>
+                    {initials}
+                  </div>
+                  <div className="space-y-1 min-w-0">
+                    <h4 className="font-extrabold text-sm text-zinc-900 dark:text-white truncate">{openUser.name}</h4>
+                    <p className="text-xs text-zinc-400 font-mono truncate">{openUser.email}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${
+                        openUser.role === 'SUPER_ADMIN' || openUser.role === 'ADMIN'
+                          ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50"
+                          : openUser.role === 'INSTRUCTOR'
+                          ? "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/50"
+                          : "bg-zinc-150 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border-transparent"
+                      }`}>
+                        {openUser.role === 'SUPER_ADMIN' ? 'Super Admin' : openUser.role === 'ADMIN' ? 'Admin' : openUser.role === 'INSTRUCTOR' ? 'Formateur' : 'Apprenant'}
+                      </span>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                        openUser.status === 'ACTIVE'
+                          ? "bg-green-100 text-green-700 dark:bg-green-950/20 dark:text-green-400"
+                          : "bg-amber-100 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400"
+                      }`}>
+                        {openUser.status === 'ACTIVE' ? 'Actif' : 'Suspendu'}
+                      </span>
+                      <span className="text-[9px] font-extrabold bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-350 px-2 py-0.5 rounded-full uppercase border border-zinc-300 dark:border-zinc-700">
+                        Plan {openUser.plan}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick actions Panel */}
+                <div className="space-y-3">
+                  <h5 className="text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-550">Actions d'administration</h5>
+                  <div className="grid grid-cols-2 gap-3">
+                    
+                    {/* Ban/Activate */}
+                    <button
+                      onClick={() => handleToggleStatus(openUser.id, openUser.status)}
+                      className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                        openUser.status === 'SUSPENDED'
+                          ? "bg-green-50 border-green-200 text-green-600 hover:bg-green-100"
+                          : "bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100"
+                      }`}
+                    >
+                      {openUser.status === 'SUSPENDED' ? <UserCheck className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
+                      {openUser.status === 'SUSPENDED' ? "Réactiver le compte" : "Suspendre le compte"}
+                    </button>
+
+                    {/* Promouvoir / Rétrograder */}
+                    {openUser.role !== 'SUPER_ADMIN' && openUser.role !== 'ADMIN' && (
+                      <button
+                        onClick={() => handleRoleToggle(openUser.id, openUser.role)}
+                        className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                          openUser.role === 'INSTRUCTOR'
+                            ? "bg-zinc-150 text-zinc-750 border-zinc-300 hover:bg-zinc-200"
+                            : "bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100"
+                        }`}
+                      >
+                        {openUser.role === 'INSTRUCTOR' ? <UserX className="w-4 h-4" /> : <GraduationCap className="w-4 h-4" />}
+                        {openUser.role === 'INSTRUCTOR' ? "Rétrograder étudiant" : "Promouvoir formateur"}
+                      </button>
+                    )}
+
+                    {/* Changement de plan */}
+                    <button
+                      onClick={() => {
+                        setPlanUser(openUser);
+                        setNewPlanVal((openUser.plan as any) || "FREE");
+                      }}
+                      className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-blue-200 bg-blue-50 text-blue-650 text-xs font-bold hover:bg-blue-100 transition-all cursor-pointer"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      Modifier le plan
+                    </button>
+
+                    {/* Modifier Mot de passe */}
+                    <button
+                      onClick={() => setPasswordUser(openUser)}
+                      className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-650 text-xs font-bold hover:bg-red-100 transition-all cursor-pointer"
+                    >
+                      <KeyRound className="w-4 h-4" />
+                      Nouveau mot de passe
+                    </button>
+
+                  </div>
+                </div>
+
+                {/* Details Section (Dynamic loading list) */}
+                <div className="pt-2">
+                  {drawerLoading ? (
+                    <div className="flex flex-col items-center justify-center py-10 space-y-2">
+                      <Loader2 className="w-6 h-6 animate-spin text-red-650" />
+                      <p className="text-xs text-zinc-400">Chargement de l&apos;historique...</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Instructor Course Section */}
+                      {openUser.role === 'INSTRUCTOR' && (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <h5 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Cours créés ({drawerCourses.length})</h5>
+                          </div>
+                          {drawerCourses.length === 0 ? (
+                            <p className="text-xs text-zinc-400 text-center py-4 bg-zinc-50 dark:bg-zinc-900/30 rounded-xl">Aucun cours créé pour le moment.</p>
+                          ) : (
+                            <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
+                              {drawerCourses.map((c) => (
+                                <div key={c.id} className="p-3 bg-zinc-50 dark:bg-zinc-900/30 rounded-xl border border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs">
+                                  <div className="min-w-0 pr-2">
+                                    <p className="font-bold text-zinc-800 dark:text-zinc-200 truncate">{c.title}</p>
+                                    <p className="text-[10px] text-zinc-400 mt-0.5">
+                                      Créé le {new Date(c.created_at).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <span className="font-extrabold text-zinc-950 dark:text-white block">{c.price || 0}$</span>
+                                    <span className={`text-[9px] px-2 py-0.5 font-bold uppercase tracking-wide rounded-full inline-block mt-1 ${
+                                      c.status === 'PUBLISHED'
+                                        ? "bg-green-50 text-green-700 dark:bg-green-950/20 dark:text-green-400"
+                                        : c.status === 'REVIEW'
+                                        ? "bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400"
+                                        : "bg-zinc-150 text-zinc-650 dark:bg-zinc-800 dark:text-zinc-450"
+                                    }`}>
+                                      {c.status}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Student Enrollment / Payment Section */}
+                      {openUser.role === 'STUDENT' && (
+                        <div className="space-y-6">
+                          {/* Student Enrollments */}
+                          <div className="space-y-3">
+                            <h5 className="text-xs font-bold uppercase tracking-wider text-zinc-400 font-sans">Cours suivis / Inscriptions ({drawerEnrollments.length})</h5>
+                            {drawerEnrollments.length === 0 ? (
+                              <p className="text-xs text-zinc-400 text-center py-4 bg-zinc-50 dark:bg-zinc-900/30 rounded-xl">Aucune inscription active.</p>
+                            ) : (
+                              <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                                {drawerEnrollments.map((e) => (
+                                  <div key={e.id} className="p-3 bg-zinc-50 dark:bg-zinc-900/30 rounded-xl border border-zinc-100 dark:border-zinc-800 flex flex-col gap-2 text-xs">
+                                    <div className="flex items-center justify-between">
+                                      <p className="font-bold text-zinc-800 dark:text-zinc-200 truncate pr-2">{e.courses?.title || "Cours inconnu"}</p>
+                                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                                        e.status === 'ACTIVE'
+                                          ? "bg-green-100 text-green-700 dark:bg-green-950/20 dark:text-green-400"
+                                          : "bg-zinc-150 text-zinc-600 dark:bg-zinc-850"
+                                      }`}>
+                                        {e.status}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-4 text-[10px] text-zinc-400">
+                                      <span>Inscrit le : {new Date(e.enrolled_at).toLocaleDateString()}</span>
+                                      <span className="flex items-center gap-1">
+                                        <Activity className="w-3 h-3 text-red-500" />
+                                        Progression : <strong className="text-zinc-700 dark:text-zinc-200">{e.progress_percent || 0}%</strong>
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Student Payments */}
+                          <div className="space-y-3">
+                            <h5 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Historique des transactions ({drawerPayments.length})</h5>
+                            {drawerPayments.length === 0 ? (
+                              <p className="text-xs text-zinc-400 text-center py-4 bg-zinc-50 dark:bg-zinc-900/30 rounded-xl">Aucune transaction enregistrée.</p>
+                            ) : (
+                              <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                                {drawerPayments.map((p) => (
+                                  <div key={p.id} className="p-3 bg-zinc-50 dark:bg-zinc-900/30 rounded-xl border border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs">
+                                    <div>
+                                      <p className="font-extrabold text-zinc-950 dark:text-white">{p.amount || 0}$</p>
+                                      <p className="text-[10px] text-zinc-400 mt-0.5 flex items-center gap-1.5">
+                                        <CreditCard className="w-3 h-3 text-zinc-400" />
+                                        {p.provider} • {new Date(p.paid_at || p.created_at).toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                                      p.status === 'PAID'
+                                        ? "bg-green-100 text-green-700 dark:bg-green-950/20 dark:text-green-400"
+                                        : p.status === 'PENDING'
+                                        ? "bg-amber-100 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400"
+                                        : "bg-red-50 text-red-650 dark:bg-red-950/20 dark:text-red-400"
+                                    }`}>
+                                      {p.status}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+              </div>
+
+              {/* Bottom bar inside drawer */}
+              <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 shrink-0 text-[10px] text-zinc-400 flex justify-between items-center">
+                <span>ID: {openUser.id}</span>
+                <span>Inscrit le {new Date(openUser.joinedAt).toLocaleDateString()}</span>
+              </div>
+
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }
