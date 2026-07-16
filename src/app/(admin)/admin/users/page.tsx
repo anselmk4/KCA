@@ -82,6 +82,15 @@ export default function AdminUsersPage() {
   const [drawerEnrollments, setDrawerEnrollments] = useState<any[]>([]);
   const [drawerPayments, setDrawerPayments] = useState<any[]>([]);
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, activeTab]);
+
   useEffect(() => {
     if (!selectedUser) {
       setDrawerCourses([]);
@@ -400,6 +409,13 @@ export default function AdminUsersPage() {
     return matchSearch && matchTab;
   });
 
+  const totalItems = filtered.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const paginatedUsers = filtered.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -459,114 +475,187 @@ export default function AdminUsersPage() {
             Aucun utilisateur trouvé.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider">
-                <tr>
-                  <th className="px-6 py-4 font-semibold">Nom Complet</th>
-                  <th className="px-6 py-4 font-semibold">Email</th>
-                  <th className="px-6 py-4 font-semibold">Rôle</th>
-                  <th className="px-6 py-4 font-semibold">Niveau / Plan</th>
-                  <th className="px-6 py-4 font-semibold">Date d'inscription</th>
-                  <th className="px-6 py-4 font-semibold">Statut</th>
-                  <th className="px-6 py-4 font-semibold text-right">Actions rapides</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-sm">
-                {filtered.map((user) => (
-                  <tr key={user.id} className="text-zinc-900 dark:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-                     <td className="px-6 py-4 font-semibold">
-                      <button
-                        onClick={() => setSelectedUser(user)}
-                        className="text-zinc-900 dark:text-zinc-100 hover:text-red-600 dark:hover:text-red-400 font-semibold transition-colors cursor-pointer text-left"
-                      >
-                        {user.name}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 font-mono text-xs text-zinc-500 dark:text-zinc-400">{user.email}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
-                        user.role === 'SUPER_ADMIN' || user.role === 'ADMIN'
-                          ? "bg-red-50 dark:bg-red-950/20 text-red-600 border-red-200 dark:border-red-900/30"
-                          : user.role === 'INSTRUCTOR'
-                          ? "bg-blue-50 dark:bg-blue-950/20 text-blue-600 border-blue-200 dark:border-blue-900/30"
-                          : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-transparent"
-                      }`}>
-                        {user.role === 'SUPER_ADMIN' ? 'Super Admin' : user.role === 'ADMIN' ? 'Admin' : user.role === 'INSTRUCTOR' ? 'Formateur' : 'Apprenant'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-xs font-medium">
-                      {user.level} · Plan <span className="font-bold text-red-600">{user.plan}</span>
-                    </td>
-                    <td className="px-6 py-4 text-zinc-500 text-xs">
-                      {new Date(user.joinedAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                        user.status === 'ACTIVE'
-                          ? "bg-green-100 dark:bg-green-950/20 text-green-700 dark:text-green-400"
-                          : "bg-amber-100 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400"
-                      }`}>
-                        {user.status === 'ACTIVE' ? 'Actif' : 'Suspendu'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex justify-end gap-3 text-zinc-400">
-                        {/* Toggle Status (Ban/Activate) */}
-                        <button
-                          onClick={() => handleToggleStatus(user.id, user.status)}
-                          className={`p-1.5 rounded-lg border hover:scale-105 transition-all cursor-pointer ${
-                            user.status === 'SUSPENDED'
-                              ? "bg-green-50 border-green-200 text-green-600 hover:bg-green-100"
-                              : "bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100"
-                          }`}
-                          title={user.status === 'SUSPENDED' ? "Activer l'utilisateur" : "Suspendre l'utilisateur"}
-                        >
-                          {user.status === 'SUSPENDED' ? <UserCheck className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
-                        </button>
-
-                        {/* Promote to Instructor / Demote */}
-                        {user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN' && (
-                          <button
-                            onClick={() => handleRoleToggle(user.id, user.role)}
-                            className={`p-1.5 rounded-lg border hover:scale-105 transition-all cursor-pointer ${
-                              user.role === 'INSTRUCTOR'
-                                ? "bg-zinc-100 border-zinc-300 text-zinc-600 hover:bg-zinc-200"
-                                : "bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100"
-                            }`}
-                            title={user.role === 'INSTRUCTOR' ? "Rétrograder en Apprenant" : "Promouvoir en Formateur"}
-                          >
-                            {user.role === 'INSTRUCTOR' ? <UserX className="w-4 h-4" /> : <GraduationCap className="w-4 h-4" />}
-                          </button>
-                        )}
-
-                        {/* Override Password */}
-                        <button
-                          onClick={() => setPasswordUser(user)}
-                          className="p-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:scale-105 hover:bg-red-100 transition-all cursor-pointer"
-                          title="Modifier le mot de passe"
-                        >
-                          <KeyRound className="w-4 h-4" />
-                        </button>
-
-                        {/* Override Subscription Plan */}
-                        <button
-                          onClick={() => {
-                            setPlanUser(user);
-                            setNewPlanVal((user.plan as any) || "FREE");
-                          }}
-                          className="p-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-600 hover:scale-105 hover:bg-blue-100 transition-all cursor-pointer"
-                          title="Modifier le plan d'abonnement"
-                        >
-                          <Sparkles className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold">Nom Complet</th>
+                    <th className="px-6 py-4 font-semibold">Email</th>
+                    <th className="px-6 py-4 font-semibold">Rôle</th>
+                    <th className="px-6 py-4 font-semibold">Niveau / Plan</th>
+                    <th className="px-6 py-4 font-semibold">Date d'inscription</th>
+                    <th className="px-6 py-4 font-semibold">Statut</th>
+                    <th className="px-6 py-4 font-semibold text-right">Actions rapides</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-sm">
+                  {paginatedUsers.map((user) => (
+                    <tr key={user.id} className="text-zinc-900 dark:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+                       <td className="px-6 py-4 font-semibold">
+                        <button
+                          onClick={() => setSelectedUser(user)}
+                          className="text-zinc-900 dark:text-zinc-100 hover:text-red-600 dark:hover:text-red-400 font-semibold transition-colors cursor-pointer text-left"
+                        >
+                          {user.name}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4 font-mono text-xs text-zinc-500 dark:text-zinc-400">{user.email}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                          user.role === 'SUPER_ADMIN' || user.role === 'ADMIN'
+                            ? "bg-red-50 dark:bg-red-950/20 text-red-600 border-red-200 dark:border-red-900/30"
+                            : user.role === 'INSTRUCTOR'
+                            ? "bg-blue-50 dark:bg-blue-950/20 text-blue-600 border-blue-200 dark:border-blue-900/30"
+                            : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-transparent"
+                        }`}>
+                          {user.role === 'SUPER_ADMIN' ? 'Super Admin' : user.role === 'ADMIN' ? 'Admin' : user.role === 'INSTRUCTOR' ? 'Formateur' : 'Apprenant'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-xs font-medium">
+                        {user.level} · Plan <span className="font-bold text-red-600">{user.plan}</span>
+                      </td>
+                      <td className="px-6 py-4 text-zinc-500 text-xs">
+                        {new Date(user.joinedAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          user.status === 'ACTIVE'
+                            ? "bg-green-100 dark:bg-green-950/20 text-green-700 dark:text-green-400"
+                            : "bg-amber-100 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400"
+                        }`}>
+                          {user.status === 'ACTIVE' ? 'Actif' : 'Suspendu'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex justify-end gap-3 text-zinc-400">
+                          {/* Toggle Status (Ban/Activate) */}
+                          <button
+                            onClick={() => handleToggleStatus(user.id, user.status)}
+                            className={`p-1.5 rounded-lg border hover:scale-105 transition-all cursor-pointer ${
+                              user.status === 'SUSPENDED'
+                                ? "bg-green-50 border-green-200 text-green-600 hover:bg-green-100"
+                                : "bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100"
+                            }`}
+                            title={user.status === 'SUSPENDED' ? "Activer l'utilisateur" : "Suspendre l'utilisateur"}
+                          >
+                            {user.status === 'SUSPENDED' ? <UserCheck className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
+                          </button>
+  
+                          {/* Promote to Instructor / Demote */}
+                          {user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN' && (
+                            <button
+                              onClick={() => handleRoleToggle(user.id, user.role)}
+                              className={`p-1.5 rounded-lg border hover:scale-105 transition-all cursor-pointer ${
+                                user.role === 'INSTRUCTOR'
+                                  ? "bg-zinc-100 border-zinc-300 text-zinc-600 hover:bg-zinc-200"
+                                  : "bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100"
+                              }`}
+                              title={user.role === 'INSTRUCTOR' ? "Rétrograder en Apprenant" : "Promouvoir en Formateur"}
+                            >
+                              {user.role === 'INSTRUCTOR' ? <UserX className="w-4 h-4" /> : <GraduationCap className="w-4 h-4" />}
+                            </button>
+                          )}
+  
+                          {/* Override Password */}
+                          <button
+                            onClick={() => setPasswordUser(user)}
+                            className="p-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:scale-105 hover:bg-red-100 transition-all cursor-pointer"
+                            title="Modifier le mot de passe"
+                          >
+                            <KeyRound className="w-4 h-4" />
+                          </button>
+  
+                          {/* Override Subscription Plan */}
+                          <button
+                            onClick={() => {
+                              setPlanUser(user);
+                              setNewPlanVal((user.plan as any) || "FREE");
+                            }}
+                            className="p-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-600 hover:scale-105 hover:bg-blue-100 transition-all cursor-pointer"
+                            title="Modifier le plan d'abonnement"
+                          >
+                            <Sparkles className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Control Bar */}
+            <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-800/10 border-t border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+              <div className="flex items-center gap-2">
+                <span>Afficher</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3 py-1.5 rounded-xl text-xs text-zinc-700 dark:text-zinc-300 outline-none focus:ring-2 focus:ring-red-500/10 cursor-pointer"
+                >
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                <span>lignes par page</span>
+              </div>
+
+              <div>
+                Affichage de <strong className="text-zinc-800 dark:text-zinc-200">{totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1}</strong> à{" "}
+                <strong className="text-zinc-800 dark:text-zinc-200">
+                  {Math.min(currentPage * pageSize, totalItems)}
+                </strong>{" "}
+                sur <strong className="text-zinc-800 dark:text-zinc-200">{totalItems}</strong> utilisateurs
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    className="px-3.5 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-40 transition-colors cursor-pointer"
+                  >
+                    Précédent
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((page) => {
+                      return Math.abs(page - currentPage) <= 1 || page === 1 || page === totalPages;
+                    })
+                    .map((page, idx, arr) => {
+                      const prevPage = arr[idx - 1];
+                      return (
+                        <div key={page} className="flex items-center">
+                          {prevPage && page - prevPage > 1 && (
+                            <span className="px-2 text-zinc-400 font-normal">...</span>
+                          )}
+                          <button
+                            onClick={() => setCurrentPage(page)}
+                            className={`px-3 py-1.5 rounded-xl border font-bold transition-all cursor-pointer ${
+                              currentPage === page
+                                ? "bg-red-50 dark:bg-red-950/20 text-red-600 border-red-200 dark:border-red-900/40"
+                                : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  <button
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    className="px-3.5 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-40 transition-colors cursor-pointer"
+                  >
+                    Suivant
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 
