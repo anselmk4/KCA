@@ -160,7 +160,8 @@ export async function initiatePawaPayDeposit(params: {
         value: params.phoneNumber
       }
     },
-    customerTimestamp: new Date().toISOString()
+    customerTimestamp: new Date().toISOString(),
+    statementDescription: "Ansella Academy"
   };
 
   console.log("[PawaPayService] Initiating deposit:", url, JSON.stringify(payload, null, 2));
