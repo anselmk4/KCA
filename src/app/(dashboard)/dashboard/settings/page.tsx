@@ -74,7 +74,7 @@ export default function StudentSettingsPage() {
           setAvatarUrl(profile.avatar_url || "");
           setCountry(profile.nationality || localStorage.getItem("kuettu_settings_country") || "");
           setCity(localStorage.getItem("kuettu_settings_city") || "");
-          setPhone(localStorage.getItem("kuettu_settings_phone") || "");
+          setPhone(profile.phone || localStorage.getItem("kuettu_settings_phone") || "");
           if (Array.isArray(profile.payment_methods)) setPaymentMethods(profile.payment_methods);
           setPreferredMethod(profile.preferred_payment_method || null);
         }
@@ -87,11 +87,17 @@ export default function StudentSettingsPage() {
     if (!session) return;
     setSavingProfile(true);
     try {
-      // Save to Supabase
+      // Save to Supabase (nationality mapped to country input, phone mapped to phone input)
       await fetch("/api/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: fullName, bio, nationality, avatar_url: avatarUrl }),
+        body: JSON.stringify({
+          name: fullName,
+          bio,
+          nationality: country,
+          phone: phone,
+          avatar_url: avatarUrl
+        }),
       });
 
       // Update local cache

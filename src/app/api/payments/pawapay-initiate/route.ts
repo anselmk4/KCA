@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Parse request body
     const body = await req.json();
-    const { amount, phoneNumber, carrier, type, itemId, couponId } = body;
+    const { amount, phoneNumber, carrier, type, itemId, couponId, country } = body;
 
     if (!amount || !phoneNumber || !carrier || !type || !itemId) {
       return NextResponse.json({ error: 'Paramètres manquants' }, { status: 400 });
@@ -33,11 +33,11 @@ export async function POST(req: NextRequest) {
     // 3. Fetch user profile to retrieve country
     const { data: profile } = await supabase
       .from('profiles')
-      .select('country')
+      .select('country, nationality')
       .eq('id', user.id)
       .maybeSingle();
 
-    const userCountry = profile?.country || 'CD';
+    const userCountry = country || profile?.nationality || profile?.country || 'CD';
     const countryConfig = getPawaPayConfigForCountry(userCountry);
 
     if (!countryConfig) {

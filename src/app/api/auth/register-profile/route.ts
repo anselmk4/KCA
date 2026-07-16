@@ -44,9 +44,13 @@ export async function POST(req: NextRequest) {
       full_name: name || email.split("@")[0],
       status: "ACTIVE",
       plan: "FREE",
-      country,
+      // Set columns on public.profiles structure (nationality and phone)
+      nationality: country,
+      phone: phone,
+      // Keep legacy keys if any trigger or DB extension depends on them
+      country: country,
       phone_number: phone,
-      gender,
+      gender: gender,
     };
 
     if (finalRole === "INSTRUCTOR") {

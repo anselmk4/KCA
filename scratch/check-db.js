@@ -1,30 +1,34 @@
-const { createClient } = require('@supabase/supabase-js');
+const { createClient } = require("@supabase/supabase-js");
+require("dotenv").config({ path: ".env.local" });
 
-const url = 'https://dwhtfoqqbwsycthpksqu.supabase.co';
-const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3aHRmb3FxYndzeWN0aHBrc3F1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NzgzNzMsImV4cCI6MjA5NjI1NDM3M30.E1kK0zGrUMkLbBhekJMQJEy5_rznyMGT_3q04rf8EqY';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-const supabase = createClient(url, key);
-
-async function main() {
-  console.log('Fetching enrollments...');
-  const { data: enrollments, error: err1 } = await supabase.from('enrollments').select('*');
-  if (err1) console.error('Enrollments error:', err1);
-  else console.log('Enrollments:', JSON.stringify(enrollments, null, 2));
-
-  console.log('Fetching certificates...');
-  const { data: certificates, error: err2 } = await supabase.from('certificates').select('*');
-  if (err2) console.error('Certificates error:', err2);
-  else console.log('Certificates:', JSON.stringify(certificates, null, 2));
-
-  console.log('Fetching payments...');
-  const { data: payments, error: err3 } = await supabase.from('payments').select('*');
-  if (err3) console.error('Payments error:', err3);
-  else console.log('Payments:', JSON.stringify(payments, null, 2));
-
-  console.log('Fetching profiles...');
-  const { data: profiles, error: err4 } = await supabase.from('profiles').select('id, email, full_name, plan, status');
-  if (err4) console.error('Profiles error:', err4);
-  else console.log('Profiles:', JSON.stringify(profiles, null, 2));
+if (!supabaseUrl || !supabaseKey) {
+  console.error("Missing credentials");
+  process.exit(1);
 }
 
-main();
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+async function run() {
+  const { data, error } = await supabase.rpc("check_profiles_columns");
+  if (error) {
+    // Si l'RPC n'existe pas, on fait une requête simple
+    console.log("Querying profiles table schema info...");
+    const { data: profileRow, error: selectError } = await supabase
+      .from("profiles")
+      .select("*")
+      .limit(1);
+    
+    if (selectError) {
+      console.error("Select error:", selectError.message);
+    } else {
+      console.log("Profile columns found:", Object.keys(profileRow[0] || {}));
+    }
+  } else {
+    console.log("Columns:", data);
+  }
+}
+
+run();

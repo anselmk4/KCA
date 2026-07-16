@@ -42,6 +42,8 @@ export async function PUT(req: NextRequest) {
       name: 'full_name',
       bio: 'bio',
       nationality: 'nationality',
+      phone: 'phone',
+      gender: 'gender',
       website: 'website',
       twitter: 'twitter',
       linkedin: 'linkedin',
