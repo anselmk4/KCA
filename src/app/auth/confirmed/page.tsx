@@ -156,6 +156,7 @@ function ConfirmedContent() {
               status: profile.status === "ACTIVE" ? "ACTIVE" : "INACTIVE",
               plan: profile.plan,
             });
+            localStorage.setItem("kuettu_unconfirmed_email", "false");
           }
 
           const { href, label } = resolveRedirect(finalRole);

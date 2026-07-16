@@ -7,6 +7,7 @@ import { DashboardHeader } from "@/components/layout/DashboardHeader";
 import { getSimulatedSession } from "@/lib/rbac";
 import { OnboardingTour } from "@/components/layout/OnboardingTour";
 import Chatbot from "@/components/Chatbot";
+import { AlertTriangle, X } from "lucide-react";
 
 export default function DashboardLayout({
   children,
@@ -14,6 +15,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [unconfirmed, setUnconfirmed] = useState(false);
   const router = useRouter();
   const [authorized, setAuthorized] = useState(false);
 
@@ -32,6 +34,9 @@ export default function DashboardLayout({
       return;
     }
     setAuthorized(true);
+    if (typeof window !== "undefined") {
+      setUnconfirmed(localStorage.getItem("kuettu_unconfirmed_email") === "true");
+    }
   }, [router]);
 
   if (!authorized) {
@@ -54,6 +59,23 @@ export default function DashboardLayout({
       {/* Main Content Wrapper */}
       <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
         <DashboardHeader onMenuClick={() => setSidebarOpen(true)} />
+
+        {unconfirmed && (
+          <div className="bg-amber-500 text-white px-6 py-3.5 flex items-center justify-between gap-4 animate-in slide-in-from-top duration-300 shrink-0">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 shrink-0 animate-bounce" />
+              <p className="text-xs md:text-sm font-semibold">
+                <strong>Action requise :</strong> Veuillez vérifier vos e-mails et activer votre compte sous un délai de <strong>2 jours</strong>. Passé ce délai, votre compte et vos données seront supprimés.
+              </p>
+            </div>
+            <button
+              onClick={() => setUnconfirmed(false)}
+              className="text-white hover:text-amber-100 p-1 cursor-pointer transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
         
         {/* Page Content */}
         <main className="flex-1 p-4 md:p-8 overflow-auto">

@@ -447,101 +447,64 @@ function RegisterForm() {
         return;
       }
 
-      const hasActiveSession = !!authData.session;
-
-      if (hasActiveSession) {
-        await ensureProfile(sessionUser.id, email, name, role || "STUDENT");
-
-        // Register affiliation if a referral code was stored
-        const storedRef = localStorage.getItem("ansella_referral_code");
-        if (storedRef) {
-          try {
-            await fetch("/api/affiliate", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ referredId: sessionUser.id, referralCode: storedRef }),
-            });
-          } catch (err) {
-            console.warn("[Register] Affiliation registration failed:", err);
-          } finally {
-            localStorage.removeItem("ansella_referral_code");
-          }
-        }
-
-        const profileUpdate: any = {
+      // Call register-profile API to build DB records on server-side
+      const storedRef = localStorage.getItem("ansella_referral_code");
+      const regProfileRes = await fetch("/api/auth/register-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: sessionUser.id,
+          email,
+          name,
+          role: role || "STUDENT",
           country,
-          phone_number: fullPhone,
+          phone: fullPhone,
           gender,
-        };
+          academyName: academyName || null,
+          bio: bio || null,
+          thematic: role === "INSTRUCTOR" ? (thematic === "other" ? customThematic : thematic) : null,
+          studentLevel: studentLevel || null,
+          interestCourse: interestCourse || null,
+          referralCode: storedRef || null,
+        }),
+      });
 
-        if (role === "INSTRUCTOR") {
-          Object.assign(profileUpdate, {
-            plan: "FREE",
-            academy_name: academyName || "Mon Académie",
-            bio,
-            specialty: thematic === "other" ? customThematic : thematic,
-          });
+      if (!regProfileRes.ok) {
+        const errData = await regProfileRes.json();
+        throw new Error(errData.error || "Erreur lors de la configuration du profil.");
+      }
 
-          await supabase.from("profiles").update(profileUpdate).eq("id", sessionUser.id);
+      if (storedRef) {
+        localStorage.removeItem("ansella_referral_code");
+      }
 
-          setSimulatedSession({
-            userId: sessionUser.id,
-            name,
-            email,
-            role: "INSTRUCTOR",
-            status: "ACTIVE",
-            plan: "FREE",
-          });
-          localStorage.setItem("kuettu_academy_name", academyName || "Mon Académie");
-          localStorage.setItem("kuettu_user_name", name);
-          router.push("/instructor");
-        } else {
-          const levelMap: Record<string, "BEGINNER" | "INTERMEDIATE" | "ADVANCED"> = {
-            Débutant: "BEGINNER",
-            Intermédiaire: "INTERMEDIATE",
-            Avancé: "ADVANCED",
-          };
-          Object.assign(profileUpdate, { level: levelMap[studentLevel] || "BEGINNER" });
+      // Initialize the simulated session so they are logged in on the front-end
+      setSimulatedSession({
+        userId: sessionUser.id,
+        name,
+        email,
+        role: (role || "STUDENT") as any,
+        status: "ACTIVE",
+        plan: "FREE",
+      });
 
-          await supabase.from("profiles").update(profileUpdate).eq("id", sessionUser.id);
-
-          setSimulatedSession({
-            userId: sessionUser.id,
-            name,
-            email,
-            role: "STUDENT",
-            status: "ACTIVE",
-            plan: "FREE",
-          });
-          localStorage.setItem("kuettu_user_name", name);
-          localStorage.setItem("kuettu_user_level", studentLevel);
-          localStorage.setItem("kuettu_active_module", interestCourse);
-
-          const COURSE_MAP: Record<string, string> = {
-            blockchain: "10000000-0000-0000-0000-000000000001",
-            trading: "10000000-0000-0000-0000-000000000002",
-            ai: "10000000-0000-0000-0000-000000000003",
-            web3: "10000000-0000-0000-0000-000000000004",
-          };
-          const courseId = COURSE_MAP[interestCourse] || interestCourse;
-          const { error: enrollError } = await supabase.from("enrollments").upsert(
-            {
-              student_id: sessionUser.id,
-              course_id: courseId,
-              progress_percent: 0,
-              status: "ACTIVE",
-              enrolled_at: new Date().toISOString(),
-            },
-            { onConflict: "student_id,course_id", ignoreDuplicates: true }
-          );
-          if (enrollError) console.error("Auto-enrollment error:", enrollError.message);
-
-          router.push("/dashboard");
-        }
+      // Mark the email as unconfirmed if there is no active session yet
+      if (!authData.session) {
+        localStorage.setItem("kuettu_unconfirmed_email", "true");
       } else {
-        setSuccessMessage(
-          `Inscription réussie ! Un email de confirmation a été envoyé à ${email}. Vérifiez votre boîte mail (et vos spams) puis cliquez sur le lien pour activer votre compte.`
-        );
+        localStorage.setItem("kuettu_unconfirmed_email", "false");
+      }
+
+      // Save local preferences and redirect directly to dashboard
+      if (role === "INSTRUCTOR") {
+        localStorage.setItem("kuettu_academy_name", academyName || "Mon Académie");
+        localStorage.setItem("kuettu_user_name", name);
+        router.push("/instructor");
+      } else {
+        localStorage.setItem("kuettu_user_name", name);
+        localStorage.setItem("kuettu_user_level", studentLevel);
+        localStorage.setItem("kuettu_active_module", interestCourse);
+        router.push("/dashboard");
       }
     } catch (err: any) {
       setFormError(err.message || "Une erreur est survenue.");

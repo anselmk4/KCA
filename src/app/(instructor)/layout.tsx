@@ -62,6 +62,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
   const [academyName, setAcademyName] = useState<string>("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [unconfirmed, setUnconfirmed] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ current: "", next: "", confirm: "" });
   const [passwordMsg, setPasswordMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -132,6 +133,9 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
       return;
     }
     setSession(s);
+    if (typeof window !== "undefined") {
+      setUnconfirmed(localStorage.getItem("kuettu_unconfirmed_email") === "true");
+    }
 
     // Fetch academy name, plan and notifications from Supabase profile
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -484,6 +488,23 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
             </div>
           </div>
         </header>
+
+        {unconfirmed && (
+          <div className="bg-amber-500 text-white px-6 py-3.5 flex items-center justify-between gap-4 animate-in slide-in-from-top duration-300 shrink-0">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 shrink-0 animate-bounce" />
+              <p className="text-xs md:text-sm font-semibold">
+                <strong>Action requise :</strong> Veuillez vérifier vos e-mails et activer votre compte sous un délai de <strong>2 jours</strong>. Passé ce délai, votre compte et vos données seront supprimés.
+              </p>
+            </div>
+            <button
+              onClick={() => setUnconfirmed(false)}
+              className="text-white hover:text-amber-100 p-1 cursor-pointer transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Page content */}
         <main className="flex-1 p-4 md:p-8 overflow-auto">
