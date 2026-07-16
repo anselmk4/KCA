@@ -761,9 +761,11 @@ function RegisterForm() {
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
                   <Globe className="w-3.5 h-3.5" /> Pays de résidence
+                  <span className="text-red-500 ml-0.5">*</span>
                 </label>
                 <div className="relative">
                   <select
+                    required
                     value={country}
                     onChange={(e) => handleCountryChange(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white appearance-none cursor-pointer"
@@ -800,6 +802,7 @@ function RegisterForm() {
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
                   <Phone className="w-3.5 h-3.5" /> Numéro de téléphone
+                  <span className="text-red-500 ml-0.5">*</span>
                 </label>
                 <div className="flex gap-2">
                   {/* Dial code selector */}
@@ -819,6 +822,7 @@ function RegisterForm() {
                     </select>
                   </div>
                   <input
+                    required
                     type="tel"
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9\s]/g, ""))}
@@ -837,6 +841,7 @@ function RegisterForm() {
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2 uppercase tracking-wider flex items-center gap-1.5">
                   <User2 className="w-3.5 h-3.5" /> Genre
+                  <span className="text-red-500 ml-0.5">*</span>
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
