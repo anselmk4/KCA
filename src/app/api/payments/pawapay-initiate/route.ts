@@ -133,8 +133,10 @@ export async function POST(req: NextRequest) {
         }
       }
     } catch (dbErr: any) {
-      console.error('[pawapay-initiate] Database setup error:', dbErr.message);
-      return NextResponse.json({ error: 'Erreur d\'enregistrement de la commande.' }, { status: 500 });
+      console.error('[pawapay-initiate] Database setup error:', dbErr);
+      return NextResponse.json({ 
+        error: `Erreur d'enregistrement de la commande : ${dbErr?.message || dbErr?.details || JSON.stringify(dbErr)}` 
+      }, { status: 500 });
     }
 
     // Convert amount to local currency for billing the user via PawaPay Mobile Money
