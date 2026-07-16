@@ -37,6 +37,23 @@ interface AdminUserItem {
   plan: string;
   level: string;
   joinedAt: string;
+  phoneNumber?: string;
+  country?: string;
+  gender?: string;
+  bio?: string;
+  nationality?: string;
+  website?: string;
+  twitter?: string;
+  linkedin?: string;
+  youtube?: string;
+  instagram?: string;
+  specialty?: string;
+  academyName?: string;
+  academyTagline?: string;
+  academicBackground?: string;
+  certifications?: string;
+  referralCode?: string;
+  affiliatePoints?: number;
 }
 
 export default function AdminUsersPage() {
@@ -207,6 +224,23 @@ export default function AdminUsersPage() {
           plan: p.plan || 'FREE',
           level: p.level || 'Débutant',
           joinedAt: p.created_at || new Date().toISOString(),
+          phoneNumber: p.phone_number || '',
+          country: p.country || '',
+          gender: p.gender || '',
+          bio: p.bio || '',
+          nationality: p.nationality || '',
+          website: p.website || '',
+          twitter: p.twitter || '',
+          linkedin: p.linkedin || '',
+          youtube: p.youtube || '',
+          instagram: p.instagram || '',
+          specialty: p.specialty || '',
+          academyName: p.academy_name || '',
+          academyTagline: p.academy_tagline || '',
+          academicBackground: p.academic_background || '',
+          certifications: p.certifications || '',
+          referralCode: p.referral_code || '',
+          affiliatePoints: p.affiliate_points || 0,
         };
       });
 
@@ -780,6 +814,136 @@ export default function AdminUsersPage() {
                         Plan {openUser.plan}
                       </span>
                     </div>
+                  </div>
+                </div>
+
+                {/* Personal & Contact Info Grid */}
+                <div className="space-y-3">
+                  <h5 className="text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-550">Informations & Contacts</h5>
+                  <div className="bg-zinc-50 dark:bg-zinc-900/30 rounded-2xl border border-zinc-155 dark:border-zinc-800 p-4 space-y-3.5 text-xs">
+                    
+                    {/* Country & Nationality */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Pays de résidence</span>
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">{openUser.country || "Non renseigné"}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Nationalité / Origine</span>
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">{openUser.nationality || "Non renseigné"}</span>
+                      </div>
+                    </div>
+
+                    {/* Phone & Gender */}
+                    <div className="grid grid-cols-2 gap-4 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80">
+                      <div>
+                        <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Téléphone / Contact</span>
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block font-mono">{openUser.phoneNumber || "Non renseigné"}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Genre</span>
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">{openUser.gender === "M" ? "Masculin" : openUser.gender === "F" ? "Féminin" : openUser.gender || "Non renseigné"}</span>
+                      </div>
+                    </div>
+
+                    {/* Bio (if present) */}
+                    {openUser.bio && (
+                      <div className="pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80">
+                        <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Biographie</span>
+                        <p className="text-zinc-600 dark:text-zinc-400 mt-1 leading-relaxed">{openUser.bio}</p>
+                      </div>
+                    )}
+
+                    {/* Academy name & Tagline (if instructor) */}
+                    {openUser.role === 'INSTRUCTOR' && (
+                      <div className="pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 space-y-2">
+                        <div>
+                          <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Nom de l&apos;Académie</span>
+                          <span className="font-extrabold text-teal-600 dark:text-teal-400 mt-0.5 block">{openUser.academyName || "Non renseigné"}</span>
+                        </div>
+                        {openUser.academyTagline && (
+                          <div>
+                            <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Slogan de l&apos;Académie</span>
+                            <span className="italic text-zinc-500 dark:text-zinc-455 mt-0.5 block">« {openUser.academyTagline} »</span>
+                          </div>
+                        )}
+                        {openUser.specialty && (
+                          <div>
+                            <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Spécialité / Thématique</span>
+                            <span className="font-medium text-zinc-800 dark:text-zinc-200 mt-0.5 block">{openUser.specialty}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Academic Background & Certifications */}
+                    {(openUser.academicBackground || openUser.certifications) && (
+                      <div className="pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 space-y-2">
+                        {openUser.academicBackground && (
+                          <div>
+                            <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Parcours Académique</span>
+                            <p className="text-zinc-600 dark:text-zinc-400 mt-1">{openUser.academicBackground}</p>
+                          </div>
+                        )}
+                        {openUser.certifications && (
+                          <div>
+                            <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Certifications</span>
+                            <p className="text-zinc-650 dark:text-zinc-400 mt-1">{openUser.certifications}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Social networks & Websites */}
+                    {(openUser.website || openUser.twitter || openUser.linkedin || openUser.youtube || openUser.instagram) && (
+                      <div className="pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80">
+                        <span className="block text-[10px] text-zinc-400 uppercase font-semibold mb-1.5">Liens & Réseaux Sociaux</span>
+                        <div className="flex flex-wrap gap-2">
+                          {openUser.website && (
+                            <a href={openUser.website.startsWith("http") ? openUser.website : `https://${openUser.website}`} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-zinc-600 dark:text-zinc-300 hover:text-red-650 rounded-lg font-medium transition-colors">
+                              Site Web
+                            </a>
+                          )}
+                          {openUser.linkedin && (
+                            <a href={openUser.linkedin.startsWith("http") ? openUser.linkedin : `https://linkedin.com/in/${openUser.linkedin}`} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-blue-50 dark:hover:bg-blue-950/20 text-zinc-600 dark:text-zinc-300 hover:text-blue-600 rounded-lg font-medium transition-colors">
+                              LinkedIn
+                            </a>
+                          )}
+                          {openUser.twitter && (
+                            <a href={openUser.twitter.startsWith("http") ? openUser.twitter : `https://twitter.com/${openUser.twitter}`} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-sky-50 dark:hover:bg-sky-950/20 text-zinc-600 dark:text-zinc-300 hover:text-sky-500 rounded-lg font-medium transition-colors">
+                              Twitter
+                            </a>
+                          )}
+                          {openUser.youtube && (
+                            <a href={openUser.youtube.startsWith("http") ? openUser.youtube : `https://youtube.com/${openUser.youtube}`} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-50 dark:hover:bg-red-950/20 text-zinc-600 dark:text-zinc-300 hover:text-red-600 rounded-lg font-medium transition-colors">
+                              YouTube
+                            </a>
+                          )}
+                          {openUser.instagram && (
+                            <a href={openUser.instagram.startsWith("http") ? openUser.instagram : `https://instagram.com/${openUser.instagram}`} target="_blank" rel="noopener noreferrer" className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-pink-50 dark:hover:bg-pink-950/20 text-zinc-600 dark:text-zinc-300 hover:text-pink-600 rounded-lg font-medium transition-colors">
+                              Instagram
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Affiliate Details */}
+                    {(openUser.referralCode || openUser.affiliatePoints !== undefined) && (
+                      <div className="pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Code Parrainage</span>
+                            <span className="font-mono font-bold text-red-600 mt-0.5 block">{openUser.referralCode || "Aucun"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Points Affiliation</span>
+                            <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">{openUser.affiliatePoints || 0} pts</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                   </div>
                 </div>
 
