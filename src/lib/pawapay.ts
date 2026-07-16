@@ -11,6 +11,7 @@ export interface PawaPayCountryConfig {
   names: string[];
   currency: string;
   phonePrefix: string;
+  exchangeRate: number; // 1 USD to local currency rate
   operators: PawaPayOperator[];
 }
 
@@ -21,6 +22,7 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
     names: ["république démocratique du congo", "rd congo", "congo-kinshasa", "rdc", "democratic republic of congo", "dr congo", "congo, democratic republic of"],
     currency: "CDF",
     phonePrefix: "243",
+    exchangeRate: 2800,
     operators: [
       { id: "VODACOM_MPESA_COD", name: "Vodacom M-Pesa" },
       { id: "AIRTEL_COD", name: "Airtel Money" },
@@ -33,6 +35,7 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
     names: ["rwanda", "république du rwanda", "republic of rwanda"],
     currency: "RWF",
     phonePrefix: "250",
+    exchangeRate: 1300,
     operators: [
       { id: "MTN_RWA", name: "MTN Mobile Money" },
       { id: "AIRTEL_RWA", name: "Airtel Money" }
@@ -44,6 +47,7 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
     names: ["ouganda", "uganda", "république d'ouganda", "republic of uganda"],
     currency: "UGX",
     phonePrefix: "256",
+    exchangeRate: 3700,
     operators: [
       { id: "MTN_UGA", name: "MTN Mobile Money" },
       { id: "AIRTEL_UGA", name: "Airtel Money" }
@@ -55,6 +59,7 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
     names: ["cameroun", "cameroon", "république du cameroun", "republic of cameroon"],
     currency: "XAF",
     phonePrefix: "237",
+    exchangeRate: 600,
     operators: [
       { id: "MTN_CMR", name: "MTN Mobile Money" },
       { id: "ORANGE_CMR", name: "Orange Money" }
@@ -66,6 +71,7 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
     names: ["sénégal", "senegal", "république du sénégal", "republic of senegal"],
     currency: "XOF",
     phonePrefix: "221",
+    exchangeRate: 600,
     operators: [
       { id: "ORANGE_SEN", name: "Orange Money" },
       { id: "FREE_SEN", name: "Free Money" },
@@ -78,6 +84,7 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
     names: ["côte d'ivoire", "cote d'ivoire", "ivory coast", "république de côte d'ivoire"],
     currency: "XOF",
     phonePrefix: "225",
+    exchangeRate: 600,
     operators: [
       { id: "MTN_CIV", name: "MTN Mobile Money" },
       { id: "ORANGE_CIV", name: "Orange Money" },

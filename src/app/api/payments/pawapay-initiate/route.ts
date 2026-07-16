@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       ? supabaseAdmin 
       : supabase;
 
-    // 5. Save PENDING records in database
+    // 5. Save PENDING records in database (USD equivalent for bookkeeping and DB constraints)
     try {
       const orderNumber = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       const { error: orderError } = await dbClient.from('orders').insert({
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
         discount_amount: 0,
         tax_amount: 0,
         total: amount,
-        currency: countryConfig.currency, // Use country specific currency
+        currency: 'USD', // Standardized currency in DB to match prices
         coupon_id: couponId || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -109,9 +109,9 @@ export async function POST(req: NextRequest) {
         order_id: orderId,
         user_id: user.id,
         amount: amount,
-        currency: countryConfig.currency,
+        currency: 'USD',
         status: 'PENDING',
-        provider: 'PAWAPAY',
+        provider: 'MOBILE_MONEY', // Replaced 'PAWAPAY' with valid DB enum value 'MOBILE_MONEY'
         method: carrier,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -137,9 +137,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Erreur d\'enregistrement de la commande.' }, { status: 500 });
     }
 
+    // Convert amount to local currency for billing the user via PawaPay Mobile Money
+    const localAmount = Math.round(amount * countryConfig.exchangeRate);
+
     // 6. Request deposit via PawaPay sandbox API
     const depositResult = await initiatePawaPayDeposit({
-      amount: amount,
+      amount: localAmount,
       currency: countryConfig.currency,
       correspondent: carrier,
       phoneNumber: formattedPhone,
