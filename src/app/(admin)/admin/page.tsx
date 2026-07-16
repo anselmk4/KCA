@@ -111,10 +111,10 @@ export default function AdminDashboardPage() {
       const topCourse = courses?.find(c => c.id === topCourseId);
       const topCourseTitle = topCourse?.title || "Aucun module";
 
-      // 4. Fetch payments
+      // 4. Fetch payments — include method field for type resolution
       const { data: payments } = await supabase
         .from("payments")
-        .select("id, amount, status, paid_at, user_id, order_id")
+        .select("id, amount, status, paid_at, user_id, order_id, method")
         .eq("status", "PAID");
 
       // 5. Get instructor plans to calculate commissions
@@ -130,22 +130,9 @@ export default function AdminDashboardPage() {
         });
       }
 
-      // Fetch order items to match payment with course/instructor
-      const orderIds = (payments || []).map(p => p.order_id).filter(Boolean);
-      let orderItemMap: Record<string, string> = {};
-      if (orderIds.length > 0) {
-        const { data: orderItems } = await supabase
-          .from("order_items")
-          .select("order_id, course_id")
-          .in("order_id", orderIds);
-        orderItems?.forEach(oi => {
-          orderItemMap[oi.order_id] = oi.course_id;
-        });
-      }
-
       // Date Ranges for filtering
       const now = new Date();
-      let filterStart = new Date(0); // Default to beginning of time
+      let filterStart = new Date(0);
       let filterEnd = new Date();
 
       if (timeFilter === "DAY") {
@@ -170,37 +157,36 @@ export default function AdminDashboardPage() {
         return pDate >= filterStart && pDate <= filterEnd;
       });
 
-      // Plan configurations mapping (BASE, PRO, MAX courses act as subscription updates)
-      const planUuidMap: Record<string, string> = {
-        "99999999-9999-9999-9999-999999990001": "BASE",
-        "99999999-9999-9999-9999-999999990002": "PRO",
-        "99999999-9999-9999-9999-999999990003": "MAX",
-      };
-
       // Calculate Revenue, Commissions & Instructor shares
+      // Parse method field: CARRIER::TYPE::ITEM_ID
       let totalRevenue = 0;
       let commissions = 0;
       let instructorPayouts = 0;
       let plansRevenue = 0;
-
-      // Plan proportions counters
       let planCounts = { BASE: 0, PRO: 0, MAX: 0 };
 
       filteredPayments.forEach(p => {
         const amount = p.amount || 0;
         totalRevenue += amount;
-        
-        const courseId = orderItemMap[p.order_id] || "";
-        const planName = planUuidMap[courseId];
-        if (planName) {
-          // It is a plan purchase -> 100% platform revenue, 0 commissions on it
+
+        // Decode method field: CARRIER::TYPE::ITEM_ID
+        const methodParts = (p.method || '').split('::');
+        const paymentType = methodParts[1] || '';
+        const itemId = methodParts[2] || '';
+
+        const isPlan = paymentType === 'INSTRUCTOR_PLAN';
+
+        if (isPlan && itemId) {
+          // Plan purchase → 100% platform revenue
           plansRevenue += amount;
-          planCounts[planName as "BASE" | "PRO" | "MAX"] += 1;
+          const planKey = itemId.toUpperCase() as "BASE" | "PRO" | "MAX";
+          if (planKey in planCounts) planCounts[planKey] += 1;
         } else {
-          // It is a course purchase
+          // Course purchase → split by instructor plan commission rate
+          const courseId = itemId || '';
           const courseObj = courses?.find(c => c.id === courseId);
-          const instructorId = courseObj?.instructor_id || "";
-          const instPlan = instructorPlans[instructorId] || "FREE";
+          const instructorId = courseObj?.instructor_id || '';
+          const instPlan = instructorPlans[instructorId] || 'FREE';
           const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;
 
           commissions += amount * commConfig.commissionRate;

@@ -144,6 +144,7 @@ export async function initiatePawaPayDeposit(params: {
   correspondent: string;
   phoneNumber: string;
   depositId?: string;
+  statementDescription?: string;
 }): Promise<InitiateDepositResponse> {
   const depositId = params.depositId || crypto.randomUUID();
   const apiKey = process.env.PAWAPAY_API_TOKEN || "pawapay_sandbox_placeholder_token_abc123";
@@ -161,7 +162,7 @@ export async function initiatePawaPayDeposit(params: {
       }
     },
     customerTimestamp: new Date().toISOString(),
-    statementDescription: "Ansella Academy"
+    statementDescription: params.statementDescription || "Ansella Academy"
   };
 
   console.log("[PawaPayService] Initiating deposit:", url, JSON.stringify(payload, null, 2));

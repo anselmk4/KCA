@@ -137,13 +137,22 @@ export async function POST(req: NextRequest) {
     // Convert amount to local currency for billing the user via PawaPay Mobile Money
     const localAmount = Math.round(amount * countryConfig.exchangeRate);
 
+    // Build meaningful payment description for mobile money statement (max 22 chars)
+    let statementDescription = "Ansella Academy";
+    if (type === 'INSTRUCTOR_PLAN') {
+      statementDescription = `Ansella Plan ${itemId.toUpperCase()}`.substring(0, 22);
+    } else if (type === 'STUDENT_COURSE') {
+      statementDescription = `Ansella Cours $${amount}`.substring(0, 22);
+    }
+
     // 6. Request deposit via PawaPay sandbox API
     const depositResult = await initiatePawaPayDeposit({
       amount: localAmount,
       currency: countryConfig.currency,
       correspondent: carrier,
       phoneNumber: formattedPhone,
-      depositId: paymentId
+      depositId: paymentId,
+      statementDescription
     });
 
     if (!depositResult.success) {
