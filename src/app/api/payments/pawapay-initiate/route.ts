@@ -83,26 +83,20 @@ export async function POST(req: NextRequest) {
 
       if (orderError) throw orderError;
 
-      const planUuidMap: Record<string, string> = {
-        BASE: "99999999-9999-9999-9999-999999990001",
-        PRO: "99999999-9999-9999-9999-999999990002",
-        MAX: "99999999-9999-9999-9999-999999990003",
-      };
-      const resolvedCourseId = type === 'STUDENT_COURSE' 
-        ? itemId 
-        : (planUuidMap[itemId.toUpperCase()] || planUuidMap.BASE);
+      // Insert Order Item — only for real course purchases (FK constraint on course_id)
+      if (type === 'STUDENT_COURSE') {
+        const { error: itemError } = await dbClient.from('order_items').insert({
+          id: crypto.randomUUID(),
+          order_id: orderId,
+          course_id: itemId,
+          unit_price: amount,
+          discount_amount: 0,
+          final_price: amount,
+          created_at: new Date().toISOString()
+        } as any);
 
-      const { error: itemError } = await dbClient.from('order_items').insert({
-        id: crypto.randomUUID(),
-        order_id: orderId,
-        course_id: resolvedCourseId,
-        unit_price: amount,
-        discount_amount: 0,
-        final_price: amount,
-        created_at: new Date().toISOString()
-      } as any);
-
-      if (itemError) throw itemError;
+        if (itemError) throw itemError;
+      }
 
       const { error: paymentError } = await dbClient.from('payments').insert({
         id: paymentId,
