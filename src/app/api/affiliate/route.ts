@@ -71,7 +71,6 @@ export async function GET(req: NextRequest) {
           id,
           full_name,
           email,
-          role,
           created_at
         )
       `) as any)
