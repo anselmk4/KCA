@@ -226,15 +226,21 @@ export default function AdminPayoutsPage() {
 
   const handleUpdatePayoutStatus = async (payoutId: string, nextStatus: AdminPayoutItem['status']) => {
     try {
-      const { error } = await supabase
-        .from('payouts')
-        .update({ status: nextStatus })
-        .eq('id', payoutId);
+      const action = nextStatus === 'PAID' ? 'accept' : 'reject';
+      
+      const response = await fetch('/api/admin/payouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payoutId, action })
+      });
 
-      if (error) throw error;
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Une erreur est survenue lors du traitement du reversement.');
+      }
 
-      setPayouts(prev => prev.map(p => p.id === payoutId ? { ...p, status: nextStatus } : p));
-      alert(`Demande de reversement mise à jour avec succès : ${nextStatus === 'PAID' ? 'Validée (Payée)' : 'Rejetée (Annulée)'}`);
+      setPayouts(prev => prev.map(p => p.id === payoutId ? { ...p, status: data.status || nextStatus } : p));
+      alert(`Demande de reversement traitée avec succès : ${data.status === 'PAID' ? 'Validée (Payée via PawaPay)' : 'Rejetée (Annulée)'}`);
     } catch (err: any) {
       console.error('Error updating payout status:', err.message);
       alert('Erreur lors de la validation du reversement : ' + err.message);

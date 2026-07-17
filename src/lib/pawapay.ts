@@ -212,3 +212,128 @@ export async function initiatePawaPayDeposit(params: {
     };
   }
 }
+
+export interface InitiatePayoutResponse {
+  success: boolean;
+  payoutId: string;
+  status?: string;
+  error?: string;
+}
+
+/**
+ * Request payout via PawaPay Sandbox API
+ */
+export async function initiatePawaPayPayout(params: {
+  amount: number;
+  currency: string;
+  correspondent: string;
+  phoneNumber: string;
+  payoutId?: string;
+  statementDescription?: string;
+}): Promise<InitiatePayoutResponse> {
+  const payoutId = params.payoutId || crypto.randomUUID();
+  const apiKey = process.env.PAWAPAY_API_TOKEN || "pawapay_sandbox_placeholder_token_abc123";
+  const url = "https://api.sandbox.pawapay.io/payouts";
+
+  const payload = {
+    payoutId: payoutId,
+    amount: Math.round(params.amount).toString(),
+    currency: params.currency,
+    correspondent: params.correspondent,
+    recipient: {
+      type: "MSISDN",
+      address: {
+        value: params.phoneNumber
+      }
+    },
+    customerTimestamp: new Date().toISOString(),
+    statementDescription: params.statementDescription || "Ansella Payout"
+  };
+
+  console.log("[PawaPayService] Initiating B2C Payout:", url, JSON.stringify(payload, null, 2));
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const responseText = await response.text();
+    console.log("[PawaPayService] PawaPay Payout response status:", response.status, "body:", responseText);
+
+    let data: any = {};
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      data = { message: responseText };
+    }
+
+    if (!response.ok) {
+      return {
+        success: false,
+        payoutId,
+        error: data.message || data.error || `HTTP ${response.status}: ${responseText}`
+      };
+    }
+
+    return {
+      success: true,
+      payoutId,
+      status: data.status || "ACCEPTED"
+    };
+
+  } catch (err: any) {
+    console.error("[PawaPayService] Network error during payout request:", err);
+    return {
+      success: false,
+      payoutId,
+      error: err.message || "Erreur réseau avec PawaPay"
+    };
+  }
+}
+
+export interface ResolvePayoutCarrierResult {
+  correspondent: string;
+  currency: string;
+  exchangeRate: number;
+  formattedPhone: string;
+  error?: string;
+}
+
+/**
+ * Automatically resolve operator, currency, conversion rate, and clean phone number for PawaPay
+ */
+export function resolvePawaPayCorrespondent(carrier: string, phoneNumber: string): ResolvePayoutCarrierResult {
+  const cleanPhone = phoneNumber.replace(/\D/g, "");
+  
+  // Find matching country by phone prefix
+  const countryConfig = PAWAPAY_COUNTRY_MAPPING.find(cfg => cleanPhone.startsWith(cfg.phonePrefix));
+  if (!countryConfig) {
+    return {
+      correspondent: "",
+      currency: "",
+      exchangeRate: 1,
+      formattedPhone: cleanPhone,
+      error: `Le préfixe du numéro de téléphone (+${cleanPhone.substring(0, 3)}...) n'est pas géré par PawaPay.`
+    };
+  }
+
+  // Find operator matching the carrier name
+  const carrierLower = carrier.toLowerCase();
+  const operator = countryConfig.operators.find(op => {
+    const opName = op.name.toLowerCase();
+    const opId = op.id.toLowerCase();
+    return opId.includes(carrierLower) || opName.includes(carrierLower);
+  }) || countryConfig.operators[0]; // Fallback to first operator if not explicitly matched
+
+  return {
+    correspondent: operator.id,
+    currency: countryConfig.currency,
+    exchangeRate: countryConfig.exchangeRate,
+    formattedPhone: cleanPhone
+  };
+}
