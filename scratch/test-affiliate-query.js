@@ -5,26 +5,27 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function run() {
-  const referredId = '6d36e750-81e1-4f72-a5bd-043cf63c3c55';
-  console.log(`Checking profile for referred ID: ${referredId}`);
-  const { data: profile, error } = await supabase
+  console.log("=== Checking profiles with affiliate_points > 0 ===");
+  const { data: profiles, error: pErr } = await supabase
     .from('profiles')
-    .select('*')
-    .eq('id', referredId)
-    .maybeSingle();
+    .select('id, email, full_name, affiliate_points, referral_code')
+    .gt('affiliate_points', 0);
 
-  if (error) {
-    console.error("Error fetching profile:", error);
+  if (pErr) {
+    console.error("Error fetching profiles:", pErr);
   } else {
-    console.log("Profile details in DB:", JSON.stringify(profile, null, 2));
+    console.log("Profiles with points:", JSON.stringify(profiles, null, 2));
   }
 
-  console.log("\nChecking user details in auth.users via admin API...");
-  const { data: user, error: userError } = await supabase.auth.admin.getUserById(referredId);
-  if (userError) {
-    console.error("Error fetching auth user:", userError);
+  console.log("\n=== Checking all rows in affiliations table ===");
+  const { data: affiliations, error: aErr } = await supabase
+    .from('affiliations')
+    .select('*');
+
+  if (aErr) {
+    console.error("Error fetching affiliations:", aErr);
   } else {
-    console.log("Auth user details:", JSON.stringify(user, null, 2));
+    console.log("All affiliations rows:", JSON.stringify(affiliations, null, 2));
   }
 }
 

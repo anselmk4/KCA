@@ -137,6 +137,48 @@ export default function StudentMessagesPage() {
     return () => window.removeEventListener("storage", handleStorageChange);
   }, [selectedContactId]);
 
+  // Real-time Supabase Database synchronization and subscription
+  useEffect(() => {
+    if (!session?.userId) return;
+    
+    // Initial sync
+    import("@/lib/chat").then(({ syncDatabaseMessages }) => {
+      syncDatabaseMessages(session.userId);
+    });
+
+    // Real-time channel subscription
+    let subscription: any;
+    import("@/lib/supabase/client").then(({ supabase }) => {
+      subscription = supabase
+        .channel(`student-chat-${session.userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "chat_messages"
+          },
+          (payload) => {
+            const newMsg = payload.new;
+            if (newMsg.sender_id === session.userId || newMsg.receiver_id === session.userId) {
+              import("@/lib/chat").then(({ syncDatabaseMessages }) => {
+                syncDatabaseMessages(session.userId);
+              });
+            }
+          }
+        )
+        .subscribe();
+    });
+
+    return () => {
+      if (subscription) {
+        import("@/lib/supabase/client").then(({ supabase }) => {
+          supabase.removeChannel(subscription);
+        });
+      }
+    };
+  }, [session?.userId]);
+
   // Scroll to bottom of chat when message list changes
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

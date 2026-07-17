@@ -125,6 +125,48 @@ export default function MessagesPage() {
     return () => window.removeEventListener("storage", handleStorageChange);
   }, [selected]);
 
+  // Real-time Supabase Database synchronization and subscription
+  useEffect(() => {
+    if (!session?.userId) return;
+    
+    // Initial sync
+    import("@/lib/chat").then(({ syncDatabaseMessages }) => {
+      syncDatabaseMessages(session.userId);
+    });
+
+    // Real-time channel subscription
+    let subscription: any;
+    import("@/lib/supabase/client").then(({ supabase }) => {
+      subscription = supabase
+        .channel(`instructor-chat-${session.userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "chat_messages"
+          },
+          (payload) => {
+            const newMsg = payload.new;
+            if (newMsg.sender_id === session.userId || newMsg.receiver_id === session.userId) {
+              import("@/lib/chat").then(({ syncDatabaseMessages }) => {
+                syncDatabaseMessages(session.userId);
+              });
+            }
+          }
+        )
+        .subscribe();
+    });
+
+    return () => {
+      if (subscription) {
+        import("@/lib/supabase/client").then(({ supabase }) => {
+          supabase.removeChannel(subscription);
+        });
+      }
+    };
+  }, [session?.userId]);
+
   const activeConv = conversations.find(c => c.userId === selected);
   const filteredConvs = conversations.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
 

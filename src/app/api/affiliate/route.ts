@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+import { createClient as createAdminClient } from "@supabase/supabase-js";
+
 export const dynamic = "force-dynamic";
+
+const supabaseAdmin = createAdminClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 // GET /api/affiliate — liste des affiliés + stats du formateur connecté
 export async function GET(req: NextRequest) {
@@ -13,7 +20,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Récupérer le profil du formateur (sélectionner '*' pour tolérer l'absence de colonnes d'affiliation si la migration est en attente)
-    let { data: profile, error: profileErr } = await (supabase
+    let { data: profile, error: profileErr } = await (supabaseAdmin
       .from("profiles")
       .select("*") as any)
       .eq("id", user.id)
@@ -23,7 +30,7 @@ export async function GET(req: NextRequest) {
       console.warn("[/api/affiliate GET] Profile missing. Attempting auto-repair...");
       const email = user.email || `${user.id}@ansella.app`;
       const name = user.user_metadata?.full_name || email.split("@")[0];
-      const { error: insertErr } = await (supabase.from("profiles") as any).insert({
+      const { error: insertErr } = await (supabaseAdmin.from("profiles") as any).insert({
         id: user.id,
         email,
         full_name: name,
@@ -36,7 +43,7 @@ export async function GET(req: NextRequest) {
       }
 
       // Réessayer de charger le profil
-      const { data: newProfile, error: refetchErr } = await (supabase
+      const { data: newProfile, error: refetchErr } = await (supabaseAdmin
         .from("profiles")
         .select("*") as any)
         .eq("id", user.id)
@@ -54,7 +61,7 @@ export async function GET(req: NextRequest) {
     if (!referralCode) {
       referralCode = user.id.replace(/-/g, "").substring(0, 12).toUpperCase();
       try {
-        await (supabase.from("profiles") as any)
+        await (supabaseAdmin.from("profiles") as any)
           .update({ referral_code: referralCode })
           .eq("id", user.id);
       } catch (updateErr: any) {
@@ -63,7 +70,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Récupérer la liste des affiliés
-    const { data: affiliations, error: affErr } = await (supabase
+    const { data: affiliations, error: affErr } = await (supabaseAdmin
       .from("affiliations" as any)
       .select(`
         id,

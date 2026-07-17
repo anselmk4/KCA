@@ -84,8 +84,83 @@ export function sendChatMessage(senderId: string, senderName: string, receiverId
   if (typeof window !== "undefined") {
     localStorage.setItem("kuettu_chat_messages", JSON.stringify(messages));
     window.dispatchEvent(new Event("storage")); // Notify other listeners in the same page
+    
+    // Persist to Supabase database asynchronously (non-blocking)
+    import("./supabase/client").then(({ supabase }) => {
+      (supabase as any).from("chat_messages").insert({
+        sender_id: senderId,
+        receiver_id: receiverId,
+        text: text
+      }).then(({ error }: any) => {
+        if (error) {
+          console.error("[chat.ts] Supabase save error:", error.message);
+        }
+      });
+    });
   }
   return newMessage;
+}
+
+// Sync messages from Supabase to local storage
+export async function syncDatabaseMessages(myId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const { supabase } = await import("./supabase/client");
+    
+    const { data: dbMsgs, error } = await (supabase as any)
+      .from("chat_messages")
+      .select("*")
+      .or(`sender_id.eq.${myId},receiver_id.eq.${myId}`)
+      .order("created_at", { ascending: true })
+      .limit(200);
+
+    if (error) {
+      console.error("[chat.ts] Database sync error:", error.message);
+      return;
+    }
+
+    if (dbMsgs && dbMsgs.length > 0) {
+      const localMessages = getChatMessages();
+      const localMap = new Map(localMessages.map(m => [`${m.senderId}-${m.receiverId}-${m.text}-${m.timestamp.slice(0, 16)}`, m]));
+      
+      let updated = false;
+      const profileCacheRaw = localStorage.getItem("kuettu_profile_cache") || "{}";
+      let cache: Record<string, any> = {};
+      try { cache = JSON.parse(profileCacheRaw); } catch {}
+
+      dbMsgs.forEach((msg: any) => {
+        const timestamp = new Date(msg.created_at).toISOString();
+        const key = `${msg.sender_id}-${msg.receiver_id}-${msg.text}-${timestamp.slice(0, 16)}`;
+        
+        if (!localMap.has(key)) {
+          let senderName = "Utilisateur";
+          if (msg.sender_id === myId) {
+            senderName = localStorage.getItem("kuettu_user_name") || "Moi";
+          } else if (cache[msg.sender_id]) {
+            senderName = cache[msg.sender_id].name;
+          }
+          
+          localMessages.push({
+            id: msg.id,
+            senderId: msg.sender_id,
+            senderName: senderName,
+            receiverId: msg.receiver_id,
+            text: msg.text,
+            timestamp: timestamp
+          });
+          updated = true;
+        }
+      });
+
+      if (updated) {
+        localMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        localStorage.setItem("kuettu_chat_messages", JSON.stringify(localMessages));
+        window.dispatchEvent(new Event("storage"));
+      }
+    }
+  } catch (err) {
+    console.error("[chat.ts] Sync failed:", err);
+  }
 }
 
 // Format message array into standard Conversations structure for the active user
