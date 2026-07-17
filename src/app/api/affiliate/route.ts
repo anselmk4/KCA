@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
     if (profileErr || !profile) {
       console.warn("[/api/affiliate GET] Profile missing. Attempting auto-repair...");
-      const email = user.email || `${user.id}@ansella.com`;
+      const email = user.email || `${user.id}@ansella.app`;
       const name = user.user_metadata?.full_name || email.split("@")[0];
       const { error: insertErr } = await (supabase.from("profiles") as any).insert({
         id: user.id,
@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
       },
     }));
 
-    const baseUrl = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://ansella.com";
+    const baseUrl = req.nextUrl.origin || process.env.NEXT_PUBLIC_SITE_URL || "https://ansella.app";
     const referralLink = `${baseUrl}/register?ref=${referralCode}`;
 
     return NextResponse.json({
