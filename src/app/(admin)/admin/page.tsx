@@ -247,11 +247,15 @@ export default function AdminDashboardPage() {
           ? pDate.toLocaleDateString("fr-FR", { month: "short" })
           : pDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
 
-        const courseId = orderItemMap[p.order_id] || "";
+        // Decode method field: CARRIER::TYPE::ITEM_ID
+        const methodParts = (p.method || '').split('::');
+        const paymentType = methodParts[1] || '';
+        const itemId = methodParts[2] || '';
+        const isPlan = paymentType === 'INSTRUCTOR_PLAN';
+
         let commAmount = 0;
-        // On plan purchases, commission is 0 (since it is platform subscription fee, not course sale commission)
-        if (!planUuidMap[courseId]) {
-          const courseObj = courses?.find(c => c.id === courseId);
+        if (!isPlan && itemId) {
+          const courseObj = courses?.find(c => c.id === itemId);
           const instructorId = courseObj?.instructor_id || "";
           const instPlan = instructorPlans[instructorId] || "FREE";
           const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;

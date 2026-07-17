@@ -1058,7 +1058,7 @@ function RegisterForm() {
                     { label: "Rôle", value: role === "INSTRUCTOR" ? "🎓 Formateur" : "📖 Apprenant" },
                     { label: "Pays", value: selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : "—" },
                     { label: "Téléphone", value: phoneNumber ? `${dialCode} ${phoneNumber}` : "—" },
-                    { label: "Genre", value: gender === "male" ? "Homme" : gender === "female" ? "Femme" : gender === "other" ? "Autre" : "—" },
+                    { label: "Genre", value: gender === "male" ? "Homme" : gender === "female" ? "Femme" : "—" },
                     ...(role === "INSTRUCTOR"
                       ? [
                           { label: "Académie", value: academyName },
