@@ -50,7 +50,7 @@ export default function InstructorAffiliatePage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/affiliate");
+      const res = await fetch("/api/affiliate", { cache: "no-store" });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || "Erreur lors du chargement");

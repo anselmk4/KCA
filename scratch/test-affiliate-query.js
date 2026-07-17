@@ -5,63 +5,26 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function run() {
-  console.log("=== Querying affiliations table raw ===");
-  const { data: rawAffiliations, error: rawError } = await supabase
-    .from('affiliations')
+  const referredId = '6d36e750-81e1-4f72-a5bd-043cf63c3c55';
+  console.log(`Checking profile for referred ID: ${referredId}`);
+  const { data: profile, error } = await supabase
+    .from('profiles')
     .select('*')
-    .limit(10);
-    
-  if (rawError) {
-    console.error("Error fetching raw affiliations:", rawError);
-    return;
-  }
-  
-  console.log("Raw affiliations in DB:", JSON.stringify(rawAffiliations, null, 2));
+    .eq('id', referredId)
+    .maybeSingle();
 
-  console.log("\n=== Querying affiliations with join profiles ===");
-  const { data: joinProfiles, error: joinError } = await supabase
-    .from('affiliations')
-    .select(`
-      id,
-      points_awarded,
-      created_at,
-      profiles!referred_id (
-        id,
-        full_name,
-        email,
-        role,
-        created_at
-      )
-    `)
-    .limit(10);
-
-  if (joinError) {
-    console.error("Error fetching join profiles:", joinError);
+  if (error) {
+    console.error("Error fetching profile:", error);
   } else {
-    console.log("Join profiles result:", JSON.stringify(joinProfiles, null, 2));
+    console.log("Profile details in DB:", JSON.stringify(profile, null, 2));
   }
 
-  console.log("\n=== Querying affiliations with default join referred ===");
-  const { data: joinReferred, error: refError } = await supabase
-    .from('affiliations')
-    .select(`
-      id,
-      points_awarded,
-      created_at,
-      referred:referred_id (
-        id,
-        full_name,
-        email,
-        role,
-        created_at
-      )
-    `)
-    .limit(10);
-
-  if (refError) {
-    console.error("Error fetching join referred:", refError);
+  console.log("\nChecking user details in auth.users via admin API...");
+  const { data: user, error: userError } = await supabase.auth.admin.getUserById(referredId);
+  if (userError) {
+    console.error("Error fetching auth user:", userError);
   } else {
-    console.log("Join referred result:", JSON.stringify(joinReferred, null, 2));
+    console.log("Auth user details:", JSON.stringify(user, null, 2));
   }
 }
 
