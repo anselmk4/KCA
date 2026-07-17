@@ -127,14 +127,18 @@ export default function StudentMessagesPage() {
 
     loadConversations();
 
-    // Listen to storage events for real-time local sync (same-browser testing)
+    // Listen to storage events and custom events for instant active-tab updates
     const handleStorageChange = () => {
       const list = getConversationsForUser(s.userId, s.role);
       setConversations(list);
     };
 
     window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    window.addEventListener("kuettu_chat_update", handleStorageChange);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("kuettu_chat_update", handleStorageChange);
+    };
   }, [selectedContactId]);
 
   // Real-time Supabase Database synchronization and subscription

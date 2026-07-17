@@ -122,7 +122,11 @@ export default function MessagesPage() {
     };
 
     window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    window.addEventListener("kuettu_chat_update", handleStorageChange);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("kuettu_chat_update", handleStorageChange);
+    };
   }, [selected]);
 
   // Real-time Supabase Database synchronization and subscription

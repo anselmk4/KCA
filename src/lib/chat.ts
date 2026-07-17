@@ -83,7 +83,8 @@ export function sendChatMessage(senderId: string, senderName: string, receiverId
   messages.push(newMessage);
   if (typeof window !== "undefined") {
     localStorage.setItem("kuettu_chat_messages", JSON.stringify(messages));
-    window.dispatchEvent(new Event("storage")); // Notify other listeners in the same page
+    window.dispatchEvent(new Event("storage")); // Notify other listeners in other tabs
+    window.dispatchEvent(new Event("kuettu_chat_update")); // Notify active tab immediately
     
     // Persist to Supabase database asynchronously (non-blocking)
     import("./supabase/client").then(({ supabase }) => {
@@ -156,6 +157,7 @@ export async function syncDatabaseMessages(myId: string) {
         localMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
         localStorage.setItem("kuettu_chat_messages", JSON.stringify(localMessages));
         window.dispatchEvent(new Event("storage"));
+        window.dispatchEvent(new Event("kuettu_chat_update"));
       }
     }
   } catch (err) {
