@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, ArrowRight, Sparkles, ShieldCheck, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { fetchUserProfile } from "@/lib/supabase/auth-helpers";
-import { setSimulatedSession } from "@/lib/rbac";
+import { setSimulatedSession, getSimulatedSession } from "@/lib/rbac";
 import type { Session } from "@supabase/supabase-js";
 
 /**
@@ -109,7 +109,8 @@ function ConfirmedContent() {
     async function run() {
       try {
         // roleParam from URL — set by the server callback, reliable fallback
-        const roleParam = (searchParams.get("role") || "STUDENT").toUpperCase();
+        const savedRegRole = typeof window !== "undefined" ? localStorage.getItem("kuettu_registration_role") : null;
+        const roleParam = (searchParams.get("role") || savedRegRole || "STUDENT").toUpperCase();
 
         setStatusText("Vérification de votre session...");
 
@@ -121,7 +122,12 @@ function ConfirmedContent() {
         if (session?.user) {
           setHasSession(true);
           const user = session.user;
-          const intendedRole = ((user.user_metadata?.role as string) || roleParam).toUpperCase();
+          const localSession = getSimulatedSession();
+          const intendedRole = (
+            (user.user_metadata?.role as string) ||
+            localSession?.role ||
+            roleParam
+          ).toUpperCase();
 
           // Fix roles only for non-student registrations
           if (intendedRole !== "STUDENT") {
@@ -136,6 +142,11 @@ function ConfirmedContent() {
           let finalRole = intendedRole;
           if (profile) {
             finalRole = intendedRole !== "STUDENT" ? intendedRole : (profile.role || "STUDENT");
+
+            // Clean up the temporary registration role tracker
+            if (typeof window !== "undefined") {
+              localStorage.removeItem("kuettu_registration_role");
+            }
 
             setSimulatedSession({
               userId: profile.id,

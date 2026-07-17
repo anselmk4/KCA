@@ -466,6 +466,9 @@ function RegisterForm() {
         localStorage.setItem("kuettu_unconfirmed_email", "false");
       }
 
+      // Store the registration role selection for robust confirmed page lookup
+      localStorage.setItem("kuettu_registration_role", role || "STUDENT");
+
       // Call register-profile API to build DB records (non-blocking — does NOT
       // prevent dashboard access if it fails; profile will be auto-created on
       // next login via the auth-helpers fallback).

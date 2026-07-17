@@ -47,10 +47,6 @@ export async function POST(req: NextRequest) {
       // Set columns on public.profiles structure (nationality and phone)
       nationality: country,
       phone: phone,
-      // Keep legacy keys if any trigger or DB extension depends on them
-      country: country,
-      phone_number: phone,
-      gender: gender,
     };
 
     if (finalRole === "INSTRUCTOR") {
