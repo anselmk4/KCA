@@ -632,11 +632,14 @@ function PaymentContent() {
 
                   <div className="flex flex-col items-center p-6 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/50 dark:border-zinc-800 rounded-2xl shadow-sm space-y-4">
                     <div className="relative p-4 bg-white rounded-xl border border-zinc-150 flex items-center justify-center shadow-sm">
-                      <svg className="w-44 h-44 text-zinc-905 dark:text-zinc-900" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M0 0h6v6H0zm2 2v2h2V2zm0 6h6v6H0zm2 2v2h2v-2zm0 6h6v6H0zm2 2v2h2v-2zm6-14h6v6H8zm2 2v2h2V2zm0 6h6v6H8zm2 2v2h2v-2zm6-10h6v6h-6zm2 2v2h2V2zm-4 8h2v2h-2zm2 2h2v2h-2zm-2 2h2v2h-2zm4-4h2v2h-2zm0 4h2v2h-2zm-4 4h2v2h-2zm2 2h2v2h-2zm4-4h2v2h-2z" />
-                        <rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="#14F195" />
-                        <path d="M10.5 10.5h3v0.7h-3zm0 1.1h3v0.7h-3zm0 1.1h3v0.7h-3z" fill="#9945FF" />
-                      </svg>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&color=09090b&data=${encodeURIComponent(`solana:AnsLA11111111111111111111111111111111111111?amount=${currentPlanDetails.price}&spl-token=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&label=Ansella%20Academy&memo=KCA-PLAN-${plan.toUpperCase()}`)}`}
+                        alt="Solana Pay QR Code"
+                        width={180}
+                        height={180}
+                        className="w-44 h-44 object-contain"
+                      />
                     </div>
                     <div className="text-center space-y-1.5">
                       <p className="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest">Solana Pay</p>
