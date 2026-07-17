@@ -223,8 +223,11 @@ export function getConversationsForUser(myId: string, myRole: string): ChatConve
   return list.sort((a, b) => {
     const lastA = allMessages.filter(m => (m.senderId === myId && m.receiverId === a.userId) || (m.senderId === a.userId && m.receiverId === myId)).pop();
     const lastB = allMessages.filter(m => (m.senderId === myId && m.receiverId === b.userId) || (m.senderId === b.userId && m.receiverId === myId)).pop();
+    
+    if (!lastA && !lastB) return 0;
     if (!lastA) return 1;
     if (!lastB) return -1;
+    
     return new Date(lastB.timestamp).getTime() - new Date(lastA.timestamp).getTime();
   });
 }

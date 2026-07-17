@@ -32,33 +32,46 @@ export default function StudentMessagesPage() {
       setLoadingInstructors(true);
       try {
         const { supabase } = await import("@/lib/supabase/client");
-        // 1. Get student's enrollments
+        
+        // 1. Get all instructor IDs from user_roles
+        const { data: userRoles } = await supabase
+          .from("user_roles")
+          .select("user_id, roles!inner(name)")
+          .eq("roles.name", "INSTRUCTOR");
+
+        const allInstructorIds = (userRoles || []).map((r: any) => r.user_id);
+
+        // 2. Get student's enrollments to prioritize primary instructors
         const { data: enrollments } = await supabase
           .from("enrollments")
           .select("course_id")
           .eq("student_id", s.userId);
 
-        if (!enrollments || enrollments.length === 0) return;
+        let primaryInstructorIds: string[] = [];
+        if (enrollments && enrollments.length > 0) {
+          const courseIds = enrollments.map((e: any) => e.course_id);
+          const { data: courses } = await supabase
+            .from("courses")
+            .select("instructor_id")
+            .in("id", courseIds);
+          if (courses) {
+            primaryInstructorIds = courses.map((c: any) => c.instructor_id).filter(Boolean);
+          }
+        }
 
-        const courseIds = enrollments.map((e: any) => e.course_id);
+        // Combine and put enrolled course instructors first
+        const sortedInstructorIds = [...new Set([
+          ...primaryInstructorIds,
+          ...allInstructorIds
+        ])];
 
-        // 2. Get unique instructor IDs for these courses
-        const { data: courses } = await supabase
-          .from("courses")
-          .select("id, title, instructor_id")
-          .in("id", courseIds);
+        if (sortedInstructorIds.length === 0) return;
 
-        if (!courses || courses.length === 0) return;
-
-        const instructorIds = [...new Set(courses.map((c: any) => c.instructor_id).filter(Boolean))];
-
-        if (instructorIds.length === 0) return;
-
-        // 3. Fetch profiles of these instructors to cache them
+        // 3. Fetch profiles of all these instructors to cache them
         const { data: profiles } = await supabase
           .from("profiles")
           .select("id, full_name, email, avatar_url")
-          .in("id", instructorIds);
+          .in("id", sortedInstructorIds);
 
         if (profiles) {
           // Update profile cache in localStorage
@@ -77,7 +90,7 @@ export default function StudentMessagesPage() {
           localStorage.setItem("kuettu_profile_cache", JSON.stringify(cache));
 
           // Save student's active instructors list
-          localStorage.setItem(`kuettu_student_instructors_${s.userId}`, JSON.stringify(instructorIds));
+          localStorage.setItem(`kuettu_student_instructors_${s.userId}`, JSON.stringify(sortedInstructorIds));
           
           // Re-load list
           const list = getConversationsForUser(s.userId, s.role);

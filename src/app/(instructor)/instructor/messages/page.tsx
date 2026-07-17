@@ -24,33 +24,46 @@ export default function MessagesPage() {
       setLoadingStudents(true);
       try {
         const { supabase } = await import("@/lib/supabase/client");
-        // 1. Get instructor's course IDs
+        
+        // 1. Get all student IDs from user_roles
+        const { data: userRoles } = await supabase
+          .from("user_roles")
+          .select("user_id, roles!inner(name)")
+          .eq("roles.name", "STUDENT");
+
+        const allStudentIds = (userRoles || []).map((r: any) => r.user_id);
+
+        // 2. Find students enrolled in my courses to prioritize them
         const { data: courses } = await supabase
           .from("courses")
           .select("id")
           .eq("instructor_id", s.userId);
+        
+        let myStudentIds: string[] = [];
+        if (courses && courses.length > 0) {
+          const courseIds = courses.map((c: any) => c.id);
+          const { data: enrollments } = await supabase
+            .from("enrollments")
+            .select("student_id")
+            .in("course_id", courseIds);
+          if (enrollments) {
+            myStudentIds = enrollments.map((e: any) => e.student_id).filter(Boolean);
+          }
+        }
 
-        if (!courses || courses.length === 0) return;
+        // Combine and put instructor's own course students first
+        const sortedStudentIds = [...new Set([
+          ...myStudentIds,
+          ...allStudentIds
+        ])];
 
-        const courseIds = courses.map((c: any) => c.id);
+        if (sortedStudentIds.length === 0) return;
 
-        // 2. Get students enrolled in these courses
-        const { data: enrollments } = await supabase
-          .from("enrollments")
-          .select("student_id")
-          .in("course_id", courseIds);
-
-        if (!enrollments || enrollments.length === 0) return;
-
-        const studentIds = [...new Set(enrollments.map((e: any) => e.student_id).filter(Boolean))];
-
-        if (studentIds.length === 0) return;
-
-        // 3. Fetch profiles of these students to cache them
+        // 3. Fetch profiles of all these students to cache them
         const { data: profiles } = await supabase
           .from("profiles")
           .select("id, full_name, email, avatar_url")
-          .in("id", studentIds);
+          .in("id", sortedStudentIds);
 
         if (profiles) {
           // Update profile cache in localStorage
@@ -69,7 +82,7 @@ export default function MessagesPage() {
           localStorage.setItem("kuettu_profile_cache", JSON.stringify(cache));
 
           // Save instructor's active students list
-          localStorage.setItem(`kuettu_instructor_students_${s.userId}`, JSON.stringify(studentIds));
+          localStorage.setItem(`kuettu_instructor_students_${s.userId}`, JSON.stringify(sortedStudentIds));
           
           // Re-load list
           const list = getConversationsForUser(s.userId, s.role);
