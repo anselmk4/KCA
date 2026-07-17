@@ -14,6 +14,80 @@ export default function MessagesPage() {
   const [search, setSearch] = useState("");
   const [mobileShowChat, setMobileShowChat] = useState(false);
 
+  const [loadingStudents, setLoadingStudents] = useState(false);
+
+  // Sync real enrolled students from Supabase
+  useEffect(() => {
+    const syncRealStudents = async () => {
+      const s = getSimulatedSession();
+      if (!s || s.role !== "INSTRUCTOR") return;
+      setLoadingStudents(true);
+      try {
+        const { supabase } = await import("@/lib/supabase/client");
+        // 1. Get instructor's course IDs
+        const { data: courses } = await supabase
+          .from("courses")
+          .select("id")
+          .eq("instructor_id", s.userId);
+
+        if (!courses || courses.length === 0) return;
+
+        const courseIds = courses.map((c: any) => c.id);
+
+        // 2. Get students enrolled in these courses
+        const { data: enrollments } = await supabase
+          .from("enrollments")
+          .select("student_id")
+          .in("course_id", courseIds);
+
+        if (!enrollments || enrollments.length === 0) return;
+
+        const studentIds = [...new Set(enrollments.map((e: any) => e.student_id).filter(Boolean))];
+
+        if (studentIds.length === 0) return;
+
+        // 3. Fetch profiles of these students to cache them
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, full_name, email, avatar_url")
+          .in("id", studentIds);
+
+        if (profiles) {
+          // Update profile cache in localStorage
+          const cacheRaw = localStorage.getItem("kuettu_profile_cache") || "{}";
+          let cache: Record<string, any> = {};
+          try {
+            cache = JSON.parse(cacheRaw);
+          } catch {}
+
+          profiles.forEach((p: any) => {
+            cache[p.id] = {
+              name: p.full_name,
+              avatar: p.full_name ? p.full_name.split(" ").map((n: string) => n[0] || "").join("").slice(0, 2).toUpperCase() : "UT"
+            };
+          });
+          localStorage.setItem("kuettu_profile_cache", JSON.stringify(cache));
+
+          // Save instructor's active students list
+          localStorage.setItem(`kuettu_instructor_students_${s.userId}`, JSON.stringify(studentIds));
+          
+          // Re-load list
+          const list = getConversationsForUser(s.userId, s.role);
+          setConversations(list);
+          if (list.length > 0 && !selected) {
+            setSelected(list[0].userId);
+          }
+        }
+      } catch (err) {
+        console.error("Error syncing students from Supabase:", err);
+      } finally {
+        setLoadingStudents(false);
+      }
+    };
+
+    syncRealStudents();
+  }, [selected]);
+
   useEffect(() => {
     const s = getSimulatedSession();
     if (!s) return;

@@ -116,7 +116,32 @@ export function getConversationsForUser(myId: string, myRole: string): ChatConve
     if (m.receiverId === myId) contactIds.add(m.senderId);
   });
 
-  // If no messages exist yet, seed a default conversation with relevant contacts
+  // Pull dynamically synced database contacts from local storage cache
+  if (typeof window !== "undefined") {
+    if (myRole === "STUDENT") {
+      const savedInsts = localStorage.getItem(`kuettu_student_instructors_${myId}`);
+      if (savedInsts) {
+        try {
+          const instIds = JSON.parse(savedInsts) as string[];
+          instIds.forEach(id => contactIds.add(id));
+        } catch (e) {
+          console.error("Error loading student instructors from cache:", e);
+        }
+      }
+    } else if (myRole === "INSTRUCTOR") {
+      const savedStds = localStorage.getItem(`kuettu_instructor_students_${myId}`);
+      if (savedStds) {
+        try {
+          const stdIds = JSON.parse(savedStds) as string[];
+          stdIds.forEach(id => contactIds.add(id));
+        } catch (e) {
+          console.error("Error loading instructor students from cache:", e);
+        }
+      }
+    }
+  }
+
+  // Fallback seed if still empty
   if (contactIds.size === 0) {
     if (myRole === "STUDENT") {
       // Find instructors in courses
@@ -132,8 +157,32 @@ export function getConversationsForUser(myId: string, myRole: string): ChatConve
   const list: ChatConversation[] = [];
 
   contactIds.forEach(contactId => {
-    const contact = db.users.find(u => u.id === contactId);
-    if (!contact) return;
+    // Determine profile metadata: Name & Avatar
+    let contactName = "Utilisateur";
+    let contactAvatar = "UT";
+
+    // 1. Try to read from Supabase profiles cache in localStorage
+    if (typeof window !== "undefined") {
+      const profileCacheRaw = localStorage.getItem("kuettu_profile_cache");
+      if (profileCacheRaw) {
+        try {
+          const cache = JSON.parse(profileCacheRaw);
+          if (cache[contactId]) {
+            contactName = cache[contactId].name || contactName;
+            contactAvatar = cache[contactId].avatar || contactName.split(" ").map((n: string) => n[0] || "").join("").slice(0, 2).toUpperCase();
+          }
+        } catch {}
+      }
+    }
+
+    // 2. Fallback to mock DB seeded users
+    if (contactName === "Utilisateur") {
+      const mockUser = db.users.find(u => u.id === contactId);
+      if (mockUser) {
+        contactName = mockUser.name;
+        contactAvatar = mockUser.name.split(" ").map(n => n[0] || "").join("").slice(0, 2).toUpperCase();
+      }
+    }
 
     // Filter messages between me and this contact, sorted by time ascending
     const relevantMsgs = allMessages
@@ -155,8 +204,8 @@ export function getConversationsForUser(myId: string, myRole: string): ChatConve
 
     list.push({
       userId: contactId,
-      name: contact.name,
-      avatar: contact.name.split(" ").map(n => n[0] || "").join("").slice(0, 2).toUpperCase(),
+      name: contactName,
+      avatar: contactAvatar,
       preview,
       time: displayTime,
       unreadCount,
