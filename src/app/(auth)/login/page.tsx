@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { AlertCircle, ArrowRight, Loader2, Sparkles, BookOpen, ShieldCheck, Cpu, Coins } from "lucide-react";
 import { initDB } from "@/lib/db";
@@ -11,8 +11,12 @@ import { supabase } from "@/lib/supabase/client";
 import { setSimulatedSession } from "@/lib/rbac";
 import { Captcha } from "@/components/ui/Captcha";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const registered = searchParams.get("registered") === "true";
+  const registeredEmail = searchParams.get("email") || "";
+  const roleParam = searchParams.get("role") || "STUDENT";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -250,6 +254,21 @@ export default function LoginPage() {
             </p>
           </div>
 
+          {registered && (
+            <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250 dark:border-emerald-900/30 rounded-2xl flex items-start gap-3 text-emerald-800 dark:text-emerald-400 text-xs animate-in fade-in">
+              <Sparkles className="w-5 h-5 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+              <div className="space-y-1">
+                <p className="font-extrabold uppercase tracking-wider text-[10px]">Inscription réussie !</p>
+                <p className="leading-relaxed font-semibold">
+                  Un e-mail de confirmation a été envoyé à <span className="underline font-bold text-zinc-800 dark:text-zinc-200">{registeredEmail}</span>.
+                </p>
+                <p className="text-[10px] leading-relaxed text-zinc-500 dark:text-zinc-400 font-medium">
+                  Veuillez cliquer sur le lien dans l'e-mail pour activer votre compte {roleParam === "INSTRUCTOR" ? "Formateur" : "Apprenant"} avant de vous connecter.
+                </p>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="mb-6 p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-2xl flex items-start gap-3 text-red-700 dark:text-red-400 text-sm animate-in fade-in">
               <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
@@ -388,5 +407,17 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

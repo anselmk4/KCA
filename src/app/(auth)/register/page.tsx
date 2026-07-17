@@ -507,16 +507,22 @@ function RegisterForm() {
         localStorage.removeItem("ansella_referral_code");
       }
 
-      // Save local preferences and redirect directly to dashboard
+      // Save local preferences
       if (role === "INSTRUCTOR") {
         localStorage.setItem("kuettu_academy_name", academyName || "Mon Académie");
         localStorage.setItem("kuettu_user_name", name);
-        router.push("/instructor");
       } else {
         localStorage.setItem("kuettu_user_name", name);
-        localStorage.setItem("kuettu_user_level", studentLevel);
-        localStorage.setItem("kuettu_active_module", interestCourse);
-        router.push("/dashboard");
+        localStorage.setItem("kuettu_user_level", studentLevel || "Débutant");
+        localStorage.setItem("kuettu_active_module", interestCourse || "blockchain");
+      }
+
+      // If email confirmation is required (session is null), redirect to login with query params.
+      // Otherwise, log in immediately and redirect directly to their dashboard.
+      if (!authData.session) {
+        router.push(`/login?registered=true&email=${encodeURIComponent(email)}&role=${role}`);
+      } else {
+        router.push(role === "INSTRUCTOR" ? "/instructor" : "/dashboard");
       }
     } catch (err: any) {
       setFormError(err.message || "Une erreur est survenue.");
