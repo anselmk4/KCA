@@ -74,6 +74,7 @@ export async function GET(req: NextRequest) {
       .from("affiliations" as any)
       .select(`
         id,
+        referred_id,
         points_awarded,
         created_at,
         referred:referred_id (
@@ -90,6 +91,27 @@ export async function GET(req: NextRequest) {
       console.warn("[/api/affiliate GET] affiliations query:", affErr.message);
     }
 
+    // Récupérer les rôles réels des utilisateurs affiliés
+    const referredIds = ((affiliations as any[]) || []).map(a => a.referred_id).filter(Boolean);
+    const rolesMap = new Map<string, string>();
+    if (referredIds.length > 0) {
+      try {
+        const { data: rolesData } = await supabaseAdmin
+          .from("user_roles" as any)
+          .select(`
+            user_id,
+            roles!inner(name)
+          ` as any)
+          .in("user_id", referredIds);
+        
+        (rolesData || []).forEach((ur: any) => {
+          rolesMap.set(ur.user_id, ur.roles?.name || "STUDENT");
+        });
+      } catch (roleFetchErr) {
+        console.warn("[/api/affiliate GET] Could not fetch referred roles:", roleFetchErr);
+      }
+    }
+
     const totalPoints = (profile as any).affiliate_points || 0;
     const affiliateList = ((affiliations as any[]) || []).map((a: any) => ({
       id: a.id,
@@ -99,7 +121,7 @@ export async function GET(req: NextRequest) {
         id: a.referred?.id,
         name: a.referred?.full_name || "—",
         email: a.referred?.email || "—",
-        role: a.referred?.role || "STUDENT",
+        role: rolesMap.get(a.referred_id) || "STUDENT",
       },
     }));
 
