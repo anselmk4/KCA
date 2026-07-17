@@ -447,38 +447,9 @@ function RegisterForm() {
         return;
       }
 
-      // Call register-profile API to build DB records on server-side
-      const storedRef = localStorage.getItem("ansella_referral_code");
-      const regProfileRes = await fetch("/api/auth/register-profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: sessionUser.id,
-          email,
-          name,
-          role: role || "STUDENT",
-          country,
-          phone: fullPhone,
-          gender,
-          academyName: academyName || null,
-          bio: bio || null,
-          thematic: role === "INSTRUCTOR" ? (thematic === "other" ? customThematic : thematic) : null,
-          studentLevel: studentLevel || null,
-          interestCourse: interestCourse || null,
-          referralCode: storedRef || null,
-        }),
-      });
-
-      if (!regProfileRes.ok) {
-        const errData = await regProfileRes.json();
-        throw new Error(errData.error || "Erreur lors de la configuration du profil.");
-      }
-
-      if (storedRef) {
-        localStorage.removeItem("ansella_referral_code");
-      }
-
-      // Initialize the simulated session so they are logged in on the front-end
+      // ── CRITICAL: write the simulated session IMMEDIATELY after signUp ──
+      // This must happen before any async API call so the layout guard
+      // always finds a valid session in localStorage on navigation.
       setSimulatedSession({
         userId: sessionUser.id,
         name,
@@ -488,11 +459,49 @@ function RegisterForm() {
         plan: "FREE",
       });
 
-      // Mark the email as unconfirmed if there is no active session yet
+      // Mark the email as unconfirmed if there is no active Supabase session yet
       if (!authData.session) {
         localStorage.setItem("kuettu_unconfirmed_email", "true");
       } else {
         localStorage.setItem("kuettu_unconfirmed_email", "false");
+      }
+
+      // Call register-profile API to build DB records (non-blocking — does NOT
+      // prevent dashboard access if it fails; profile will be auto-created on
+      // next login via the auth-helpers fallback).
+      const storedRef = localStorage.getItem("ansella_referral_code");
+      try {
+        const regProfileRes = await fetch("/api/auth/register-profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: sessionUser.id,
+            email,
+            name,
+            role: role || "STUDENT",
+            country,
+            phone: fullPhone,
+            gender,
+            academyName: academyName || null,
+            bio: bio || null,
+            thematic: role === "INSTRUCTOR" ? (thematic === "other" ? customThematic : thematic) : null,
+            studentLevel: studentLevel || null,
+            interestCourse: interestCourse || null,
+            referralCode: storedRef || null,
+          }),
+        });
+        if (!regProfileRes.ok) {
+          const errData = await regProfileRes.json().catch(() => ({}));
+          console.error("[register] register-profile API error:", errData);
+          // Non-blocking: the session is already written, continue to redirect
+        }
+      } catch (apiErr) {
+        console.error("[register] register-profile fetch failed:", apiErr);
+        // Non-blocking: still redirect to dashboard
+      }
+
+      if (storedRef) {
+        localStorage.removeItem("ansella_referral_code");
       }
 
       // Save local preferences and redirect directly to dashboard
