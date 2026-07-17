@@ -46,6 +46,7 @@ export default function AdminPayoutsPage() {
   const [fundSources, setFundSources] = useState<FundSourceItem[]>([]);
   const [commissionRate, setCommissionRate] = useState(20); // Fallback commission rate
   const [activeTab, setActiveTab] = useState<"ALL" | "PENDING" | "PAID">("PENDING");
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -225,6 +226,8 @@ export default function AdminPayoutsPage() {
   }, []);
 
   const handleUpdatePayoutStatus = async (payoutId: string, nextStatus: AdminPayoutItem['status']) => {
+    if (processingId) return;
+    setProcessingId(payoutId);
     try {
       const action = nextStatus === 'PAID' ? 'accept' : 'reject';
       
@@ -244,6 +247,8 @@ export default function AdminPayoutsPage() {
     } catch (err: any) {
       console.error('Error updating payout status:', err.message);
       alert('Erreur lors de la validation du reversement : ' + err.message);
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -478,15 +483,36 @@ export default function AdminPayoutsPage() {
                         {p.status === 'PENDING' ? (
                           <div className="flex justify-end gap-2">
                             <button
+                              disabled={processingId !== null}
                               onClick={() => handleUpdatePayoutStatus(p.id, 'PAID')}
-                              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                                processingId === p.id 
+                                  ? "bg-green-700/50 text-white/50 cursor-not-allowed"
+                                  : processingId !== null
+                                  ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
+                                  : "bg-green-600 hover:bg-green-700 text-white cursor-pointer"
+                              }`}
                               title="Valider le reversement"
                             >
-                              <Check className="w-3 h-3" /> Payer
+                              {processingId === p.id ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" />
+                                  Traitement...
+                                </>
+                              ) : (
+                                <>
+                                  <Check className="w-3 h-3" /> Payer
+                                </>
+                              )}
                             </button>
                             <button
+                              disabled={processingId !== null}
                               onClick={() => handleUpdatePayoutStatus(p.id, 'CANCELLED')}
-                              className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                                processingId !== null
+                                  ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
+                                  : "bg-red-600 hover:bg-red-700 text-white cursor-pointer"
+                              }`}
                               title="Rejeter le reversement"
                             >
                               <X className="w-3 h-3" /> Refuser
