@@ -148,7 +148,8 @@ export async function initiatePawaPayDeposit(params: {
 }): Promise<InitiateDepositResponse> {
   const depositId = params.depositId || crypto.randomUUID();
   const apiKey = process.env.PAWAPAY_API_TOKEN || "pawapay_sandbox_placeholder_token_abc123";
-  const url = "https://api.sandbox.pawapay.io/deposits";
+  const isProduction = process.env.PAWAPAY_ENVIRONMENT === "production";
+  const url = `${isProduction ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io"}/deposits`;
 
   const payload = {
     depositId: depositId,
@@ -233,7 +234,8 @@ export async function initiatePawaPayPayout(params: {
 }): Promise<InitiatePayoutResponse> {
   const payoutId = params.payoutId || crypto.randomUUID();
   const apiKey = process.env.PAWAPAY_API_TOKEN || "pawapay_sandbox_placeholder_token_abc123";
-  const url = "https://api.sandbox.pawapay.io/payouts";
+  const isProduction = process.env.PAWAPAY_ENVIRONMENT === "production";
+  const url = `${isProduction ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io"}/payouts`;
 
   const payload = {
     payoutId: payoutId,
