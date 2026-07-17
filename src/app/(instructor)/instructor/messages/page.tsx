@@ -1,87 +1,56 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getDB, initDB, Database } from "@/lib/db";
+import { useState, useEffect } from "react";
 import { getSimulatedSession } from "@/lib/rbac";
+import { getConversationsForUser, sendChatMessage, ChatConversation } from "@/lib/chat";
 import { MessageSquare, Send, Search, ArrowLeft, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
-interface Message {
-  id: string;
-  from: string;
-  text: string;
-  time: string;
-  own?: boolean;
-}
-
-interface Conversation {
-  userId: string;
-  name: string;
-  avatar: string;
-  preview: string;
-  time: string;
-  unread: number;
-  messages: Message[];
-}
-
 export default function MessagesPage() {
-  const [db, setDb] = useState<Database | null>(null);
   const [session, setSession] = useState<any>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [search, setSearch] = useState("");
   const [mobileShowChat, setMobileShowChat] = useState(false);
 
   useEffect(() => {
-    initDB();
-    const d = getDB();
-    setDb(d);
     const s = getSimulatedSession();
     if (!s) return;
     setSession(s);
 
-    const myCourseIds = d.courses.filter(c => c.instructorId === s.userId).map(c => c.id);
-    const myEnrollments = d.enrollments.filter(e => myCourseIds.includes(e.courseId));
-    const studentIds = [...new Set(myEnrollments.map(e => e.studentId))];
-    const students = d.users.filter(u => studentIds.includes(u.id)).slice(0, 6);
+    const loadConversations = () => {
+      const list = getConversationsForUser(s.userId, s.role);
+      setConversations(list);
+      if (list.length > 0 && !selected) {
+        setSelected(list[0].userId);
+      }
+    };
 
-    const mockConversations: Conversation[] = students.map((student, i) => ({
-      userId: student.id,
-      name: student.name || "Apprenant",
-      avatar: (student.name || "").split(" ").map((n: string) => n[0] || "").join("").slice(0, 2),
-      preview: i % 2 === 0 ? "Merci pour le cours, super contenu !" : "J'ai une question sur le module 3...",
-      time: `${10 + i}:${30 + i < 60 ? 30 + i : "00"}`,
-      unread: i % 3 === 0 ? 2 : 0,
-      messages: [
-        { id: "m1", from: student.name || "Apprenant", text: i % 2 === 0 ? "Bonjour, j'ai adoré le cours !" : "Bonjour, j'ai une question.", time: "09:00" },
-        { id: "m2", from: s.name || "Vous", text: "Merci ! Posez votre question.", time: "09:05", own: true },
-        { id: "m3", from: student.name || "Apprenant", text: i % 2 === 0 ? "Merci pour le cours, super contenu !" : "J'ai une question sur le module 3...", time: "09:10" },
-      ]
-    }));
+    loadConversations();
 
-    setConversations(mockConversations);
-    if (mockConversations.length > 0) setSelected(mockConversations[0].userId);
-  }, []);
+    const handleStorageChange = () => {
+      const list = getConversationsForUser(s.userId, s.role);
+      setConversations(list);
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, [selected]);
 
   const activeConv = conversations.find(c => c.userId === selected);
   const filteredConvs = conversations.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
 
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!draft.trim() || !selected) return;
-    setConversations(prev => prev.map(c => {
-      if (c.userId !== selected) return c;
-      return {
-        ...c,
-        preview: draft,
-        messages: [...c.messages, { id: `m${Date.now()}`, from: session?.name || "Vous", text: draft, time: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }), own: true }]
-      };
-    }));
+    if (!draft.trim() || !selected || !session) return;
+    
+    sendChatMessage(session.userId, session.name, selected, draft);
+    setConversations(getConversationsForUser(session.userId, session.role));
     setDraft("");
   };
 
-  if (!db || !session) return (
+  if (!session) return (
     <div className="h-96 bg-zinc-200 dark:bg-zinc-800 rounded-2xl animate-pulse" />
   );
 
@@ -166,8 +135,8 @@ export default function MessagesPage() {
                     </div>
                     <div className="flex items-center justify-between mt-0.5">
                       <p className="text-xs text-zinc-400 truncate">{c.preview}</p>
-                      {c.unread > 0 && (
-                        <span className="ml-1 w-4 h-4 bg-teal-500 rounded-full text-white text-[10px] flex items-center justify-center shrink-0">{c.unread}</span>
+                      {c.unreadCount > 0 && (
+                        <span className="ml-1 w-4 h-4 bg-teal-500 rounded-full text-white text-[10px] flex items-center justify-center shrink-0">{c.unreadCount}</span>
                       )}
                     </div>
                   </div>

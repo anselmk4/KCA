@@ -1,9 +1,10 @@
 "use client";
 
-import { Bell, ChevronDown, Menu, Settings, LogOut, UserCircle, Info, CheckCircle, AlertTriangle, XCircle, Trash2 } from "lucide-react";
+import { Bell, ChevronDown, Menu, Settings, LogOut, UserCircle, Info, CheckCircle, AlertTriangle, XCircle, Trash2, MessageSquare } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { useEffect, useState, useRef } from "react";
 import { getSimulatedSession } from "@/lib/rbac";
+import { getConversationsForUser } from "@/lib/chat";
 import Link from "next/link";
 
 interface DashboardHeaderProps {
@@ -16,6 +17,11 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
   const [userId, setUserId] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Messages State
+  const [messagesOpen, setMessagesOpen] = useState(false);
+  const [conversations, setConversations] = useState<any[]>([]);
+  const messagesRef = useRef<HTMLDivElement>(null);
 
   // Notifications State
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -118,6 +124,9 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
       if (notificationsRef.current && !notificationsRef.current.contains(e.target as Node)) {
         setNotificationsOpen(false);
       }
+      if (messagesRef.current && !messagesRef.current.contains(e.target as Node)) {
+        setMessagesOpen(false);
+      }
     };
     document.addEventListener("mousedown", clickOutside);
 
@@ -126,6 +135,21 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
       document.removeEventListener("mousedown", clickOutside);
     };
   }, []);
+
+  const loadConversations = () => {
+    const s = getSimulatedSession();
+    if (s) {
+      setConversations(getConversationsForUser(s.userId, s.role));
+    }
+  };
+
+  // Keep conversations counts updated
+  useEffect(() => {
+    loadConversations();
+    const handleStorage = () => loadConversations();
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [session]);
 
   const handleLogout = async () => {
     const { supabase } = await import("@/lib/supabase/client");
@@ -160,6 +184,68 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
       <div className="flex items-center space-x-3 md:space-x-6">
         <div className="flex items-center space-x-3">
           <ThemeToggle />
+
+          {/* Messages Dropdown */}
+          {session && (
+            <div ref={messagesRef} className="relative">
+              <button 
+                onClick={() => {
+                  setMessagesOpen(!messagesOpen);
+                  loadConversations();
+                }}
+                className="relative p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-full hover:bg-zinc-50 text-zinc-600 dark:text-zinc-350 cursor-pointer flex items-center justify-center"
+              >
+                <MessageSquare className="w-4 h-4 text-zinc-500" />
+                {conversations.filter(c => c.unreadCount > 0).length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 rounded-full text-[9px] font-bold text-white flex items-center justify-center border border-white dark:border-zinc-800 animate-pulse">
+                    {conversations.filter(c => c.unreadCount > 0).length}
+                  </span>
+                )}
+              </button>
+
+              {messagesOpen && (
+                <div className="absolute right-0 top-12 w-80 bg-white dark:bg-zinc-900 dark:border-zinc-800 rounded-xl border border-zinc-200 shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150 text-left">
+                  <div className="px-4 py-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                    <p className="text-sm font-bold text-zinc-900 dark:text-white">Messages</p>
+                    <Link 
+                      href={session.role === "INSTRUCTOR" ? "/instructor/messages" : "/dashboard/messages"}
+                      onClick={() => setMessagesOpen(false)}
+                      className="text-xxs text-blue-600 hover:text-blue-500 dark:text-blue-400 font-semibold cursor-pointer"
+                    >
+                      Ouvrir la messagerie
+                    </Link>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {conversations.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-xs text-zinc-400">
+                        Aucun message
+                      </div>
+                    ) : (
+                      conversations.slice(0, 4).map((c) => (
+                        <Link
+                          key={c.userId}
+                          href={session.role === "INSTRUCTOR" ? "/instructor/messages" : "/dashboard/messages"}
+                          onClick={() => setMessagesOpen(false)}
+                          className="px-4 py-3 flex gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-850 transition-colors cursor-pointer"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-500 to-indigo-500 text-white flex items-center justify-center text-xs font-black shrink-0">
+                            {c.avatar}
+                          </div>
+                          <div className="space-y-0.5 min-w-0 flex-1">
+                            <div className="flex justify-between items-baseline">
+                              <p className="text-xs font-bold text-zinc-800 dark:text-white truncate">{c.name}</p>
+                              <span className="text-[9px] text-zinc-400 font-medium">{c.time}</span>
+                            </div>
+                            <p className="text-xxs text-zinc-500 dark:text-zinc-400 truncate">{c.preview}</p>
+                          </div>
+                        </Link>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Notifications Dropdown */}
           {userId && (

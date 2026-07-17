@@ -16,7 +16,8 @@ import {
   LifeBuoy,
   Compass,
   Video,
-  UserCircle
+  UserCircle,
+  MessageSquare
 } from "lucide-react";
 import { clearSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
@@ -41,6 +42,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     { icon: <LayoutDashboard className="w-5 h-5" />, label: "Vue d'ensemble", href: "/dashboard" },
     { icon: <Compass className="w-5 h-5" />, label: "Découvrir", href: "/dashboard/discover" },
     { icon: <BookOpen className="w-5 h-5" />, label: "Mes Formations", href: "/dashboard/courses" },
+    { icon: <MessageSquare className="w-5 h-5" />, label: "Messagerie Directe", href: "/dashboard/messages" },
     { icon: <Video className="w-5 h-5" />, label: "Session Live", href: "/dashboard/live" },
     { icon: <CreditCard className="w-5 h-5" />, label: "Paiements", href: "/dashboard/payments" },
     { icon: <Award className="w-5 h-5" />, label: "Certificats", href: "/dashboard/certificates" },

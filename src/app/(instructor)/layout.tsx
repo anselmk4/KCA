@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { getSimulatedSession, setSimulatedSession, clearSimulatedSession } from "@/lib/rbac";
+import { getConversationsForUser } from "@/lib/chat";
 import { supabase } from "@/lib/supabase/client";
 import { OnboardingTour } from "@/components/layout/OnboardingTour";
 import Chatbot from "@/components/Chatbot";
@@ -67,6 +68,11 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
   const [passwordForm, setPasswordForm] = useState({ current: "", next: "", confirm: "" });
   const [passwordMsg, setPasswordMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  // Messages State
+  const [messagesOpen, setMessagesOpen] = useState(false);
+  const [conversations, setConversations] = useState<any[]>([]);
+  const messagesRef = useRef<HTMLDivElement>(null);
 
   // Notifications State
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -176,10 +182,28 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
       if (notificationsRef.current && !notificationsRef.current.contains(e.target as Node)) {
         setNotificationsOpen(false);
       }
+      if (messagesRef.current && !messagesRef.current.contains(e.target as Node)) {
+        setMessagesOpen(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  const loadConversations = () => {
+    const s = getSimulatedSession();
+    if (s) {
+      setConversations(getConversationsForUser(s.userId, s.role));
+    }
+  };
+
+  // Keep conversations counts updated
+  useEffect(() => {
+    loadConversations();
+    const handleStorageChange = () => loadConversations();
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, [session]);
 
   const isActive = (href: string) => {
     if (href === "/instructor") return pathname === "/instructor";
@@ -327,6 +351,68 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
 
           <div className="flex items-center gap-3">
             <ThemeToggle />
+
+            {/* Messages Dropdown */}
+            {session && (
+              <div ref={messagesRef} className="relative">
+                <button 
+                  onClick={() => {
+                    setMessagesOpen(!messagesOpen);
+                    loadConversations();
+                  }}
+                  className="relative p-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-full hover:bg-zinc-50 text-zinc-600 dark:text-zinc-355 cursor-pointer flex items-center justify-center"
+                >
+                  <MessageSquare className="w-5 h-5 text-zinc-500" />
+                  {conversations.filter(c => c.unreadCount > 0).length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-teal-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center border border-white dark:border-zinc-800 animate-pulse">
+                      {conversations.filter(c => c.unreadCount > 0).length}
+                    </span>
+                  )}
+                </button>
+
+                {messagesOpen && (
+                  <div className="absolute right-0 top-12 w-80 bg-white dark:bg-zinc-900 dark:border-zinc-800 rounded-xl border border-zinc-200 shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150 text-left">
+                    <div className="px-4 py-2 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                      <p className="text-sm font-bold text-zinc-900 dark:text-white">Messages</p>
+                      <Link 
+                        href="/instructor/messages"
+                        onClick={() => setMessagesOpen(false)}
+                        className="text-xxs text-teal-650 hover:text-teal-500 dark:text-teal-400 font-semibold cursor-pointer"
+                      >
+                        Ouvrir la messagerie
+                      </Link>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800">
+                      {conversations.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-xs text-zinc-400">
+                          Aucun message
+                        </div>
+                      ) : (
+                        conversations.slice(0, 4).map((c) => (
+                          <Link
+                            key={c.userId}
+                            href="/instructor/messages"
+                            onClick={() => setMessagesOpen(false)}
+                            className="px-4 py-3 flex gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-850 transition-colors cursor-pointer"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-500 to-indigo-500 text-white flex items-center justify-center text-xs font-black shrink-0">
+                              {c.avatar}
+                            </div>
+                            <div className="space-y-0.5 min-w-0 flex-1">
+                              <div className="flex justify-between items-baseline">
+                                <p className="text-xs font-bold text-zinc-800 dark:text-white truncate">{c.name}</p>
+                                <span className="text-[9px] text-zinc-400 font-medium">{c.time}</span>
+                              </div>
+                              <p className="text-xxs text-zinc-500 dark:text-zinc-400 truncate">{c.preview}</p>
+                            </div>
+                          </Link>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Notifications Dropdown */}
             {userId && (
