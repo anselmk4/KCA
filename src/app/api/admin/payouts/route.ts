@@ -16,15 +16,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    // Role verification (SUPER_ADMIN, ADMIN, or FINANCE_ADMIN)
-    const { data: userRole } = await supabaseAdmin
+    // Role verification (SUPER_ADMIN, ADMIN, or FINANCE_ADMIN) - Support multiple roles per user
+    const { data: userRoles, error: rolesErr } = await supabaseAdmin
       .from("user_roles")
       .select("roles!inner(name)")
-      .eq("user_id", user.id)
-      .maybeSingle() as any;
+      .eq("user_id", user.id) as any;
 
-    const roleName = userRole?.roles?.name;
-    if (roleName !== "SUPER_ADMIN" && roleName !== "ADMIN" && roleName !== "FINANCE_ADMIN") {
+    if (rolesErr || !userRoles || userRoles.length === 0) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
+    }
+
+    const roleNames = userRoles.map((ur: any) => ur.roles?.name);
+    const hasAdminAccess = roleNames.some((name: string) => 
+      name === "SUPER_ADMIN" || name === "ADMIN" || name === "FINANCE_ADMIN"
+    );
+
+    if (!hasAdminAccess) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
