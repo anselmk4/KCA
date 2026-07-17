@@ -17,10 +17,48 @@ export async function POST(req: NextRequest) {
     const events = Array.isArray(body) ? body : [body];
 
     for (const event of events) {
-      const { depositId, status, failureCode } = event;
+      const { depositId, payoutId, status, failureCode } = event;
 
-      if (!depositId) {
-        console.warn('[webhook-pawapay] Skipping event due to missing depositId');
+      if (!depositId && !payoutId) {
+        console.warn('[webhook-pawapay] Skipping event due to missing depositId and payoutId');
+        continue;
+      }
+
+      // Handle PawaPay B2C Payout callback
+      if (payoutId) {
+        console.log(`[webhook-pawapay] Processing payoutId: ${payoutId}, Status: ${status}`);
+        const { data: payout, error: payoutFetchErr } = await supabaseAdmin
+          .from('payouts')
+          .select('id, status, notes')
+          .eq('id', payoutId)
+          .maybeSingle() as any;
+
+        if (payoutFetchErr || !payout) {
+          console.error(`[webhook-pawapay] Payout record not found for id ${payoutId}:`, payoutFetchErr?.message);
+          continue;
+        }
+
+        if (status === 'COMPLETED') {
+          console.log(`[webhook-pawapay] Payout ${payoutId} is COMPLETED. Updating database...`);
+          await supabaseAdmin
+            .from('payouts')
+            .update({
+              status: 'PAID',
+              notes: (payout.notes || '') + `\n[Callback] Statut finalisé: COMPLETED le ${new Date().toLocaleString()}.`,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', payoutId);
+        } else if (status === 'FAILED') {
+          console.log(`[webhook-pawapay] Payout ${payoutId} has FAILED. Updating database...`);
+          await supabaseAdmin
+            .from('payouts')
+            .update({
+              status: 'FAILED',
+              notes: (payout.notes || '') + `\n[Callback] Échec de la transaction: FAILED. Code: ${failureCode || 'Inconnu'} le ${new Date().toLocaleString()}.`,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', payoutId);
+        }
         continue;
       }
 
