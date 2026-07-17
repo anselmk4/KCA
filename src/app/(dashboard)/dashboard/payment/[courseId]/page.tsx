@@ -142,7 +142,7 @@ export default function PaymentPage() {
   const [success, setSuccess] = useState(false);
 
   // Crypto state
-  const [cryptoNetwork, setCryptoNetwork] = useState("trc20");
+  const [cryptoNetwork, setCryptoNetwork] = useState("solana");
 
   useEffect(() => {
     async function loadCourse() {
@@ -935,38 +935,38 @@ export default function PaymentPage() {
               {method === "crypto" && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Réseau de transfert</label>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Moyen de paiement crypto</label>
                     <div className="flex gap-4">
-                      {[
-                        { id: "trc20", label: "Tron (TRC20)" },
-                        { id: "erc20", label: "Ethereum (ERC20)" }
-                      ].map(net => (
-                        <button
-                          key={net.id}
-                          type="button"
-                          onClick={() => setCryptoNetwork(net.id)}
-                          className={`px-4 py-2.5 border rounded-xl text-xs font-semibold cursor-pointer ${
-                            cryptoNetwork === net.id
-                              ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                              : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-400"
-                          }`}
-                        >
-                          {net.label}
-                        </button>
-                      ))}
+                      <button
+                        type="button"
+                        className="px-4 py-2.5 border border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-semibold cursor-default"
+                      >
+                        USDC (Solana Pay)
+                      </button>
                     </div>
                   </div>
-                  <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-200/50 dark:border-zinc-800 space-y-3">
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Veuillez envoyer exactement <span className="font-bold text-zinc-900 dark:text-white">${finalAmount} USDT</span> à l'adresse ci-dessous :</p>
-                    <div className="bg-white dark:bg-zinc-900 p-3 rounded-lg border border-zinc-300 dark:border-zinc-700 select-all font-mono text-xs text-center break-all text-zinc-900 dark:text-white">
-                      {cryptoNetwork === "trc20"
-                        ? "TY7aB4n8W3rWq9s9J2tA1kPz5X9c2v3b4n"
-                        : "0x7aB4n8W3rWq9s9J2tA1kPz5X9c2v3b4n8W3rWq9s"}
-                    </div>
-                    <div className="flex items-center justify-center pt-2">
-                      <svg className="w-32 h-32 text-zinc-800 dark:text-white border border-zinc-200 p-2 rounded bg-white" viewBox="0 0 24 24" fill="currentColor">
+                  
+                  <div className="flex flex-col items-center p-6 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/50 dark:border-zinc-800 rounded-2xl shadow-sm space-y-4">
+                    <div className="relative p-4 bg-white rounded-xl border border-zinc-150 flex items-center justify-center shadow-sm">
+                      <svg className="w-44 h-44 text-zinc-905 dark:text-zinc-900" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M0 0h6v6H0zm2 2v2h2V2zm0 6h6v6H0zm2 2v2h2v-2zm0 6h6v6H0zm2 2v2h2v-2zm6-14h6v6H8zm2 2v2h2V2zm0 6h6v6H8zm2 2v2h2v-2zm6-10h6v6h-6zm2 2v2h2V2zm-4 8h2v2h-2zm2 2h2v2h-2zm-2 2h2v2h-2zm4-4h2v2h-2zm0 4h2v2h-2zm-4 4h2v2h-2zm2 2h2v2h-2zm4-4h2v2h-2z" />
+                        {/* Solana logo in center */}
+                        <rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="#14F195" />
+                        <path d="M10.5 10.5h3v0.7h-3zm0 1.1h3v0.7h-3zm0 1.1h3v0.7h-3z" fill="#9945FF" />
                       </svg>
+                    </div>
+                    <div className="text-center space-y-1.5">
+                      <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Solana Pay</p>
+                      <p className="text-sm font-black text-zinc-800 dark:text-zinc-150">
+                        Montant : <span className="text-emerald-600 dark:text-emerald-450 font-black">${finalAmount} USDC</span>
+                      </p>
+                      <p className="text-[10px] text-zinc-555 dark:text-zinc-400 max-w-[260px] leading-relaxed font-semibold">
+                        Scannez ce QR Code avec Phantom, Solflare ou tout portefeuille Solana Pay pour finaliser votre règlement.
+                      </p>
+                    </div>
+                    
+                    <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2.5 rounded-xl text-center select-all font-mono text-[9px] text-zinc-650 dark:text-zinc-450 break-all leading-normal">
+                      {`solana:AnsLA11111111111111111111111111111111111111?amount=${finalAmount}&spl-token=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&label=Ansella%20Academy&memo=KCA-ORDER-${course.id.substring(0,6).toUpperCase()}`}
                     </div>
                   </div>
                 </div>

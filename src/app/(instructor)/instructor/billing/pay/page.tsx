@@ -61,7 +61,7 @@ function PaymentContent() {
     }
   }, [userCountry, countryConfig]);
 
-  const [cryptoCoin, setCryptoCoin] = useState("usdt");
+  const [cryptoCoin, setCryptoCoin] = useState("usdc");
   const [cryptoTxId, setCryptoTxId] = useState("");
 
   useEffect(() => {
@@ -622,46 +622,45 @@ function PaymentContent() {
               {/* 4. Crypto Gateway Form */}
               {method === "crypto" && (
                 <div className="space-y-4 animate-in fade-in duration-200">
-                  <h4 className="font-bold text-sm text-zinc-900 dark:text-white mb-2">Paiement en Cryptomonnaie (Stablecoin)</h4>
+                  <h4 className="font-bold text-sm text-zinc-900 dark:text-white mb-2">Paiement en Cryptomonnaie (Solana Pay)</h4>
                   
                   <div className="grid grid-cols-2 gap-2 mb-4">
-                    {[
-                      { id: "usdt", name: "Tether (USDT - TRC20)" },
-                      { id: "usdc", name: "USD Coin (USDC - ERC20)" }
-                    ].map((coin) => (
-                      <div 
-                        key={coin.id}
-                        onClick={() => setCryptoCoin(coin.id)}
-                        className={`p-2.5 rounded-lg border text-xs font-medium cursor-pointer text-center transition-all ${
-                          cryptoCoin === coin.id 
-                            ? "border-amber-500 bg-amber-50/10 text-amber-500" 
-                            : "border-zinc-150 dark:border-zinc-800 hover:border-amber-300 text-zinc-500"
-                        }`}
-                      >
-                        {coin.name}
-                      </div>
-                    ))}
+                    <div className="p-2.5 rounded-lg border border-teal-500 bg-teal-50/10 text-teal-500 text-xs font-semibold text-center cursor-default">
+                      USD Coin (USDC - Solana)
+                    </div>
                   </div>
 
-                  <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl space-y-3 border border-zinc-150 dark:border-zinc-800">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Adresse de dépôt officielle</p>
-                    <div className="bg-white dark:bg-zinc-900 p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-[11px] font-mono break-all text-zinc-900 dark:text-zinc-200 select-all">
-                      {cryptoCoin === "usdt" 
-                        ? "TXz4P1Zk7R3xZc7tM9yK8wQvPqGfE1a9sD" 
-                        : "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"
-                      }
+                  <div className="flex flex-col items-center p-6 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/50 dark:border-zinc-800 rounded-2xl shadow-sm space-y-4">
+                    <div className="relative p-4 bg-white rounded-xl border border-zinc-150 flex items-center justify-center shadow-sm">
+                      <svg className="w-44 h-44 text-zinc-905 dark:text-zinc-900" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M0 0h6v6H0zm2 2v2h2V2zm0 6h6v6H0zm2 2v2h2v-2zm0 6h6v6H0zm2 2v2h2v-2zm6-14h6v6H8zm2 2v2h2V2zm0 6h6v6H8zm2 2v2h2v-2zm6-10h6v6h-6zm2 2v2h2V2zm-4 8h2v2h-2zm2 2h2v2h-2zm-2 2h2v2h-2zm4-4h2v2h-2zm0 4h2v2h-2zm-4 4h2v2h-2zm2 2h2v2h-2zm4-4h2v2h-2z" />
+                        <rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="#14F195" />
+                        <path d="M10.5 10.5h3v0.7h-3zm0 1.1h3v0.7h-3zm0 1.1h3v0.7h-3z" fill="#9945FF" />
+                      </svg>
                     </div>
-                    <p className="text-[10px] text-zinc-500 leading-tight">Envoyez exactement le montant équivalent de <span className="font-bold">{currentPlanDetails.price} USDT/USDC</span> à cette adresse, puis collez l'ID de transaction (TXID) ci-dessous.</p>
+                    <div className="text-center space-y-1.5">
+                      <p className="text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest">Solana Pay</p>
+                      <p className="text-sm font-black text-zinc-800 dark:text-zinc-150">
+                        Montant : <span className="text-emerald-600 dark:text-emerald-450 font-black">${currentPlanDetails.price} USDC</span>
+                      </p>
+                      <p className="text-[10px] text-zinc-555 dark:text-zinc-400 max-w-[260px] leading-relaxed font-semibold">
+                        Scannez ce QR Code avec votre portefeuille Solana pour payer les frais d'abonnement.
+                      </p>
+                    </div>
+                    
+                    <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2.5 rounded-xl text-center select-all font-mono text-[9px] text-zinc-650 dark:text-zinc-450 break-all leading-normal">
+                      {`solana:AnsLA11111111111111111111111111111111111111?amount=${currentPlanDetails.price}&spl-token=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&label=Ansella%20Academy&memo=KCA-PLAN-${plan.toUpperCase()}`}
+                    </div>
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-medium text-zinc-400 uppercase mb-1">ID de transaction (TXID / Hash)</label>
+                    <label className="block text-[11px] font-medium text-zinc-400 uppercase mb-1">ID de transaction (Signature / TXID)</label>
                     <input 
                       required
                       type="text" 
                       value={cryptoTxId}
                       onChange={e => setCryptoTxId(e.target.value)}
-                      placeholder="Collez le hash de votre transaction ici"
+                      placeholder="Collez la signature de votre transfert Solana ici"
                       className="w-full px-4 py-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border-transparent text-sm focus:ring-1 focus:ring-teal-500 outline-none text-zinc-900 dark:text-white"
                     />
                   </div>
