@@ -25,6 +25,7 @@ import { setSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
 import { ensureProfile, fetchUserProfile } from "@/lib/supabase/auth-helpers";
 import { Captcha } from "@/components/ui/Captcha";
+import { useLanguage } from "@/context/LanguageContext";
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
 
@@ -111,10 +112,11 @@ const TOTAL_STEPS = 4;
 // ─── Step Indicator ─────────────────────────────────────────────────────────────
 
 function StepIndicator({ step, role }: { step: number; role: "INSTRUCTOR" | "STUDENT" }) {
+  const { language } = useLanguage();
   const labels =
     role === "INSTRUCTOR"
-      ? ["Compte", "Profil", "Académie", "Validation"]
-      : ["Compte", "Profil", "Préférences", "Validation"];
+      ? (language === "en" ? ["Account", "Profile", "Academy", "Validation"] : ["Compte", "Profil", "Académie", "Validation"])
+      : (language === "en" ? ["Account", "Profile", "Preferences", "Validation"] : ["Compte", "Profil", "Préférences", "Validation"]);
 
   return (
     <div className="flex items-center justify-center gap-1 mb-6">
@@ -165,6 +167,7 @@ function StepIndicator({ step, role }: { step: number; role: "INSTRUCTOR" | "STU
 // ─── Main Form ──────────────────────────────────────────────────────────────────
 
 function RegisterForm() {
+  const { language } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -537,29 +540,47 @@ function RegisterForm() {
   const selectedCountry = COUNTRIES.find((c) => c.code === country);
 
   const stepTitle = () => {
-    if (role === null) return "Choisissez votre profil";
+    if (role === null) return language === "en" ? "Choose your profile" : "Choisissez votre profil";
     const titles: Record<string, string[]> = {
-      INSTRUCTOR: ["Créer un compte Formateur", "Votre profil personnel", "Configurez votre Académie", "Validation finale"],
-      STUDENT: ["Créer un compte Apprenant", "Votre profil personnel", "Configurez vos préférences", "Validation finale"],
+      INSTRUCTOR: language === "en"
+        ? ["Create an Instructor Account", "Your Personal Profile", "Configure your Academy", "Final Validation"]
+        : ["Créer un compte Formateur", "Votre profil personnel", "Configurez votre Académie", "Validation finale"],
+      STUDENT: language === "en"
+        ? ["Create a Learner Account", "Your Personal Profile", "Configure your Preferences", "Final Validation"]
+        : ["Créer un compte Apprenant", "Votre profil personnel", "Configurez vos préférences", "Validation finale"],
     };
     return titles[role][step - 1];
   };
 
   const stepSubtitle = () => {
-    if (role === null) return "Sélectionnez la manière dont vous souhaitez utiliser notre LMS.";
+    if (role === null) return language === "en" ? "Select how you would like to use our LMS." : "Sélectionnez la manière dont vous souhaitez utiliser notre LMS.";
     const subtitles: Record<string, string[]> = {
-      INSTRUCTOR: [
-        "Lancez et monétisez votre école en ligne en quelques clics.",
-        "Ces informations nous permettent de personnaliser votre expérience.",
-        "Configurez votre domaine d'enseignement et votre académie.",
-        "Relisez vos informations et finalisez votre inscription.",
-      ],
-      STUDENT: [
-        "Accédez aux meilleures formations certifiantes de haut niveau.",
-        "Ces informations nous permettent de personnaliser votre espace.",
-        "Dites-nous en plus sur vos objectifs d'apprentissage.",
-        "Relisez vos informations et finalisez votre inscription.",
-      ],
+      INSTRUCTOR: language === "en"
+        ? [
+            "Launch and monetize your online school in a few clicks.",
+            "This information helps us personalize your experience.",
+            "Configure your teaching domain and your academy.",
+            "Review your information and complete your registration.",
+          ]
+        : [
+            "Lancez et monétisez votre école en ligne en quelques clics.",
+            "Ces informations nous permettent de personnaliser votre expérience.",
+            "Configurez votre domaine d'enseignement et votre académie.",
+            "Relisez vos informations et finalisez votre inscription.",
+          ],
+      STUDENT: language === "en"
+        ? [
+            "Access top high-level certification training.",
+            "This information helps us personalize your space.",
+            "Tell us more about your learning goals.",
+            "Review your information and complete your registration.",
+          ]
+        : [
+            "Accédez aux meilleures formations certifiantes de haut niveau.",
+            "Ces informations nous permettent de personnaliser votre espace.",
+            "Dites-nous en plus sur vos objectifs d'apprentissage.",
+            "Relisez vos informations et finalisez votre inscription.",
+          ],
     };
     return subtitles[role][step - 1];
   };
@@ -587,7 +608,7 @@ function RegisterForm() {
         </Link>
         <div className="w-full flex justify-end mb-3 lg:hidden">
           <Link href="/" className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-white transition-colors font-medium">
-            ← Retour à l&apos;accueil
+            {language === "en" ? "← Back to Home" : "← Retour à l'accueil"}
           </Link>
         </div>
 
@@ -613,10 +634,12 @@ function RegisterForm() {
             </div>
             <div>
               <h3 className="font-bold text-zinc-900 dark:text-white text-base group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                Je suis un Apprenant
+                {language === "en" ? "I am a Learner" : "Je suis un Apprenant"}
               </h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
-                Je souhaite suivre des cours interactifs, passer des examens et obtenir des certifications professionnelles.
+                {language === "en"
+                  ? "I want to take interactive courses, pass exams, and obtain professional certifications."
+                  : "Je souhaite suivre des cours interactifs, passer des examens et obtenir des certifications professionnelles."}
               </p>
             </div>
           </div>
@@ -630,18 +653,20 @@ function RegisterForm() {
             </div>
             <div>
               <h3 className="font-bold text-zinc-900 dark:text-white text-base group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                Je suis un Formateur / Enseignant
+                {language === "en" ? "I am an Instructor / Teacher" : "Je suis un Formateur / Enseignant"}
               </h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
-                Je souhaite créer ma propre académie en ligne, héberger mes formations et les vendre à l&apos;aide de paiements locaux.
+                {language === "en"
+                  ? "I want to create my own online academy, host my courses, and sell them using local payments."
+                  : "Je souhaite créer ma propre académie en ligne, héberger mes formations et les vendre à l'aide de paiements locaux."}
               </p>
             </div>
           </div>
 
           <div className="pt-4 text-center text-sm text-zinc-600 dark:text-zinc-400">
-            Vous avez déjà un compte ?{" "}
+            {language === "en" ? "Already have an account?" : "Vous avez déjà un compte ?"}{" "}
             <Link href="/login" className="text-blue-600 hover:text-blue-500 font-bold transition-colors">
-              Se connecter
+              {language === "en" ? "Log In" : "Se connecter"}
             </Link>
           </div>
         </div>
@@ -669,20 +694,20 @@ function RegisterForm() {
             <div className="space-y-4 animate-in fade-in duration-300">
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
-                  Nom complet
+                  {language === "en" ? "Full name" : "Nom complet"}
                 </label>
                 <input
                   required
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder={role === "INSTRUCTOR" ? "Prof. Jean Dupont" : "Jean Dupont"}
+                  placeholder={role === "INSTRUCTOR" ? (language === "en" ? "Prof. John Doe" : "Prof. Jean Dupont") : (language === "en" ? "John Doe" : "Jean Dupont")}
                   className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white"
                 />
               </div>
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
-                  Adresse Email
+                  {language === "en" ? "Email Address" : "Adresse Email"}
                 </label>
                 <input
                   required
@@ -695,7 +720,7 @@ function RegisterForm() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
-                  Mot de passe
+                  {language === "en" ? "Password" : "Mot de passe"}
                 </label>
                 <div className="relative">
                   <input
@@ -704,7 +729,7 @@ function RegisterForm() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     minLength={8}
-                    placeholder="•••••••• (Min. 8 caractères)"
+                    placeholder={language === "en" ? "•••••••• (Min. 8 characters)" : "•••••••• (Min. 8 caractères)"}
                     className="w-full px-4 py-3 pr-12 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white"
                   />
                   <button
@@ -712,7 +737,7 @@ function RegisterForm() {
                     onClick={() => setShowPassword((v) => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors text-xs font-semibold"
                   >
-                    {showPassword ? "Cacher" : "Voir"}
+                    {showPassword ? (language === "en" ? "Hide" : "Cacher") : (language === "en" ? "Show" : "Voir")}
                   </button>
                 </div>
                 {/* Password strength indicator */}
@@ -747,7 +772,7 @@ function RegisterForm() {
                   <div className="w-full border-t border-zinc-200 dark:border-zinc-800" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white dark:bg-zinc-900 px-3 text-zinc-400 font-bold">Ou utiliser</span>
+                  <span className="bg-white dark:bg-zinc-900 px-3 text-zinc-400 font-bold">{language === "en" ? "Or use" : "Ou utiliser"}</span>
                 </div>
               </div>
 
@@ -767,7 +792,7 @@ function RegisterForm() {
                     <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.92c-1.04.7-2.38 1.12-3.83 1.12-3.19 0-5.93-2.74-6.86-5.78l-3.86 3C3.19 20.22 7.21 23 12 23z" />
                   </svg>
                 )}
-                <span>S&apos;inscrire avec Google (Profil Apprenant)</span>
+                <span>{language === "en" ? "Sign up with Google (Learner Profile)" : "S'inscrire avec Google (Profil Apprenant)"}</span>
               </button>
             </div>
           )}
@@ -778,7 +803,7 @@ function RegisterForm() {
               {/* Country */}
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
-                  <Globe className="w-3.5 h-3.5" /> Pays de résidence
+                  <Globe className="w-3.5 h-3.5" /> {language === "en" ? "Country of residence" : "Pays de résidence"}
                   <span className="text-red-500 ml-0.5">*</span>
                 </label>
                 <div className="relative">
@@ -788,8 +813,8 @@ function RegisterForm() {
                     onChange={(e) => handleCountryChange(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white appearance-none cursor-pointer"
                   >
-                    <option value="">-- Sélectionner votre pays --</option>
-                    <optgroup label="🌍 Afrique">
+                    <option value="">{language === "en" ? "-- Select your country --" : "-- Sélectionner votre pays --"}</option>
+                    <optgroup label={language === "en" ? "🌍 Africa" : "🌍 Afrique"}>
                       {COUNTRIES.filter((c) =>
                         !["FR","BE","CA","CH","US","GB","DE","BR","AE"].includes(c.code)
                       ).map((c) => (
@@ -819,7 +844,7 @@ function RegisterForm() {
               {/* Phone */}
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5" /> Numéro de téléphone
+                  <Phone className="w-3.5 h-3.5" /> {language === "en" ? "Phone number" : "Numéro de téléphone"}
                   <span className="text-red-500 ml-0.5">*</span>
                 </label>
                 <div className="flex gap-2">
@@ -858,13 +883,13 @@ function RegisterForm() {
               {/* Gender */}
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                  <User2 className="w-3.5 h-3.5" /> Genre
+                  <User2 className="w-3.5 h-3.5" /> {language === "en" ? "Gender" : "Genre"}
                   <span className="text-red-500 ml-0.5">*</span>
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { value: "male", label: "Homme", emoji: "👨" },
-                    { value: "female", label: "Femme", emoji: "👩" },
+                    { value: "male", label: language === "en" ? "Male" : "Homme", emoji: "👨" },
+                    { value: "female", label: language === "en" ? "Female" : "Femme", emoji: "👩" },
                   ].map((opt) => (
                     <button
                       key={opt.value}
@@ -887,7 +912,9 @@ function RegisterForm() {
               <div className="flex items-start gap-2.5 p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/50 rounded-xl">
                 <ShieldCheck className="w-4 h-4 text-teal-500 shrink-0 mt-0.5" />
                 <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                  Ces informations sont utilisées uniquement pour personnaliser votre expérience et ne seront jamais partagées avec des tiers.
+                  {language === "en"
+                    ? "This information is used solely to personalize your experience and will never be shared with third parties."
+                    : "Ces informations sont utilisées uniquement pour personnaliser votre expérience et ne seront jamais partagées avec des tiers."}
                 </p>
               </div>
             </div>
@@ -899,14 +926,14 @@ function RegisterForm() {
               {/* Academy name */}
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider flex items-center gap-1.5">
-                  <GraduationCap className="w-3.5 h-3.5" /> Nom de votre Académie
+                  <GraduationCap className="w-3.5 h-3.5" /> {language === "en" ? "Name of your Academy" : "Nom de votre Académie"}
                 </label>
                 <input
                   required
                   type="text"
                   value={academyName}
                   onChange={(e) => setAcademyName(e.target.value)}
-                  placeholder="Ex: École de Commerce de Kinshasa"
+                  placeholder={language === "en" ? "e.g., Kinshasa Business School" : "Ex: École de Commerce de Kinshasa"}
                   className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white"
                 />
               </div>
@@ -914,48 +941,60 @@ function RegisterForm() {
               {/* Domain / Specialty */}
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                  <Briefcase className="w-3.5 h-3.5" /> Domaine principal d&apos;enseignement
+                  <Briefcase className="w-3.5 h-3.5" /> {language === "en" ? "Main teaching domain" : "Domaine principal d'enseignement"}
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {INSTRUCTOR_DOMAINS.map((d) => (
-                    <button
-                      key={d.value}
-                      type="button"
-                      onClick={() => setThematic(d.value)}
-                      className={`px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200 cursor-pointer ${
-                        thematic === d.value
-                          ? "border-blue-600 bg-blue-50 dark:bg-blue-950/30 shadow-sm shadow-blue-500/10"
-                          : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-base">{d.icon}</span>
-                        <span
-                          className={`text-[11px] font-semibold leading-tight ${
-                            thematic === d.value
-                              ? "text-blue-700 dark:text-blue-400"
-                              : "text-zinc-700 dark:text-zinc-300"
-                          }`}
-                        >
-                          {d.label}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
+                  {INSTRUCTOR_DOMAINS.map((d) => {
+                    let translatedLabel = d.label;
+                    if (language === "en") {
+                      if (d.value === "blockchain") translatedLabel = "Blockchain & Cryptocurrencies";
+                      else if (d.value === "trading") translatedLabel = "Trading & Finance";
+                      else if (d.value === "ai") translatedLabel = "Artificial Intelligence";
+                      else if (d.value === "security") translatedLabel = "Cybersecurity & Audit";
+                      else if (d.value === "development") translatedLabel = "Blockchain Development";
+                      else if (d.value === "entrepreneurship") translatedLabel = "Entrepreneurship & Startups";
+                      else if (d.value === "other") translatedLabel = "Other / Custom";
+                    }
+                    return (
+                      <button
+                        key={d.value}
+                        type="button"
+                        onClick={() => setThematic(d.value)}
+                        className={`px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200 cursor-pointer ${
+                          thematic === d.value
+                            ? "border-blue-600 bg-blue-50 dark:bg-blue-950/30 shadow-sm shadow-blue-500/10"
+                            : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">{d.icon}</span>
+                          <span
+                            className={`text-[11px] font-semibold leading-tight ${
+                              thematic === d.value
+                                ? "text-blue-700 dark:text-blue-400"
+                                : "text-zinc-700 dark:text-zinc-300"
+                            }`}
+                          >
+                            {translatedLabel}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               {thematic === "other" && (
                 <div className="mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
                   <label className="block text-xs font-bold text-zinc-650 dark:text-zinc-400 mb-1.5 uppercase tracking-wider">
-                    Spécifiez votre domaine d&apos;enseignement
+                    {language === "en" ? "Specify your teaching domain" : "Spécifiez votre domaine d'enseignement"}
                   </label>
                   <input
                     required
                     type="text"
                     value={customThematic}
                     onChange={(e) => setCustomThematic(e.target.value)}
-                    placeholder="Ex: Marketing Digital, Photographie, Anglais..."
+                    placeholder={language === "en" ? "e.g., Digital Marketing, Photography, English..." : "Ex: Marketing Digital, Photographie, Anglais..."}
                     className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white"
                   />
                 </div>
@@ -964,18 +1003,18 @@ function RegisterForm() {
               {/* Bio */}
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
-                  Courte bio / Présentation
+                  {language === "en" ? "Short bio / Presentation" : "Courte bio / Présentation"}
                 </label>
                 <textarea
                   required
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
-                  placeholder="Décrivez votre expérience, vos compétences ou votre académie en quelques lignes..."
+                  placeholder={language === "en" ? "Describe your experience, skills, or academy in a few lines..." : "Décrivez votre expérience, vos compétences ou votre académie en quelques lignes..."}
                   rows={3}
                   className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white resize-none"
                 />
                 <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1 text-right">
-                  {bio.length} / 300 caractères
+                  {bio.length} / 300 {language === "en" ? "characters" : "caractères"}
                 </p>
               </div>
             </div>
@@ -986,13 +1025,13 @@ function RegisterForm() {
               {/* Level */}
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2 uppercase tracking-wider">
-                  Votre niveau actuel
+                  {language === "en" ? "Your current level" : "Votre niveau actuel"}
                 </label>
                 <div className="space-y-2">
                   {[
-                    { value: "Débutant", label: "Débutant", desc: "Je découvre le domaine", emoji: "🌱" },
-                    { value: "Intermédiaire", label: "Intermédiaire", desc: "J'ai quelques notions", emoji: "📚" },
-                    { value: "Avancé", label: "Avancé", desc: "Je veux me spécialiser", emoji: "🚀" },
+                    { value: "Débutant", label: language === "en" ? "Beginner" : "Débutant", desc: language === "en" ? "I am discovering the field" : "Je découvre le domaine", emoji: "🌱" },
+                    { value: "Intermédiaire", label: language === "en" ? "Intermediate" : "Intermédiaire", desc: language === "en" ? "I have some basic concepts" : "J'ai quelques notions", emoji: "📚" },
+                    { value: "Avancé", label: language === "en" ? "Advanced" : "Avancé", desc: language === "en" ? "I want to specialize" : "Je veux me spécialiser", emoji: "🚀" },
                   ].map((lvl) => (
                     <button
                       key={lvl.value}
@@ -1022,13 +1061,13 @@ function RegisterForm() {
               {/* Interest course */}
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-2 uppercase tracking-wider">
-                  Domaine qui vous intéresse le plus
+                  {language === "en" ? "Domain that interests you the most" : "Domaine qui vous intéresse le plus"}
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { value: "blockchain", label: "Blockchain", icon: "⛓️" },
                     { value: "trading", label: "Trading", icon: "📈" },
-                    { value: "ai", label: "Intelligence Artificielle", icon: "🤖" },
+                    { value: "ai", label: language === "en" ? "Artificial Intelligence" : "Intelligence Artificielle", icon: "🤖" },
                     { value: "web3", label: "Web3 & NFT", icon: "🌐" },
                   ].map((course) => (
                     <button
@@ -1053,7 +1092,9 @@ function RegisterForm() {
               <div className="p-3.5 bg-blue-50/50 dark:bg-blue-950/10 border border-blue-100 dark:border-blue-900/30 rounded-2xl flex items-start gap-3">
                 <ShieldCheck className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                 <p className="text-[10px] text-blue-800 dark:text-blue-300 leading-relaxed font-semibold">
-                  L&apos;inscription vous donne un accès immédiat aux chapitres d&apos;évaluation du cours choisi. Vous pourrez à tout moment débloquer l&apos;accès complet et obtenir votre certificat vérifiable.
+                  {language === "en"
+                    ? "Registration gives you immediate access to the evaluation chapters of the chosen course. You can unlock full access and obtain your verifiable certificate at any time."
+                    : "L'inscription vous donne un accès immédiat aux chapitres d'évaluation du cours choisi. Vous pourrez à tout moment débloquer l'accès complet et obtenir votre certificat vérifiable."}
                 </p>
               </div>
             </div>
@@ -1066,25 +1107,25 @@ function RegisterForm() {
               <div className="rounded-2xl border border-zinc-200 dark:border-zinc-700 overflow-hidden">
                 <div className="px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700">
                   <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
-                    Récapitulatif de votre inscription
+                    {language === "en" ? "Registration Summary" : "Récapitulatif de votre inscription"}
                   </p>
                 </div>
                 <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                   {[
-                    { label: "Nom", value: name },
+                    { label: language === "en" ? "Name" : "Nom", value: name },
                     { label: "Email", value: email },
-                    { label: "Rôle", value: role === "INSTRUCTOR" ? "🎓 Formateur" : "📖 Apprenant" },
-                    { label: "Pays", value: selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : "—" },
-                    { label: "Téléphone", value: phoneNumber ? `${dialCode} ${phoneNumber}` : "—" },
-                    { label: "Genre", value: gender === "male" ? "Homme" : gender === "female" ? "Femme" : "—" },
+                    { label: language === "en" ? "Role" : "Rôle", value: role === "INSTRUCTOR" ? (language === "en" ? "🎓 Instructor" : "🎓 Formateur") : (language === "en" ? "📖 Learner" : "📖 Apprenant") },
+                    { label: language === "en" ? "Country" : "Pays", value: selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : "—" },
+                    { label: language === "en" ? "Phone" : "Téléphone", value: phoneNumber ? `${dialCode} ${phoneNumber}` : "—" },
+                    { label: language === "en" ? "Gender" : "Genre", value: gender === "male" ? (language === "en" ? "Male" : "Homme") : gender === "female" ? (language === "en" ? "Female" : "Femme") : "—" },
                     ...(role === "INSTRUCTOR"
                       ? [
-                          { label: "Académie", value: academyName },
-                          { label: "Domaine", value: thematic === "other" ? customThematic : (INSTRUCTOR_DOMAINS.find((d) => d.value === thematic)?.label || thematic) },
+                          { label: language === "en" ? "Academy" : "Académie", value: academyName },
+                          { label: language === "en" ? "Domain" : "Domaine", value: thematic === "other" ? customThematic : (INSTRUCTOR_DOMAINS.find((d) => d.value === thematic)?.label || thematic) },
                         ]
                       : [
-                          { label: "Niveau", value: studentLevel },
-                          { label: "Intérêt", value: interestCourse },
+                          { label: language === "en" ? "Level" : "Niveau", value: studentLevel },
+                          { label: language === "en" ? "Interest" : "Intérêt", value: interestCourse },
                         ]),
                   ].map((row) => (
                     <div key={row.label} className="flex justify-between items-center px-4 py-2.5">
@@ -1132,13 +1173,15 @@ function RegisterForm() {
               {loading || checkingEmail ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  {checkingEmail ? "Vérification..." : "Création du compte..."}
+                  {checkingEmail 
+                    ? (language === "en" ? "Verifying..." : "Vérification...") 
+                    : (language === "en" ? "Creating account..." : "Création du compte...")}
                 </>
               ) : step === TOTAL_STEPS ? (
-                "Finaliser et ouvrir mon Espace"
+                (language === "en" ? "Finalize and open My Space" : "Finaliser et ouvrir mon Espace")
               ) : (
                 <>
-                  Suivant
+                  {language === "en" ? "Next" : "Suivant"}
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -1153,6 +1196,7 @@ function RegisterForm() {
 // ─── Page Shell ──────────────────────────────────────────────────────────────────
 
 export default function RegisterPage() {
+  const { language } = useLanguage();
   return (
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-white dark:bg-black font-sans">
 
@@ -1167,25 +1211,27 @@ export default function RegisterPage() {
             <Image src="/logo-dark.png" alt="Logo" width={160} height={48} className="object-contain h-10 w-auto hidden dark:block" priority />
           </Link>
           <Link href="/" className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-white transition-colors font-medium">
-            ← Accueil
+            {language === "en" ? "← Home" : "← Accueil"}
           </Link>
         </div>
 
         <div className="z-10 max-w-md my-auto space-y-8">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-zinc-200/50 dark:bg-white/5 backdrop-blur-md border border-zinc-300/40 dark:border-white/10 rounded-full text-zinc-700 dark:text-zinc-300 text-xs font-bold">
             <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-            <span>LMS Premium de Nouvelle Génération</span>
+            <span>{language === "en" ? "Next-Generation Premium LMS" : "LMS Premium de Nouvelle Génération"}</span>
           </div>
 
           <div className="space-y-4">
             <h1 className="text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white leading-tight">
-              Développez vos compétences avec{" "}
+              {language === "en" ? "Develop your skills with " : "Développez vos compétences avec "}{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-teal-500 to-emerald-500 dark:from-blue-400 dark:via-teal-400 dark:to-emerald-400">
                 Ansella
               </span>
             </h1>
             <p className="text-zinc-600 dark:text-zinc-400 text-base leading-relaxed font-medium">
-              Créez votre profil en quelques secondes pour acquérir des compétences concrètes et valorisables sur le marché.
+              {language === "en" 
+                ? "Create your profile in seconds to acquire concrete and market-valuable skills." 
+                : "Créez votre profil en quelques secondes pour acquérir des compétences concrètes et valorisables sur le marché."}
             </p>
           </div>
 
@@ -1194,25 +1240,25 @@ export default function RegisterPage() {
               <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
                 <Coins className="w-4 h-4 text-blue-600 dark:text-blue-450" />
               </div>
-              <span>Accès gratuit aux cours d&apos;évaluation</span>
+              <span>{language === "en" ? "Free access to evaluation courses" : "Accès gratuit aux cours d'évaluation"}</span>
             </div>
             <div className="flex items-center space-x-3 text-sm text-zinc-700 dark:text-zinc-350 font-semibold">
               <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
                 <Cpu className="w-4 h-4 text-purple-600 dark:text-purple-450" />
               </div>
-              <span>Quiz d&apos;évaluation et de progression</span>
+              <span>{language === "en" ? "Evaluation and progress quizzes" : "Quiz d'évaluation et de progression"}</span>
             </div>
             <div className="flex items-center space-x-3 text-sm text-zinc-700 dark:text-zinc-350 font-semibold">
               <div className="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center shrink-0">
                 <ShieldCheck className="w-4 h-4 text-teal-600 dark:text-teal-450" />
               </div>
-              <span>Diplômes et certifications infalsifiables</span>
+              <span>{language === "en" ? "Tamper-proof diplomas and certifications" : "Diplômes et certifications infalsifiables"}</span>
             </div>
           </div>
         </div>
 
         <div className="z-10 text-xs text-zinc-450 dark:text-zinc-500">
-          © {new Date().getFullYear()} Ansella Inc. Tous droits réservés.
+          © {new Date().getFullYear()} Ansella Inc. {language === "en" ? "All rights reserved." : "Tous droits réservés."}
         </div>
       </div>
 

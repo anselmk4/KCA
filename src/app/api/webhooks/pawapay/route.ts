@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createNotification } from '@/lib/supabase/notifications-helper';
+import crypto from 'crypto';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -172,21 +173,40 @@ export async function POST(req: NextRequest) {
           // --- Student Course Enrollment Activation ---
           const courseId = itemId;
 
-          const { error: enrollUpdateErr } = await supabaseAdmin
+          // 1. Try to update the enrollment to ACTIVE if it exists
+          const { data: updateData, error: enrollUpdateErr } = await supabaseAdmin
             .from('enrollments')
-            .update({ status: 'ACTIVE' } as any)
-            .eq('student_id', payment.user_id)
-            .eq('course_id', courseId);
-
-          if (enrollUpdateErr) {
-            console.error('[webhook-pawapay] Enrollment activate error, trying upsert:', enrollUpdateErr.message);
-            await supabaseAdmin.from('enrollments').upsert({
-              student_id: payment.user_id,
-              course_id: courseId,
-              progress_percent: 0,
+            .update({ 
               status: 'ACTIVE',
-              enrolled_at: new Date().toISOString()
-            } as any);
+              updated_at: new Date().toISOString()
+            } as any)
+            .eq('student_id', payment.user_id)
+            .eq('course_id', courseId)
+            .select('id');
+
+          // 2. If it didn't update any row (updateData is empty or null), insert a new enrollment
+          if (enrollUpdateErr || !updateData || updateData.length === 0) {
+            if (enrollUpdateErr) {
+              console.error('[webhook-pawapay] Enrollment update error:', enrollUpdateErr.message);
+            }
+            console.log('[webhook-pawapay] Enrollment not found or failed to update. Creating new enrollment...');
+            
+            const { error: enrollInsertErr } = await supabaseAdmin
+              .from('enrollments')
+              .insert({
+                id: crypto.randomUUID(),
+                student_id: payment.user_id,
+                course_id: courseId,
+                progress_percent: 0,
+                status: 'ACTIVE',
+                enrolled_at: new Date().toISOString(),
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              } as any);
+
+            if (enrollInsertErr) {
+              console.error('[webhook-pawapay] Enrollment insertion error:', enrollInsertErr.message);
+            }
           }
 
           // Notifications & Emails

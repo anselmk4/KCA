@@ -159,11 +159,14 @@ export async function POST(req: NextRequest) {
 
       if (type === 'STUDENT_COURSE') {
         const { error: enrollError } = await dbClient.from('enrollments').upsert({
+          id: crypto.randomUUID(),
           student_id: user.id,
           course_id: itemId,
           progress_percent: 0,
-          status: 'PENDING',
-          enrolled_at: new Date().toISOString()
+          status: 'INACTIVE',
+          enrolled_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         } as any, { onConflict: 'student_id,course_id' });
 
         if (enrollError) {

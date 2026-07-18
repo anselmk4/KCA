@@ -10,8 +10,10 @@ import { loginWithEmail, fetchUserProfile } from "@/lib/supabase/auth-helpers";
 import { supabase } from "@/lib/supabase/client";
 import { setSimulatedSession } from "@/lib/rbac";
 import { Captcha } from "@/components/ui/Captcha";
+import { useLanguage } from "@/context/LanguageContext";
 
 function LoginForm() {
+  const { t, language } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const registered = searchParams.get("registered") === "true";
@@ -245,12 +247,16 @@ function LoginForm() {
             </Link>
             <div className="w-full flex justify-end mb-4 lg:hidden">
               <Link href="/" className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-white transition-colors font-medium">
-                ← Retour à l&apos;accueil
+                {language === "en" ? "← Back to Home" : "← Retour à l'accueil"}
               </Link>
             </div>
-            <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Bienvenue sur Ansella</h2>
+            <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
+              {language === "en" ? "Welcome to Ansella" : "Bienvenue sur Ansella"}
+            </h2>
             <p className="text-zinc-500 dark:text-zinc-400 text-center text-sm">
-              Connectez-vous à votre académie ou à votre espace apprenant.
+              {language === "en" 
+                ? "Log in to your academy or learner space." 
+                : "Connectez-vous à votre académie ou à votre espace apprenant."}
             </p>
           </div>
 
@@ -258,12 +264,19 @@ function LoginForm() {
             <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250 dark:border-emerald-900/30 rounded-2xl flex items-start gap-3 text-emerald-800 dark:text-emerald-400 text-xs animate-in fade-in">
               <Sparkles className="w-5 h-5 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
               <div className="space-y-1">
-                <p className="font-extrabold uppercase tracking-wider text-[10px]">Inscription réussie !</p>
+                <p className="font-extrabold uppercase tracking-wider text-[10px]">
+                  {language === "en" ? "Registration successful!" : "Inscription réussie !"}
+                </p>
                 <p className="leading-relaxed font-semibold">
-                  Un e-mail de confirmation a été envoyé à <span className="underline font-bold text-zinc-800 dark:text-zinc-200">{registeredEmail}</span>.
+                  {language === "en" 
+                    ? `A confirmation email has been sent to ` 
+                    : `Un e-mail de confirmation a été envoyé à `}
+                  <span className="underline font-bold text-zinc-800 dark:text-zinc-200">{registeredEmail}</span>.
                 </p>
                 <p className="text-[10px] leading-relaxed text-zinc-500 dark:text-zinc-400 font-medium">
-                  Veuillez cliquer sur le lien dans l'e-mail pour activer votre compte {roleParam === "INSTRUCTOR" ? "Formateur" : "Apprenant"} avant de vous connecter.
+                  {language === "en" 
+                    ? `Please click the link in the email to activate your ${roleParam === "INSTRUCTOR" ? "Instructor" : "Learner"} account before logging in.`
+                    : `Veuillez cliquer sur le lien dans l'e-mail pour activer votre compte ${roleParam === "INSTRUCTOR" ? "Formateur" : "Apprenant"} avant de vous connecter.`}
                 </p>
               </div>
             </div>
@@ -280,7 +293,7 @@ function LoginForm() {
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
-                Adresse Email
+                {language === "en" ? "Email Address" : "Adresse Email"}
               </label>
               <input
                 required
@@ -294,10 +307,10 @@ function LoginForm() {
             <div>
               <div className="flex justify-between items-center mb-2">
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
-                  Mot de passe
+                  {language === "en" ? "Password" : "Mot de passe"}
                 </label>
                 <Link href="/forgot-password" className="text-xs text-blue-600 hover:text-blue-500 font-medium">
-                  Mot de passe oublié ?
+                  {language === "en" ? "Forgot password?" : "Mot de passe oublié ?"}
                 </Link>
               </div>
               <input
@@ -320,9 +333,9 @@ function LoginForm() {
               className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer text-sm"
             >
               {loading ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Connexion en cours...</>
+                language === "en" ? <><Loader2 className="w-4 h-4 animate-spin" /> Logging in...</> : <><Loader2 className="w-4 h-4 animate-spin" /> Connexion en cours...</>
               ) : (
-                <>Se connecter <ArrowRight className="w-4 h-4" /></>
+                language === "en" ? <>Log In <ArrowRight className="w-4 h-4" /></> : <>Se connecter <ArrowRight className="w-4 h-4" /></>
               )}
             </button>
           </form>
@@ -333,7 +346,9 @@ function LoginForm() {
               <div className="w-full border-t border-zinc-250 dark:border-zinc-800" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white dark:bg-zinc-900 px-3 text-zinc-400 dark:text-zinc-500 font-bold">Ou continuer avec</span>
+              <span className="bg-white dark:bg-zinc-900 px-3 text-zinc-400 dark:text-zinc-500 font-bold">
+                {language === "en" ? "Or continue with" : "Ou continuer avec"}
+              </span>
             </div>
           </div>
 
@@ -366,14 +381,14 @@ function LoginForm() {
                 />
               </svg>
             )}
-            <span>Se connecter avec Google</span>
+            <span>{language === "en" ? "Sign in with Google" : "Se connecter avec Google"}</span>
           </button>
 
           {/* Quick test accounts — affiché uniquement si NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS=true */}
           {process.env.NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS === 'true' && (
             <div className="mt-8 pt-6 border-t border-zinc-150 dark:border-zinc-800">
               <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-3 text-center">
-                Accès rapide démo
+                {language === "en" ? "Quick demo access" : "Accès rapide démo"}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button
@@ -383,25 +398,25 @@ function LoginForm() {
                   className="py-2.5 px-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-350 transition-all text-left disabled:opacity-50 cursor-pointer"
                 >
                   <p className="font-bold text-zinc-900 dark:text-white">Prof. Kuettu</p>
-                  <p className="text-[10px] text-zinc-500 truncate">Formateur</p>
+                  <p className="text-[10px] text-zinc-505">{language === "en" ? "Instructor" : "Formateur"}</p>
                 </button>
                 <button
                   type="button"
                   disabled={loading || googleLoading}
                   onClick={() => quickLogin("jean@example.com", "password123")}
-                  className="py-2.5 px-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-350 transition-all text-left disabled:opacity-50 cursor-pointer"
+                  className="py-2.5 px-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-850 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-350 transition-all text-left disabled:opacity-50 cursor-pointer"
                 >
                   <p className="font-bold text-zinc-900 dark:text-white">Jean Dupont</p>
-                  <p className="text-[10px] text-zinc-500 truncate">Apprenant</p>
+                  <p className="text-[10px] text-zinc-505">{language === "en" ? "Learner" : "Apprenant"}</p>
                 </button>
               </div>
             </div>
           )}
 
-          <div className="mt-8 text-center text-sm text-zinc-600 dark:text-zinc-400">
-            Nouveau sur la plateforme ?{" "}
+          <div className="mt-8 text-center text-sm text-zinc-650 dark:text-zinc-400">
+            {language === "en" ? "New to the platform?" : "Nouveau sur la plateforme ?"}{" "}
             <Link href="/register" className="text-blue-600 hover:text-blue-500 font-bold transition-colors">
-              Créer un compte
+              {language === "en" ? "Create an account" : "Créer un compte"}
             </Link>
           </div>
         </div>
