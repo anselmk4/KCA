@@ -257,15 +257,6 @@ export async function POST(req: NextRequest) {
                 const platformFee = payment.amount * commissionRate;
                 const instructorEarnings = payment.amount - platformFee;
 
-                await supabaseAdmin.from('payouts').insert({
-                  id: crypto.randomUUID(),
-                  instructor_id: courseData.instructor_id,
-                  amount: instructorEarnings,
-                  status: 'PENDING',
-                  payment_method: 'MOBILE_MONEY',
-                  created_at: new Date().toISOString()
-                } as any);
-
                 await createNotification({
                   userId: courseData.instructor_id,
                   title: "Nouvelle inscription !",
