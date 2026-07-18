@@ -196,6 +196,14 @@ export async function initiatePawaPayDeposit(params: {
       };
     }
 
+    if (data.status === "REJECTED") {
+      return {
+        success: false,
+        depositId,
+        error: data.rejectionReason?.rejectionMessage || "La transaction a été rejetée par PawaPay."
+      };
+    }
+
     // PawaPay standard success response indicates the request is accepted
     // and returns status (often PENDING, waiting for customer PIN)
     return {
