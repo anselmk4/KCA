@@ -97,6 +97,29 @@ export default function StudentsPage() {
     }
   }
 
+  async function handleRevokeStudent(studentId: string, courseId: string, courseTitle: string, studentName: string) {
+    const confirm = window.confirm(`Êtes-vous sûr de vouloir révoquer ${studentName} du cours "${courseTitle}" ? Son accès sera immédiatement supprimé.`);
+    if (!confirm) return;
+
+    try {
+      const { error } = await supabase
+        .from('enrollments')
+        .delete()
+        .eq('student_id', studentId)
+        .eq('course_id', courseId);
+
+      if (error) throw error;
+
+      alert(`L'apprenant ${studentName} a été révoqué du cours "${courseTitle}" avec succès.`);
+      if (session?.userId) {
+        fetchStudents(session.userId);
+      }
+    } catch (err: any) {
+      console.error("[students] revoke error:", err.message);
+      alert("Erreur lors de la révocation : " + err.message);
+    }
+  }
+
   // Group by student
   const grouped = useMemo<GroupedStudent[]>(() => {
     const map = new Map<string, GroupedStudent>();
@@ -448,18 +471,30 @@ export default function StudentsPage() {
                 {/* Progress bars per course (expanded view) */}
                 {student.enrollments.length > 0 && (
                   <div className="px-6 pb-4 pt-0">
-                    <div className="border-t border-zinc-100 dark:border-zinc-800 pt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {student.enrollments.map(e => (
-                        <div key={e.courseId} className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate max-w-[120px]">{e.courseTitle}</span>
-                            <span className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300">{e.progressPercent}%</span>
+                        <div key={e.courseId} className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 rounded-xl p-3.5 space-y-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 truncate max-w-[150px]">{e.courseTitle}</span>
+                            <button
+                              onClick={() => handleRevokeStudent(student.studentId, e.courseId, e.courseTitle, student.studentName)}
+                              className="text-[10px] font-bold text-red-650 hover:text-red-750 hover:bg-red-50 dark:hover:bg-red-950/20 px-2.5 py-1 rounded-lg transition-colors border border-red-200/20"
+                              title="Révoquer l'apprenant de ce cours"
+                            >
+                              Révoquer
+                            </button>
                           </div>
-                          <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all duration-500 ${e.progressPercent >= 80 ? "bg-emerald-500" : e.progressPercent >= 40 ? "bg-blue-500" : "bg-amber-400"}`}
-                              style={{ width: `${e.progressPercent}%` }}
-                            />
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="text-zinc-400">Progression</span>
+                              <span className="font-bold text-zinc-700 dark:text-zinc-300">{e.progressPercent}%</span>
+                            </div>
+                            <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${e.progressPercent >= 80 ? "bg-emerald-500" : e.progressPercent >= 40 ? "bg-blue-500" : "bg-amber-400"}`}
+                                style={{ width: `${e.progressPercent}%` }}
+                              />
+                            </div>
                           </div>
                         </div>
                       ))}

@@ -34,6 +34,8 @@ import {
   X,
   Loader2,
   RefreshCw,
+  Mail,
+  AlertCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import RichEditor from "@/components/editor/RichEditor";
@@ -208,6 +210,13 @@ export default function CourseDetailPage() {
   const [requireSectionQuiz, setRequireSectionQuiz] = useState(true);
   const [quizSettingSaved, setQuizSettingSaved] = useState(false);
 
+  // ─── Collaborator states ──────────────────────────────────
+  const [collaborators, setCollaborators] = useState<any[]>([]);
+  const [collaboratorSearchEmail, setCollaboratorSearchEmail] = useState("");
+  const [collaboratorError, setCollaboratorError] = useState("");
+  const [collaboratorSuccess, setCollaboratorSuccess] = useState("");
+  const [collaboratorLoading, setCollaboratorLoading] = useState(false);
+
   // ─── Load all data from Supabase ──────────────────────────
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -310,6 +319,13 @@ export default function CourseDetailPage() {
         .select("*")
         .eq("course_id", courseId);
       setHomeworks(hwData || []);
+
+      // Fetch Collaborators
+      const { data: collabData } = await (supabase as any)
+        .from("course_collaborators")
+        .select("id, collaborator_id, profiles!collaborator_id(full_name, email)")
+        .eq("course_id", courseId);
+      setCollaborators(collabData || []);
 
     } catch (err) {
       console.error("[CourseBuilder] loadData error:", err);
@@ -824,6 +840,93 @@ export default function CourseDetailPage() {
       if (error) { alert("Erreur : " + error.message); return; }
       router.push("/instructor/courses");
     } finally { setSaving(false); }
+  };
+
+  // ─── COLLABORATORS handlers ───────────────────────────────
+  const handleAddCollaborator = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCollaboratorError("");
+    setCollaboratorSuccess("");
+    if (!collaboratorSearchEmail.trim()) return;
+
+    setCollaboratorLoading(true);
+    try {
+      // Find user by email in profiles
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .eq("email", collaboratorSearchEmail.trim())
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!profile) {
+        setCollaboratorError("Aucun formateur trouvé avec cette adresse email.");
+        return;
+      }
+
+      // Check if they are the course owner
+      if (profile.id === userId) {
+        setCollaboratorError("Vous êtes déjà le propriétaire principal de ce cours.");
+        return;
+      }
+
+      // Check if already collaborator
+      if (collaborators.some(c => c.collaborator_id === profile.id)) {
+        setCollaboratorError("Cet utilisateur est déjà collaborateur sur ce cours.");
+        return;
+      }
+
+      // Add collaborator
+      const { error: insertError } = await (supabase as any)
+        .from("course_collaborators")
+        .insert({
+          course_id: courseId,
+          collaborator_id: profile.id
+        });
+
+      if (insertError) throw insertError;
+
+      setCollaboratorSuccess(`Collaborateur "${profile.full_name}" ajouté avec succès !`);
+      setCollaboratorSearchEmail("");
+      
+      // Reload collaborators
+      const { data: collabData } = await (supabase as any)
+        .from("course_collaborators")
+        .select("id, collaborator_id, profiles!collaborator_id(full_name, email)")
+        .eq("course_id", courseId);
+      setCollaborators(collabData || []);
+
+    } catch (err: any) {
+      console.error("Error adding collaborator:", err.message);
+      setCollaboratorError("Erreur lors de l'ajout : " + err.message);
+    } finally {
+      setCollaboratorLoading(false);
+    }
+  };
+
+  const handleRemoveCollaborator = async (collabId: string, name: string) => {
+    const confirm = window.confirm(`Êtes-vous sûr de vouloir retirer "${name}" de la co-gestion de ce cours ?`);
+    if (!confirm) return;
+
+    try {
+      const { error } = await (supabase as any)
+        .from("course_collaborators")
+        .delete()
+        .eq("id", collabId);
+
+      if (error) throw error;
+
+      alert(`Collaborateur retiré avec succès.`);
+      // Reload collaborators
+      const { data: collabData } = await (supabase as any)
+        .from("course_collaborators")
+        .select("id, collaborator_id, profiles!collaborator_id(full_name, email)")
+        .eq("course_id", courseId);
+      setCollaborators(collabData || []);
+    } catch (err: any) {
+      console.error("Error removing collaborator:", err.message);
+      alert("Erreur lors de la suppression : " + err.message);
+    }
   };
 
   // ─── STUDENTS tab handlers ────────────────────────────────
@@ -2183,6 +2286,105 @@ export default function CourseDetailPage() {
                   Enregistrer le paramètre
                 </button>
               </div>
+            </div>
+
+            {/* Collaborateurs UI block */}
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-6 shadow-sm">
+              <div className="pb-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-zinc-900 dark:text-white text-base">Collaborateurs & Co-gestionnaires</h3>
+                  <p className="text-zinc-400 text-xs mt-0.5">Partagez l&apos;accès à ce cours avec d&apos;autres formateurs pour co-construire le programme et gérer les élèves.</p>
+                </div>
+                <Users className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+              </div>
+
+              {/* Collaborators List */}
+              {collaborators.length === 0 ? (
+                <div className="text-center py-8 bg-zinc-50/50 dark:bg-zinc-900/30 rounded-xl border border-dashed border-zinc-150 dark:border-zinc-800">
+                  <UserPlus className="w-8 h-8 text-zinc-300 dark:text-zinc-700 mx-auto mb-2" />
+                  <p className="text-xs text-zinc-550 dark:text-zinc-450 font-medium">Aucun collaborateur pour le moment</p>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">Ajoutez un collaborateur ci-dessous pour commencer.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Collaborateurs Actifs ({collaborators.length})</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {collaborators.map(c => {
+                      const initials = c.profiles?.full_name?.split(" ").map((n: string) => n[0] || "").join("").slice(0, 2).toUpperCase() || "CO";
+                      return (
+                        <div key={c.id} className="flex items-center justify-between p-3.5 bg-zinc-50 dark:bg-zinc-850/40 rounded-xl border border-zinc-150 dark:border-zinc-800/80">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-teal-50 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400 flex items-center justify-center font-bold text-xs shrink-0">
+                              {initials}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate">{c.profiles?.full_name || "Co-gestionnaire"}</p>
+                              <p className="text-[10px] text-zinc-455 dark:text-zinc-550 truncate">{c.profiles?.email}</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCollaborator(c.id, c.profiles?.full_name || "")}
+                            className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-650 hover:text-red-700 rounded-lg transition-colors border border-transparent hover:border-red-200/20 cursor-pointer"
+                            title="Retirer les droits"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Add Collaborator Form */}
+              <form onSubmit={handleAddCollaborator} className="space-y-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Ajouter un nouveau co-gestionnaire</h4>
+                
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                    <input
+                      type="email"
+                      required
+                      placeholder="Adresse email du formateur..."
+                      value={collaboratorSearchEmail}
+                      onChange={e => setCollaboratorSearchEmail(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-zinc-250 dark:border-zinc-850 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40 transition-shadow"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={collaboratorLoading}
+                    className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5 shrink-0"
+                  >
+                    {collaboratorLoading ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Recherche...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="w-3.5 h-3.5" />
+                        Ajouter
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {collaboratorError && (
+                  <p className="text-xs text-red-650 bg-red-50 dark:bg-red-950/20 border border-red-200/20 px-3 py-2 rounded-lg flex items-center gap-1.5 font-medium animate-in slide-in-from-top-1 duration-200">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    {collaboratorError}
+                  </p>
+                )}
+                {collaboratorSuccess && (
+                  <p className="text-xs text-emerald-700 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250/20 px-3 py-2 rounded-lg flex items-center gap-1.5 font-medium animate-in slide-in-from-top-1 duration-200">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    {collaboratorSuccess}
+                  </p>
+                )}
+              </form>
             </div>
 
             <div className="bg-red-50/30 dark:bg-red-950/10 rounded-2xl border-2 border-dashed border-red-200 dark:border-red-900/30 p-6 space-y-4">

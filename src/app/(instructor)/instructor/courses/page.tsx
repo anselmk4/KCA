@@ -68,12 +68,26 @@ export default function InstructorCoursesPage() {
 
     try {
       const instructorId = activeSession.userId;
+      
+      // Fetch co-managed course IDs where this instructor is a collaborator
+      const { data: collabData } = await (supabase as any)
+        .from("course_collaborators")
+        .select("course_id")
+        .eq("collaborator_id", instructorId);
+      const collabCourseIds = (collabData || []).map((c: any) => c.course_id);
 
-      // 1. Fetch courses owned by the instructor
-      const { data: coursesData } = await supabase
+      // Fetch courses owned or co-managed
+      let query = supabase
         .from("courses")
-        .select("id, title, description, status, price, level, thumbnail_url")
-        .eq("instructor_id", instructorId);
+        .select("id, title, description, status, price, level, thumbnail_url, instructor_id");
+      
+      if (collabCourseIds.length > 0) {
+        query = query.or(`instructor_id.eq.${instructorId},id.in.(${collabCourseIds.join(",")})`);
+      } else {
+        query = query.eq("instructor_id", instructorId);
+      }
+
+      const { data: coursesData } = await query;
 
       const coursesList = coursesData || [];
       setMyCourses(coursesList);
