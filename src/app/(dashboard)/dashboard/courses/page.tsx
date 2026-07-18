@@ -94,8 +94,12 @@ export default function MyCoursesPage() {
       setActiveEnrollments(active);
       setCompletedEnrollments(completed);
 
-      // Available courses not enrolled
-      const enrolledIds = new Set(all.map((e) => e.course_id));
+      // Available courses not enrolled in actively
+      const enrolledIds = new Set(
+        all
+          .filter((e) => e.status === "ACTIVE" || e.status === "COMPLETED")
+          .map((e) => e.course_id)
+      );
       const { data: coursesData } = await supabase
         .from("courses")
         .select("id, title, category_id, level, price, status, thumbnail_url, categories(name)")

@@ -159,7 +159,6 @@ export async function POST(req: NextRequest) {
 
       if (type === 'STUDENT_COURSE') {
         const { error: enrollError } = await dbClient.from('enrollments').upsert({
-          id: crypto.randomUUID(),
           student_id: user.id,
           course_id: itemId,
           progress_percent: 0,
