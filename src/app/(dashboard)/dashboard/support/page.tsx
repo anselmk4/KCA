@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getDB, addSupportTicket, addReplyToTicket, Database, SupportTicket } from "@/lib/db";
 import { getSimulatedSession, CurrentSession } from "@/lib/rbac";
+import { useLanguage } from "@/context/LanguageContext";
 import { 
   MessageSquare, 
   Send, 
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 
 export default function StudentSupportPage() {
+  const { t } = useLanguage();
   const [db, setDb] = useState<Database | null>(null);
   const [session, setSession] = useState<CurrentSession | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -107,22 +109,22 @@ export default function StudentSupportPage() {
   // Status visual attributes
   const statusConfig = {
     OPEN: {
-      label: "Ouvert",
+      label: t("student.support.open", "Ouvert"),
       color: "text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30",
       icon: <AlertCircle className="w-3.5 h-3.5" />
     },
     IN_PROGRESS: {
-      label: "En cours",
+      label: t("student.support.pending", "En cours"),
       color: "text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/30",
       icon: <Clock className="w-3.5 h-3.5" />
     },
     RESOLVED: {
-      label: "Résolu",
+      label: t("student.support.closed", "Résolu"),
       color: "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/30",
       icon: <CheckCircle2 className="w-3.5 h-3.5" />
     },
     CLOSED: {
-      label: "Fermé",
+      label: t("student.support.closed", "Fermé"),
       color: "text-zinc-500 bg-zinc-50 dark:bg-zinc-800/40 border-zinc-200 dark:border-zinc-800",
       icon: <X className="w-3.5 h-3.5" />
     }
@@ -135,17 +137,17 @@ export default function StudentSupportPage() {
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white flex items-center gap-2.5">
             <HelpCircle className="w-7 h-7 text-blue-600 dark:text-blue-400" />
-            Support Technique
+            {t("student.support.title", "Support Technique")}
           </h1>
           <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">
-            Besoin d'aide ? Échangez avec l'équipe pédagogique et technique de l'Académie.
+            {t("student.support.subtitle", "Une question ou un problème ? Contactez notre équipe d'assistance.")}
           </p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-blue-500/10 transition-all hover:scale-[1.02] shrink-0"
         >
-          <Plus className="w-4 h-4" /> Nouveau Ticket
+          <Plus className="w-4 h-4" /> {t("student.support.createTicket", "Nouveau Ticket")}
         </button>
       </div>
 
@@ -161,7 +163,7 @@ export default function StudentSupportPage() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Rechercher un ticket..."
+                placeholder={t("student.discover.searchPlaceholder", "Rechercher un ticket...")}
                 className="pl-9 pr-4 py-2.5 w-full bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-500 transition-all placeholder-zinc-400 text-zinc-900 dark:text-white"
               />
             </div>
@@ -171,8 +173,8 @@ export default function StudentSupportPage() {
             {filteredTickets.length === 0 ? (
               <div className="py-16 text-center px-4">
                 <MessageSquare className="w-10 h-10 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
-                <p className="text-zinc-900 dark:text-zinc-100 font-semibold text-xs">Aucun ticket disponible</p>
-                <p className="text-zinc-400 text-[10px] mt-1">Créez votre première requête de support pour débuter.</p>
+                <p className="text-zinc-900 dark:text-zinc-100 font-semibold text-xs">{t("student.support.noTickets", "Aucun ticket disponible")}</p>
+                <p className="text-zinc-400 text-[10px] mt-1">{t("student.payment.applyCoupon", "Créez").toLowerCase().includes("appliqu") ? "Create your first support ticket to get started." : "Créez votre première requête de support pour débuter."}</p>
               </div>
             ) : (
               filteredTickets.map((t) => {
@@ -212,7 +214,6 @@ export default function StudentSupportPage() {
             )}
           </div>
         </div>
-
         {/* Right Side: Chat Area */}
         <div className="flex-1 flex flex-col bg-zinc-50/50 dark:bg-zinc-900/10">
           {activeTicket ? (
@@ -225,7 +226,9 @@ export default function StudentSupportPage() {
                   </div>
                   <div>
                     <h2 className="font-bold text-zinc-900 dark:text-white text-xs truncate max-w-md">{activeTicket.subject}</h2>
-                    <p className="text-[10px] text-zinc-400 mt-0.5">Créé le {new Date(activeTicket.createdAt).toLocaleString("fr-FR")}</p>
+                    <p className="text-[10px] text-zinc-400 mt-0.5">
+                      {t("student.payment.applyCoupon", "Créé").toLowerCase().includes("appliqu") ? "Created on" : "Créé le"} {new Date(activeTicket.createdAt).toLocaleString(t("student.payment.applyCoupon", "Créé").toLowerCase().includes("appliqu") ? "en-US" : "fr-FR")}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -247,7 +250,7 @@ export default function StudentSupportPage() {
                   <div className="flex-1 space-y-1">
                     <div className="flex items-baseline gap-2">
                       <span className="font-bold text-xs text-zinc-900 dark:text-white">{session.name}</span>
-                      <span className="text-[9px] text-zinc-400">Auteur</span>
+                      <span className="text-[9px] text-zinc-400">{t("student.payment.applyCoupon", "Auteur").toLowerCase().includes("appliqu") ? "Author" : "Auteur"}</span>
                     </div>
                     <div className="bg-white dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800/60 p-4 rounded-2xl rounded-tl-sm shadow-sm max-w-2xl text-xs text-zinc-800 dark:text-zinc-200 leading-relaxed whitespace-pre-wrap">
                       {activeTicket.message}
@@ -277,7 +280,7 @@ export default function StudentSupportPage() {
                           <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
                             isAdmin ? "bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400" : "text-zinc-400"
                           }`}>
-                            {isAdmin ? "Équipe" : "Vous"}
+                            {isAdmin ? (t("student.payment.applyCoupon", "Équipe").toLowerCase().includes("appliqu") ? "Staff" : "Équipe") : (t("student.payment.applyCoupon", "Vous").toLowerCase().includes("appliqu") ? "You" : "Vous")}
                           </span>
                         </div>
                         <div className={`p-4 rounded-2xl rounded-tl-sm shadow-sm max-w-2xl text-xs leading-relaxed whitespace-pre-wrap ${
@@ -287,7 +290,7 @@ export default function StudentSupportPage() {
                         }`}>
                           {reply.message}
                         </div>
-                        <p className="text-[9px] text-zinc-400 pl-1">{new Date(reply.createdAt).toLocaleString("fr-FR")}</p>
+                        <p className="text-[9px] text-zinc-400 pl-1">{new Date(reply.createdAt).toLocaleString(t("student.payment.applyCoupon", "Créé").toLowerCase().includes("appliqu") ? "en-US" : "fr-FR")}</p>
                       </div>
                     </div>
                   );
@@ -304,7 +307,7 @@ export default function StudentSupportPage() {
                     type="text"
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
-                    placeholder="Écrire un message de réponse..."
+                    placeholder={t("student.payment.applyCoupon", "Écrire").toLowerCase().includes("appliqu") ? "Write a reply message..." : "Écrire un message de réponse..."}
                     className="flex-1 px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-zinc-900 dark:text-white"
                   />
                   <button
@@ -317,7 +320,7 @@ export default function StudentSupportPage() {
                 </form>
               ) : (
                 <div className="p-4 bg-zinc-100 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-900 text-center text-xs text-zinc-400">
-                  Ce ticket a été fermé. Il n'est plus possible d'y répondre.
+                  {t("student.payment.applyCoupon", "Ce ticket").toLowerCase().includes("appliqu") ? "This ticket has been closed. Replies are no longer allowed." : "Ce ticket a été fermé. Il n'est plus possible d'y répondre."}
                 </div>
               )}
             </>
@@ -325,8 +328,8 @@ export default function StudentSupportPage() {
             <div className="flex-1 flex items-center justify-center text-center p-8">
               <div className="max-w-md space-y-3">
                 <MessageCircle className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
-                <h3 className="font-bold text-zinc-700 dark:text-zinc-300 text-sm">Aucune discussion ouverte</h3>
-                <p className="text-xs text-zinc-400">Sélectionnez un ticket dans la liste de gauche ou ouvrez-en un nouveau pour poser votre question à l'assistance.</p>
+                <h3 className="font-bold text-zinc-700 dark:text-zinc-300 text-sm">{t("student.payment.applyCoupon", "Aucune discussion").toLowerCase().includes("appliqu") ? "No Open Discussion" : "Aucune discussion ouverte"}</h3>
+                <p className="text-xs text-zinc-400">{t("student.payment.applyCoupon", "Sélectionnez").toLowerCase().includes("appliqu") ? "Select a ticket from the list on the left or open a new one to ask your question." : "Sélectionnez un ticket dans la liste de gauche ou ouvrez-en un nouveau pour poser votre question à l'assistance."}</p>
               </div>
             </div>
           )}
@@ -339,8 +342,8 @@ export default function StudentSupportPage() {
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/50">
               <div>
-                <h2 className="text-base font-bold text-zinc-900 dark:text-white">Créer un nouveau ticket</h2>
-                <p className="text-[11px] text-zinc-400 mt-0.5">Décrivez précisément votre problème technique ou académique.</p>
+                <h2 className="text-base font-bold text-zinc-900 dark:text-white">{t("student.payment.applyCoupon", "Créer").toLowerCase().includes("appliqu") ? "Create New Ticket" : "Créer un nouveau ticket"}</h2>
+                <p className="text-[11px] text-zinc-400 mt-0.5">{t("student.payment.applyCoupon", "Décrivez").toLowerCase().includes("appliqu") ? "Describe your technical or academic issue in detail." : "Décrivez précisément votre problème technique ou académique."}</p>
               </div>
               <button
                 onClick={() => setShowCreateModal(false)}
@@ -354,28 +357,28 @@ export default function StudentSupportPage() {
               <div className="p-6 space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wide">
-                    Sujet de votre requête *
+                    {t("student.payment.applyCoupon", "Sujet").toLowerCase().includes("appliqu") ? "Subject of your request *" : "Sujet de votre requête *"}
                   </label>
                   <input
                     type="text"
                     required
                     value={newSubject}
                     onChange={(e) => setNewSubject(e.target.value)}
-                    placeholder="Ex: Problème d'accès à mon quiz"
+                    placeholder={t("student.payment.applyCoupon", "Ex").toLowerCase().includes("appliqu") ? "e.g. Issue accessing my quiz" : "Ex: Problème d'accès à mon quiz"}
                     className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
                 </div>
                 
                 <div>
                   <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wide">
-                    Message / Description détaillée *
+                    {t("student.payment.applyCoupon", "Message").toLowerCase().includes("appliqu") ? "Detailed Message / Description *" : "Message / Description détaillée *"}
                   </label>
                   <textarea
                     required
                     rows={4}
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Veuillez décrire le problème rencontré avec le plus de précisions possibles (actions effectuées, messages d'erreurs, etc.)."
+                    placeholder={t("student.payment.applyCoupon", "Veuillez").toLowerCase().includes("appliqu") ? "Please describe the problem you encountered with as much detail as possible (actions performed, error messages, etc.)." : "Veuillez décrire le problème rencontré avec le plus de précisions possibles (actions effectuées, messages d'erreurs, etc.)."}
                     className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none leading-relaxed"
                   />
                 </div>
@@ -387,14 +390,14 @@ export default function StudentSupportPage() {
                   onClick={() => setShowCreateModal(false)}
                   className="px-4 py-2.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
                 >
-                  Annuler
+                  {t("student.payment.applyCoupon", "Annuler").toLowerCase().includes("appliqu") ? "Cancel" : "Annuler"}
                 </button>
                 <button
                   type="submit"
                   disabled={!newSubject.trim() || !newMessage.trim() || creating}
                   className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/10"
                 >
-                  {creating ? "Création..." : "Soumettre le ticket"}
+                  {creating ? (t("student.payment.applyCoupon", "Création").toLowerCase().includes("appliqu") ? "Creating..." : "Création...") : (t("student.payment.applyCoupon", "Soumettre").toLowerCase().includes("appliqu") ? "Submit Ticket" : "Soumettre le ticket")}
                 </button>
               </div>
             </form>

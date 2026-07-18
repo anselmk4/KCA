@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Search, Clock, ArrowRight, Compass, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
 
 type DiscoverCourse = {
   id: string;
@@ -63,7 +64,8 @@ function stripHtml(html: string | null | undefined): string {
     .trim();
 }
 
-export default function DiscoverPage() {
+export default function DiscoverCoursesPage() {
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [courses, setCourses] = useState<DiscoverCourse[]>([]);
@@ -193,11 +195,11 @@ export default function DiscoverPage() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
-          <Compass className="w-5 h-5" />
-          <span className="text-xs font-bold tracking-[0.2em] uppercase">Catalogue</span>
+          <Compass className="h-5 w-5" />
+          <span className="text-xs font-bold tracking-[0.2em] uppercase">{t("student.sidebar.catalog", "Catalogue")}</span>
         </div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Découvrir des Formations</h1>
-        <p className="text-zinc-500 dark:text-zinc-400">Parcourez les formations créées par nos experts et rejoignez de nouveaux parcours d&apos;apprentissage.</p>
+        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">{t("student.discover.title", "Découvrir des Formations")}</h1>
+        <p className="text-zinc-500 dark:text-zinc-400">{t("student.discover.subtitle", "Parcourez les formations créées par nos experts et rejoignez de nouveaux parcours d'apprentissage.")}</p>
       </div>
 
       {/* Search & Filters */}
@@ -207,7 +209,7 @@ export default function DiscoverPage() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
           <input
             type="text"
-            placeholder="Rechercher une formation..."
+            placeholder={t("student.discover.searchPlaceholder", "Rechercher une formation...")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-11 pr-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-shadow"
@@ -226,7 +228,7 @@ export default function DiscoverPage() {
                   : "bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600"
               }`}
             >
-              {cat.label}
+              {cat.value === "all" ? t("student.discover.allCategories", "Toutes les catégories") : cat.label}
             </button>
           ))}
         </div>
@@ -236,12 +238,12 @@ export default function DiscoverPage() {
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-          <span className="ml-3 text-zinc-500 dark:text-zinc-400">Chargement des formations...</span>
+          <span className="ml-3 text-zinc-500 dark:text-zinc-400">{t("student.payment.submitting", "Chargement des formations...")}</span>
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-20 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
           <p className="text-zinc-400 dark:text-zinc-500 text-lg">
-            Aucune formation ne correspond à votre recherche.
+            {t("student.discover.noCourses", "Aucune formation ne correspond à votre recherche.")}
           </p>
         </div>
       ) : (
@@ -289,25 +291,26 @@ export default function DiscoverPage() {
                   
                   {/* Instructor name */}
                   <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-4 font-medium">
-                    Par <span className="text-zinc-700 dark:text-zinc-300">{course.instructorName}</span>
+                    {t("instructor.settings.title", "Par").toLowerCase().includes("par") ? "Par " : "By "} 
+                    <span className="text-zinc-700 dark:text-zinc-300">{course.instructorName}</span>
                   </p>
 
                   <div className="flex items-center justify-between pt-4 border-t border-zinc-100 dark:border-zinc-800">
                     <div className="flex flex-col gap-1.5">
                       <div className="flex items-center gap-1.5 text-xs text-zinc-400">
                         <Clock className="h-3.5 w-3.5" />
-                        <span>{course.level || "Tous niveaux"}</span>
+                        <span>{course.level || t("student.discover.level", "Tous niveaux")}</span>
                       </div>
                       <div className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold flex items-center gap-1">
                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                        {enrolledCount} {enrolledCount > 1 ? "apprenants" : "apprenant"}
+                        {enrolledCount} {enrolledCount > 1 ? t("instructor.courses.students", "étudiants") : t("instructor.courses.students", "étudiant")}
                       </div>
                     </div>
                     <Link
                       href={`/dashboard/discover/${course.id}`}
                       className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors group/link"
                     >
-                      Aperçu
+                      {t("student.courses.review", "Aperçu")}
                       <ArrowRight className="h-4 w-4 transition-transform group-hover/link:translate-x-0.5" />
                     </Link>
                   </div>

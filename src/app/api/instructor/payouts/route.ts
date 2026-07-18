@@ -157,3 +157,133 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err?.message || 'Erreur interne' }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const supabase = await createClient();
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Identifiant manquant' }, { status: 400 });
+    }
+
+    const dbClient = (process.env.SUPABASE_SERVICE_ROLE_KEY && 
+                      process.env.SUPABASE_SERVICE_ROLE_KEY !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+      ? supabaseAdmin 
+      : supabase;
+
+    // 1. Fetch payout request
+    const { data: payout, error: fetchErr } = await dbClient
+      .from('payouts')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchErr || !payout) {
+      return NextResponse.json({ error: 'Demande de retrait introuvable' }, { status: 404 });
+    }
+
+    // 2. Security: Verify ownership
+    if (payout.instructor_id !== user.id) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
+    }
+
+    // 3. Verify status is PENDING
+    if (payout.status !== 'PENDING') {
+      return NextResponse.json({ error: 'Seules les demandes en attente peuvent être annulées.' }, { status: 400 });
+    }
+
+    // 4. Update status to CANCELLED
+    const { data: updatedPayout, error: updateErr } = await dbClient
+      .from('payouts')
+      .update({
+        status: 'CANCELLED',
+        notes: `Annulé par l'instructeur le ${new Date().toLocaleDateString('fr-FR')}.`,
+        updated_at: new Date().toISOString()
+      } as any)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateErr) {
+      return NextResponse.json({ error: updateErr.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, payout: updatedPayout });
+  } catch (err: any) {
+    console.error('[API instructor/payouts DELETE] Unexpected error:', err);
+    return NextResponse.json({ error: err?.message || 'Erreur interne' }, { status: 500 });
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  try {
+    const supabase = await createClient();
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { id, carrier, phoneNumber } = body;
+
+    if (!id || !carrier || !phoneNumber) {
+      return NextResponse.json({ error: 'Données manquantes' }, { status: 400 });
+    }
+
+    const dbClient = (process.env.SUPABASE_SERVICE_ROLE_KEY && 
+                      process.env.SUPABASE_SERVICE_ROLE_KEY !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+      ? supabaseAdmin 
+      : supabase;
+
+    // 1. Fetch payout request
+    const { data: payout, error: fetchErr } = await dbClient
+      .from('payouts')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchErr || !payout) {
+      return NextResponse.json({ error: 'Demande de retrait introuvable' }, { status: 404 });
+    }
+
+    // 2. Security: Verify ownership
+    if (payout.instructor_id !== user.id) {
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
+    }
+
+    // 3. Verify status is PENDING
+    if (payout.status !== 'PENDING') {
+      return NextResponse.json({ error: 'Seules les demandes en attente peuvent être modifiées.' }, { status: 400 });
+    }
+
+    // 4. Update details
+    const { data: updatedPayout, error: updateErr } = await dbClient
+      .from('payouts')
+      .update({
+        payment_reference: `${carrier.toUpperCase()}: ${phoneNumber}`,
+        notes: `Coordonnées de retrait modifiées par l'instructeur le ${new Date().toLocaleDateString('fr-FR')}.`,
+        updated_at: new Date().toISOString()
+      } as any)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateErr) {
+      return NextResponse.json({ error: updateErr.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, payout: updatedPayout });
+  } catch (err: any) {
+    console.error('[API instructor/payouts PUT] Unexpected error:', err);
+    return NextResponse.json({ error: err?.message || 'Erreur interne' }, { status: 500 });
+  }
+}

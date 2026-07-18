@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { User, Mail, Shield, Bell, CreditCard, Check, Settings, Phone, Globe, MapPin, KeyRound, Eye, EyeOff, Camera, Loader2, Plus, Trash2, Star, Save, CheckCircle2 } from "lucide-react";
 import { getDB, saveDB } from "@/lib/db";
 import { getSimulatedSession, setSimulatedSession } from "@/lib/rbac";
+import { useLanguage } from "@/context/LanguageContext";
 
 type SettingsTab = "profile" | "security" | "notifications" | "billing" | "payment";
 
 export default function StudentSettingsPage() {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [session, setSession] = useState<any>(null);
 
@@ -147,8 +149,8 @@ export default function StudentSettingsPage() {
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Paramètres</h1>
-        <p className="text-zinc-500 dark:text-zinc-400">Configurez votre compte personnel, gérez vos abonnements et ajustez vos notifications.</p>
+        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">{t("student.sidebar.settings", "Paramètres")}</h1>
+        <p className="text-zinc-500 dark:text-zinc-400">{t("student.settings.subtitle", "Configurez votre compte personnel, gérez vos abonnements et ajustez vos notifications.")}</p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-8 items-start">
@@ -164,7 +166,7 @@ export default function StudentSettingsPage() {
             }`}
           >
             <User className="w-4 h-4" />
-            <span>Mon Profil</span>
+            <span>{t("student.settings.personalInfo", "Mon Profil")}</span>
           </button>
           <button
             onClick={() => setActiveTab("security")}
@@ -175,7 +177,7 @@ export default function StudentSettingsPage() {
             }`}
           >
             <Shield className="w-4 h-4" />
-            <span>Sécurité</span>
+            <span>{t("student.settings.security", "Sécurité")}</span>
           </button>
           <button
             onClick={() => setActiveTab("notifications")}
@@ -186,7 +188,7 @@ export default function StudentSettingsPage() {
             }`}
           >
             <Bell className="w-4 h-4" />
-            <span>Notifications</span>
+            <span>{t("student.payment.applyCoupon", "Notifications").toLowerCase().includes("appliqu") ? "Notifications" : "Notifications"}</span>
           </button>
           <button
             onClick={() => setActiveTab("billing")}
@@ -197,7 +199,7 @@ export default function StudentSettingsPage() {
             }`}
           >
             <CreditCard className="w-4 h-4" />
-            <span>Facturation & Plan</span>
+            <span>{t("student.sidebar.billing", "Facturation & Plan")}</span>
           </button>
           <button
             onClick={() => setActiveTab("payment")}
@@ -208,7 +210,7 @@ export default function StudentSettingsPage() {
             }`}
           >
             <Phone className="w-4 h-4" />
-            <span>Moyens de paiement</span>
+            <span>{t("student.payment.paymentMethod", "Moyens de paiement")}</span>
           </button>
         </div>
 

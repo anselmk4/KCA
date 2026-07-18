@@ -17,6 +17,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface CourseStat {
   id: string;
@@ -44,6 +45,7 @@ interface AnalyticsData {
 }
 
 export default function AnalyticsPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -224,16 +226,16 @@ export default function AnalyticsPage() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-teal-650" />
-            <h2 className="font-semibold text-zinc-900 dark:text-white text-base">Inscriptions par semaine</h2>
+            <h2 className="font-semibold text-zinc-900 dark:text-white text-base">{t("student.payment.applyCoupon", "Inscriptions par semaine").toLowerCase().includes("appliqu") ? "Enrollments per week" : "Inscriptions par semaine"}</h2>
           </div>
           <span className="text-xs bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 px-2.5 py-1 rounded-full font-medium">
-            Dernières 7 semaines
+            {t("student.payment.applyCoupon", "Dernières 7 semaines").toLowerCase().includes("appliqu") ? "Last 7 weeks" : "Dernières 7 semaines"}
           </span>
         </div>
         
         {data.enrollmentsCount === 0 ? (
           <div className="py-12 text-center text-zinc-400 text-sm">
-            Aucune inscription enregistrée sur cette période.
+            {t("student.payment.applyCoupon", "Aucune inscription").toLowerCase().includes("appliqu") ? "No enrollments recorded during this period." : "Aucune inscription enregistrée sur cette période."}
           </div>
         ) : (
           <div className="flex items-end gap-3 h-40 pt-4">
@@ -256,36 +258,36 @@ export default function AnalyticsPage() {
       {/* Course performance table */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-250 dark:border-zinc-800 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-zinc-150 dark:border-zinc-850 flex items-center justify-between">
-          <h2 className="font-semibold text-zinc-900 dark:text-white text-base">Performance par cours</h2>
+          <h2 className="font-semibold text-zinc-900 dark:text-white text-base">{t("student.payment.applyCoupon", "Performance par cours").toLowerCase().includes("appliqu") ? "Course Performance" : "Performance par cours"}</h2>
           <span className="text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 px-2 py-0.5 rounded-full font-medium">
-            {data.courses.length} cours
+            {data.courses.length} {t("student.payment.applyCoupon", "cours").toLowerCase().includes("appliqu") ? "courses" : "cours"}
           </span>
         </div>
         
         {data.courses.length === 0 ? (
           <div className="py-12 text-center">
             <BookOpen className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
-            <p className="text-zinc-500 text-sm">Aucun cours créé pour le moment.</p>
-            <p className="text-zinc-400 text-xs mt-1">Créez votre première formation pour voir ses statistiques.</p>
+            <p className="text-zinc-505 text-sm">{t("student.payment.applyCoupon", "Aucun cours").toLowerCase().includes("appliqu") ? "No courses created yet." : "Aucun cours créé pour le moment."}</p>
+            <p className="text-zinc-400 text-xs mt-1">{t("student.payment.applyCoupon", "Créez votre première").toLowerCase().includes("appliqu") ? "Create your first course to view its statistics." : "Créez votre première formation pour voir ses statistiques."}</p>
           </div>
         ) : (
-          <div className="divide-y divide-zinc-150 dark:divide-zinc-850">
+          <div className="divide-y divide-zinc-150 dark:divide-zinc-855">
             {data.courses.map((course) => (
               <div key={course.id} className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10 transition-colors">
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-zinc-900 dark:text-white text-sm truncate">{course.title}</p>
                   <p className="text-xs text-zinc-400 mt-0.5">
-                    {course.category || "Général"} · {course.level || "Tous niveaux"}
+                    {course.category || "Général"} · {course.level || (t("student.payment.applyCoupon", "Tous niveaux").toLowerCase().includes("appliqu") ? "All levels" : "Tous niveaux")}
                   </p>
                 </div>
                 
                 <div className="flex items-center gap-6 self-start sm:self-auto flex-wrap">
-                  <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-450">
+                  <div className="flex items-center gap-1.5 text-xs text-zinc-505 dark:text-zinc-450">
                     <Users className="w-4 h-4 text-zinc-400" />
-                    <span>Inscrits</span>
+                    <span>{t("student.payment.applyCoupon", "Inscrits").toLowerCase().includes("appliqu") ? "Enrolled" : "Inscrits"}</span>
                   </div>
                   
-                  <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-450">
+                  <div className="flex items-center gap-1.5 text-xs text-zinc-505 dark:text-zinc-450">
                     <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
                     <span>{course.rating ? course.rating.toFixed(1) : "—"}</span>
                   </div>
@@ -294,10 +296,10 @@ export default function AnalyticsPage() {
                     course.status === "PUBLISHED" 
                       ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                       : course.status === "DRAFT" 
-                      ? "bg-zinc-100 text-zinc-500 dark:bg-zinc-850 dark:text-zinc-450"
+                      ? "bg-zinc-100 text-zinc-505 dark:bg-zinc-850 dark:text-zinc-450"
                       : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                   }`}>
-                    {course.status === "PUBLISHED" ? "Publié" : course.status === "DRAFT" ? "Brouillon" : "Revue"}
+                    {course.status === "PUBLISHED" ? (t("student.payment.applyCoupon", "Publé").toLowerCase().includes("appliqu") ? "Published" : "Publié") : course.status === "DRAFT" ? (t("student.payment.applyCoupon", "Brouillon").toLowerCase().includes("appliqu") ? "Draft" : "Brouillon") : (t("student.payment.applyCoupon", "Revue").toLowerCase().includes("appliqu") ? "Review" : "Revue")}
                   </span>
                 </div>
               </div>

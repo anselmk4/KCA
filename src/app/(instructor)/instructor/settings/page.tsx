@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getSimulatedSession, setSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
 import {
   User, Globe, Bell, Shield, Save, CheckCircle2, Camera,
   Share2, Link as LinkIcon, Video as VideoIcon, ExternalLink, GraduationCap, Award, Loader2,
@@ -12,6 +13,7 @@ import {
 type Tab = "profile" | "academy" | "social" | "notifications" | "security" | "payment";
 
 export default function InstructorSettingsPage() {
+  const { t } = useLanguage();
   const [session, setSession] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<Tab>("profile");
   const [saved, setSaved] = useState(false);
@@ -168,19 +170,19 @@ export default function InstructorSettingsPage() {
     : "PR";
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    { key: "profile", label: "Profil", icon: <User className="w-4 h-4" /> },
-    { key: "academy", label: "Académie", icon: <GraduationCap className="w-4 h-4" /> },
-    { key: "social", label: "Réseaux sociaux", icon: <Globe className="w-4 h-4" /> },
-    { key: "notifications", label: "Notifications", icon: <Bell className="w-4 h-4" /> },
-    { key: "payment", label: "Paiement", icon: <CreditCard className="w-4 h-4" /> },
-    { key: "security", label: "Sécurité", icon: <Shield className="w-4 h-4" /> },
+    { key: "profile", label: t("student.settings.personalInfo", "Mon Profil"), icon: <User className="w-4 h-4" /> },
+    { key: "academy", label: t("student.payment.applyCoupon", "Académie").toLowerCase().includes("appliqu") ? "Academy" : "Académie", icon: <GraduationCap className="w-4 h-4" /> },
+    { key: "social", label: t("student.payment.applyCoupon", "Réseaux").toLowerCase().includes("appliqu") ? "Social Networks" : "Réseaux sociaux", icon: <Globe className="w-4 h-4" /> },
+    { key: "notifications", label: t("student.payment.applyCoupon", "Notifications").toLowerCase().includes("appliqu") ? "Notifications" : "Notifications", icon: <Bell className="w-4 h-4" /> },
+    { key: "payment", label: t("student.payment.paymentMethod", "Paiement"), icon: <CreditCard className="w-4 h-4" /> },
+    { key: "security", label: t("student.settings.security", "Sécurité"), icon: <Shield className="w-4 h-4" /> },
   ];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Paramètres</h1>
-        <p className="text-zinc-500 dark:text-zinc-400 mt-1">Gérez votre profil instructeur et les préférences de votre académie.</p>
+        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">{t("student.sidebar.settings", "Paramètres")}</h1>
+        <p className="text-zinc-500 dark:text-zinc-400 mt-1">{t("student.payment.applyCoupon", "Gérez").toLowerCase().includes("appliqu") ? "Manage your instructor profile and your academy preferences." : "Gérez votre profil instructeur et les préférences de votre académie."}</p>
       </div>
 
       {/* Tabs */}
@@ -202,7 +204,7 @@ export default function InstructorSettingsPage() {
       {saved && (
         <div className="flex items-center gap-3 p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-xl">
           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Modifications enregistrées avec succès !</p>
+          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{t("student.payment.applyCoupon", "Modifications").toLowerCase().includes("appliqu") ? "Changes saved successfully!" : "Modifications enregistrées avec succès !"}</p>
         </div>
       )}
 

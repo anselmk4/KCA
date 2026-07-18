@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
 
 // ─── Types ────────────────────────────────────────────────
 type CertRow = {
@@ -27,7 +28,7 @@ type EnrollmentRow = {
 };
 
 // ─── Canvas-based PDF export (zero dependency) ──────────
-async function downloadCertificatePDF(cert: CertRow, studentName: string) {
+async function downloadCertificatePDF(cert: CertRow, studentName: string, isEnglish: boolean) {
   const canvas = document.createElement("canvas");
   // A4 landscape at 150dpi
   canvas.width = 1587;
@@ -92,12 +93,12 @@ async function downloadCertificatePDF(cert: CertRow, studentName: string) {
   // Certificate of Completion
   ctx.fillStyle = "#475569"; // Slate-600
   ctx.font = "italic 28px Georgia, serif";
-  ctx.fillText("Certificat d'Accomplissement", canvas.width / 2, 250);
+  ctx.fillText(isEnglish ? "Certificate of Completion" : "Certificat d'Accomplissement", canvas.width / 2, 250);
 
   // "Décerné à"
   ctx.fillStyle = "#64748b"; // Slate-500
   ctx.font = "22px Arial, sans-serif";
-  ctx.fillText("Décerné à", canvas.width / 2, 320);
+  ctx.fillText(isEnglish ? "Awarded to" : "Décerné à", canvas.width / 2, 320);
 
   // Student name in Charcoal
   ctx.fillStyle = "#0f172a"; // Deep Charcoal
@@ -116,7 +117,7 @@ async function downloadCertificatePDF(cert: CertRow, studentName: string) {
   // "pour avoir complété avec succès"
   ctx.fillStyle = "#475569";
   ctx.font = "24px Arial, sans-serif";
-  ctx.fillText("pour avoir complété avec succès la formation", canvas.width / 2, 510);
+  ctx.fillText(isEnglish ? "for successfully completing the course" : "pour avoir complété avec succès la formation", canvas.width / 2, 510);
 
   // Course title in elegant Deep Teal/Charcoal
   ctx.fillStyle = "#0f766e"; // Deep Teal
@@ -143,20 +144,20 @@ async function downloadCertificatePDF(cert: CertRow, studentName: string) {
   if (cert.instructorName) {
     ctx.fillStyle = "#475569";
     ctx.font = "20px Arial, sans-serif";
-    ctx.fillText(`Instructeur : ${cert.instructorName}`, canvas.width / 2, y + 70);
+    ctx.fillText(isEnglish ? `Instructor: ${cert.instructorName}` : `Instructeur : ${cert.instructorName}`, canvas.width / 2, y + 70);
   }
 
   // Date + Code
-  const issuedDate = new Date(cert.issued_at).toLocaleDateString("fr-FR", {
+  const issuedDate = new Date(cert.issued_at).toLocaleDateString(isEnglish ? "en-US" : "fr-FR", {
     year: "numeric", month: "long", day: "numeric",
   });
   ctx.fillStyle = "#475569";
   ctx.font = "20px Arial, sans-serif";
-  ctx.fillText(`Date d'émission : ${issuedDate}`, canvas.width / 2, canvas.height - 200);
+  ctx.fillText(isEnglish ? `Issue Date: ${issuedDate}` : `Date d'émission : ${issuedDate}`, canvas.width / 2, canvas.height - 200);
 
   ctx.fillStyle = "#334155";
   ctx.font = "bold 18px monospace";
-  ctx.fillText(`Code de vérification : ${cert.code}`, canvas.width / 2, canvas.height - 160);
+  ctx.fillText(isEnglish ? `Verification Code: ${cert.code}` : `Code de vérification : ${cert.code}`, canvas.width / 2, canvas.height - 160);
 
   ctx.fillStyle = "#2563eb"; // Royal Blue link
   ctx.font = "16px Arial, sans-serif";
@@ -192,6 +193,7 @@ const CERT_COLORS = [
 ];
 
 export default function CertificatesPage() {
+  const { t } = useLanguage();
   const [userName, setUserName] = useState("Apprenant");
   const [userId, setUserId] = useState<string | null>(null);
   const [earnedCerts, setEarnedCerts] = useState<CertRow[]>([]);
@@ -314,8 +316,9 @@ export default function CertificatesPage() {
   // ── Télécharger PDF ────────────────────────────────────
   const handleDownload = async (cert: CertRow) => {
     setDownloading(cert.id);
+    const isEnglish = !t("student.certificates.title", "Mes Certificats").includes("Certificats");
     try {
-      await downloadCertificatePDF(cert, userName);
+      await downloadCertificatePDF(cert, userName, isEnglish);
     } finally {
       setDownloading(null);
     }
@@ -333,8 +336,8 @@ export default function CertificatesPage() {
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Mes Certificats</h1>
-          <p className="text-zinc-500 dark:text-zinc-400">Vos accomplissements et diplômes obtenus sur ANSELLA.</p>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">{t("student.certificates.title", "Mes Certificats")}</h1>
+          <p className="text-zinc-500 dark:text-zinc-400">{t("student.certificates.subtitle", "Vos accomplissements et diplômes obtenus sur ANSELLA.")}</p>
         </div>
       </div>
 
@@ -344,24 +347,23 @@ export default function CertificatesPage() {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
           <div className="md:col-span-7 space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5" /> Modèle Officiel
+              <Sparkles className="w-3.5 h-3.5" /> {t("student.payment.applyCoupon", "Modèle Officiel").toLowerCase().includes("appliqu") ? "Official Template" : "Modèle Officiel"}
             </div>
             <h2 className="text-xl md:text-2xl font-black tracking-tight leading-tight">
-              Aperçu du Modèle de Certificat ANSELLA
+              {t("student.payment.applyCoupon", "Aperçu").toLowerCase().includes("appliqu") ? "ANSELLA Certificate Template Preview" : "Aperçu du Modèle de Certificat ANSELLA"}
             </h2>
             <p className="text-zinc-400 text-sm max-w-lg leading-relaxed">
-              Voici à quoi ressemblera votre certificat officiel une fois vos formations complétées à 100%. 
-              Chaque certificat est unique, infalsifiable, et comprend un code de vérification unique ainsi qu'un lien de partage.
+              {t("student.payment.applyCoupon", "Voici").toLowerCase().includes("appliqu") ? "This is what your official certificate will look like once your training is 100% complete. Each certificate is unique, tamper-proof, and includes a unique verification code and a share link." : "Voici à quoi ressemblera votre certificat officiel une fois vos formations complétées à 100%. Chaque certificat est unique, infalsifiable, et comprend un code de vérification unique ainsi qu'un lien de partage."}
             </p>
             <div className="flex flex-wrap gap-4 text-xs font-semibold text-zinc-400 pt-2">
               <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-teal-500" /> Signature de l'Instructeur
+                <CheckCircle2 className="w-4 h-4 text-teal-500" /> {t("student.payment.applyCoupon", "Signature").toLowerCase().includes("appliqu") ? "Instructor Signature" : "Signature de l'Instructeur"}
               </div>
               <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-teal-500" /> Code de vérification unique
+                <CheckCircle2 className="w-4 h-4 text-teal-500" /> {t("student.payment.applyCoupon", "Code").toLowerCase().includes("appliqu") ? "Unique Verification Code" : "Code de vérification unique"}
               </div>
               <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-teal-500" /> Export PNG Haute Résolution
+                <CheckCircle2 className="w-4 h-4 text-teal-500" /> {t("student.payment.applyCoupon", "Export").toLowerCase().includes("appliqu") ? "High Resolution PNG Export" : "Export PNG Haute Résolution"}
               </div>
             </div>
           </div>
@@ -381,9 +383,9 @@ export default function CertificatesPage() {
                 <div className="w-8 h-8 bg-amber-500/10 rounded-full flex items-center justify-center mb-2">
                   <Award className="w-5 h-5 text-amber-500" />
                 </div>
-                <p className="font-serif text-[8px] text-zinc-500 uppercase tracking-[0.2em] leading-none">Certificat d&apos;Accomplissement</p>
+                <p className="font-serif text-[8px] text-zinc-500 uppercase tracking-[0.2em] leading-none">{t("student.payment.applyCoupon", "Certificat").toLowerCase().includes("appliqu") ? "Certificate of Completion" : "Certificat d'Accomplissement"}</p>
                 
-                <h4 className="font-bold text-white text-xs mt-1.5 line-clamp-1">Nom de la Formation</h4>
+                <h4 className="font-bold text-white text-xs mt-1.5 line-clamp-1">{t("student.payment.applyCoupon", "Nom").toLowerCase().includes("appliqu") ? "Course Title" : "Nom de la Formation"}</h4>
                 
                 <div className="mt-2 flex items-center gap-1.5">
                   <div className="w-6 h-[0.5px] bg-amber-500/40" />
@@ -393,7 +395,7 @@ export default function CertificatesPage() {
                 
                 <p className="text-[7px] text-zinc-650 mt-1 font-mono">CODE: CERT-XXXX-XXXXXX</p>
                 <div className="mt-2 text-[7px] bg-teal-500/10 text-teal-400 px-2 py-0.5 rounded border border-teal-500/20 font-bold uppercase tracking-wider">
-                  Modèle de Démonstration
+                  {t("student.payment.applyCoupon", "Modèle").toLowerCase().includes("appliqu") ? "Demonstration Template" : "Modèle de Démonstration"}
                 </div>
               </div>
             </div>
@@ -407,7 +409,7 @@ export default function CertificatesPage() {
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-amber-500" />
             <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
-              Certificats obtenus ({earnedCerts.length})
+              {t("student.payment.applyCoupon", "Certificats").toLowerCase().includes("appliqu") ? "Earned Certificates" : "Certificats obtenus"} ({earnedCerts.length})
             </h2>
           </div>
 
@@ -426,7 +428,7 @@ export default function CertificatesPage() {
                         <Award className="w-7 h-7 text-amber-600" />
                       </div>
                       <p className="font-serif text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-[0.25em] mb-1">{cert.academyName || "ANSELLA ACADEMY"}</p>
-                      <p className="font-serif text-[9px] text-zinc-400 uppercase tracking-widest leading-none mb-2">Certificat d&apos;Accomplissement</p>
+                      <p className="font-serif text-[9px] text-zinc-400 uppercase tracking-widest leading-none mb-2">{t("student.payment.applyCoupon", "Certificat").toLowerCase().includes("appliqu") ? "Certificate of Completion" : "Certificat d'Accomplissement"}</p>
                       <p className="font-bold text-zinc-900 dark:text-white mt-1 text-sm leading-tight line-clamp-2">{cert.courseTitle}</p>
                       <div className="mt-3 flex items-center gap-2">
                         <div className="w-12 h-[1px] bg-amber-400" />
@@ -437,7 +439,7 @@ export default function CertificatesPage() {
                     </div>
                     <div className="absolute top-4 right-4 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
                       <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                      <span className="text-xs font-bold text-emerald-600">Vérifié</span>
+                      <span className="text-xs font-bold text-emerald-600">{t("student.payment.applyCoupon", "Vérifié").toLowerCase().includes("appliqu") ? "Verified" : "Vérifié"}</span>
                     </div>
                   </div>
 
@@ -445,7 +447,7 @@ export default function CertificatesPage() {
                   <div className="p-6 flex flex-col flex-1">
                     <h2 className="text-lg font-bold text-zinc-900 dark:text-white mb-1 line-clamp-1">{cert.courseTitle}</h2>
                     <p className="text-zinc-500 dark:text-zinc-400 text-xs mb-1">
-                      Délivré le {new Date(cert.issued_at).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })}
+                      {t("student.certificates.issuedAt", "Délivré le")} {new Date(cert.issued_at).toLocaleDateString(t("student.payment.applyCoupon", "Délivré").toLowerCase().includes("appliqu") ? "en-US" : "fr-FR", { year: "numeric", month: "long", day: "numeric" })}
                     </p>
                     <div className="flex items-center gap-2 mb-5">
                       <p className="text-zinc-400 text-xs font-mono truncate">{cert.code}</p>
@@ -466,9 +468,9 @@ export default function CertificatesPage() {
                         className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer"
                       >
                         {downloading === cert.id ? (
-                          <><Loader2 className="w-4 h-4 animate-spin" /> Génération...</>
+                          <><Loader2 className="w-4 h-4 animate-spin" /> {t("student.payment.applyCoupon", "Génération...").toLowerCase().includes("appliqu") ? "Generating..." : "Génération..."}</>
                         ) : (
-                          <><Download className="w-4 h-4" /> Télécharger</>
+                          <><Download className="w-4 h-4" /> {t("student.certificates.download", "Télécharger")}</>
                         )}
                       </button>
                       <button
@@ -476,9 +478,9 @@ export default function CertificatesPage() {
                         className="py-3 px-4 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
                       >
                         {copiedCode === cert.code ? (
-                          <><CheckCircle2 className="w-4 h-4 text-green-500" /> Copié !</>
+                          <><CheckCircle2 className="w-4 h-4 text-green-500" /> {t("student.payment.applyCoupon", "Copié !").toLowerCase().includes("appliqu") ? "Copied!" : "Copié !"}</>
                         ) : (
-                          <><Share2 className="w-4 h-4" /> Partager</>
+                          <><Share2 className="w-4 h-4" /> {t("student.payment.applyCoupon", "Partager").toLowerCase().includes("appliqu") ? "Share" : "Partager"}</>
                         )}
                       </button>
                     </div>
@@ -494,7 +496,7 @@ export default function CertificatesPage() {
       {inProgress.length > 0 && (
         <div className="space-y-6">
           <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
-            Certificats en cours d&apos;obtention
+            {t("student.payment.applyCoupon", "Certificats en cours").toLowerCase().includes("appliqu") ? "Certificates in Progress" : "Certificats en cours d'obtention"}
           </h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {inProgress.map((enrollment) => (
@@ -509,7 +511,7 @@ export default function CertificatesPage() {
                       : "opacity-40 grayscale group-hover:opacity-60"
                   }`}>
                     <Award className={`w-10 h-10 mb-2 ${enrollment.progress_percent >= 100 ? "text-emerald-500" : "text-zinc-400"}`} />
-                    <p className="font-serif text-xs text-zinc-400 uppercase tracking-widest text-center">Certificat d&apos;Accomplissement</p>
+                    <p className="font-serif text-xs text-zinc-400 uppercase tracking-widest text-center">{t("student.payment.applyCoupon", "Certificat").toLowerCase().includes("appliqu") ? "Certificate of Completion" : "Certificat d'Accomplissement"}</p>
                     <p className="font-bold text-zinc-500 mt-1 text-center text-xs line-clamp-2">{enrollment.courseTitle}</p>
                   </div>
                   {enrollment.progress_percent < 100 ? (
@@ -530,12 +532,12 @@ export default function CertificatesPage() {
                   <h2 className="text-base font-bold text-zinc-900 dark:text-white mb-1 line-clamp-1">{enrollment.courseTitle}</h2>
                   <p className="text-zinc-500 dark:text-zinc-400 text-xs mb-4">
                     {enrollment.progress_percent >= 100 
-                      ? "Félicitations ! Votre progression est complète." 
-                      : "Complétez 100% des leçons et validez tous les quiz ≥ 80% pour déverrouiller ce certificat."}
+                      ? (t("student.payment.applyCoupon", "Félicitations").toLowerCase().includes("appliqu") ? "Congratulations! Your progress is complete." : "Félicitations ! Votre progression est complète.") 
+                      : (t("student.payment.applyCoupon", "Complétez").toLowerCase().includes("appliqu") ? "Complete 100% of the lessons and pass all quizzes ≥ 80% to unlock this certificate." : "Complétez 100% des leçons et validez tous les quiz ≥ 80% pour déverrouiller ce certificat.")}
                   </p>
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-xs font-semibold">
-                      <span className="text-zinc-500">Progression</span>
+                      <span className="text-zinc-500">{t("student.dashboard.progress", "Progression")}</span>
                       <span className="text-blue-600">{enrollment.progress_percent}%</span>
                     </div>
                     <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-2.5 overflow-hidden">
@@ -551,7 +553,7 @@ export default function CertificatesPage() {
                       <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 rounded-2xl flex items-center gap-3">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
                         <p className="text-xs font-bold text-emerald-800 dark:text-emerald-400">
-                          Formation complétée à 100% ! Votre certificat est prêt.
+                          {t("student.payment.applyCoupon", "Formation complétée").toLowerCase().includes("appliqu") ? "Course 100% completed! Your certificate is ready." : "Formation complétée à 100% ! Votre certificat est prêt."}
                         </p>
                       </div>
                       <button
@@ -562,12 +564,12 @@ export default function CertificatesPage() {
                         {generatingId === enrollment.course_id ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            Génération en cours...
+                            {t("student.payment.applyCoupon", "Génération en cours...").toLowerCase().includes("appliqu") ? "Generating..." : "Génération en cours..."}
                           </>
                         ) : (
                           <>
                             <Award className="w-4 h-4" />
-                            Obtenir mon certificat
+                            {t("student.payment.applyCoupon", "Obtenir mon certificat").toLowerCase().includes("appliqu") ? "Claim My Certificate" : "Obtenir mon certificat"}
                           </>
                         )}
                       </button>
@@ -577,7 +579,7 @@ export default function CertificatesPage() {
                       href={`/dashboard/courses/${enrollment.course_id}/learn`}
                       className="mt-auto w-full py-3 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs rounded-xl transition-colors text-center block"
                     >
-                      Continuer le cours →
+                      {t("student.courses.resume", "Continuer le cours")} →
                     </Link>
                   )}
                 </div>
@@ -592,27 +594,27 @@ export default function CertificatesPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-8 text-center space-y-5 flex flex-col items-center justify-center">
             <BookOpen className="w-16 h-16 text-zinc-300" />
-            <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Aucun certificat pour le moment</h3>
+            <h3 className="text-xl font-bold text-zinc-900 dark:text-white">{t("student.certificates.emptyState", "Vous n'avez pas encore obtenu de certificat.")}</h3>
             <p className="text-zinc-500 dark:text-zinc-400 text-sm max-w-sm">
-              Inscrivez-vous à une formation, complétez toutes les leçons et obtenez votre certificat.
+              {t("student.payment.applyCoupon", "Inscrivez-vous").toLowerCase().includes("appliqu") ? "Enroll in a course, complete all lessons and claim your certificate." : "Inscrivez-vous à une formation, complétez toutes les leçons et obtenez votre certificat."}
             </p>
             <Link
               href="/dashboard/discover"
               className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors gap-2"
             >
-              <Compass className="w-5 h-5" /> Découvrir le catalogue
+              <Compass className="w-5 h-5" /> {t("student.courses.browseCatalog", "Découvrir le catalogue")}
             </Link>
           </div>
           <div className="bg-blue-50 dark:bg-blue-900/10 rounded-3xl border border-blue-100 dark:border-blue-900/30 p-8 flex flex-col justify-center">
             <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/50 rounded-2xl flex items-center justify-center mb-6">
               <Award className="w-8 h-8 text-blue-600 dark:text-blue-400" />
             </div>
-            <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-3">Pourquoi obtenir nos certificats ?</h3>
+            <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-3">{t("student.payment.applyCoupon", "Pourquoi").toLowerCase().includes("appliqu") ? "Why obtain our certificates?" : "Pourquoi obtenir nos certificats ?"}</h3>
             <ul className="space-y-4 text-zinc-600 dark:text-zinc-400">
               {[
-                "Démontrez votre expertise auprès des employeurs à l'échelle internationale.",
-                "Lien de vérification unique pour votre profil LinkedIn.",
-                "Accédez à des opportunités exclusives au sein du réseau ANSELLA.",
+                t("student.payment.applyCoupon", "Démontrez").toLowerCase().includes("appliqu") ? "Demonstrate your expertise to employers globally." : "Démontrez votre expertise auprès des employeurs à l'échelle internationale.",
+                t("student.payment.applyCoupon", "Lien").toLowerCase().includes("appliqu") ? "Unique verification link for your LinkedIn profile." : "Lien de vérification unique pour votre profil LinkedIn.",
+                t("student.payment.applyCoupon", "Accédez").toLowerCase().includes("appliqu") ? "Access exclusive opportunities within the ANSELLA network." : "Accédez à des opportunités exclusives au sein du réseau ANSELLA.",
               ].map((item, i) => (
                 <li key={i} className="flex items-start gap-3">
                   <CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
@@ -632,12 +634,16 @@ export default function CertificatesPage() {
               <Award className="w-7 h-7 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Vos certificats ANSELLA</h3>
-              <p className="text-xs text-zinc-500">Vérifiables, partageables et reconnus.</p>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">{t("student.payment.applyCoupon", "Vos").toLowerCase().includes("appliqu") ? "Your ANSELLA certificates" : "Vos certificats ANSELLA"}</h3>
+              <p className="text-xs text-zinc-500">{t("student.payment.applyCoupon", "Vérifiables").toLowerCase().includes("appliqu") ? "Verifiable, shareable and recognized." : "Vérifiables, partageables et reconnus."}</p>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {["Expertise reconnue à l'échelle internationale", "Lien de vérification unique pour LinkedIn", "Opportunités exclusives réseau ANSELLA"].map((item, i) => (
+            {[
+              t("student.payment.applyCoupon", "Expertise").toLowerCase().includes("appliqu") ? "Globally recognized expertise" : "Expertise reconnue à l'échelle internationale",
+              t("student.payment.applyCoupon", "Lien").toLowerCase().includes("appliqu") ? "Unique verification link for LinkedIn" : "Lien de vérification unique pour LinkedIn",
+              t("student.payment.applyCoupon", "Opportunités").toLowerCase().includes("appliqu") ? "Exclusive ANSELLA network opportunities" : "Opportunités exclusives réseau ANSELLA"
+            ].map((item, i) => (
               <div key={i} className="flex items-start gap-3 p-4 bg-white/50 dark:bg-zinc-900/30 rounded-xl">
                 <CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                 <span className="text-sm text-zinc-600 dark:text-zinc-400">{item}</span>

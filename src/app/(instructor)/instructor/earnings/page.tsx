@@ -18,7 +18,9 @@ import {
   X,
   Phone,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Edit2,
+  Trash2
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
@@ -73,6 +75,14 @@ export default function EarningsPage() {
   const [withdrawPhone, setWithdrawPhone] = useState<string>("");
   const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
   const [withdrawMessage, setWithdrawMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Edit payout modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editPayoutId, setEditPayoutId] = useState<string>("");
+  const [editCarrier, setEditCarrier] = useState<string>("MPESA");
+  const [editPhone, setEditPhone] = useState<string>("");
+  const [submittingEdit, setSubmittingEdit] = useState(false);
+  const [editMessage, setEditMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const fetchEarningsData = useCallback(async () => {
     setLoading(true);
@@ -323,6 +333,82 @@ export default function EarningsPage() {
     }
   };
 
+  // Cancel withdrawal request
+  const handleCancelPayout = async (payoutId: string) => {
+    if (!confirm("Voulez-vous vraiment annuler cette demande de retrait ?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/instructor/payouts?id=${payoutId}`, {
+        method: "DELETE",
+      });
+
+      const resData = await response.json();
+      if (!response.ok) {
+        throw new Error(resData.error || "Échec de l'annulation.");
+      }
+
+      alert("Demande de retrait annulée avec succès !");
+      fetchEarningsData();
+    } catch (err: any) {
+      alert(err.message || "Une erreur inattendue est survenue.");
+    }
+  };
+
+  // Open edit modal
+  const handleOpenEditModal = (payout: LocalPayout) => {
+    setEditPayoutId(payout.id);
+    const parts = payout.payment_reference.split(":");
+    const carrier = parts[0]?.trim() || "MPESA";
+    const phone = parts[1]?.trim() || "";
+    setEditCarrier(carrier);
+    setEditPhone(phone);
+    setEditMessage(null);
+    setIsEditModalOpen(true);
+  };
+
+  // Save modified withdrawal request
+  const handleSaveEditPayout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditMessage(null);
+
+    if (!editPhone || editPhone.length < 9) {
+      setEditMessage({ type: "error", text: "Veuillez entrer un numéro de téléphone valide." });
+      return;
+    }
+
+    setSubmittingEdit(true);
+    try {
+      const response = await fetch("/api/instructor/payouts", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editPayoutId,
+          carrier: editCarrier,
+          phoneNumber: editPhone,
+        }),
+      });
+
+      const resData = await response.json();
+      if (!response.ok) {
+        throw new Error(resData.error || "Échec de la modification.");
+      }
+
+      setEditMessage({ type: "success", text: "Vos coordonnées de retrait ont été modifiées avec succès !" });
+      fetchEarningsData();
+      
+      setTimeout(() => {
+        setIsEditModalOpen(false);
+        setEditMessage(null);
+      }, 2000);
+    } catch (err: any) {
+      setEditMessage({ type: "error", text: err.message || "Une erreur inattendue est survenue." });
+    } finally {
+      setSubmittingEdit(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -547,7 +633,7 @@ export default function EarningsPage() {
 
       {/* Payout requests list */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-zinc-150 dark:border-zinc-850 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-zinc-150 dark:border-zinc-855 flex items-center justify-between">
           <h2 className="font-semibold text-zinc-900 dark:text-white text-base">Historique des retraits</h2>
           <span className="text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-550 dark:text-zinc-400 px-2 py-0.5 rounded-full font-medium">
             {payouts.length} demande{payouts.length > 1 ? "s" : ""}
@@ -568,11 +654,12 @@ export default function EarningsPage() {
                   <th className="px-6 py-3">Notes</th>
                   <th className="px-6 py-3 text-right">Montant</th>
                   <th className="px-6 py-3 text-center">Statut</th>
+                  <th className="px-6 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800 text-sm">
                 {payouts.map((p) => (
-                  <tr key={p.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10 transition-colors">
+                  <tr key={p.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20 transition-colors">
                     <td className="px-6 py-4 text-xs text-zinc-500">
                       {new Date(p.created_at).toLocaleDateString("fr-FR")} à {new Date(p.created_at).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit' })}
                     </td>
@@ -594,8 +681,30 @@ export default function EarningsPage() {
                           ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                           : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
                       }`}>
-                        {p.status === "PAID" ? "Validé" : p.status === "PENDING" ? "En attente" : p.status === "PROCESSING" ? "En cours" : "Annulé / Échoué"}
+                        {p.status === "PAID" ? "Validé" : p.status === "PENDING" ? "En attente" : p.status === "PROCESSING" ? "En cours" : p.status === "CANCELLED" ? "Annulé" : "Annulé / Échoué"}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      {p.status === "PENDING" ? (
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => handleOpenEditModal(p)}
+                            className="p-1 text-blue-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors cursor-pointer"
+                            title="Modifier les coordonnées"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleCancelPayout(p.id)}
+                            className="p-1 text-red-655 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors cursor-pointer"
+                            title="Annuler la demande"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-zinc-400">—</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -679,7 +788,7 @@ export default function EarningsPage() {
                   setIsWithdrawModalOpen(false);
                   setWithdrawMessage(null);
                 }}
-                className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-zinc-650 cursor-pointer"
+                className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-zinc-655 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -688,8 +797,8 @@ export default function EarningsPage() {
             {/* Modal Body / Form */}
             <form onSubmit={handleSubmitWithdrawal} className="space-y-4">
               <div className="bg-teal-50 dark:bg-teal-900/20 p-4 rounded-2xl flex justify-between items-center">
-                <span className="text-xs text-zinc-650 dark:text-zinc-400 font-semibold">Disponible pour retrait</span>
-                <span className="font-extrabold text-teal-650 dark:text-teal-400 text-lg">${availableBalance.toFixed(2)}</span>
+                <span className="text-xs text-zinc-655 dark:text-zinc-400 font-semibold">Disponible pour retrait</span>
+                <span className="font-extrabold text-teal-655 dark:text-teal-400 text-lg">${availableBalance.toFixed(2)}</span>
               </div>
 
               {/* Status alerts */}
@@ -716,7 +825,7 @@ export default function EarningsPage() {
                   placeholder="Ex: 50"
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}
-                  className="w-full px-4 py-3 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-950 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-955 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-650 focus:border-transparent transition-all"
                 />
               </div>
 
@@ -735,8 +844,8 @@ export default function EarningsPage() {
                       onClick={() => setWithdrawCarrier(carrier.id)}
                       className={`py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                         withdrawCarrier === carrier.id
-                          ? "border-teal-600 bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-400"
-                          : "border-zinc-200 dark:border-zinc-700 text-zinc-650 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                          ? "border-teal-650 bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-400"
+                          : "border-zinc-200 dark:border-zinc-700 text-zinc-655 hover:bg-zinc-50 dark:hover:bg-zinc-800"
                       }`}
                     >
                       {carrier.label}
@@ -756,7 +865,7 @@ export default function EarningsPage() {
                     placeholder="Ex: 0820000000"
                     value={withdrawPhone}
                     onChange={(e) => setWithdrawPhone(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-950 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent transition-all"
+                    className="w-full pl-11 pr-4 py-3 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-955 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-655 focus:border-transparent transition-all"
                   />
                 </div>
                 <p className="text-[10px] text-zinc-400 dark:text-zinc-500">Le retrait sera envoyé directement vers ce numéro Mobile Money.</p>
@@ -766,7 +875,7 @@ export default function EarningsPage() {
               <button
                 type="submit"
                 disabled={submittingWithdraw || availableBalance <= 0}
-                className="w-full py-3.5 mt-4 bg-teal-650 hover:bg-teal-500 disabled:bg-zinc-150 disabled:text-zinc-450 dark:disabled:bg-zinc-800 text-white text-sm font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                className="w-full py-3.5 mt-4 bg-teal-655 hover:bg-teal-555 disabled:bg-zinc-150 disabled:text-zinc-455 dark:disabled:bg-zinc-800 text-white text-sm font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 {submittingWithdraw ? (
                   <>
@@ -777,6 +886,105 @@ export default function EarningsPage() {
                   <>
                     <CheckCircle2 className="w-4 h-4" />
                     Confirmer le retrait
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Payout CSS Overlay Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-6 relative animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Edit2 className="w-5 h-5 text-teal-650" />
+                <h3 className="font-bold text-zinc-955 dark:text-white text-lg">Modifier les coordonnées</h3>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditMessage(null);
+                }}
+                className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-zinc-655 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body / Form */}
+            <form onSubmit={handleSaveEditPayout} className="space-y-4">
+              {/* Status alerts */}
+              {editMessage && (
+                <div className={`p-3.5 rounded-xl text-xs font-semibold flex items-start gap-2.5 ${
+                  editMessage.type === "success" 
+                    ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400 border border-emerald-250" 
+                    : "bg-red-50 text-red-800 dark:bg-red-950/20 dark:text-red-400 border border-red-250"
+                }`}>
+                  {editMessage.type === "success" ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+                  <span>{editMessage.text}</span>
+                </div>
+              )}
+
+              {/* Carrier selection */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-350">Opérateur Mobile Money</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "MPESA", label: "M-Pesa" },
+                    { id: "ORANGE", label: "Orange" },
+                    { id: "AIRTEL", label: "Airtel" }
+                  ].map((carrier) => (
+                    <button
+                      key={carrier.id}
+                      type="button"
+                      onClick={() => setEditCarrier(carrier.id)}
+                      className={`py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                        editCarrier === carrier.id
+                          ? "border-teal-655 bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-400"
+                          : "border-zinc-200 dark:border-zinc-700 text-zinc-655 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                      }`}
+                    >
+                      {carrier.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Phone number input */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-350">Numéro de téléphone du compte</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-3.5 text-zinc-400"><Phone className="w-4 h-4" /></span>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="Ex: 0820000000"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-955 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-655 focus:border-transparent transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Submit button */}
+              <button
+                type="submit"
+                disabled={submittingEdit}
+                className="w-full py-3.5 mt-4 bg-teal-655 hover:bg-teal-555 disabled:bg-zinc-150 disabled:text-zinc-455 dark:disabled:bg-zinc-800 text-white text-sm font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                {submittingEdit ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Enregistrement...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    Enregistrer les modifications
                   </>
                 )}
               </button>

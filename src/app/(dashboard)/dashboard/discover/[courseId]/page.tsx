@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Lock, Users, Tag, User, ChevronLeft, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
 
 // ─── Local Types ──────────────────────────────────────────
 interface Course {
@@ -26,6 +27,7 @@ interface Course {
 }
 
 export default function CoursePreviewPage() {
+  const { t } = useLanguage();
   const params = useParams();
   const router = useRouter();
   const courseId = params.courseId as string;
@@ -156,9 +158,9 @@ export default function CoursePreviewPage() {
       setOnlineCount(activeOnline);
 
       // Mapper le niveau
-      let levelLabel = "Débutant";
-      if (courseData.level === "INTERMEDIATE") levelLabel = "Intermédiaire";
-      else if (courseData.level === "ADVANCED") levelLabel = "Avancé";
+      let levelLabel = t("student.dashboard.welcome", "Débutant").includes("Ravi") ? "Débutant" : "Beginner";
+      if (courseData.level === "INTERMEDIATE") levelLabel = t("student.dashboard.welcome", "Intermédiaire").includes("Ravi") ? "Intermédiaire" : "Intermediate";
+      else if (courseData.level === "ADVANCED") levelLabel = t("student.dashboard.welcome", "Avancé").includes("Ravi") ? "Avancé" : "Advanced";
       else if (courseData.level === "EXPERT") levelLabel = "Expert";
 
       setCourse({
@@ -200,10 +202,10 @@ export default function CoursePreviewPage() {
   if (!course) {
     return (
       <div className="text-center py-20 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
-        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Cours non trouvé</h2>
-        <p className="text-zinc-500 dark:text-zinc-400 mb-6">Le cours que vous cherchez n&apos;existe pas ou a été retiré.</p>
+        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">{t("student.discover.noCourses", "Cours non trouvé")}</h2>
+        <p className="text-zinc-500 dark:text-zinc-400 mb-6">{t("student.discover.noCourses", "Le cours que vous cherchez n'existe pas ou a été retiré.")}</p>
         <Link href="/dashboard/discover" className="px-5 py-2.5 bg-teal-600 text-white font-semibold rounded-xl">
-          Retour au catalogue
+          {t("student.courses.browseCatalog", "Retour au catalogue")}
         </Link>
       </div>
     );
@@ -234,7 +236,7 @@ export default function CoursePreviewPage() {
       {/* Back button */}
       <Link href="/dashboard/discover" className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-white text-sm font-semibold transition-colors">
         <ChevronLeft className="w-4 h-4" />
-        Retour
+        {t("student.courses.browseCatalog", "Retour au catalogue").includes("catalogue") ? "Retour" : "Back"}
       </Link>
 
       {/* Title */}
@@ -271,11 +273,11 @@ export default function CoursePreviewPage() {
           <div className="flex flex-wrap items-center gap-6 py-4 border-y border-zinc-200 dark:border-zinc-800 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
             <div className="flex items-center gap-2">
               <Lock className="w-5 h-5 text-zinc-400" />
-              <span>Privé</span>
+              <span>{t("student.payment.installmentSubtitle", "Privé").includes("mensua") ? "Private" : "Privé"}</span>
             </div>
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-zinc-400" />
-              <span>{enrolledCount} {enrolledCount > 1 ? "membres" : "membre"}</span>
+              <span>{enrolledCount} {enrolledCount > 1 ? (t("student.courses.availableSubtitle", "Visitez").includes("Visitez") ? "membres" : "members") : (t("student.courses.availableSubtitle", "Visitez").includes("Visitez") ? "membre" : "member")}</span>
             </div>
             <div className="flex items-center gap-2">
               <Tag className="w-5 h-5 text-zinc-400" />
@@ -283,7 +285,7 @@ export default function CoursePreviewPage() {
             </div>
             <div className="flex items-center gap-2">
               <User className="w-5 h-5 text-zinc-400" />
-              <span>Par {course.instructorName || "Prof. Kuettu"}</span>
+              <span>{t("instructor.settings.title", "Par").toLowerCase().includes("par") ? "Par " : "By "}{course.instructorName || "Prof. Kuettu"}</span>
             </div>
           </div>
 
@@ -291,27 +293,27 @@ export default function CoursePreviewPage() {
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-8 shadow-sm space-y-6">
             <div>
               <h2 className="text-xl font-extrabold text-zinc-900 dark:text-white uppercase tracking-wider mb-4">
-                BIENVENUE DANS L&apos;ACADÉMIE : {course.title.toUpperCase()}
+                {t("student.dashboard.welcome", "BIENVENUE DANS L'ACADÉMIE :").includes("Ravi") ? `BIENVENUE DANS L'ACADÉMIE : ${course.title.toUpperCase()}` : `WELCOME TO THE ACADEMY: ${course.title.toUpperCase()}`}
               </h2>
               <div className="prose dark:prose-invert max-w-none text-zinc-650 dark:text-zinc-400 leading-relaxed space-y-4">
                 <p className="font-semibold text-zinc-800 dark:text-zinc-200">
-                  Rejoignez-nous de l&apos;autre côté. Ne vous contentez pas de regarder, apprenez activement !
+                  {t("student.dashboard.welcome", "Rejoignez-nous").includes("Ravi") ? "Rejoignez-nous de l'autre côté. Ne vous contentez pas de regarder, apprenez activement !" : "Join us on the other side. Don't just watch, learn actively!"}
                 </p>
                 <p>
-                  Ce parcours d&apos;apprentissage intensif est conçu pour vous emmener de zéro aux compétences professionnelles exigées par les entreprises. Que vous soyez débutant ou intermédiaire, nos modules progressifs s&apos;adapteront à votre rythme.
+                  {t("student.dashboard.welcome", "Ce parcours").includes("Ravi") ? "Ce parcours d'apprentissage intensif est conçu pour vous emmener de zéro aux compétences professionnelles exigées par les entreprises. Que vous soyez débutant ou intermédiaire, nos modules progressifs s'adapteront à votre rythme." : "This intensive learning path is designed to take you from zero to professional skills demanded by employers. Whether you are a beginner or intermediate, our progressive modules will adapt to your pace."}
                 </p>
                 <p>
-                  <strong>Ce que vous allez obtenir dans ce cours :</strong>
+                  <strong>{t("student.dashboard.welcome", "Ce que vous").includes("Ravi") ? "Ce que vous allez obtenir dans ce cours :" : "What you will get in this course:"}</strong>
                 </p>
                 <ul className="list-disc pl-5 space-y-2">
-                  <li>Accès à vie à {lessonsCount} leçons vidéos détaillées divisées en {sectionsCount} chapitres structurés.</li>
-                  <li>Exercices pratiques et quiz d&apos;évaluation après chaque chapitre.</li>
-                  <li>Un certificat de réussite officiel d&apos;ANSELLA vérifiable en ligne.</li>
-                  <li>Accès à notre communauté privée d&apos;apprenants pour collaborer et poser vos questions.</li>
+                  <li>{t("student.dashboard.welcome", "Accès à vie").includes("Ravi") ? `Accès à vie à ${lessonsCount} leçons vidéos détaillées divisées en ${sectionsCount} chapitres structurés.` : `Lifetime access to ${lessonsCount} detailed video lessons split into ${sectionsCount} structured chapters.`}</li>
+                  <li>{t("student.dashboard.welcome", "Exercices").includes("Ravi") ? "Exercices pratiques et quiz d'évaluation après chaque chapitre." : "Hands-on exercises and evaluation quizzes after each chapter."}</li>
+                  <li>{t("student.dashboard.welcome", "Un certificat").includes("Ravi") ? "Un certificat de réussite officiel d'ANSELLA vérifiable en ligne." : "An official ANSELLA certificate of completion verifiable online."}</li>
+                  <li>{t("student.dashboard.welcome", "Accès à notre").includes("Ravi") ? "Accès à notre communauté privée d'apprenants pour collaborer et poser vos questions." : "Access to our private learner community to collaborate and ask questions."}</li>
                 </ul>
                 {course.description && (
                   <div className="mt-6 pt-6 border-t border-zinc-150 dark:border-zinc-800">
-                    <p className="font-bold text-zinc-850 dark:text-zinc-155 mb-2">Description de la formation :</p>
+                    <p className="font-bold text-zinc-850 dark:text-zinc-155 mb-2">{t("student.dashboard.welcome", "Description").includes("Ravi") ? "Description de la formation :" : "Course description:"}</p>
                     <div 
                       className="prose dark:prose-invert max-w-none text-zinc-650 dark:text-zinc-400 space-y-4"
                       dangerouslySetInnerHTML={{ __html: course.description }}
@@ -320,7 +322,7 @@ export default function CoursePreviewPage() {
                 )}
                 {course.benefits && (
                   <div className="mt-6 pt-6 border-t border-zinc-150 dark:border-zinc-800">
-                    <p className="font-bold text-zinc-850 dark:text-zinc-155 mb-2">Bénéfices du cours / Ce que vous allez apprendre :</p>
+                    <p className="font-bold text-zinc-850 dark:text-zinc-155 mb-2">{t("student.dashboard.welcome", "Bénéfices").includes("Ravi") ? "Bénéfices du cours / Ce que vous allez apprendre :" : "Course benefits / What you will learn:"}</p>
                     <div 
                       className="prose dark:prose-invert max-w-none text-zinc-650 dark:text-zinc-400 space-y-4"
                       dangerouslySetInnerHTML={{ __html: course.benefits }}
@@ -350,7 +352,7 @@ export default function CoursePreviewPage() {
                 ansella.app/{course.slug || course.id}
               </Link>
               <p className="text-sm text-zinc-550 dark:text-zinc-400 mt-3 font-semibold px-2">
-                Parcours certifiant et pratique de {course.category}
+                {t("student.dashboard.welcome", "Parcours").includes("Ravi") ? `Parcours certifiant et pratique de ${course.category}` : `Practical and certifying path of ${course.category}`}
               </p>
             </div>
 
@@ -358,11 +360,11 @@ export default function CoursePreviewPage() {
             <div className="grid grid-cols-3 border-y border-zinc-100 dark:border-zinc-800 py-4 text-center">
               <div>
                 <p className="text-xl font-extrabold text-zinc-900 dark:text-white">{enrolledCount}</p>
-                <p className="text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5">Membres</p>
+                <p className="text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5">{t("student.dashboard.welcome", "Membres").includes("Ravi") ? "Membres" : "Members"}</p>
               </div>
               <div>
                 <p className="text-xl font-extrabold text-teal-600">{onlineCount}</p>
-                <p className="text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5">En Ligne</p>
+                <p className="text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5">{t("student.dashboard.welcome", "En Ligne").includes("Ravi") ? "En Ligne" : "Online"}</p>
               </div>
               <div>
                 <p className="text-xl font-extrabold text-blue-500">1</p>
@@ -374,10 +376,10 @@ export default function CoursePreviewPage() {
             {course.allowInstallments && !isEnrolled && (
               <div className="p-3 bg-teal-50/50 dark:bg-teal-950/10 border border-teal-100/50 dark:border-teal-900/30 rounded-xl text-center">
                 <p className="text-xs font-semibold text-teal-700 dark:text-teal-400">
-                  Option multi-tranches disponible
+                  {t("student.payment.installmentSubtitle", "Option multi-tranches").includes("mensua") ? "Installment plan available" : "Option multi-tranches disponible"}
                 </p>
                 <p className="text-[10px] text-zinc-450 mt-0.5">
-                  Payez en {course.installmentsCount} fois : seulement {Math.round(course.price / (course.installmentsCount || 1))}$ par tranche.
+                  {t("student.payment.installmentSubtitle", "Payez").includes("mensua") ? `Pay in ${course.installmentsCount} installments: only $${Math.round(course.price / (course.installmentsCount || 1))} per installment.` : `Payez en ${course.installmentsCount} fois : seulement ${Math.round(course.price / (course.installmentsCount || 1))}$ par tranche.`}
                 </p>
               </div>
             )}
@@ -391,25 +393,25 @@ export default function CoursePreviewPage() {
                   : "bg-yellow-400 hover:bg-yellow-505 text-zinc-900 shadow-yellow-500/20"
               }`}
             >
-              {isEnrolled ? "✓ ACCÉDER À LA FORMATION" : `REJOINDRE POUR $${course.price}`}
+              {isEnrolled ? (t("student.dashboard.welcome", "ACCÉDER").includes("Ravi") ? "✓ ACCÉDER À LA FORMATION" : "✓ ACCESS COURSE") : (t("student.dashboard.welcome", "REJOINDRE").includes("Ravi") ? `REJOINDRE POUR $${course.price}` : `JOIN FOR $${course.price}`)}
             </button>
 
             {/* Additional details */}
             <div className="space-y-3 text-xs text-zinc-500 dark:text-zinc-400 pt-2">
               <div className="flex justify-between">
-                <span>Catégorie :</span>
+                <span>{t("student.dashboard.welcome", "Catégorie").includes("Ravi") ? "Catégorie :" : "Category:"}</span>
                 <span className="font-semibold text-zinc-700 dark:text-zinc-300">{course.category}</span>
               </div>
               <div className="flex justify-between">
-                <span>Niveau requis :</span>
+                <span>{t("student.dashboard.welcome", "Niveau").includes("Ravi") ? "Niveau requis :" : "Required Level:"}</span>
                 <span className="font-semibold text-zinc-700 dark:text-zinc-300">{course.level || "Tous"}</span>
               </div>
               <div className="flex justify-between">
-                <span>Chapitres :</span>
+                <span>{t("student.dashboard.welcome", "Chapitres").includes("Ravi") ? "Chapitres :" : "Chapters:"}</span>
                 <span className="font-semibold text-zinc-700 dark:text-zinc-300">{sectionsCount}</span>
               </div>
               <div className="flex justify-between">
-                <span>Leçons :</span>
+                <span>{t("student.dashboard.welcome", "Leçons").includes("Ravi") ? "Leçons :" : "Lessons:"}</span>
                 <span className="font-semibold text-zinc-700 dark:text-zinc-300">{lessonsCount}</span>
               </div>
             </div>

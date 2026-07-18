@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { getSimulatedSession } from "@/lib/rbac";
+import { useLanguage } from "@/context/LanguageContext";
 
 type StudentEnrollment = {
   studentId: string;
@@ -66,6 +67,17 @@ function ProgressRing({ percent, size = 44 }: { percent: number; size?: number }
 }
 
 export default function StudentsPage() {
+  const { t } = useLanguage();
+  const getPaymentBadge = (status: string) => {
+    const isEn = !t("instructor.sidebar.students", "Étudiants").includes("Étudiants");
+    const PAYMENT_BADGES_DYN: Record<string, { label: string; cls: string }> = {
+      PAID: { label: isEn ? "Paid" : "Payé", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400" },
+      PENDING: { label: isEn ? "Pending" : "En attente", cls: "bg-amber-100 text-amber-705 dark:bg-amber-950/30 dark:text-amber-400" },
+      FAILED: { label: isEn ? "Failed" : "Échoué", cls: "bg-red-100 text-red-707 dark:bg-red-950/30 dark:text-red-400" },
+      none: { label: isEn ? "Free" : "Gratuit", cls: "bg-zinc-100 text-zinc-505 dark:bg-zinc-800 dark:text-zinc-400" },
+    };
+    return PAYMENT_BADGES_DYN[status] || PAYMENT_BADGES_DYN.none;
+  };
   const router = useRouter();
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -181,8 +193,6 @@ export default function StudentsPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
-
-      {/* Plan Free Limitations Card / Upgrade Invite Banner */}
       {session?.plan === "FREE" && (
         <div className="bg-gradient-to-r from-red-500/10 via-amber-500/10 to-blue-500/10 border-2 border-dashed border-red-500/30 rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6 shadow-md relative overflow-hidden text-left mb-6">
           <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/5 dark:bg-red-500/5 rounded-full blur-[40px] pointer-events-none -mr-16 -mt-16" />
@@ -190,14 +200,15 @@ export default function StudentsPage() {
           
           <div className="space-y-3 z-10 max-w-2xl">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-[10px] font-bold uppercase tracking-wider rounded-lg">
-              ⚠️ Plan d&apos;essai gratuit actif
+              ⚠️ {t("student.payment.applyCoupon", "Plan d'essai").toLowerCase().includes("appliqu") ? "Free trial plan active" : "Plan d'essai gratuit actif"}
             </span>
             <h2 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white leading-snug">
-              Boostez votre Académie en passant au Plan Supérieur !
+              {t("student.payment.applyCoupon", "Boostez").toLowerCase().includes("appliqu") ? "Boost your Academy by upgrading to the Premium Plan!" : "Boostez votre Académie en passant au Plan Supérieur !"}
             </h2>
             <p className="text-xs md:text-sm text-zinc-650 dark:text-zinc-400 leading-relaxed font-medium">
-              Votre plan actuel est limité à <span className="font-bold text-zinc-900 dark:text-white">1 cours actif</span>, <span className="font-bold text-zinc-900 dark:text-white">15 apprenants</span> et comporte des frais de transaction de <span className="font-bold text-zinc-900 dark:text-white">20%</span>. 
-              Passez au Plan supérieur pour débloquer les <span className="font-semibold text-blue-600 dark:text-blue-400">sessions live</span>, réduire vos frais de transaction à <span className="font-semibold text-teal-650 dark:text-teal-400">10% ou moins</span> et accueillir des élèves en illimité.
+              {t("student.payment.applyCoupon", "Votre plan").toLowerCase().includes("appliqu")
+                ? "Your current plan is limited to 1 active course, 15 students, and incurs a 20% transaction fee. Upgrade your Plan to unlock live sessions, reduce your transaction fees to 10% or less, and welcome unlimited students."
+                : "Votre plan actuel est limité à 1 cours actif, 15 apprenants et comporte des frais de transaction de 20%. Passez au Plan supérieur pour débloquer les sessions live, réduire vos frais de transaction à 10% ou moins et accueillir des élèves en illimité."}
             </p>
           </div>
           <div className="shrink-0 z-10 flex flex-col sm:flex-row lg:flex-col gap-3">
@@ -205,14 +216,14 @@ export default function StudentsPage() {
               href="/instructor/billing"
               className="px-6 py-3 bg-red-650 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-md transition-all text-center flex items-center justify-center gap-2 cursor-pointer"
             >
-              Passer à l&apos;offre supérieure
+              {t("student.payment.applyCoupon", "Passer").toLowerCase().includes("appliqu") ? "Upgrade Plan" : "Passer à l'offre supérieure"}
               <TrendingUp className="w-4 h-4" />
             </Link>
             <Link
               href="/instructor/billing"
               className="px-6 py-3 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-850 text-zinc-650 dark:text-zinc-350 font-bold text-xs rounded-xl transition-all text-center cursor-pointer"
             >
-              Voir tous les tarifs & avantages
+              {t("student.payment.applyCoupon", "Voir").toLowerCase().includes("appliqu") ? "View all pricing & benefits" : "Voir tous les tarifs & avantages"}
             </Link>
           </div>
         </div>
@@ -223,11 +234,13 @@ export default function StudentsPage() {
         <div>
           <div className="flex items-center gap-2 text-teal-600 dark:text-teal-400 mb-1">
             <Users className="w-4 h-4" />
-            <span className="text-xs font-bold tracking-[0.2em] uppercase">Gestion</span>
+            <span className="text-xs font-bold tracking-[0.2em] uppercase">{t("student.payment.applyCoupon", "Gestion").toLowerCase().includes("appliqu") ? "Management" : "Gestion"}</span>
           </div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Mes Étudiants</h1>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">{t("instructor.sidebar.students", "Mes Étudiants")}</h1>
           <p className="text-zinc-500 dark:text-zinc-400 mt-1 text-sm">
-            {grouped.length} apprenant{grouped.length !== 1 ? "s" : ""} inscrits sur {[...new Set(enrollments.map(e => e.courseId))].length} cours
+            {t("student.payment.applyCoupon", "inscrits sur").toLowerCase().includes("appliqu")
+              ? `${grouped.length} student${grouped.length !== 1 ? "s" : ""} enrolled in ${[...new Set(enrollments.map(e => e.courseId))].length} course${[...new Set(enrollments.map(e => e.courseId))].length !== 1 ? "s" : ""}`
+              : `${grouped.length} apprenant${grouped.length !== 1 ? "s" : ""} inscrits sur ${[...new Set(enrollments.map(e => e.courseId))].length} cours`}
           </p>
         </div>
       </div>
@@ -236,7 +249,7 @@ export default function StudentsPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           {
-            label: "Total apprenants",
+            label: t("student.payment.applyCoupon", "Total apprenants").toLowerCase().includes("appliqu") ? "Total Students" : "Total apprenants",
             value: grouped.length,
             icon: Users,
             color: "text-teal-600 dark:text-teal-400",
@@ -244,7 +257,7 @@ export default function StudentsPage() {
             border: "border-teal-100 dark:border-teal-900/30",
           },
           {
-            label: "Revenus générés",
+            label: t("student.payment.applyCoupon", "Revenus générés").toLowerCase().includes("appliqu") ? "Revenue Generated" : "Revenus générés",
             value: `${totalRevenue.toLocaleString()} $`,
             icon: DollarSign,
             color: "text-emerald-600 dark:text-emerald-400",
@@ -252,7 +265,7 @@ export default function StudentsPage() {
             border: "border-emerald-100 dark:border-emerald-900/30",
           },
           {
-            label: "Progression moy.",
+            label: t("student.payment.applyCoupon", "Progression moy.").toLowerCase().includes("appliqu") ? "Avg. Progress" : "Progression moy.",
             value: `${avgProgress}%`,
             icon: TrendingUp,
             color: "text-blue-600 dark:text-blue-400",
@@ -260,7 +273,7 @@ export default function StudentsPage() {
             border: "border-blue-100 dark:border-blue-900/30",
           },
           {
-            label: "Certifiés",
+            label: t("student.payment.applyCoupon", "Certifiés").toLowerCase().includes("appliqu") ? "Certified" : "Certifiés",
             value: certifiedCount,
             icon: Award,
             color: "text-purple-600 dark:text-purple-400",
@@ -288,7 +301,11 @@ export default function StudentsPage() {
         <div className="flex items-center gap-3 px-5 py-3.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl">
           <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
           <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
-            <span className="font-bold">{atRiskCount} apprenant{atRiskCount > 1 ? "s" : ""}</span> n&apos;ont pas encore dépassé 20% de progression. Pensez à les relancer.
+            {t("student.payment.applyCoupon", "dépassé").toLowerCase().includes("appliqu") ? (
+              <><span className="font-bold">{atRiskCount} student{atRiskCount > 1 ? "s" : ""}</span> have not yet exceeded 20% progress. Consider following up.</>
+            ) : (
+              <><span className="font-bold">{atRiskCount} apprenant{atRiskCount > 1 ? "s" : ""}</span> n&apos;ont pas encore dépassé 20% de progression. Pensez à les relancer.</>
+            )}
           </p>
         </div>
       )}
@@ -299,7 +316,7 @@ export default function StudentsPage() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
           <input
             type="text"
-            placeholder="Rechercher un apprenant..."
+            placeholder={t("student.payment.applyCoupon", "Rechercher").toLowerCase().includes("appliqu") ? "Search students..." : "Rechercher un apprenant..."}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-11 pr-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40 transition-shadow"
@@ -307,10 +324,10 @@ export default function StudentsPage() {
         </div>
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className={`inline-flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-all ${showFilters ? "bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800 text-teal-700 dark:text-teal-400" : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400"}`}
+          className={`inline-flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-all ${showFilters ? "bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800 text-teal-700 dark:text-teal-400" : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-650 dark:text-zinc-400"}`}
         >
           <Filter className="w-4 h-4" />
-          Filtres
+          {t("student.payment.applyCoupon", "Filtres").toLowerCase().includes("appliqu") ? "Filters" : "Filtres"}
           <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? "rotate-180" : ""}`} />
         </button>
       </div>
@@ -318,7 +335,7 @@ export default function StudentsPage() {
       {showFilters && (
         <div className="flex flex-wrap gap-4 p-4 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 animate-in fade-in duration-200">
           <div>
-            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Statut</label>
+            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">{t("student.payment.applyCoupon", "Statut").toLowerCase().includes("appliqu") ? "Status" : "Statut"}</label>
             <div className="flex flex-wrap gap-2">
               {["all", "ACTIVE", "COMPLETED", "AT_RISK", "INACTIVE"].map(s => (
                 <button
@@ -326,21 +343,21 @@ export default function StudentsPage() {
                   onClick={() => setFilterStatus(s)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filterStatus === s ? "bg-teal-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"}`}
                 >
-                  {s === "all" ? "Tous" : s === "ACTIVE" ? "Actif" : s === "COMPLETED" ? "Complété" : s === "AT_RISK" ? "En difficulté" : "Inactif"}
+                  {s === "all" ? (t("student.payment.applyCoupon", "Tous").toLowerCase().includes("appliqu") ? "All" : "Tous") : s === "ACTIVE" ? (t("student.payment.applyCoupon", "Actif").toLowerCase().includes("appliqu") ? "Active" : "Actif") : s === "COMPLETED" ? (t("student.payment.applyCoupon", "Complété").toLowerCase().includes("appliqu") ? "Completed" : "Complété") : s === "AT_RISK" ? (t("student.payment.applyCoupon", "En difficulté").toLowerCase().includes("appliqu") ? "At Risk" : "En difficulté") : (t("student.payment.applyCoupon", "Inactif").toLowerCase().includes("appliqu") ? "Inactive" : "Inactif")}
                 </button>
               ))}
             </div>
           </div>
           <div>
-            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Paiement</label>
+            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">{t("student.payment.applyCoupon", "Paiement").toLowerCase().includes("appliqu") ? "Payment" : "Paiement"}</label>
             <div className="flex flex-wrap gap-2">
               {["all", "PAID", "PENDING", "FAILED"].map(p => (
                 <button
                   key={p}
                   onClick={() => setFilterPayment(p)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filterPayment === p ? "bg-teal-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filterPayment === p ? "bg-teal-600 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-650 dark:text-zinc-450 hover:bg-zinc-200 dark:hover:bg-zinc-700"}`}
                 >
-                  {p === "all" ? "Tous" : p === "PAID" ? "Payé" : p === "PENDING" ? "En attente" : "Échoué"}
+                  {p === "all" ? (t("student.payment.applyCoupon", "Tous").toLowerCase().includes("appliqu") ? "All" : "Tous") : p === "PAID" ? (t("student.payment.applyCoupon", "Payé").toLowerCase().includes("appliqu") ? "Paid" : "Payé") : p === "PENDING" ? (t("student.payment.applyCoupon", "En attente").toLowerCase().includes("appliqu") ? "Pending" : "En attente") : (t("student.payment.applyCoupon", "Échoué").toLowerCase().includes("appliqu") ? "Failed" : "Échoué")}
                 </button>
               ))}
             </div>
@@ -352,25 +369,25 @@ export default function StudentsPage() {
       {filtered.length === 0 ? (
         <div className="text-center py-20 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
           <Users className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
-          <p className="text-zinc-500 dark:text-zinc-400 font-medium">Aucun étudiant trouvé</p>
-          <p className="text-zinc-400 dark:text-zinc-600 text-sm mt-1">Publiez vos cours pour attirer vos premiers apprenants.</p>
+          <p className="text-zinc-500 dark:text-zinc-400 font-medium">{t("student.payment.applyCoupon", "Aucun étudiant").toLowerCase().includes("appliqu") ? "No students found" : "Aucun étudiant trouvé"}</p>
+          <p className="text-zinc-400 dark:text-zinc-650 text-sm mt-1">{t("student.payment.applyCoupon", "Publiez").toLowerCase().includes("appliqu") ? "Publish your courses to attract your first learners." : "Publiez vos cours pour attirer vos premiers apprenants."}</p>
         </div>
       ) : (
         <div className="space-y-3">
           {/* Table Header */}
           <div className="hidden lg:grid grid-cols-12 gap-4 px-6 py-2 text-xs font-bold text-zinc-400 uppercase tracking-wider">
-            <div className="col-span-3">Apprenant</div>
-            <div className="col-span-3">Cours inscrits</div>
-            <div className="col-span-2 text-center">Progression</div>
-            <div className="col-span-2 text-center">Paiement</div>
-            <div className="col-span-1 text-center">Certif.</div>
-            <div className="col-span-1 text-right">Action</div>
+            <div className="col-span-3">{t("student.payment.applyCoupon", "Apprenant").toLowerCase().includes("appliqu") ? "Student" : "Apprenant"}</div>
+            <div className="col-span-3">{t("student.payment.applyCoupon", "Cours inscrits").toLowerCase().includes("appliqu") ? "Enrolled Courses" : "Cours inscrits"}</div>
+            <div className="col-span-2 text-center">{t("student.dashboard.progress", "Progression")}</div>
+            <div className="col-span-2 text-center">{t("student.payment.applyCoupon", "Paiement").toLowerCase().includes("appliqu") ? "Payment" : "Paiement"}</div>
+            <div className="col-span-1 text-center">{t("student.payment.applyCoupon", "Certif.").toLowerCase().includes("appliqu") ? "Cert." : "Certif."}</div>
+            <div className="col-span-1 text-right">{t("student.payment.applyCoupon", "Action").toLowerCase().includes("appliqu") ? "Action" : "Action"}</div>
           </div>
 
           {filtered.map(student => {
             const initials = student.studentName.split(" ").map(n => n[0] || "").join("").slice(0, 2).toUpperCase();
             const primaryEnrollment = student.enrollments[0];
-            const payBadge = PAYMENT_BADGE[primaryEnrollment?.paymentStatus || "none"];
+            const payBadge = getPaymentBadge(primaryEnrollment?.paymentStatus || "none");
             const isAtRisk = student.avgProgress < 20;
 
             return (

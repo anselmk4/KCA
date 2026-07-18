@@ -18,6 +18,7 @@ import {
 import Link from "next/link";
 import { getSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
 
 type StatusFilter = "ALL" | "DRAFT" | "REVIEW" | "PUBLISHED" | "ARCHIVED";
 
@@ -43,6 +44,15 @@ function stripHtml(html: string | null | undefined): string {
 }
 
 export default function InstructorCoursesPage() {
+  const { t } = useLanguage();
+  const getStatusLabel = (status: string) => {
+    const isEn = !t("instructor.sidebar.courses", "Mes Cours").includes("Cours");
+    if (status === "PUBLISHED") return isEn ? "Published" : "Publié";
+    if (status === "DRAFT") return isEn ? "Draft" : "Brouillon";
+    if (status === "REVIEW") return isEn ? "In Review" : "En révision";
+    if (status === "ARCHIVED") return isEn ? "Archived" : "Archivé";
+    return status;
+  };
   const [session, setSession] = useState<any>(null);
   const [myCourses, setMyCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -287,11 +297,12 @@ export default function InstructorCoursesPage() {
               ⚠️ Plan d&apos;essai gratuit actif
             </span>
             <h2 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white leading-snug">
-              Boostez votre Académie en passant au Plan Supérieur !
+              {t("student.payment.applyCoupon", "Boostez").toLowerCase().includes("appliqu") ? "Boost your Academy by upgrading to the Premium Plan!" : "Boostez votre Académie en passant au Plan Supérieur !"}
             </h2>
             <p className="text-xs md:text-sm text-zinc-650 dark:text-zinc-400 leading-relaxed font-medium">
-              Votre plan actuel est limité à <span className="font-bold text-zinc-900 dark:text-white">1 cours actif</span>, <span className="font-bold text-zinc-900 dark:text-white">15 apprenants</span> et comporte des frais de transaction de <span className="font-bold text-zinc-900 dark:text-white">20%</span>. 
-              Passez au Plan supérieur pour débloquer les <span className="font-semibold text-blue-600 dark:text-blue-400">sessions live</span>, réduire vos frais de transaction à <span className="font-semibold text-teal-600 dark:text-teal-400">10% ou moins</span> et accueillir des élèves en illimité.
+              {t("student.payment.applyCoupon", "Votre plan").toLowerCase().includes("appliqu")
+                ? "Your current plan is limited to 1 active course, 15 students, and incurs a 20% transaction fee. Upgrade your Plan to unlock live sessions, reduce your transaction fees to 10% or less, and welcome unlimited students."
+                : "Votre plan actuel est limité à 1 cours actif, 15 apprenants et comporte des frais de transaction de 20%. Passez au Plan supérieur pour débloquer les sessions live, réduire vos frais de transaction à 10% ou moins et accueillir des élèves en illimité."}
             </p>
           </div>
           <div className="shrink-0 z-10 flex flex-col sm:flex-row lg:flex-col gap-3">
@@ -299,14 +310,14 @@ export default function InstructorCoursesPage() {
               href="/instructor/billing"
               className="px-6 py-3 bg-red-650 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-md transition-all text-center flex items-center justify-center gap-2 cursor-pointer"
             >
-              Passer à l&apos;offre supérieure
+              {t("student.payment.applyCoupon", "Passer").toLowerCase().includes("appliqu") ? "Upgrade Plan" : "Passer à l'offre supérieure"}
               <TrendingUp className="w-4 h-4" />
             </Link>
             <Link
               href="/instructor/billing"
               className="px-6 py-3 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-850 text-zinc-650 dark:text-zinc-350 font-bold text-xs rounded-xl transition-all text-center cursor-pointer"
             >
-              Voir tous les tarifs & avantages
+              {t("student.payment.applyCoupon", "Voir").toLowerCase().includes("appliqu") ? "View all pricing & benefits" : "Voir tous les tarifs & avantages"}
             </Link>
           </div>
         </div>
@@ -314,16 +325,18 @@ export default function InstructorCoursesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="text-left">
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Mes Cours</h1>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">{t("instructor.sidebar.courses", "Mes Cours")}</h1>
           <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">
-            {myCourses.length} cours · {myCourses.filter((c) => c.status === "PUBLISHED").length} publiés
+            {t("student.payment.applyCoupon", "publiés").toLowerCase().includes("appliqu")
+              ? `${myCourses.length} courses · ${myCourses.filter((c) => c.status === "PUBLISHED").length} published`
+              : `${myCourses.length} cours · ${myCourses.filter((c) => c.status === "PUBLISHED").length} publiés`}
           </p>
         </div>
         <button
           onClick={handleNewCourseClick}
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-medium text-sm transition-colors shadow-sm cursor-pointer"
         >
-          <Plus className="w-4 h-4" /> Nouveau Cours
+          <Plus className="w-4 h-4" /> {t("student.payment.applyCoupon", "Nouveau Cours").toLowerCase().includes("appliqu") ? "New Course" : "Nouveau Cours"}
         </button>
       </div>
 
@@ -333,7 +346,7 @@ export default function InstructorCoursesPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
           <input
             type="text"
-            placeholder="Rechercher un cours..."
+            placeholder={t("student.payment.applyCoupon", "Rechercher").toLowerCase().includes("appliqu") ? "Search courses..." : "Rechercher un cours..."}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
@@ -350,7 +363,7 @@ export default function InstructorCoursesPage() {
                   : "bg-white dark:bg-zinc-900 text-zinc-500 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800"
               }`}
             >
-              {s === "ALL" ? "Tous" : statusLabels[s]}
+              {s === "ALL" ? (t("student.payment.applyCoupon", "Tous").toLowerCase().includes("appliqu") ? "All" : "Tous") : getStatusLabel(s)}
             </button>
           ))}
         </div>
@@ -361,19 +374,19 @@ export default function InstructorCoursesPage() {
         <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-12 text-center">
           <BookOpen className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
-            Aucun cours trouvé
+            {t("student.payment.applyCoupon", "Aucun cours").toLowerCase().includes("appliqu") ? "No courses found" : "Aucun cours trouvé"}
           </h3>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
             {search || statusFilter !== "ALL"
-              ? "Essayez de modifier vos filtres."
-              : "Créez votre premier cours pour commencer."}
+              ? (t("student.payment.applyCoupon", "Essayez").toLowerCase().includes("appliqu") ? "Try changing your filters." : "Essayez de modifier vos filtres.")
+              : (t("student.payment.applyCoupon", "Créez").toLowerCase().includes("appliqu") ? "Create your first course to get started." : "Créez votre premier cours pour commencer.")}
           </p>
           {!search && statusFilter === "ALL" && (
             <button
               onClick={handleNewCourseClick}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-medium text-sm transition-colors cursor-pointer"
             >
-              <Plus className="w-4 h-4" /> Créer un cours
+              <Plus className="w-4 h-4" /> {t("student.payment.applyCoupon", "Créer un cours").toLowerCase().includes("appliqu") ? "Create a Course" : "Créer un cours"}
             </button>
           )}
         </div>
@@ -381,8 +394,8 @@ export default function InstructorCoursesPage() {
         <div className="space-y-3">
           {/* Table Header */}
           <div className="hidden lg:grid grid-cols-12 gap-4 px-6 py-2 text-xs font-bold text-zinc-400 uppercase tracking-wider">
-            <div className="col-span-4">Cours</div>
-            <div className="col-span-2 text-center">Syllabus</div>
+            <div className="col-span-4">{t("student.payment.applyCoupon", "Cours").toLowerCase().includes("appliqu") ? "Course" : "Cours"}</div>
+            <div className="col-span-2 text-center">{t("student.payment.applyCoupon", "Syllabus").toLowerCase().includes("appliqu") ? "Syllabus" : "Syllabus"}</div>
             <div className="col-span-1 text-center">Étudiants</div>
             <div className="col-span-1 text-center">Revenu</div>
             <div className="col-span-1 text-center">Statut</div>
@@ -427,33 +440,35 @@ export default function InstructorCoursesPage() {
 
                   {/* Syllabus */}
                   <div className="col-span-2 text-center">
-                    <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">{sectionCount} sect. · {lessonCount} leçons</p>
-                    <p className="text-[10px] text-zinc-400 mt-0.5">Programme</p>
+                    <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                      {t("student.payment.applyCoupon", "sect.").toLowerCase().includes("appliqu") ? `${sectionCount} sect. · ${lessonCount} lessons` : `${sectionCount} sect. · ${lessonCount} leçons`}
+                    </p>
+                    <p className="text-[10px] text-zinc-400 mt-0.5">{t("student.payment.applyCoupon", "Programme").toLowerCase().includes("appliqu") ? "Curriculum" : "Programme"}</p>
                   </div>
 
                   {/* Students */}
                   <div className="col-span-1 flex flex-col items-center gap-0.5">
                     <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{enrollCount}</span>
-                    <span className="text-[10px] text-zinc-400 flex items-center gap-0.5"><Users className="w-3 h-3" /> inscrits</span>
+                    <span className="text-[10px] text-zinc-400 flex items-center gap-0.5"><Users className="w-3 h-3" /> {t("student.payment.applyCoupon", "inscrits").toLowerCase().includes("appliqu") ? "enrolled" : "inscrits"}</span>
                   </div>
 
                   {/* Revenue */}
                   <div className="col-span-1 flex flex-col items-center gap-0.5">
                     <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{revenue.toLocaleString()}$</span>
-                    <span className="text-[10px] text-zinc-400 flex items-center gap-0.5"><DollarSign className="w-3 h-3" /> revenu</span>
+                    <span className="text-[10px] text-zinc-400 flex items-center gap-0.5"><DollarSign className="w-3 h-3" /> {t("student.payment.applyCoupon", "revenu").toLowerCase().includes("appliqu") ? "revenue" : "revenu"}</span>
                   </div>
 
                   {/* Status */}
                   <div className="col-span-1 flex justify-center">
                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${statusColors[course.status]}`}>
-                      {statusLabels[course.status]}
+                      {getStatusLabel(course.status)}
                     </span>
                   </div>
 
                   {/* Price */}
                   <div className="col-span-1 flex justify-center">
                     <span className="text-sm font-bold text-zinc-900 dark:text-white">
-                      {course.price > 0 ? `${course.price.toLocaleString()}$` : "Gratuit"}
+                      {course.price > 0 ? `${course.price.toLocaleString()}$` : t("student.discover.free", "Gratuit")}
                     </span>
                   </div>
 
@@ -464,19 +479,19 @@ export default function InstructorCoursesPage() {
                       className="inline-flex items-center gap-1 px-3 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold rounded-xl transition-all shadow-sm"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
-                      Gérer
+                      {t("student.payment.applyCoupon", "Gérer").toLowerCase().includes("appliqu") ? "Manage" : "Gérer"}
                     </Link>
                     <Link
                       href={`/courses/${course.id}/preview`}
                       className="p-2 bg-zinc-50 dark:bg-zinc-800 text-zinc-500 rounded-lg text-xs hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
-                      title="Aperçu public"
+                      title={t("student.payment.applyCoupon", "Aperçu public").toLowerCase().includes("appliqu") ? "Public Preview" : "Aperçu public"}
                     >
                       <Eye className="w-3.5 h-3.5" />
                     </Link>
                     <button
                       onClick={() => handleDelete(course.id)}
                       className="p-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 rounded-lg text-xs hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
-                      title="Supprimer le cours"
+                      title={t("student.payment.applyCoupon", "Supprimer le cours").toLowerCase().includes("appliqu") ? "Delete Course" : "Supprimer le cours"}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -493,29 +508,29 @@ export default function InstructorCoursesPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl w-full max-w-lg">
             <div className="p-6 border-b border-zinc-200 dark:border-zinc-800">
-              <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Nouveau Cours</h2>
-              <p className="text-sm text-zinc-500 mt-1">Remplissez les informations de base.</p>
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-white">{t("student.payment.applyCoupon", "Nouveau Cours").toLowerCase().includes("appliqu") ? "New Course" : "Nouveau Cours"}</h2>
+              <p className="text-sm text-zinc-500 mt-1">{t("student.payment.applyCoupon", "Remplissez").toLowerCase().includes("appliqu") ? "Fill in the basic information." : "Remplissez les informations de base."}</p>
             </div>
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
-                  Titre du cours *
+                  {t("student.payment.applyCoupon", "Titre du cours").toLowerCase().includes("appliqu") ? "Course Title *" : "Titre du cours *"}
                 </label>
                 <input
                   type="text"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="Ex: Introduction au DeFi"
+                  placeholder={t("student.payment.applyCoupon", "Ex").toLowerCase().includes("appliqu") ? "e.g. Introduction to DeFi" : "Ex: Introduction au DeFi"}
                   className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Prix ($)</label>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">{t("student.payment.applyCoupon", "Prix").toLowerCase().includes("appliqu") ? "Price ($)" : "Prix ($)"}</label>
                 <input
                   type="number"
                   value={newPrice}
                   onChange={(e) => setNewPrice(e.target.value)}
-                  placeholder="0 = Gratuit"
+                  placeholder={t("student.payment.applyCoupon", "0 = Gratuit").toLowerCase().includes("appliqu") ? "0 = Free" : "0 = Gratuit"}
                   min="0"
                   className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
                 />
@@ -524,16 +539,16 @@ export default function InstructorCoursesPage() {
             <div className="p-6 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-end gap-3">
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
+                className="px-4 py-2.5 text-sm font-medium text-zinc-650 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
               >
-                Annuler
+                {t("student.payment.applyCoupon", "Annuler").toLowerCase().includes("appliqu") ? "Cancel" : "Annuler"}
               </button>
               <button
                 onClick={handleCreate}
                 disabled={!newTitle.trim() || creating}
                 className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors cursor-pointer"
               >
-                {creating ? "Création..." : "Créer le cours"}
+                {creating ? (t("student.payment.applyCoupon", "Création").toLowerCase().includes("appliqu") ? "Creating..." : "Création...") : (t("student.payment.applyCoupon", "Créer le cours").toLowerCase().includes("appliqu") ? "Create Course" : "Créer le cours")}
               </button>
             </div>
           </div>
@@ -547,20 +562,20 @@ export default function InstructorCoursesPage() {
             <div className="w-16 h-16 bg-amber-50 dark:bg-amber-950/30 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-200 dark:border-amber-900/50">
               <AlertTriangle className="w-8 h-8" />
             </div>
-            <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-2">Limite du forfait atteinte</h3>
+            <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-2">{t("student.payment.applyCoupon", "Limite").toLowerCase().includes("appliqu") ? "Plan limit reached" : "Limite du forfait atteinte"}</h3>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6 leading-relaxed">{limitMessage}</p>
             <div className="flex flex-col gap-2.5">
               <Link
                 href="/instructor/billing"
                 className="w-full py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-white font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 hover:brightness-105"
               >
-                <Sparkles className="w-4 h-4" /> Voir les abonnements <ArrowRight className="w-4 h-4" />
+                <Sparkles className="w-4 h-4" /> {t("student.payment.applyCoupon", "Voir les abonnements").toLowerCase().includes("appliqu") ? "View Subscriptions" : "Voir les abonnements"} <ArrowRight className="w-4 h-4" />
               </Link>
               <button
                 onClick={() => setShowLimitModal(false)}
                 className="w-full py-2.5 text-zinc-500 hover:text-zinc-800 dark:hover:text-white text-sm font-semibold transition-colors cursor-pointer"
               >
-                Fermer
+                {t("student.payment.applyCoupon", "Fermer").toLowerCase().includes("appliqu") ? "Close" : "Fermer"}
               </button>
             </div>
           </div>

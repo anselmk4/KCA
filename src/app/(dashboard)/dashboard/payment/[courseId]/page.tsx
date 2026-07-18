@@ -6,6 +6,7 @@ import Link from "next/link";
 import Script from "next/script";
 import { ChevronLeft, CreditCard, Smartphone, ShieldCheck, QrCode, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
 import { getPawaPayConfigForCountry } from "@/lib/pawapay";
 
 declare global {
@@ -34,6 +35,7 @@ interface Course {
 type PaymentMethod = "momo" | "paypal" | "crypto" | "card";
 
 export default function PaymentPage() {
+  const { t } = useLanguage();
   const params = useParams();
   const router = useRouter();
   const courseId = params.courseId as string;
@@ -774,7 +776,7 @@ export default function PaymentPage() {
       {/* Back link */}
       <Link href={`/dashboard/discover/${course.id}`} className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-zinc-950 dark:hover:text-white text-sm font-semibold transition-colors">
         <ChevronLeft className="w-4 h-4" />
-        Retour à l'aperçu
+        {t("student.payment.applyCoupon", "Retour").toLowerCase().includes("appliqu") ? "Back to preview" : "Retour à l'aperçu"}
       </Link>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -785,8 +787,8 @@ export default function PaymentPage() {
           {/* Main card */}
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-md overflow-hidden">
             <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/10">
-              <h2 className="font-extrabold text-lg text-zinc-900 dark:text-white">Sélectionner un moyen de paiement</h2>
-              <p className="text-xs text-zinc-500 mt-1">Transaction 100% sécurisée et cryptée</p>
+              <h2 className="font-extrabold text-lg text-zinc-900 dark:text-white">{t("student.payment.paymentMethod", "Sélectionner un moyen de paiement")}</h2>
+              <p className="text-xs text-zinc-500 mt-1">{t("student.payment.applyCoupon", "Transaction").toLowerCase().includes("appliqu") ? "100% secure and encrypted transaction" : "Transaction 100% sécurisée et cryptée"}</p>
             </div>
 
             {/* Selection tabs */}
@@ -836,7 +838,7 @@ export default function PaymentPage() {
               {method === "momo" && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Pays de paiement</label>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">{t("student.payment.applyCoupon", "Pays").toLowerCase().includes("appliqu") ? "Payment Country" : "Pays de paiement"}</label>
                     <select
                       value={userCountry}
                       onChange={(e) => setUserCountry(e.target.value)}
@@ -852,9 +854,9 @@ export default function PaymentPage() {
                   </div>
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Opérateur Mobile</label>
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">{t("student.payment.carrier", "Opérateur Mobile")}</label>
                       <span className="text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-650 px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-750">
-                        Devise : {countryConfig.currency}
+                        Currency : {countryConfig.currency}
                       </span>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -875,7 +877,7 @@ export default function PaymentPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Numéro de téléphone</label>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">{t("student.payment.phoneNumber", "Numéro de téléphone")}</label>
                     <div className="flex gap-2">
                       <span className="bg-zinc-100 dark:bg-zinc-800 px-3.5 py-3 rounded-xl text-sm text-zinc-500 font-semibold border border-zinc-200 dark:border-zinc-800 flex items-center justify-center">
                         +{countryConfig.phonePrefix}
@@ -889,7 +891,7 @@ export default function PaymentPage() {
                         className="flex-1 px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800 text-sm text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/40"
                       />
                     </div>
-                    <p className="text-xxs text-zinc-400 mt-1">Vous recevrez une demande de confirmation de code PIN sur votre téléphone.</p>
+                    <p className="text-xxs text-zinc-400 mt-1">{t("student.payment.applyCoupon", "PIN").toLowerCase().includes("appliqu") ? "You will receive a PIN code validation prompt on your phone." : "Vous recevrez une demande de confirmation de code PIN sur votre téléphone."}</p>
                   </div>
                 </div>
               )}
@@ -898,8 +900,8 @@ export default function PaymentPage() {
               {method === "paypal" && (
                 <div className="space-y-4">
                   <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-200 dark:border-zinc-800 text-center space-y-2">
-                    <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Payer en toute sécurité avec PayPal</p>
-                    <p className="text-xxs text-zinc-400">Cliquez sur le bouton ci-dessous pour ouvrir la fenêtre de paiement PayPal.</p>
+                    <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">{t("student.payment.applyCoupon", "PayPal").toLowerCase().includes("appliqu") ? "Pay securely with PayPal" : "Payer en toute sécurité avec PayPal"}</p>
+                    <p className="text-xxs text-zinc-400">{t("student.payment.applyCoupon", "PayPal").toLowerCase().includes("appliqu") ? "Click the button below to open the PayPal payment window." : "Cliquez sur le bouton ci-dessous pour ouvrir la fenêtre de paiement PayPal."}</p>
                   </div>
                   
                   {paypalError && (
@@ -930,7 +932,7 @@ export default function PaymentPage() {
               {method === "crypto" && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Moyen de paiement crypto</label>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{t("student.payment.applyCoupon", "Moyen").toLowerCase().includes("appliqu") ? "Crypto Payment Method" : "Moyen de paiement crypto"}</label>
                     <div className="flex gap-4">
                       <button
                         type="button"
@@ -954,10 +956,10 @@ export default function PaymentPage() {
                     <div className="text-center space-y-1.5">
                       <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Solana Pay</p>
                       <p className="text-sm font-black text-zinc-800 dark:text-zinc-150">
-                        Montant : <span className="text-emerald-600 dark:text-emerald-450 font-black">${discountedAmount} USDC</span>
+                        {t("student.payment.applyCoupon", "Montant").toLowerCase().includes("appliqu") ? "Amount" : "Montant"} : <span className="text-emerald-600 dark:text-emerald-450 font-black">${discountedAmount} USDC</span>
                       </p>
                       <p className="text-[10px] text-zinc-555 dark:text-zinc-400 max-w-[260px] leading-relaxed font-semibold">
-                        Scannez ce QR Code avec Phantom, Solflare ou tout portefeuille Solana Pay pour finaliser votre règlement.
+                        {t("student.payment.applyCoupon", "Scannez").toLowerCase().includes("appliqu") ? "Scan this QR Code with Phantom, Solflare or any Solana Pay wallet to finalize your payment." : "Scannez ce QR Code avec Phantom, Solflare ou tout portefeuille Solana Pay pour finaliser votre règlement."}
                       </p>
                     </div>
                     
@@ -971,7 +973,7 @@ export default function PaymentPage() {
               {/* Billing Options Selector (Installments vs Full) */}
               {course.allowInstallments && (
                 <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-3">
-                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">Option de facturation</label>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">{t("student.payment.applyCoupon", "Option").toLowerCase().includes("appliqu") ? "Billing Option" : "Option de facturation"}</label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
@@ -982,7 +984,7 @@ export default function PaymentPage() {
                           : "border-zinc-250 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 hover:border-zinc-400"
                       }`}
                     >
-                      <span>Paiement unique</span>
+                      <span>{t("student.payment.applyCoupon", "Paiement unique").toLowerCase().includes("appliqu") ? "One-time payment" : "Paiement unique"}</span>
                       <span className="text-xxs opacity-80">${course.price} USD</span>
                     </button>
                     <button
@@ -994,8 +996,8 @@ export default function PaymentPage() {
                           : "border-zinc-250 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 hover:border-zinc-400"
                       }`}
                     >
-                      <span>En {course.installmentsCount} mensualités</span>
-                      <span className="text-xxs opacity-80">${finalAmount} USD / mois</span>
+                      <span>{t("student.payment.installment", `En ${course.installmentsCount} fois`)}</span>
+                      <span className="text-xxs opacity-80">${finalAmount} USD / {t("student.payment.applyCoupon", "mois").toLowerCase().includes("appliqu") ? "month" : "mois"}</span>
                     </button>
                   </div>
                 </div>
@@ -1011,12 +1013,12 @@ export default function PaymentPage() {
                   {submitting ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>Validation de la transaction...</span>
+                      <span>{t("student.payment.submitting", "Traitement en cours...")}</span>
                     </>
                   ) : (
                     <>
                       <ShieldCheck className="w-5 h-5" />
-                      <span>Valider le paiement de ${discountedAmount}</span>
+                      <span>{t("student.payment.payNow", "Valider le paiement")} (${discountedAmount})</span>
                     </>
                   )}
                 </button>
@@ -1029,7 +1031,7 @@ export default function PaymentPage() {
         {/* Recapitulation (Right) */}
         <div className="space-y-6">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-md p-6 space-y-4">
-            <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white uppercase tracking-wider">Récapitulatif de commande</h3>
+            <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white uppercase tracking-wider">{t("student.payment.applyCoupon", "Récapitulatif").toLowerCase().includes("appliqu") ? "Order Summary" : "Récapitulatif de commande"}</h3>
             
             <div className="flex gap-4">
               <div className="w-16 h-16 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0 border border-zinc-200 dark:border-zinc-800">
@@ -1043,12 +1045,12 @@ export default function PaymentPage() {
 
             <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-zinc-500">Sous-total :</span>
+                <span className="text-zinc-500">{t("student.payment.applyCoupon", "Sous-total").toLowerCase().includes("appliqu") ? "Subtotal" : "Sous-total"} :</span>
                 <span className="font-semibold text-zinc-900 dark:text-white">${course.price}</span>
               </div>
               {appliedCoupon && (
                 <div className="flex justify-between text-emerald-500 font-semibold text-xs">
-                  <span>Réduction ({appliedCoupon.code}) :</span>
+                  <span>{t("student.payment.discount", "Réduction")} ({appliedCoupon.code}) :</span>
                   <span>
                     -{appliedCoupon.discount_type === "PERCENTAGE" 
                       ? `${appliedCoupon.discount_value}% (-$${Math.round(finalAmount * (appliedCoupon.discount_value / 100))})` 
@@ -1057,17 +1059,17 @@ export default function PaymentPage() {
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-zinc-500">Frais d'inscription :</span>
-                <span className="font-semibold text-green-500">Gratuit</span>
+                <span className="text-zinc-500">{t("student.payment.applyCoupon", "Frais").toLowerCase().includes("appliqu") ? "Enrollment fee" : "Frais d'inscription"} :</span>
+                <span className="font-semibold text-green-500">{t("student.discover.freeCourse", "Gratuit")}</span>
               </div>
               {payInstallment && course.allowInstallments && (
                 <div className="flex justify-between text-xs text-zinc-500">
-                  <span>Tranches restantes :</span>
+                  <span>{t("student.payment.applyCoupon", "Tranches").toLowerCase().includes("appliqu") ? "Remaining installments" : "Tranches restantes"} :</span>
                   <span>{(course.installmentsCount || 1) - 1} x ${discountedAmount}</span>
                 </div>
               )}
               <div className="flex justify-between border-t border-zinc-100 dark:border-zinc-800 pt-2 text-base font-bold">
-                <span className="text-zinc-950 dark:text-white">Aujourd'hui :</span>
+                <span className="text-zinc-950 dark:text-white">{t("student.payment.applyCoupon", "Aujourd'hui").toLowerCase().includes("appliqu") ? "Today" : "Aujourd'hui"} :</span>
                 <span className="text-blue-600 dark:text-blue-400">${discountedAmount}</span>
               </div>
             </div>
@@ -1075,7 +1077,7 @@ export default function PaymentPage() {
             {/* Code Promo Input */}
             <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2">
               <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
-                Code de réduction / Coupon
+                {t("student.payment.couponCode", "Code promo")}
               </label>
               <div className="relative flex items-center">
                 <input
@@ -1096,7 +1098,7 @@ export default function PaymentPage() {
                       }}
                       className="px-2.5 py-1 text-[10px] font-bold bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-900/40 text-red-650 dark:text-red-400 rounded-lg transition-colors cursor-pointer"
                     >
-                      Retirer
+                      {t("student.payment.applyCoupon", "Retirer").toLowerCase().includes("appliqu") ? "Remove" : "Retirer"}
                     </button>
                   ) : (
                     <button
@@ -1105,7 +1107,7 @@ export default function PaymentPage() {
                       onClick={handleApplyCoupon}
                       className="px-2.5 py-1 text-[10px] font-bold bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
-                      {applyingCoupon ? "..." : "Appliquer"}
+                      {applyingCoupon ? "..." : t("student.payment.applyCoupon", "Appliquer")}
                     </button>
                   )}
                 </div>
@@ -1115,13 +1117,13 @@ export default function PaymentPage() {
               )}
               {appliedCoupon && (
                 <p className="text-[10px] text-emerald-500 font-semibold mt-1">
-                  ✓ Code <strong>{appliedCoupon.code}</strong> appliqué !
+                  ✓ Code <strong>{appliedCoupon.code}</strong> {t("student.payment.applyCoupon", "appliqué").toLowerCase().includes("appliqu") ? "appliqué" : "applied"} !
                 </p>
               )}
             </div>
 
             <div className="text-xxs text-zinc-400 text-center pt-2">
-              En validant, vous acceptez les conditions générales d'utilisation d'ANSELLA et autorisez la facturation immédiate.
+              {t("student.payment.applyCoupon", "En validant").toLowerCase().includes("appliqu") ? "By confirming, you agree to ANSELLA's terms of service and authorize immediate billing." : "En validant, vous acceptez les conditions générales d'utilisation d'ANSELLA et autorisez la facturation immédiate."}
             </div>
           </div>
         </div>

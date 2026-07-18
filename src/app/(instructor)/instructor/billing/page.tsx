@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { getSimulatedSession, setSimulatedSession, CurrentSession } from "@/lib/rbac";
 import { Check, CheckCircle2, ShieldAlert, Loader2, Download, Receipt, CreditCard } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function BillingPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [session, setSession] = useState<CurrentSession | null>(null);
   const [coursesCount, setCoursesCount] = useState(0);
@@ -446,7 +448,7 @@ export default function BillingPage() {
                   : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20"
               }`}
             >
-              {currentPlan === "FREE" ? "Passer au Plan Pro" : "Retourner au Plan Pro"}
+              {currentPlan === "FREE" || currentPlan === "BASE" ? (t("student.payment.applyCoupon", "Passer au").toLowerCase().includes("appliqu") ? "Upgrade to Pro Plan" : "Passer au Plan Pro") : (t("student.payment.applyCoupon", "Retourner au").toLowerCase().includes("appliqu") ? "Return to Pro Plan" : "Retourner au Plan Pro")}
             </button>
           </div>
 
@@ -456,25 +458,25 @@ export default function BillingPage() {
           }`}>
             {currentPlan === "MAX" && (
               <span className="absolute -top-3 right-4 bg-teal-500 text-white text-[10px] font-bold uppercase tracking-wide px-2.5 py-0.5 rounded-full">
-                Actif
+                {t("student.payment.applyCoupon", "Actif").toLowerCase().includes("appliqu") ? "Active" : "Actif"}
               </span>
             )}
             <div>
               <h3 className="font-bold text-lg text-zinc-900 dark:text-white">Plan Max</h3>
-              <p className="text-xs text-zinc-400 mt-1 min-h-[48px]">Pour les écoles d&apos;envergure exigeant une puissance illimitée.</p>
+              <p className="text-xs text-zinc-400 mt-1 min-h-[48px]">{t("student.payment.applyCoupon", "Pour les écoles").toLowerCase().includes("appliqu") ? "For large schools demanding unlimited power." : "Pour les écoles d'envergure exigeant une puissance illimitée."}</p>
               <div className="my-6">
                 <span className="text-3xl font-extrabold text-zinc-900 dark:text-white">200$</span>
-                <span className="text-zinc-400 text-sm ml-1">/ mois</span>
+                <span className="text-zinc-400 text-sm ml-1">/ {t("student.payment.applyCoupon", "mois").toLowerCase().includes("appliqu") ? "month" : "mois"}</span>
               </div>
               <ul className="space-y-3 mb-6 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                 <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
-                  <Check className="w-4 h-4 text-teal-600" /> Cours et élèves illimités
+                  <Check className="w-4 h-4 text-teal-600" /> {t("student.payment.applyCoupon", "Cours et élèves").toLowerCase().includes("appliqu") ? "Unlimited courses and students" : "Cours et élèves illimités"}
                 </li>
                 <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
-                  <Check className="w-4 h-4 text-teal-600" /> 0% de frais de transaction
+                  <Check className="w-4 h-4 text-teal-600" /> {t("student.payment.applyCoupon", "0% de frais").toLowerCase().includes("appliqu") ? "0% transaction fees" : "0% de frais de transaction"}
                 </li>
                 <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
-                  <Check className="w-4 h-4 text-teal-600" /> Nom de domaine personnalisé
+                  <Check className="w-4 h-4 text-teal-600" /> {t("student.payment.applyCoupon", "Nom de domaine").toLowerCase().includes("appliqu") ? "Custom domain name" : "Nom de domaine personnalisé"}
                 </li>
                 <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
                   <Check className="w-4 h-4 text-teal-600" /> Support VIP WhatsApp 24/7
@@ -490,7 +492,7 @@ export default function BillingPage() {
                   : "bg-zinc-850 hover:bg-zinc-800 text-white"
               }`}
             >
-              Mettre à niveau (Plan Max)
+              {t("student.payment.applyCoupon", "Mettre à niveau").toLowerCase().includes("appliqu") ? "Upgrade to Max Plan" : "Mettre à niveau (Plan Max)"}
             </button>
           </div>
         </div>
@@ -504,8 +506,8 @@ export default function BillingPage() {
               <Receipt className="w-5 h-5 text-teal-600" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Mes Paiements</h2>
-              <p className="text-xs text-zinc-400">Historique de vos abonnements et achats sur la plateforme</p>
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-white">{t("student.payment.applyCoupon", "Mes Paiements").toLowerCase().includes("appliqu") ? "My Payments" : "Mes Paiements"}</h2>
+              <p className="text-xs text-zinc-400">{t("student.payment.applyCoupon", "Historique").toLowerCase().includes("appliqu") ? "Billing history of subscriptions and purchases on the platform" : "Historique de vos abonnements et achats sur la plateforme"}</p>
             </div>
           </div>
         </div>
@@ -517,20 +519,20 @@ export default function BillingPage() {
         ) : myPayments.length === 0 ? (
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-10 text-center">
             <CreditCard className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
-            <p className="text-zinc-500 text-sm font-medium">Aucun paiement enregistré</p>
-            <p className="text-zinc-400 text-xs mt-1">Vos achats et abonnements apparaîtront ici.</p>
+            <p className="text-zinc-505 text-sm font-medium">{t("student.payment.applyCoupon", "Aucun paiement").toLowerCase().includes("appliqu") ? "No payments registered" : "Aucun paiement enregistré"}</p>
+            <p className="text-zinc-400 text-xs mt-1">{t("student.payment.applyCoupon", "Vos achats").toLowerCase().includes("appliqu") ? "Your purchases and subscriptions will appear here." : "Vos achats et abonnements apparaîtront ici."}</p>
           </div>
         ) : (
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="bg-zinc-50 dark:bg-zinc-800/30 text-zinc-500 dark:text-zinc-400 text-xs font-semibold uppercase tracking-wider border-b border-zinc-100 dark:border-zinc-800">
+                <thead className="bg-zinc-55 dark:bg-zinc-800/30 text-zinc-500 dark:text-zinc-400 text-xs font-semibold uppercase tracking-wider border-b border-zinc-100 dark:border-zinc-805">
                   <tr>
-                    <th className="px-6 py-3">Description</th>
-                    <th className="px-6 py-3">Mode</th>
-                    <th className="px-6 py-3">Date</th>
-                    <th className="px-6 py-3 text-right">Montant</th>
-                    <th className="px-6 py-3 text-center">Facture</th>
+                    <th className="px-6 py-3">{t("student.payment.applyCoupon", "Description").toLowerCase().includes("appliqu") ? "Description" : "Description"}</th>
+                    <th className="px-6 py-3">{t("student.payment.applyCoupon", "Mode").toLowerCase().includes("appliqu") ? "Method" : "Mode"}</th>
+                    <th className="px-6 py-3">{t("student.payment.applyCoupon", "Date").toLowerCase().includes("appliqu") ? "Date" : "Date"}</th>
+                    <th className="px-6 py-3 text-right">{t("student.payment.applyCoupon", "Montant").toLowerCase().includes("appliqu") ? "Amount" : "Montant"}</th>
+                    <th className="px-6 py-3 text-center">{t("student.payment.applyCoupon", "Facture").toLowerCase().includes("appliqu") ? "Invoice" : "Facture"}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -539,12 +541,12 @@ export default function BillingPage() {
                       <td className="px-6 py-4">
                         <p className="font-semibold text-zinc-900 dark:text-white">{p.label}</p>
                         {p.transactionRef && (
-                          <p className="text-[11px] text-zinc-400 mt-0.5 font-mono">Réf: {p.transactionRef}</p>
+                          <p className="text-[11px] text-zinc-400 mt-0.5 font-mono font-medium">Réf: {p.transactionRef}</p>
                         )}
                       </td>
                       <td className="px-6 py-4 text-zinc-500 text-xs">{p.provider}</td>
                       <td className="px-6 py-4 text-zinc-500 text-xs whitespace-nowrap">
-                        {new Date(p.date).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })}
+                        {new Date(p.date).toLocaleDateString(t("student.payment.applyCoupon", "Description").toLowerCase().includes("appliqu") ? "en-US" : "fr-FR", { year: "numeric", month: "long", day: "numeric" })}
                       </td>
                       <td className="px-6 py-4 text-right font-bold text-zinc-900 dark:text-white">
                         {Number(p.amount).toFixed(2)} {p.currency}
@@ -555,10 +557,10 @@ export default function BillingPage() {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 hover:bg-teal-100 dark:bg-teal-900/20 dark:hover:bg-teal-900/40 text-teal-700 dark:text-teal-400 rounded-lg text-xs font-semibold transition-colors cursor-pointer border border-teal-200 dark:border-teal-800/40"
-                          title="Télécharger la facture"
+                          title={t("student.payment.applyCoupon", "Facture").toLowerCase().includes("appliqu") ? "Invoice" : "Facture"}
                         >
                           <Download className="w-3.5 h-3.5" />
-                          Facture
+                          {t("student.payment.applyCoupon", "Facture").toLowerCase().includes("appliqu") ? "Invoice" : "Facture"}
                         </a>
                       </td>
                     </tr>
