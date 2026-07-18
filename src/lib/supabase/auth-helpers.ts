@@ -22,7 +22,24 @@ export type AuthProfile = {
  */
 export async function fetchUserProfile(userId: string): Promise<AuthProfile | null> {
   try {
-    // Fetch profile
+    // 1. Try to fetch via API first (robust server-side bypass)
+    try {
+      // Determine base origin context dynamically
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const res = await fetch(`${origin}/api/auth/login-profile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.profile) return data.profile;
+      }
+    } catch (apiErr) {
+      console.warn('[auth-helpers] API fetch failed, falling back to client query:', apiErr);
+    }
+
+    // 2. Fallback to direct client query
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('id, email, full_name, plan, status')
