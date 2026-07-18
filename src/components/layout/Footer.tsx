@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { useLanguage } from "@/context/LanguageContext";
 
 function FacebookIcon(props: any) {
   return (
@@ -26,6 +29,8 @@ function LinkedInIcon(props: any) {
 }
 
 export function Footer() {
+  const { language } = useLanguage();
+
   return (
     <footer className="border-t bg-slate-50 dark:bg-zinc-950">
       <div className="container mx-auto px-4 md:px-8 py-12">
@@ -36,7 +41,9 @@ export function Footer() {
               <Image src="/logo-dark.png" alt="ANSELLA" width={180} height={52} className="object-contain h-12 w-auto hidden dark:block" />
             </Link>
             <p className="text-sm text-muted-foreground mb-4">
-              Formations certifiantes et outils d'apprentissage pour entrepreneurs africains.
+              {language === "en" 
+                ? "Certification training and learning tools for African entrepreneurs." 
+                : "Formations certifiantes et outils d'apprentissage pour entrepreneurs africains."}
             </p>
             <div className="flex space-x-3">
               <Link href="#" className="text-muted-foreground hover:text-blue-600 transition-colors">
@@ -55,20 +62,20 @@ export function Footer() {
           </div>
           
           <div>
-            <h3 className="font-semibold mb-4">Liens Rapides</h3>
+            <h3 className="font-semibold mb-4">{language === "en" ? "Quick Links" : "Liens Rapides"}</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link href="/about" className="hover:text-foreground transition-colors">À propos de nous</Link></li>
-              <li><Link href="/courses" className="hover:text-foreground transition-colors">Nos formations</Link></li>
-              <li><Link href="/#pricing" className="hover:text-foreground transition-colors">Tarifs</Link></li>
-              <li><Link href="/login" className="hover:text-foreground transition-colors">Se connecter</Link></li>
+              <li><Link href="/about" className="hover:text-foreground transition-colors">{language === "en" ? "About Us" : "À propos de nous"}</Link></li>
+              <li><Link href="/courses" className="hover:text-foreground transition-colors">{language === "en" ? "Our Courses" : "Nos formations"}</Link></li>
+              <li><Link href="/#pricing" className="hover:text-foreground transition-colors">{language === "en" ? "Pricing" : "Tarifs"}</Link></li>
+              <li><Link href="/login" className="hover:text-foreground transition-colors">{language === "en" ? "Log In" : "Se connecter"}</Link></li>
             </ul>
           </div>
           
           <div>
-            <h3 className="font-semibold mb-4">Légal</h3>
+            <h3 className="font-semibold mb-4">{language === "en" ? "Legal" : "Légal"}</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link href="/terms" className="hover:text-foreground transition-colors">Conditions d'utilisation</Link></li>
-              <li><Link href="/privacy" className="hover:text-foreground transition-colors">Politique de confidentialité</Link></li>
+              <li><Link href="/terms" className="hover:text-foreground transition-colors">{language === "en" ? "Terms of Service" : "Conditions d'utilisation"}</Link></li>
+              <li><Link href="/privacy" className="hover:text-foreground transition-colors">{language === "en" ? "Privacy Policy" : "Politique de confidentialité"}</Link></li>
             </ul>
           </div>
 
@@ -77,13 +84,13 @@ export function Footer() {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>Email: info@ansella.app</li>
               <li>Téléphone: +243990387237</li>
-              <li>Bukavu, RDC (Bureau International)</li>
+              <li>{language === "en" ? "Bukavu, DRC (International Office)" : "Bukavu, RDC (Bureau International)"}</li>
             </ul>
           </div>
         </div>
         
         <div className="mt-12 pt-8 border-t text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} ANSELLA. Tous droits réservés.</p>
+          <p>&copy; {new Date().getFullYear()} ANSELLA. {language === "en" ? "All rights reserved." : "Tous droits réservés."}</p>
         </div>
       </div>
     </footer>

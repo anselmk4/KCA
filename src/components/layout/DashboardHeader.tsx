@@ -6,6 +6,8 @@ import { useEffect, useState, useRef } from "react";
 import { getSimulatedSession } from "@/lib/rbac";
 import { getConversationsForUser } from "@/lib/chat";
 import Link from "next/link";
+import { useLanguage } from "@/context/LanguageContext";
+import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 
 interface DashboardHeaderProps {
   onMenuClick?: () => void;
@@ -13,6 +15,7 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHeaderProps) {
+  const { t } = useLanguage();
   const [session, setSession] = useState<any>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -219,6 +222,7 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
 
       <div className="flex items-center space-x-3 md:space-x-6">
         <div className="flex items-center space-x-3">
+          <LanguageSwitcher />
           <ThemeToggle />
 
           {/* Messages Dropdown */}

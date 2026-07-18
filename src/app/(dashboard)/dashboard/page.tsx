@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface Profile {
   id: string;
@@ -69,6 +70,7 @@ function getCourseStyles(category: string) {
 }
 
 export default function DashboardPage() {
+  const { t, language } = useLanguage();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [activeEnrollments, setActiveEnrollments] = useState<EnrollmentData[]>([]);
   const [completedEnrollments, setCompletedEnrollments] = useState<EnrollmentData[]>([]);
@@ -169,14 +171,20 @@ export default function DashboardPage() {
       {/* Welcome Hero */}
       <div className="bg-white dark:bg-zinc-900 rounded-3xl p-7 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row justify-between items-center gap-5">
         <div>
-          <p className="text-xs font-bold text-teal-600 uppercase tracking-widest mb-1">Tableau de bord</p>
+          <p className="text-xs font-bold text-teal-600 uppercase tracking-widest mb-1">
+            {language === "en" ? "Dashboard" : "Tableau de bord"}
+          </p>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
-            Bon retour, {firstName} ! 👋
+            {language === "en" ? `Welcome back, ${firstName}! 👋` : `Bon retour, ${firstName} ! 👋`}
           </h1>
           <p className="text-zinc-500 dark:text-zinc-400 text-sm">
-            {activeEnrollments.length > 0
-              ? `Vous suivez ${activeEnrollments.length} formation${activeEnrollments.length > 1 ? "s" : ""}. Continuez sur votre lancée !`
-              : "Explorez notre catalogue et commencez votre apprentissage dès maintenant."
+            {language === "en"
+              ? (activeEnrollments.length > 0 
+                 ? `You are taking ${activeEnrollments.length} course${activeEnrollments.length > 1 ? "s" : ""}. Keep going!` 
+                 : "Explore our catalog and start learning now.")
+              : (activeEnrollments.length > 0
+                 ? `Vous suivez ${activeEnrollments.length} formation${activeEnrollments.length > 1 ? "s" : ""}. Continuez sur votre lancée !`
+                 : "Explorez notre catalogue et commencez votre apprentissage dès maintenant.")
             }
           </p>
         </div>
@@ -185,14 +193,14 @@ export default function DashboardPage() {
             href={`/dashboard/courses/${currentCourse.course_id}/learn`}
             className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition-all shadow-md shadow-teal-500/20 whitespace-nowrap"
           >
-            <PlayCircle className="w-5 h-5" /> Reprendre le cours
+            <PlayCircle className="w-5 h-5" /> {language === "en" ? "Resume learning" : "Reprendre le cours"}
           </Link>
         ) : (
           <Link
             href="/dashboard/discover"
             className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition-all shadow-md shadow-teal-500/20"
           >
-            <Compass className="w-5 h-5" /> Découvrir le catalogue
+            <Compass className="w-5 h-5" /> {language === "en" ? "Explore the catalog" : "Découvrir le catalogue"}
           </Link>
         )}
       </div>
@@ -204,7 +212,9 @@ export default function DashboardPage() {
             <div className="w-8 h-8 bg-teal-100 dark:bg-teal-900/30 rounded-lg flex items-center justify-center">
               <BookOpen className="w-4 h-4 text-teal-600" />
             </div>
-            <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">Cours actifs</p>
+            <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">
+              {language === "en" ? "Active Courses" : "Cours actifs"}
+            </p>
           </div>
           <h4 className="text-2xl font-bold text-zinc-900 dark:text-white">{activeEnrollments.length}</h4>
         </div>
@@ -213,7 +223,9 @@ export default function DashboardPage() {
             <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
               <Award className="w-4 h-4 text-emerald-600" />
             </div>
-            <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">Certificats</p>
+            <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">
+              {language === "en" ? "Certificates" : "Certificats"}
+            </p>
           </div>
           <h4 className="text-2xl font-bold text-zinc-900 dark:text-white">{certificates.length}</h4>
         </div>
@@ -222,7 +234,9 @@ export default function DashboardPage() {
             <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
               <CheckCircle2 className="w-4 h-4 text-blue-600" />
             </div>
-            <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">Terminées</p>
+            <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">
+              {language === "en" ? "Completed" : "Terminées"}
+            </p>
           </div>
           <h4 className="text-2xl font-bold text-zinc-900 dark:text-white">{completedEnrollments.length}</h4>
         </div>
@@ -231,7 +245,9 @@ export default function DashboardPage() {
             <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
               <TrendingUp className="w-4 h-4 text-purple-600" />
             </div>
-            <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">Progression moy.</p>
+            <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">
+              {language === "en" ? "Avg. Progress" : "Progression moy."}
+            </p>
           </div>
           <h4 className="text-2xl font-bold text-zinc-900 dark:text-white">{avgProgress}%</h4>
         </div>

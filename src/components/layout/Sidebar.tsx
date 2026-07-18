@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { clearSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface SidebarProps {
   open?: boolean;
@@ -28,6 +29,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ open = false, onClose }: SidebarProps) {
+  const { t, language } = useLanguage();
   const pathname = usePathname();
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
@@ -39,16 +41,16 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   }, []);
 
   const menuItems = [
-    { icon: <LayoutDashboard className="w-5 h-5" />, label: "Vue d'ensemble", href: "/dashboard" },
-    { icon: <Compass className="w-5 h-5" />, label: "Découvrir", href: "/dashboard/discover" },
-    { icon: <BookOpen className="w-5 h-5" />, label: "Mes Formations", href: "/dashboard/courses" },
-    { icon: <MessageSquare className="w-5 h-5" />, label: "Messagerie Directe", href: "/dashboard/messages" },
-    { icon: <Video className="w-5 h-5" />, label: "Session Live", href: "/dashboard/live" },
-    { icon: <CreditCard className="w-5 h-5" />, label: "Paiements", href: "/dashboard/payments" },
-    { icon: <Award className="w-5 h-5" />, label: "Certificats", href: "/dashboard/certificates" },
-    { icon: <Users className="w-5 h-5" />, label: "Communauté", href: "/dashboard/community" },
-    { icon: <LifeBuoy className="w-5 h-5" />, label: "Support Technique", href: "/dashboard/support" },
-    ...(userId ? [{ icon: <UserCircle className="w-5 h-5" />, label: "Mon Profil", href: `/profile/${userId}` }] : []),
+    { icon: <LayoutDashboard className="w-5 h-5" />, label: language === "en" ? "Overview" : "Vue d'ensemble", href: "/dashboard" },
+    { icon: <Compass className="w-5 h-5" />, label: language === "en" ? "Discover" : "Découvrir", href: "/dashboard/discover" },
+    { icon: <BookOpen className="w-5 h-5" />, label: t("student.sidebar.myCourses"), href: "/dashboard/courses" },
+    { icon: <MessageSquare className="w-5 h-5" />, label: language === "en" ? "Direct Messages" : "Messagerie Directe", href: "/dashboard/messages" },
+    { icon: <Video className="w-5 h-5" />, label: language === "en" ? "Live Sessions" : "Session Live", href: "/dashboard/live" },
+    { icon: <CreditCard className="w-5 h-5" />, label: t("student.sidebar.billing"), href: "/dashboard/payments" },
+    { icon: <Award className="w-5 h-5" />, label: t("student.sidebar.certificates"), href: "/dashboard/certificates" },
+    { icon: <Users className="w-5 h-5" />, label: language === "en" ? "Community" : "Communauté", href: "/dashboard/community" },
+    { icon: <LifeBuoy className="w-5 h-5" />, label: t("student.sidebar.support"), href: "/dashboard/support" },
+    ...(userId ? [{ icon: <UserCircle className="w-5 h-5" />, label: language === "en" ? "My Profile" : "Mon Profil", href: `/profile/${userId}` }] : []),
   ];
 
   const handleLogout = async () => {
@@ -102,14 +104,14 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           }`}
         >
           <Settings className="w-5 h-5" />
-          <span className="text-sm">Paramètres</span>
+          <span className="text-sm">{t("student.sidebar.settings")}</span>
         </Link>
         <button 
           onClick={handleLogout}
-          className="flex items-center space-x-3 px-4 py-3 rounded-xl text-zinc-500 dark:text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-all"
+          className="flex items-center space-x-3 px-4 py-3 rounded-xl text-zinc-500 dark:text-zinc-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-all cursor-pointer"
         >
           <LogOut className="w-5 h-5" />
-          <span className="text-sm">Déconnexion</span>
+          <span className="text-sm">{t("nav.logout")}</span>
         </button>
       </div>
     </aside>

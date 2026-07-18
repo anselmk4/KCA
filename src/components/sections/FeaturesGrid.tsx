@@ -2,8 +2,10 @@
 
 import { Zap, Shield, Smartphone, Globe, ArrowRight, Play, CheckCircle2 } from "lucide-react";
 import { motion, Variants } from "framer-motion";
+import { useLanguage } from "@/context/LanguageContext";
 
 export function FeaturesGrid() {
+  const { language } = useLanguage();
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: {
@@ -34,14 +36,18 @@ export function FeaturesGrid() {
           className="text-center mb-20 space-y-4"
         >
           <span className="text-xs font-bold text-teal-400 bg-teal-400/10 border border-teal-500/20 px-3.5 py-1 rounded-full uppercase tracking-widest">
-            Outils Créateurs
+            {language === "en" ? "Creator Tools" : "Outils Créateurs"}
           </span>
           <h2 className="text-3xl md:text-5xl font-black tracking-tight text-zinc-900 dark:text-white leading-tight">
-            Une plateforme d&apos;enseignement de{" "}
-            <span className="bg-gradient-to-r from-teal-400 to-indigo-400 bg-clip-text text-transparent">classe mondiale</span>
+            {language === "en" ? "A world-class " : "Une plateforme d'enseignement de "}
+            <span className="bg-gradient-to-r from-teal-400 to-indigo-400 bg-clip-text text-transparent">
+              {language === "en" ? "teaching platform" : "classe mondiale"}
+            </span>
           </h2>
           <p className="text-base text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-            ANSELLA vous fournit tous les outils nécessaires pour créer, gérer et rentabiliser votre contenu éducatif.
+            {language === "en" 
+              ? "ANSELLA provides all the necessary tools to create, manage, and monetize your educational content."
+              : "ANSELLA vous fournit tous les outils nécessaires pour créer, gérer et rentabiliser votre contenu éducatif."}
           </p>
         </motion.div>
         
@@ -66,25 +72,35 @@ export function FeaturesGrid() {
               <div className="bg-teal-500/15 w-12 h-12 rounded-2xl flex items-center justify-center text-teal-400 border border-teal-500/20">
                 <Smartphone className="h-6 w-6" />
               </div>
-              <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Paiements et Retraits Flexibles</h3>
+              <h3 className="text-xl font-bold text-zinc-900 dark:text-white">
+                {language === "en" ? "Flexible Payments & Payouts" : "Paiements et Retraits Flexibles"}
+              </h3>
               <p className="text-sm text-zinc-650 dark:text-zinc-400 max-w-md leading-relaxed">
-                Encaissez les inscriptions en ligne et retirez vos gains par cartes bancaires, PayPal ou Mobile Money de manière simple et sécurisée.
+                {language === "en" 
+                  ? "Collect online registrations and withdraw your earnings via bank cards, PayPal, or Mobile Money in a simple and secure way."
+                  : "Encaissez les inscriptions en ligne et retirez vos gains par cartes bancaires, PayPal ou Mobile Money de manière simple et sécurisée."}
               </p>
             </div>
 
             {/* Visual simulation inside the bento item */}
             <div className="mt-8 relative h-36 bg-zinc-100/50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-900 rounded-2xl p-4 overflow-hidden flex items-center justify-between gap-4">
               <div className="space-y-2">
-                <p className="text-[10px] text-zinc-500 font-bold uppercase">Transaction validée</p>
+                <p className="text-[10px] text-zinc-500 font-bold uppercase">
+                  {language === "en" ? "Transaction verified" : "Transaction validée"}
+                </p>
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
                   <p className="text-sm font-bold">$150.00 USD</p>
                 </div>
-                <p className="text-[10px] text-zinc-600 dark:text-zinc-450">Via Stripe • Paris, FR</p>
+                <p className="text-[10px] text-zinc-600 dark:text-zinc-450">
+                  {language === "en" ? "Via Mobile Money • Kinshasa, CD" : "Via Stripe • Paris, FR"}
+                </p>
               </div>
               
               <div className="flex flex-col gap-1.5 shrink-0 bg-white dark:bg-zinc-950/80 border border-zinc-200 dark:border-zinc-800/80 p-3 rounded-xl">
-                <span className="text-[9px] text-zinc-550 dark:text-zinc-500 font-bold">SOLDE DISPONIBLE</span>
+                <span className="text-[9px] text-zinc-550 dark:text-zinc-500 font-bold">
+                  {language === "en" ? "AVAILABLE BALANCE" : "SOLDE DISPONIBLE"}
+                </span>
                 <span className="text-lg font-black text-teal-400">$2,480.00</span>
               </div>
             </div>
@@ -101,16 +117,22 @@ export function FeaturesGrid() {
               <div className="bg-indigo-500/15 w-12 h-12 rounded-2xl flex items-center justify-center text-indigo-400 border border-indigo-500/20">
                 <Shield className="h-6 w-6" />
               </div>
-              <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Quiz & Évaluations</h3>
+              <h3 className="text-xl font-bold text-zinc-900 dark:text-white">
+                {language === "en" ? "Quizzes & Assessments" : "Quiz & Évaluations"}
+              </h3>
               <p className="text-sm text-zinc-650 dark:text-zinc-400 leading-relaxed">
-                Créez des QCM interactifs pour tester les connaissances de vos apprenants avec correction automatique et obtention automatique du certificat.
+                {language === "en" 
+                  ? "Create interactive MCQs to test your learners' knowledge with automatic grading and automated certificate issuance."
+                  : "Créez des QCM interactifs pour tester les connaissances de vos apprenants avec correction automatique et obtention automatique du certificat."}
               </p>
             </div>
 
             {/* Interactive checkmark UI simulation */}
             <div className="mt-8 flex gap-2 items-center bg-zinc-100/50 dark:bg-zinc-900/20 border border-zinc-200 dark:border-zinc-900/50 p-3.5 rounded-xl">
               <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-              <span className="text-[11px] font-bold text-zinc-750 dark:text-zinc-300">Certificat débloqué au score ≥ 80%</span>
+              <span className="text-[11px] font-bold text-zinc-750 dark:text-zinc-300">
+                {language === "en" ? "Certificate unlocked at score ≥ 80%" : "Certificat débloqué au score ≥ 80%"}
+              </span>
             </div>
           </motion.div>
 
@@ -125,14 +147,18 @@ export function FeaturesGrid() {
               <div className="bg-emerald-500/15 w-12 h-12 rounded-2xl flex items-center justify-center text-emerald-400 border border-emerald-500/20">
                 <Zap className="h-6 w-6" />
               </div>
-              <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Générateur de Cours</h3>
+              <h3 className="text-xl font-bold text-zinc-900 dark:text-white">
+                {language === "en" ? "Course Builder" : "Générateur de Cours"}
+              </h3>
               <p className="text-sm text-zinc-650 dark:text-zinc-400 leading-relaxed">
-                Structurez vos cours en modules et leçons, ajoutez des vidéos et des ressources de manière simple et rapide.
+                {language === "en" 
+                  ? "Structure your courses into modules and lessons, add videos and resources quickly and easily."
+                  : "Structurez vos cours en modules et leçons, ajoutez des vidéos et des ressources de manière simple et rapide."}
               </p>
             </div>
 
             <div className="mt-8 flex items-center gap-2 text-xs font-semibold text-teal-400 group-hover:translate-x-1 transition-transform">
-              Essayer le builder <ArrowRight className="w-4 h-4" />
+              {language === "en" ? "Try the builder" : "Essayer le builder"} <ArrowRight className="w-4 h-4" />
             </div>
           </motion.div>
 
@@ -147,9 +173,13 @@ export function FeaturesGrid() {
               <div className="bg-indigo-500/15 w-12 h-12 rounded-2xl flex items-center justify-center text-indigo-400 border border-indigo-500/20">
                 <Globe className="h-6 w-6" />
               </div>
-              <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Analyses & Suivi Élèves</h3>
+              <h3 className="text-xl font-bold text-zinc-900 dark:text-white">
+                {language === "en" ? "Analytics & Student Tracking" : "Analyses & Suivi Élèves"}
+              </h3>
               <p className="text-sm text-zinc-650 dark:text-zinc-400 max-w-md leading-relaxed">
-                Suivez la progression moyenne de vos apprenants, les taux de complétion des cours et vos statistiques de revenus grâce à notre tableau analytique.
+                {language === "en" 
+                  ? "Track your learners' average progress, course completion rates, and your revenue statistics using our analytics dashboard."
+                  : "Suivez la progression moyenne de vos apprenants, les taux de complétion des cours et vos statistiques de revenus grâce à notre tableau analytique."}
               </p>
             </div>
 

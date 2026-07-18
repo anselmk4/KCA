@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { ArrowRight, BookOpen, GraduationCap, ShieldCheck, DollarSign, Users, Play } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLanguage } from "@/context/LanguageContext";
 
 export function Hero() {
+  const { t } = useLanguage();
   return (
     <section className="relative overflow-hidden bg-transparent text-zinc-900 dark:text-white pt-28 pb-32 lg:pt-36 lg:pb-44">
       {/* Background Decorative Gradients & Glows */}
@@ -28,7 +30,7 @@ export function Hero() {
               className="inline-flex items-center rounded-full border border-teal-500/30 px-4 py-1.5 text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/30 backdrop-blur-md shadow-sm"
             >
               <span className="flex h-2 w-2 rounded-full bg-teal-500 dark:bg-teal-400 mr-2 animate-pulse" />
-              🌍 Plateforme LMS Mondiale
+              {t("hero.badge")}
             </motion.div>
 
             {/* Title with Gradient Text */}
@@ -38,9 +40,9 @@ export function Hero() {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1] text-zinc-900 dark:text-white"
             >
-              Créez, vendez vos formations{" "}
+              {t("hero.title1")}{" "}
               <span className="bg-gradient-to-r from-teal-500 via-teal-400 to-indigo-500 dark:from-teal-400 dark:via-emerald-400 dark:to-indigo-400 bg-clip-text text-transparent">
-                partout et facilement.
+                {t("hero.title2")}
               </span>
             </motion.h1>
 
@@ -52,16 +54,7 @@ export function Hero() {
                 transition={{ duration: 0.6, delay: 0.2 }}
                 className="text-lg md:text-xl text-zinc-700 dark:text-zinc-300 font-semibold"
               >
-                ANSELLA est une plateforme LMS tout-en-un pensée pour le monde entier.
-              </motion.p>
-              
-              <motion.p 
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="text-sm md:text-base text-zinc-600 dark:text-zinc-400 leading-relaxed"
-              >
-                Hébergez vos cours, évaluez vos apprenants, encaissez vos gains via Mobile Money, carte bancaire ou PayPal — et faites grandir votre académie sans frontières.
+                {t("hero.subtitle")}
               </motion.p>
             </div>
 
@@ -77,7 +70,7 @@ export function Hero() {
                 className="group relative inline-flex items-center justify-center rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white h-14 px-8 w-full sm:w-auto shadow-lg shadow-teal-500/20 overflow-hidden"
               >
                 <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                Créer mon académie gratuitement
+                {t("hero.ctaStart")}
                 <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </Link>
               
@@ -85,7 +78,7 @@ export function Hero() {
                 href="/courses" 
                 className="inline-flex items-center justify-center rounded-xl text-sm font-bold transition-all border border-zinc-300 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-700 bg-white/70 dark:bg-zinc-900/50 hover:bg-white dark:hover:bg-zinc-900 text-zinc-800 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white h-14 px-8 w-full sm:w-auto backdrop-blur-sm shadow-sm"
               >
-                Voir le catalogue
+                {t("hero.ctaExplore")}
               </Link>
             </motion.div>
 

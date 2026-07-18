@@ -7,9 +7,12 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { MobileMenu } from "@/components/layout/MobileMenu";
 import { getSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
+import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 
 
 export function Navbar() {
+  const { t } = useLanguage();
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -58,10 +61,10 @@ export function Navbar() {
         </Link>
         <nav className="hidden md:flex items-center space-x-6 text-sm font-medium">
           <Link href="/about" className="transition-colors hover:text-foreground/80 text-foreground/60">
-            À propos
+            {t("nav.about")}
           </Link>
           <Link href="/features" className="transition-colors hover:text-foreground/80 text-foreground/60">
-            Fonctionnalités
+            {t("nav.features")}
           </Link>
           <Link href="/templates" className="transition-colors hover:text-foreground/80 text-foreground/60">
             Modèle d'académie
@@ -76,10 +79,11 @@ export function Navbar() {
             Partenaires
           </Link>
           <Link href="/pricing" className="transition-colors hover:text-foreground/80 text-foreground/60">
-            Tarifs
+            {t("nav.pricing")}
           </Link>
         </nav>
         <div className="flex items-center space-x-4">
+          <LanguageSwitcher />
           <ThemeToggle />
           
           {loading ? (
@@ -89,7 +93,7 @@ export function Navbar() {
               href={getDashboardLink()} 
               className="hidden sm:inline-flex items-center justify-center rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-600/90 h-10 px-4 py-2 transition-colors font-semibold"
             >
-              Accéder au Dashboard
+              {t("nav.dashboard")}
             </Link>
           ) : (
             <>
@@ -97,10 +101,10 @@ export function Navbar() {
                 href="/login" 
                 className="hidden sm:inline-flex items-center justify-center rounded-md text-sm font-semibold border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 h-10 px-4 py-2 transition-colors"
               >
-                Connexion
+                {t("nav.login")}
               </Link>
               <Link href="/register" className="hidden sm:inline-flex items-center justify-center rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-600/90 h-10 px-4 py-2 transition-colors">
-                S'inscrire
+                {t("nav.register")}
               </Link>
             </>
           )}

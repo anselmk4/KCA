@@ -39,28 +39,31 @@ import { getConversationsForUser } from "@/lib/chat";
 import { supabase } from "@/lib/supabase/client";
 import { OnboardingTour } from "@/components/layout/OnboardingTour";
 import Chatbot from "@/components/Chatbot";
-
-const menuItems = [
-  { icon: LayoutDashboard, label: "Tableau de bord", href: "/instructor" },
-  { icon: BookOpen, label: "Mes cours", href: "/instructor/courses" },
-  { icon: Ticket, label: "Codes promo / Coupons", href: "/instructor/coupons" },
-  { icon: Users, label: "Étudiants", href: "/instructor/students" },
-  { icon: Video, label: "Sessions live", href: "/instructor/live" },
-  { icon: BarChart3, label: "Analytique", href: "/instructor/analytics" },
-  { icon: Wallet, label: "Revenus", href: "/instructor/earnings" },
-  { icon: Share2, label: "Affiliation", href: "/instructor/affiliate" },
-  { icon: CreditCard, label: "Abonnement", href: "/instructor/billing" },
-  { icon: MessageSquare, label: "Messages", href: "/instructor/messages" },
-  { icon: Bell, label: "Notifications", href: "/instructor/notifications" },
-  { icon: Users2, label: "Communauté", href: "/instructor/community" },
-  { icon: Settings, label: "Paramètres", href: "/instructor/settings" },
-];
+import { useLanguage } from "@/context/LanguageContext";
+import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 
 export default function InstructorLayout({ children }: { children: React.ReactNode }) {
+  const { t } = useLanguage();
   const pathname = usePathname();
   const router = useRouter();
   const [session, setSession] = useState<any>(null);
   const [userId, setUserId] = useState<string | null>(null);
+
+  const menuItems = [
+    { icon: LayoutDashboard, label: t("instructor.sidebar.dashboard"), href: "/instructor" },
+    { icon: BookOpen, label: t("instructor.sidebar.myCourses"), href: "/instructor/courses" },
+    { icon: Ticket, label: "Codes promo / Coupons", href: "/instructor/coupons" },
+    { icon: Users, label: t("instructor.sidebar.students"), href: "/instructor/students" },
+    { icon: Video, label: "Sessions live", href: "/instructor/live" },
+    { icon: BarChart3, label: t("instructor.sidebar.analytics"), href: "/instructor/analytics" },
+    { icon: Wallet, label: "Revenus", href: "/instructor/earnings" },
+    { icon: Share2, label: "Affiliation", href: "/instructor/affiliate" },
+    { icon: CreditCard, label: t("instructor.sidebar.billing"), href: "/instructor/billing" },
+    { icon: MessageSquare, label: "Messages", href: "/instructor/messages" },
+    { icon: Bell, label: t("instructor.sidebar.notifications"), href: "/instructor/notifications" },
+    { icon: Users2, label: "Communauté", href: "/instructor/community" },
+    { icon: Settings, label: t("instructor.sidebar.settings"), href: "/instructor/settings" },
+  ];
   const [academyName, setAcademyName] = useState<string>("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -384,6 +387,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
           </div>
 
           <div className="flex items-center gap-3">
+            <LanguageSwitcher />
             <ThemeToggle />
 
             {/* Messages Dropdown */}

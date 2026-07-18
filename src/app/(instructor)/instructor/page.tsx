@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
 import {
   BookOpen,
   Users,
@@ -17,6 +18,7 @@ import {
 import Link from "next/link";
 
 export default function InstructorDashboardPage() {
+  const { t, language } = useLanguage();
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [academyName, setAcademyName] = useState("Kuettu Crypto Academy");
@@ -195,14 +197,16 @@ export default function InstructorDashboardPage() {
       <div className="text-left flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-1">
-            Bonjour, {instructorName} 👋
+            {language === "en" ? `Hello, ${instructorName} 👋` : `Bonjour, {instructorName} 👋`.replace('{instructorName}', instructorName)}
           </h1>
           <p className="text-zinc-500 dark:text-zinc-400">
-            Voici un aperçu de votre activité d'enseignement.
+            {language === "en" ? "Here is an overview of your teaching activity." : "Voici un aperçu de votre activité d'enseignement."}
           </p>
         </div>
         <div className="bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-800/40 rounded-2xl px-5 py-3 text-right">
-          <span className="block text-xxs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-widest">Votre Académie</span>
+          <span className="block text-xxs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-widest">
+            {language === "en" ? "Your Academy" : "Votre Académie"}
+          </span>
           <span className="text-sm font-black text-zinc-900 dark:text-white mt-0.5 block">{academyName}</span>
         </div>
       </div>
@@ -251,7 +255,9 @@ export default function InstructorDashboardPage() {
             <DollarSign className="w-8 h-8" />
           </div>
           <div className="text-left">
-            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Revenus totaux</p>
+            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+              {t("instructor.dashboard.statsRevenue")}
+            </p>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">
               {totalRevenue.toLocaleString()}$
             </h3>
@@ -264,7 +270,9 @@ export default function InstructorDashboardPage() {
             <Users className="w-8 h-8" />
           </div>
           <div className="text-left">
-            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Étudiants inscrits</p>
+            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+              {t("instructor.dashboard.statsStudents")}
+            </p>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">{totalStudents}</h3>
           </div>
         </div>
@@ -275,12 +283,14 @@ export default function InstructorDashboardPage() {
             <BookOpen className="w-8 h-8" />
           </div>
           <div className="text-left">
-            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Cours publiés</p>
+            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+              {language === "en" ? "Published Courses" : "Cours publiés"}
+            </p>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">
               {publishedCourses.length}
               {draftCourses.length > 0 && (
                 <span className="text-sm font-normal text-zinc-400 ml-1">
-                  +{draftCourses.length} brouillons
+                  +{draftCourses.length} {language === "en" ? "drafts" : "brouillons"}
                 </span>
               )}
             </h3>
@@ -293,7 +303,9 @@ export default function InstructorDashboardPage() {
             <Wallet className="w-8 h-8" />
           </div>
           <div className="text-left">
-            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Paiements en attente</p>
+            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+              {language === "en" ? "Pending Payouts" : "Paiements en attente"}
+            </p>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">
               {pendingPayouts.toLocaleString()}$
             </h3>

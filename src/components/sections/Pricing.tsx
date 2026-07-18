@@ -3,10 +3,11 @@
 import { Check, Star } from "lucide-react";
 import Link from "next/link";
 import { motion, Variants } from "framer-motion";
-
+import { useLanguage } from "@/context/LanguageContext";
 
 export function Pricing() {
-  const plans = [
+  const { language } = useLanguage();
+  const plansFr = [
     {
       name: "Plan Free",
       price: "0$",
@@ -81,6 +82,83 @@ export function Pricing() {
     }
   ];
 
+  const plansEn = [
+    {
+      name: "Plan Free",
+      price: "0$",
+      unit: "/ month",
+      description: "Perfect for launching your academy and validating your first courses with a small group of learners.",
+      features: [
+        "1 active course maximum",
+        "Up to 15 enrolled learners",
+        "Simple validation quizzes",
+        "Mobile Money & Card payment",
+        "Transaction fee: 20%",
+        "Community support"
+      ],
+      popular: false,
+      buttonText: "Start for free",
+      href: "/register?plan=free",
+      glowColor: "group-hover:shadow-[0_0_20px_rgba(20,184,166,0.15)] group-hover:border-teal-500/50"
+    },
+    {
+      name: "Plan Base",
+      price: "19$",
+      unit: "/ month",
+      description: "For serious creators launching their academy.",
+      features: [
+        "Up to 3 active courses",
+        "Up to 50 enrolled learners",
+        "Simple validation quizzes",
+        "Mobile Money & Card payment",
+        "Transaction fee: 10%",
+        "Email support"
+      ],
+      popular: false,
+      buttonText: "Get started with Base",
+      href: "/register?plan=base",
+      glowColor: "group-hover:shadow-[0_0_20px_rgba(99,102,241,0.15)] group-hover:border-indigo-500/50"
+    },
+    {
+      name: "Plan Pro",
+      price: "49$",
+      unit: "/ month",
+      description: "The ideal solution for professional instructors and growing academies.",
+      features: [
+        "Up to 10 active courses",
+        "Up to 200 enrolled learners",
+        "Unlimited quizzes and exams",
+        "Automated achievement certificates",
+        "Reduced transaction fee: 5%",
+        "Priority 24h support"
+      ],
+      popular: true,
+      buttonText: "Get started with Pro",
+      href: "/register?plan=pro",
+      glowColor: "shadow-[0_0_30px_rgba(20,184,166,0.1)] border-teal-500/80 bg-[#09101f]/60"
+    },
+    {
+      name: "Plan Max",
+      price: "200$",
+      unit: "/ month",
+      description: "For large academies and training schools demanding unlimited power and dedicated assistance.",
+      features: [
+        "Unlimited online courses",
+        "Unlimited learners",
+        "Unlimited quizzes, exams, and certificates",
+        "0% transaction fee",
+        "Custom domain name (e.g., school.com)",
+        "Dedicated account manager & WhatsApp"
+      ],
+      popular: false,
+      buttonText: "Activate Plan Max",
+      href: "/register?plan=max",
+      glowColor: "group-hover:shadow-[0_0_20px_rgba(236,72,153,0.15)] group-hover:border-pink-500/50"
+    }
+  ];
+
+  const plans = language === "en" ? plansEn : plansFr;
+
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: {
@@ -112,14 +190,18 @@ export function Pricing() {
           className="text-center mb-20 space-y-4"
         >
           <span className="text-xs font-bold text-teal-400 bg-teal-400/10 border border-teal-500/20 px-3.5 py-1 rounded-full uppercase tracking-widest">
-            Tarification
+            {language === "en" ? "Pricing" : "Tarification"}
           </span>
           <h2 className="text-3xl md:text-5xl font-black tracking-tight text-zinc-900 dark:text-white leading-tight">
-            Des Tarifs Transparents{" "}
-            <span className="bg-gradient-to-r from-teal-400 to-indigo-400 bg-clip-text text-transparent">et Adaptés</span>
+            {language === "en" ? "Transparent & Adapted " : "Des Tarifs Transparents "}
+            <span className="bg-gradient-to-r from-teal-400 to-indigo-400 bg-clip-text text-transparent">
+              {language === "en" ? "Pricing" : "et Adaptés"}
+            </span>
           </h2>
           <p className="text-base text-zinc-650 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-            Choisissez le forfait qui correspond au niveau de développement de votre académie. Annulez ou changez de plan à tout moment.
+            {language === "en" 
+              ? "Choose the plan that matches your academy's development stage. Cancel or change plan at any time."
+              : "Choisissez le forfait qui correspond au niveau de développement de votre académie. Annulez ou changez de plan à tout moment."}
           </p>
         </motion.div>
         
@@ -143,7 +225,7 @@ export function Pricing() {
             >
               {plan.popular && (
                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-teal-500 text-zinc-950 px-4 py-1 text-xxs font-black uppercase tracking-widest rounded-full shadow-lg flex items-center gap-1">
-                  <Star className="w-3 h-3 fill-zinc-950" /> Recommandé
+                  <Star className="w-3 h-3 fill-zinc-950" /> {language === "en" ? "Recommended" : "Recommandé"}
                 </div>
               )}
 
