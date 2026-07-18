@@ -38,6 +38,8 @@ export default function AdminDashboardPage() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [stats, setStats] = useState<OverviewData | null>(null);
+  const [recentRegistrations, setRecentRegistrations] = useState<any[]>([]);
+  const [rolesMap, setRolesMap] = useState<Record<string, string>>({});
 
   const calculateStats = useCallback(async () => {
     if (!stats) {
@@ -57,12 +59,15 @@ export default function AdminDashboardPage() {
         .select("user_id, roles(name)");
 
       const roleMap = new Map<string, string>();
+      const rolesObj: Record<string, string> = {};
       userRolesData?.forEach((ur: any) => {
         const name = ur.roles?.name;
         if (name) {
           roleMap.set(ur.user_id, name);
+          rolesObj[ur.user_id] = name;
         }
       });
+      setRolesMap(rolesObj);
 
       const totalMembers = profiles?.length || 0;
       let activeStudents = 0;
@@ -88,6 +93,14 @@ export default function AdminDashboardPage() {
       const { data: enrollments } = await supabase
         .from("enrollments")
         .select("student_id, course_id, status");
+
+      // 4. Fetch 5 most recent registrations
+      const { data: recentRegs } = await supabase
+        .from("profiles")
+        .select("id, email, full_name, created_at")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      setRecentRegistrations(recentRegs || []);
 
       const totalEnrollments = enrollments?.length || 0;
       const suspendedCount = enrollments?.filter(e => e.status === "SUSPENDED" || e.status === "INACTIVE").length || 0;
@@ -768,6 +781,52 @@ export default function AdminDashboardPage() {
             <span className="text-sm font-extrabold text-blue-600 dark:text-blue-450">{stats.topCourseStudentCount} apprenants</span>
           </div>
         </div>
+      </div>
+
+      {/* Latest Registrations */}
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-4">
+        <div>
+          <h2 className="text-base font-bold text-zinc-900 dark:text-white">Dernières Inscriptions</h2>
+          <p className="text-xxs text-zinc-500">Les 5 derniers apprenants ou formateurs inscrits sur la plateforme</p>
+        </div>
+
+        {recentRegistrations.length === 0 ? (
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center py-4">Aucune inscription récente.</p>
+        ) : (
+          <div className="divide-y divide-zinc-100 dark:divide-zinc-850">
+            {recentRegistrations.map((user) => {
+              const roleName = rolesMap[user.id] || "STUDENT";
+              const initials = user.full_name?.split(" ").map((n: string) => n[0] || "").join("").slice(0, 2).toUpperCase() || "US";
+              return (
+                <div key={user.id} className="flex items-center justify-between py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-teal-50 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400 flex items-center justify-center font-bold text-xs shrink-0">
+                      {initials}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{user.full_name || "Utilisateur anonyme"}</p>
+                      <p className="text-[10px] text-zinc-450 dark:text-zinc-500">{user.email}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                      roleName === "SUPER_ADMIN" || roleName === "ADMIN"
+                        ? "bg-red-100 text-red-700 dark:bg-red-950/20 dark:text-red-400"
+                        : roleName === "INSTRUCTOR"
+                        ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/20 dark:text-indigo-400"
+                        : "bg-teal-100 text-teal-700 dark:bg-teal-950/20 dark:text-teal-400"
+                    }`}>
+                      {roleName === "SUPER_ADMIN" ? "Admin" : roleName === "ADMIN" ? "Admin" : roleName === "INSTRUCTOR" ? "Formateur" : "Apprenant"}
+                    </span>
+                    <p className="text-[9px] text-zinc-455 dark:text-zinc-500 mt-1">
+                      {new Date(user.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
