@@ -221,10 +221,16 @@ function PaymentContent() {
     }
   };
 
-  // Sandbox auto-simulation helper for Mobile Money
+  // Sandbox auto-simulation helper for Mobile Money - only auto-simulate on localhost
   useEffect(() => {
     if (showPendingState && paymentId && method === "mobile_money") {
-      if (isSandboxMode) {
+      const isLocalhost = typeof window !== "undefined" && (
+        window.location.hostname === "localhost" || 
+        window.location.hostname === "127.0.0.1" || 
+        window.location.hostname.startsWith("192.168.")
+      );
+
+      if (isSandboxMode && isLocalhost) {
         const timer = setTimeout(() => {
           simulateSuccess();
         }, 3000);
