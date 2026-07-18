@@ -234,8 +234,8 @@ export default function AdminUsersPage() {
           plan: p.plan || 'FREE',
           level: p.level || 'Débutant',
           joinedAt: p.created_at || new Date().toISOString(),
-          phoneNumber: p.phone_number || '',
-          country: p.country || '',
+          phoneNumber: p.phone || '',
+          country: p.nationality || '',
           gender: p.gender || '',
           bio: p.bio || '',
           nationality: p.nationality || '',
@@ -972,7 +972,14 @@ export default function AdminUsersPage() {
                       </div>
                       <div>
                         <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Genre</span>
-                        <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">{openUser.gender === "M" ? "Masculin" : openUser.gender === "F" ? "Féminin" : openUser.gender || "Non renseigné"}</span>
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">
+                          {(() => {
+                            const g = (openUser.gender || '').toLowerCase();
+                            if (g === 'm' || g === 'male' || g === 'homme') return 'Masculin';
+                            if (g === 'f' || g === 'female' || g === 'femme') return 'Féminin';
+                            return openUser.gender || 'Non renseigné';
+                          })()}
+                        </span>
                       </div>
                     </div>
 
