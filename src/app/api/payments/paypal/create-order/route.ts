@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createPayPalOrder } from "@/lib/paypal";
 
+import { createClient as createDirectClient } from "@supabase/supabase-js";
+
+const supabaseAdmin = createDirectClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -22,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     if (type === "COURSE") {
       // 1. Fetch course details from DB to get the correct price (avoid client-side price tampering)
-      const { data: course, error: courseError } = await (supabase as any)
+      const { data: course, error: courseError } = await supabaseAdmin
         .from("courses")
         .select("price, title, allow_installments, installments_count")
         .eq("id", itemId)
@@ -39,7 +46,7 @@ export async function POST(req: NextRequest) {
 
       // Apply coupon if any
       if (couponId) {
-        const { data: coupon } = await (supabase as any)
+        const { data: coupon } = await supabaseAdmin
           .from("coupons")
           .select("*")
           .eq("id", couponId)

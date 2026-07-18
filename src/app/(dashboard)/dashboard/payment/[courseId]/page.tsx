@@ -350,8 +350,10 @@ export default function PaymentPage() {
         throw new Error("Erreur de simulation");
       }
 
-      // Check status immediately
-      await checkPaymentStatus();
+      // Wait 2 seconds for webhook DB transaction to settle
+      setTimeout(async () => {
+        await checkPaymentStatus();
+      }, 2000);
     } catch (err: any) {
       console.error("[Simulate Success Error]", err);
       alert("Erreur lors de la simulation : " + err.message);
@@ -359,6 +361,19 @@ export default function PaymentPage() {
       setSimulating(false);
     }
   };
+
+  // Sandbox auto-simulation helper for Mobile Money
+  useEffect(() => {
+    if (showPendingState && paymentId && method === "momo") {
+      const isSandbox = process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS === "true";
+      if (isSandbox) {
+        const timer = setTimeout(() => {
+          simulateSuccess();
+        }, 3000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [showPendingState, paymentId, method]);
 
   // Note: PayPal SDK script is loaded dynamically in the JSX using next/script component
 
@@ -687,7 +702,7 @@ export default function PaymentPage() {
           <div className="space-y-2">
             <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Validation du paiement en cours...</h2>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
-              Une demande d'approbation a été envoyée sur votre téléphone. Veuillez saisir votre code PIN secret pour confirmer le paiement de <span className="font-extrabold text-blue-600 dark:text-blue-400">${finalAmount} USD</span>.
+              Une demande d'approbation a été envoyée sur votre téléphone. Veuillez saisir votre code PIN secret pour confirmer le paiement de <span className="font-extrabold text-blue-600 dark:text-blue-450">${discountedAmount} USD</span>.
             </p>
           </div>
 
@@ -779,20 +794,6 @@ export default function PaymentPage() {
                 <Smartphone className="w-5 h-5" />
                 <span className="text-xs">Mobile Money</span>
               </button>
-              {/* CARD OPTION - ARCHIVED WITH MOKO AFRIKA CARD SYSTEM
-              <button
-                type="button"
-                onClick={() => setMethod("card")}
-                className={`flex flex-col items-center gap-2 py-3 rounded-xl transition-all cursor-pointer ${
-                  method === "card"
-                    ? "bg-zinc-100 dark:bg-zinc-800 text-blue-600 dark:text-blue-400 font-bold"
-                    : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-700"
-                }`}
-              >
-                <CreditCard className="w-5 h-5" />
-                <span className="text-xs">Carte bancaire</span>
-              </button>
-              */}
               <button
                 type="button"
                 onClick={() => setMethod("paypal")}
@@ -821,21 +822,6 @@ export default function PaymentPage() {
 
             {/* Input Forms */}
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              
-              {/* CARD Form */}
-              {method === "card" && (
-                <div className="space-y-4 animate-in fade-in duration-200 py-4 text-center">
-                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-950/30 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-2">
-                    <ShieldCheck className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-zinc-900 dark:text-white mb-1">Paiement sécurisé par Carte Bancaire</h4>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed">
-                      Vous allez être redirigé vers l'interface de paiement sécurisée de Moko Afrika pour saisir les coordonnées de votre carte Visa ou Mastercard et valider le paiement de <span className="font-semibold text-blue-600 dark:text-blue-400">${discountedAmount} USD</span>.
-                    </p>
-                  </div>
-                </div>
-              )}
               
               {/* MOMO Form */}
               {method === "momo" && (
@@ -948,9 +934,8 @@ export default function PaymentPage() {
                   
                   <div className="flex flex-col items-center p-6 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/50 dark:border-zinc-800 rounded-2xl shadow-sm space-y-4">
                     <div className="relative p-4 bg-white rounded-xl border border-zinc-150 flex items-center justify-center shadow-sm">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&color=09090b&data=${encodeURIComponent(`solana:AnsLA11111111111111111111111111111111111111?amount=${finalAmount}&spl-token=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&label=Ansella%20Academy&memo=KCA-ORDER-${course.id.substring(0,6).toUpperCase()}`)}`}
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&color=09090b&data=${encodeURIComponent(`solana:AnsLA11111111111111111111111111111111111111?amount=${discountedAmount}&spl-token=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&label=Ansella%20Academy&memo=KCA-ORDER-${course.id.substring(0,6).toUpperCase()}`)}`}
                         alt="Solana Pay QR Code"
                         width={180}
                         height={180}
@@ -960,7 +945,7 @@ export default function PaymentPage() {
                     <div className="text-center space-y-1.5">
                       <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Solana Pay</p>
                       <p className="text-sm font-black text-zinc-800 dark:text-zinc-150">
-                        Montant : <span className="text-emerald-600 dark:text-emerald-450 font-black">${finalAmount} USDC</span>
+                        Montant : <span className="text-emerald-600 dark:text-emerald-450 font-black">${discountedAmount} USDC</span>
                       </p>
                       <p className="text-[10px] text-zinc-555 dark:text-zinc-400 max-w-[260px] leading-relaxed font-semibold">
                         Scannez ce QR Code avec Phantom, Solflare ou tout portefeuille Solana Pay pour finaliser votre règlement.
@@ -968,7 +953,7 @@ export default function PaymentPage() {
                     </div>
                     
                     <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2.5 rounded-xl text-center select-all font-mono text-[9px] text-zinc-650 dark:text-zinc-450 break-all leading-normal">
-                      {`solana:AnsLA11111111111111111111111111111111111111?amount=${finalAmount}&spl-token=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&label=Ansella%20Academy&memo=KCA-ORDER-${course.id.substring(0,6).toUpperCase()}`}
+                      {`solana:AnsLA11111111111111111111111111111111111111?amount=${discountedAmount}&spl-token=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&label=Ansella%20Academy&memo=KCA-ORDER-${course.id.substring(0,6).toUpperCase()}`}
                     </div>
                   </div>
                 </div>
