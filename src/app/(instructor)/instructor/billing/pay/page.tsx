@@ -39,6 +39,7 @@ function PaymentContent() {
   const [simulating, setSimulating] = useState(false);
   const [paypalLoaded, setPaypalLoaded] = useState(false);
   const [paypalError, setPaypalError] = useState<string | null>(null);
+  const [isSandboxMode, setIsSandboxMode] = useState(false);
 
   // Form Fields
   const [cardNumber, setCardNumber] = useState("");
@@ -220,6 +221,18 @@ function PaymentContent() {
     }
   };
 
+  // Sandbox auto-simulation helper for Mobile Money
+  useEffect(() => {
+    if (showPendingState && paymentId && method === "mobile_money") {
+      if (isSandboxMode) {
+        const timer = setTimeout(() => {
+          simulateSuccess();
+        }, 3000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [showPendingState, paymentId, method, isSandboxMode]);
+
   // Note: PayPal SDK script is loaded dynamically in the JSX using next/script component
 
   // Render PayPal buttons once script is loaded
@@ -348,6 +361,7 @@ function PaymentContent() {
         }
 
         setPaymentId(resData.depositId);
+        setIsSandboxMode(!!resData.isSandbox);
         setShowPendingState(true);
       } catch (err: any) {
         alert(err.message || "Une erreur est survenue lors de l'appel de la passerelle.");
@@ -474,7 +488,7 @@ function PaymentContent() {
             </button>
 
             {/* Sandbox Simulation Button */}
-            {(process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS === "true") && (
+            {isSandboxMode && (
               <button
                 type="button"
                 onClick={simulateSuccess}

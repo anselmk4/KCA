@@ -219,6 +219,7 @@ export async function POST(req: NextRequest) {
       success: true,
       depositId: paymentId,
       status: depositResult.status,
+      isSandbox: process.env.PAWAPAY_ENVIRONMENT !== "production",
       message: 'Requête PIN envoyée sur le mobile de l\'utilisateur.'
     });
 

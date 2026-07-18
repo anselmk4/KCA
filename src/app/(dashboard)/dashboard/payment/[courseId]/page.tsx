@@ -47,6 +47,7 @@ export default function PaymentPage() {
   const [paymentId, setPaymentId] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [simulating, setSimulating] = useState(false);
+  const [isSandboxMode, setIsSandboxMode] = useState(false);
 
   // MOMO state
   const [userCountry, setUserCountry] = useState("CD");
@@ -365,15 +366,14 @@ export default function PaymentPage() {
   // Sandbox auto-simulation helper for Mobile Money
   useEffect(() => {
     if (showPendingState && paymentId && method === "momo") {
-      const isSandbox = process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS === "true";
-      if (isSandbox) {
+      if (isSandboxMode) {
         const timer = setTimeout(() => {
           simulateSuccess();
         }, 3000);
         return () => clearTimeout(timer);
       }
     }
-  }, [showPendingState, paymentId, method]);
+  }, [showPendingState, paymentId, method, isSandboxMode]);
 
   // Note: PayPal SDK script is loaded dynamically in the JSX using next/script component
 
@@ -517,6 +517,7 @@ export default function PaymentPage() {
           }
 
           setPaymentId(resData.depositId);
+          setIsSandboxMode(!!resData.isSandbox);
           setShowPendingState(true);
         } catch (momoErr: any) {
           alert(momoErr.message || "Une erreur est survenue avec le service Mobile Money.");
@@ -731,7 +732,7 @@ export default function PaymentPage() {
             </button>
 
             {/* Sandbox Simulation Button */}
-            {(process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS === "true") && (
+            {isSandboxMode && (
               <button
                 type="button"
                 onClick={simulateSuccess}
