@@ -6,6 +6,7 @@ import {
   SolanaLogo, EthereumLogo, TetherLogo, MoovLogo, WaveLogo, MtnMomoLogo 
 } from "@/components/icons/PaymentLogos";
 import { Wallet, Smartphone, ShieldCheck, Sparkles } from "lucide-react";
+import { useLanguage } from "@/context/LanguageContext";
 
 const payments = [
   { name: "Airtel Money", logo: <AirtelMoneyLogo className="w-9 h-9 shrink-0 rounded-xl" /> },
@@ -21,6 +22,7 @@ const payments = [
 ];
 
 export function PartnersMarquee() {
+  const { language } = useLanguage();
   // Double the list to make the loop seamless
   const duplicatedPayments = [...payments, ...payments, ...payments];
 
@@ -53,18 +55,25 @@ export function PartnersMarquee() {
           <div className="lg:col-span-6 space-y-5">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30 rounded-full text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>L'avantage concurrentiel d'Ansella</span>
+              <span>{language === "en" ? "Ansella's Competitive Advantage" : "L'avantage concurrentiel d'Ansella"}</span>
             </div>
             
             <h2 className="text-3xl md:text-4xl font-extrabold text-zinc-900 dark:text-white tracking-tight leading-tight">
-              Démocratisez l'accès à vos formations grâce aux <span className="bg-gradient-to-r from-blue-600 to-teal-500 bg-clip-text text-transparent">paiements locaux</span>
+              {language === "en" ? "Democratize access to your courses through " : "Démocratisez l'accès à vos formations grâce aux "}
+              <span className="bg-gradient-to-r from-blue-600 to-teal-505 bg-clip-text text-transparent">
+                {language === "en" ? "local payments" : "paiements locaux"}
+              </span>
             </h2>
             
             <p className="text-sm md:text-base text-zinc-650 dark:text-zinc-400 leading-relaxed">
-              Contrairement aux LMS traditionnels occidentaux qui imposent l'usage exclusif de cartes bancaires internationales ou de comptes PayPal, Ansella intègre nativement les <strong>Mobile Money</strong> et les <strong>Cryptomonnaies</strong>. 
+              {language === "en" 
+                ? "Unlike traditional Western LMS that impose the exclusive use of international credit cards or PayPal accounts, Ansella natively integrates Mobile Money and Cryptocurrencies."
+                : "Contrairement aux LMS traditionnels occidentaux qui imposent l'usage exclusif de cartes bancaires internationales ou de comptes PayPal, Ansella intègre nativement les Mobile Money et les Cryptomonnaies."}
             </p>
-            <p className="text-sm md:text-base text-zinc-650 dark:text-zinc-400 leading-relaxed">
-              Permettez à des millions d'apprenants en Afrique et dans le monde de s'inscrire instantanément et de débloquer vos formations avec leurs moyens de paiement quotidiens.
+            <p className="text-sm md:text-base text-zinc-655 dark:text-zinc-400 leading-relaxed">
+              {language === "en"
+                ? "Enable millions of learners in Africa and around the world to instantly register and unlock your courses with their daily payment methods."
+                : "Permettez à des millions d'apprenants en Afrique et dans le monde de s'inscrire instantanément et de débloquer vos formations avec leurs moyens de paiement quotidiens."}
             </p>
           </div>
 
@@ -74,9 +83,13 @@ export function PartnersMarquee() {
               <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-950/30 flex items-center justify-center text-teal-600 dark:text-teal-400">
                 <Smartphone className="w-5 h-5" />
               </div>
-              <h4 className="font-bold text-zinc-900 dark:text-white text-sm">Mobile Money Natif</h4>
+              <h4 className="font-bold text-zinc-900 dark:text-white text-sm">
+                {language === "en" ? "Native Mobile Money" : "Mobile Money Natif"}
+              </h4>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                M-Pesa, Orange Money, Airtel, MTN MoMo, Wave et Moov. Vos étudiants paient directement avec leur téléphone portable en quelques secondes.
+                {language === "en"
+                  ? "M-Pesa, Orange Money, Airtel, MTN MoMo, Wave, and Moov. Your students pay directly with their mobile phone in seconds."
+                  : "M-Pesa, Orange Money, Airtel, MTN MoMo, Wave et Moov. Vos étudiants paient directement avec leur téléphone portable en quelques secondes."}
               </p>
             </div>
 
@@ -84,9 +97,13 @@ export function PartnersMarquee() {
               <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
                 <Wallet className="w-5 h-5" />
               </div>
-              <h4 className="font-bold text-zinc-900 dark:text-white text-sm">Web3 & Cryptomonnaies</h4>
+              <h4 className="font-bold text-zinc-900 dark:text-white text-sm">
+                {language === "en" ? "Web3 & Cryptocurrencies" : "Web3 & Cryptomonnaies"}
+              </h4>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                Ethereum, Solana et USDT. Ouvrez vos cours à une audience technophile internationale sans frais de conversion bancaire abusifs.
+                {language === "en"
+                  ? "Ethereum, Solana, and USDT. Open your courses to a tech-savvy international audience without abusive bank conversion fees."
+                  : "Ethereum, Solana et USDT. Ouvrez vos cours à une audience technophile internationale sans frais de conversion bancaire abusifs."}
               </p>
             </div>
           </div>
@@ -96,8 +113,8 @@ export function PartnersMarquee() {
 
       {/* Marquee Title */}
       <div className="container mx-auto px-6 md:px-12 max-w-7xl mb-6">
-        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-black uppercase tracking-widest text-center lg:text-left">
-          Méthodes de paiement entièrement intégrées & automatisées
+        <p className="text-[10px] text-zinc-400 dark:text-zinc-505 font-black uppercase tracking-widest text-center lg:text-left">
+          {language === "en" ? "Fully integrated & automated payment methods" : "Méthodes de paiement entièrement intégrées & automatisées"}
         </p>
       </div>
 

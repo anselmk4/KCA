@@ -43,7 +43,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 
 export default function InstructorLayout({ children }: { children: React.ReactNode }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const pathname = usePathname();
   const router = useRouter();
   const [session, setSession] = useState<any>(null);
@@ -52,16 +52,16 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
   const menuItems = [
     { icon: LayoutDashboard, label: t("instructor.sidebar.dashboard"), href: "/instructor" },
     { icon: BookOpen, label: t("instructor.sidebar.myCourses"), href: "/instructor/courses" },
-    { icon: Ticket, label: "Codes promo / Coupons", href: "/instructor/coupons" },
+    { icon: Ticket, label: language === "en" ? "Promo Codes / Coupons" : "Codes promo / Coupons", href: "/instructor/coupons" },
     { icon: Users, label: t("instructor.sidebar.students"), href: "/instructor/students" },
-    { icon: Video, label: "Sessions live", href: "/instructor/live" },
+    { icon: Video, label: language === "en" ? "Live Sessions" : "Sessions live", href: "/instructor/live" },
     { icon: BarChart3, label: t("instructor.sidebar.analytics"), href: "/instructor/analytics" },
-    { icon: Wallet, label: "Revenus", href: "/instructor/earnings" },
-    { icon: Share2, label: "Affiliation", href: "/instructor/affiliate" },
+    { icon: Wallet, label: language === "en" ? "Revenue" : "Revenus", href: "/instructor/earnings" },
+    { icon: Share2, label: language === "en" ? "Affiliation" : "Affiliation", href: "/instructor/affiliate" },
     { icon: CreditCard, label: t("instructor.sidebar.billing"), href: "/instructor/billing" },
-    { icon: MessageSquare, label: "Messages", href: "/instructor/messages" },
+    { icon: MessageSquare, label: language === "en" ? "Messages" : "Messages", href: "/instructor/messages" },
     { icon: Bell, label: t("instructor.sidebar.notifications"), href: "/instructor/notifications" },
-    { icon: Users2, label: "Communauté", href: "/instructor/community" },
+    { icon: Users2, label: language === "en" ? "Community" : "Communauté", href: "/instructor/community" },
     { icon: Settings, label: t("instructor.sidebar.settings"), href: "/instructor/settings" },
   ];
   const [academyName, setAcademyName] = useState<string>("");
@@ -530,7 +530,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
                         onClick={() => setNotificationsOpen(false)}
                         className="block py-1.5 text-xxs font-bold text-teal-600 hover:text-teal-700 dark:text-teal-400 transition-colors"
                       >
-                        Voir toutes les notifications
+                        {language === "en" ? "View all notifications" : "Voir toutes les notifications"}
                       </Link>
                     </div>
                   </div>
@@ -548,7 +548,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
                   {initials}
                 </div>
                 <div className="hidden md:block text-left">
-                  <p className="text-xs font-semibold text-zinc-900 dark:text-white leading-none">{session?.name || "Instructeur"}</p>
+                  <p className="text-xs font-semibold text-zinc-900 dark:text-white leading-none">{session?.name || (language === "en" ? "Instructor" : "Instructeur")}</p>
                   <p className="text-[10px] text-zinc-400 mt-0.5">{session?.email || ""}</p>
                 </div>
                 <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${profileOpen ? "rotate-180" : ""}`} />
@@ -574,7 +574,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
                       className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                     >
                       <User className="w-4 h-4 text-zinc-400" />
-                      Mon Profil & Académie
+                      {language === "en" ? "My Profile & Academy" : "Mon Profil & Académie"}
                     </Link>
                     {userId && (
                       <Link
@@ -583,7 +583,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                       >
                         <UserCircle className="w-4 h-4 text-zinc-400" />
-                        Voir mon profil public
+                        {language === "en" ? "View my public profile" : "Voir mon profil public"}
                       </Link>
                     )}
                     <button
@@ -591,7 +591,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                     >
                       <Lock className="w-4 h-4 text-zinc-400" />
-                      Changer le mot de passe
+                      {language === "en" ? "Change Password" : "Changer le mot de passe"}
                     </button>
                     <Link
                       href="/instructor/billing"
@@ -599,7 +599,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
                       className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
                     >
                       <CreditCard className="w-4 h-4 text-zinc-400" />
-                      Mon Abonnement
+                      {language === "en" ? "My Subscription" : "Mon Abonnement"}
                       <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                         session?.plan === "MAX" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
                         : session?.plan === "PRO" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
@@ -613,7 +613,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
-                      Déconnexion
+                      {language === "en" ? "Log Out" : "Déconnexion"}
                     </button>
                   </div>
                 </div>
@@ -627,7 +627,15 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
             <div className="flex items-center gap-3">
               <AlertTriangle className="w-5 h-5 shrink-0 animate-bounce" />
               <p className="text-xs md:text-sm font-semibold">
-                <strong>Action requise :</strong> Veuillez vérifier vos e-mails et activer votre compte sous un délai de <strong>2 jours</strong>. Passé ce délai, votre compte et vos données seront supprimés.
+                {language === "en" ? (
+                  <>
+                    <strong>Action required:</strong> Please check your email and activate your account within <strong>2 days</strong>. After this limit, your account and data will be deleted.
+                  </>
+                ) : (
+                  <>
+                    <strong>Action requise :</strong> Veuillez vérifier vos e-mails et activer votre compte sous un délai de <strong>2 jours</strong>. Passé ce délai, votre compte et vos données seront supprimés.
+                  </>
+                )}
               </p>
             </div>
             <button

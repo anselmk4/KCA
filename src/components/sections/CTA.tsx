@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
+import { useLanguage } from "@/context/LanguageContext";
 
 export function CTA() {
+  const { language } = useLanguage();
+
   return (
     <section className="relative py-32 overflow-hidden bg-transparent text-zinc-900 dark:text-white border-t border-zinc-200 dark:border-zinc-900">
       {/* Immersive background decoration */}
@@ -33,8 +36,10 @@ export function CTA() {
           transition={{ duration: 0.6 }}
           className="text-3xl md:text-5xl lg:text-6xl font-black mb-6 tracking-tight max-w-4xl mx-auto leading-tight text-zinc-900 dark:text-white"
         >
-          N’attendez plus pour créer votre formation en ligne{" "}
-          <span className="bg-gradient-to-r from-teal-400 to-indigo-400 bg-clip-text text-transparent">simplement.</span>
+          {language === "en" ? "Don't wait any longer to create your online course " : "N’attendez plus pour créer votre formation en ligne "}
+          <span className="bg-gradient-to-r from-teal-400 to-indigo-400 bg-clip-text text-transparent">
+            {language === "en" ? "simply." : "simplement."}
+          </span>
         </motion.h2>
         
         <motion.p 
@@ -42,9 +47,11 @@ export function CTA() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.15 }}
-          className="text-lg md:text-xl text-zinc-650 dark:text-zinc-400 mb-10 max-w-2xl mx-auto leading-relaxed"
+          className="text-lg md:text-xl text-zinc-600 dark:text-zinc-400 mb-10 max-w-2xl mx-auto leading-relaxed"
         >
-          Partagez & valorisez votre expertise auprès de ceux qui en ont besoin !
+          {language === "en" 
+            ? "Share & value your expertise with those who need it!" 
+            : "Partagez & valorisez votre expertise auprès de ceux qui en ont besoin !"}
         </motion.p>
 
         {/* Button Animation */}
@@ -56,10 +63,10 @@ export function CTA() {
         >
           <Link
             href="/register"
-            className="group relative inline-flex items-center justify-center rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white h-14 px-8 shadow-lg shadow-teal-500/25 overflow-hidden"
+            className="group relative inline-flex items-center justify-center rounded-xl text-sm font-bold transition-all bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white h-14 px-8 shadow-lg shadow-teal-500/25 overflow-hidden cursor-pointer"
           >
             <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-            Commencer maintenant
+            {language === "en" ? "Get Started Now" : "Commencer maintenant"}
             <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
           </Link>
         </motion.div>

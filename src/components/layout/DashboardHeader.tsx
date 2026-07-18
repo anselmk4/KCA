@@ -15,7 +15,7 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHeaderProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [session, setSession] = useState<any>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -216,7 +216,9 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
         <div className="hidden sm:flex items-center text-sm text-zinc-500 dark:text-zinc-400">
           <span>Dashboard</span>
           <span className="mx-2">›</span>
-          <span className="text-zinc-900 dark:text-zinc-100 font-medium">Vue d'ensemble</span>
+          <span className="text-zinc-900 dark:text-zinc-100 font-medium">
+            {language === "en" ? "Overview" : "Vue d'ensemble"}
+          </span>
         </div>
       </div>
 
@@ -252,13 +254,13 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
                       onClick={() => setMessagesOpen(false)}
                       className="text-xxs text-blue-600 hover:text-blue-500 dark:text-blue-400 font-semibold cursor-pointer"
                     >
-                      Ouvrir la messagerie
+                      {language === "en" ? "Open Messenger" : "Ouvrir la messagerie"}
                     </Link>
                   </div>
                   <div className="max-h-64 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800">
                     {conversations.length === 0 ? (
                       <div className="px-4 py-6 text-center text-xs text-zinc-400">
-                        Aucun message
+                        {language === "en" ? "No messages" : "Aucun message"}
                       </div>
                     ) : (
                       conversations.slice(0, 4).map((c) => (
@@ -314,14 +316,14 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
                         onClick={handleMarkAllRead}
                         className="text-xxs text-teal-600 hover:text-teal-500 dark:text-teal-400 font-semibold cursor-pointer"
                       >
-                        Tout lu
+                        {language === "en" ? "Mark all read" : "Tout lu"}
                       </button>
                     )}
                   </div>
                   <div className="max-h-64 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800">
                     {notifications.length === 0 ? (
                       <div className="px-4 py-6 text-center text-xs text-zinc-400">
-                        Aucune notification
+                        {language === "en" ? "No notifications" : "Aucune notification"}
                       </div>
                     ) : (
                       notifications.map((n) => {
@@ -365,7 +367,7 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
                       onClick={() => setNotificationsOpen(false)}
                       className="inline-block text-[11px] font-bold text-teal-600 hover:text-teal-700 dark:text-teal-400 transition-colors cursor-pointer w-full py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/40 rounded-lg"
                     >
-                      Voir toutes les notifications
+                      {language === "en" ? "View all notifications" : "Voir toutes les notifications"}
                     </Link>
                   </div>
                 </div>
@@ -383,7 +385,9 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
                   {initials}
                 </div>
                 <div className="hidden md:block">
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-white leading-none">{session?.name?.split(" ")?.[0] || "Étudiant"}</p>
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-white leading-none">
+                    {session?.name?.split(" ")?.[0] || (language === "en" ? "Student" : "Étudiant")}
+                  </p>
                   <p className="text-xs text-zinc-500 mt-1">Plan {session?.plan || "FREE"}</p>
                 </div>
                 <ChevronDown className="w-4 h-4 text-zinc-500 hidden md:block" />
@@ -392,18 +396,20 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
               {dropdownOpen && (
                 <div className="absolute right-0 top-12 w-56 bg-white dark:bg-zinc-850 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                   <div className="px-4 py-2 border-b border-zinc-100 dark:border-zinc-800">
-                    <p className="text-sm font-bold text-zinc-900 dark:text-white truncate">{session?.name || "Étudiant"}</p>
+                    <p className="text-sm font-bold text-zinc-900 dark:text-white truncate">
+                      {session?.name || (language === "en" ? "Student" : "Étudiant")}
+                    </p>
                     <p className="text-xxs text-zinc-400 truncate">{session?.email || "etudiant@example.com"}</p>
                     <p className="text-xxs text-blue-600 dark:text-blue-400 font-bold mt-1">Plan {session?.plan || "FREE"}</p>
                   </div>
                   <Link href="/dashboard/settings" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                     <Settings className="w-4 h-4 text-zinc-400" />
-                    <span>Paramètres</span>
+                    <span>{language === "en" ? "Settings" : "Paramètres"}</span>
                   </Link>
                   {userId && (
                     <Link href={`/profile/${userId}`} onClick={() => setDropdownOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                       <UserCircle className="w-4 h-4 text-zinc-400" />
-                      <span>Mon Profil</span>
+                      <span>{language === "en" ? "My Profile" : "Mon Profil"}</span>
                     </Link>
                   )}
                   <button 
@@ -411,7 +417,7 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/10 transition-colors text-left border-t border-zinc-100 dark:border-zinc-800 cursor-pointer"
                   >
                     <LogOut className="w-4 h-4" />
-                    <span>Déconnexion</span>
+                    <span>{language === "en" ? "Log Out" : "Déconnexion"}</span>
                   </button>
                 </div>
               )}

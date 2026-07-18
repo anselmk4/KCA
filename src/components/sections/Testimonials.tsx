@@ -1,25 +1,36 @@
+"use client";
+
+import { useLanguage } from "@/context/LanguageContext";
 import { Star } from "lucide-react";
 
 export function Testimonials() {
+  const { language } = useLanguage();
+
   const reviews = [
     {
       name: "Prof. Marc D.",
-      role: "Formateur Finance & Trading, Paris",
-      text: "Grâce à ANSELLA, j'ai lancé mon école de trading en ligne. La plateforme encaisse les frais d'inscription sans que je n'aie à coder. Mes revenus ont doublé en 3 mois.",
+      role: language === "en" ? "Finance & Trading Instructor, Paris" : "Formateur Finance & Trading, Paris",
+      text: language === "en"
+        ? "Thanks to ANSELLA, I launched my online trading school. The platform collects registration fees without me having to code. My revenues doubled in 3 months."
+        : "Grâce à ANSELLA, j'ai lancé mon école de trading en ligne. La plateforme encaisse les frais d'inscription sans que je n'aie à coder. Mes revenus ont doublé en 3 mois.",
       rating: 5,
       academy: "Global Trading Academy"
     },
     {
       name: "Sarah K.",
-      role: "Formatrice Web3 & IA, Montréal",
-      text: "J'adore la simplicité d'utilisation. J'ai 150 étudiants actifs sur mon académie d'IA générative. Les quiz automatiques me font gagner un temps fou dans les corrections.",
+      role: language === "en" ? "Web3 & AI Instructor, Montreal" : "Formatrice Web3 & IA, Montréal",
+      text: language === "en"
+        ? "I love the simplicity of use. I have 150 active students on my generative AI academy. Automatic quizzes save me crazy amount of time in grading."
+        : "J'adore la simplicité d'utilisation. J'ai 150 étudiants actifs sur mon académie d'IA générative. Les quiz automatiques me font gagner un temps fou dans les corrections.",
       rating: 5,
       academy: "Web3/AI World Academy"
     },
     {
       name: "Dr. Jean-Claude B.",
-      role: "Enseignant Blockchain, Bruxelles",
-      text: "Mes étudiants reçoivent des certificats automatisés très professionnels à la fin du cursus. Les retraits de mes commissions se font instantanément vers mon compte.",
+      role: language === "en" ? "Blockchain Lecturer, Brussels" : "Enseignant Blockchain, Bruxelles",
+      text: language === "en"
+        ? "My students receive very professional automated certificates at the end of the course. The withdrawals of my commissions are done instantly to my account."
+        : "Mes étudiants reçoivent des certificats automatisés très professionnels à la fin du cursus. Les retraits de mes commissions se font instantanément vers mon compte.",
       rating: 5,
       academy: "Blockchain Institute Europe"
     }
@@ -30,11 +41,15 @@ export function Testimonials() {
       <div className="container mx-auto px-4 md:px-8">
         <div className="text-center mb-16">
           <span className="text-xs font-bold text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-400/10 border border-yellow-200 dark:border-yellow-500/20 px-3.5 py-1 rounded-full uppercase tracking-widest inline-block mb-4">
-            Témoignages
+            {language === "en" ? "Testimonials" : "Témoignages"}
           </span>
-          <h2 className="text-3xl md:text-5xl font-bold mb-4 text-zinc-900 dark:text-white">Ils réussissent avec ANSELLA</h2>
+          <h2 className="text-3xl md:text-5xl font-bold mb-4 text-zinc-900 dark:text-white">
+            {language === "en" ? "They Succeed with ANSELLA" : "Ils réussissent avec ANSELLA"}
+          </h2>
           <p className="text-lg text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-            Découvrez les témoignages de formateurs et professeurs qui gèrent leurs académies en ligne de A à Z.
+            {language === "en"
+              ? "Discover testimonials from trainers and professors managing their online academies from A to Z."
+              : "Découvrez les témoignages de formateurs et professeurs qui gèrent leurs académies en ligne de A à Z."}
           </p>
         </div>
 

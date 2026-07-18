@@ -12,7 +12,7 @@ import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 
 
 export function Navbar() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -67,16 +67,16 @@ export function Navbar() {
             {t("nav.features")}
           </Link>
           <Link href="/templates" className="transition-colors hover:text-foreground/80 text-foreground/60">
-            Modèle d'académie
+            {language === "en" ? "Academy Models" : "Modèle d'académie"}
           </Link>
           <Link href="/services" className="transition-colors hover:text-foreground/80 text-foreground/60">
             Services
           </Link>
           <Link href="/cases" className="transition-colors hover:text-foreground/80 text-foreground/60">
-            Cas d'utilisation
+            {language === "en" ? "Use Cases" : "Cas d'utilisation"}
           </Link>
           <Link href="/partners" className="transition-colors hover:text-foreground/80 text-foreground/60">
-            Partenaires
+            {language === "en" ? "Partners" : "Partenaires"}
           </Link>
           <Link href="/pricing" className="transition-colors hover:text-foreground/80 text-foreground/60">
             {t("nav.pricing")}
