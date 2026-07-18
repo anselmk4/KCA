@@ -1067,45 +1067,47 @@ export default function PaymentPage() {
 
             {/* Code Promo Input */}
             <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2">
-              <label className="block text-xxs font-extrabold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+              <label className="block text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
                 Code de réduction / Coupon
               </label>
-              <div className="flex gap-2">
+              <div className="relative flex items-center">
                 <input
                   type="text"
                   placeholder="Ex: PROMO10"
                   value={couponCode}
                   onChange={(e) => setCouponCode(e.target.value)}
                   disabled={!!appliedCoupon || applyingCoupon}
-                  className="flex-1 px-3 py-1.5 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-900 dark:text-white uppercase outline-none focus:ring-1 focus:ring-blue-500/40"
+                  className="w-full pl-3 pr-24 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50 dark:bg-zinc-850 text-xs text-zinc-900 dark:text-white uppercase outline-none focus:ring-1 focus:ring-blue-500/40 font-mono tracking-wider placeholder:font-sans placeholder:tracking-normal"
                 />
-                {appliedCoupon ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAppliedCoupon(null);
-                      setCouponCode("");
-                    }}
-                    className="px-3 py-1.5 text-xs font-bold bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition-colors cursor-pointer"
-                  >
-                    Retirer
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={applyingCoupon || !couponCode.trim()}
-                    onClick={handleApplyCoupon}
-                    className="px-3 py-1.5 text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    {applyingCoupon ? "..." : "Appliquer"}
-                  </button>
-                )}
+                <div className="absolute right-1">
+                  {appliedCoupon ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAppliedCoupon(null);
+                        setCouponCode("");
+                      }}
+                      className="px-2.5 py-1 text-[10px] font-bold bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-900/40 text-red-650 dark:text-red-400 rounded-lg transition-colors cursor-pointer"
+                    >
+                      Retirer
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={applyingCoupon || !couponCode.trim()}
+                      onClick={handleApplyCoupon}
+                      className="px-2.5 py-1 text-[10px] font-bold bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      {applyingCoupon ? "..." : "Appliquer"}
+                    </button>
+                  )}
+                </div>
               </div>
               {couponError && (
-                <p className="text-[10px] text-red-500 font-semibold">{couponError}</p>
+                <p className="text-[10px] text-red-500 font-semibold mt-1">{couponError}</p>
               )}
               {appliedCoupon && (
-                <p className="text-[10px] text-emerald-500 font-semibold">
+                <p className="text-[10px] text-emerald-500 font-semibold mt-1">
                   ✓ Code <strong>{appliedCoupon.code}</strong> appliqué !
                 </p>
               )}

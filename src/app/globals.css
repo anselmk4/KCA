@@ -226,3 +226,22 @@
 .ProseMirror u {
   text-decoration: underline;
 }
+
+/* --- GLOBAL RESPONSIVENESS AND OVERFLOW CORRECTIONS --- */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Ensure data tables don't stretch the layout on mobile viewports */
+.table-responsive-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Make sure all code blocks and other elements don't wrap awkwardly or cause spillover */
+pre, code {
+  max-width: 100%;
+  overflow-x: auto;
+}

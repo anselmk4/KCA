@@ -179,12 +179,7 @@ export default function AnalyticsPage() {
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
             Compte : <span className="font-bold text-zinc-900 dark:text-zinc-200">{session?.name}</span> ({session?.email})
           </p>
-          {session?.supabaseUrl && (
-            <p className="text-[10px] text-zinc-400 font-mono">
-              DB: {session.supabaseUrl}
-            </p>
-          )}
-          <p className="text-xs text-zinc-450 dark:text-zinc-500 mt-0.5">Suivez les performances de vos formations et vos revenus en temps réel.</p>
+           <p className="text-xs text-zinc-450 dark:text-zinc-500 mt-0.5">Suivez les performances de vos formations et vos revenus en temps réel.</p>
         </div>
         <span className="self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-850">
           Forfait actuel : {data.plan}

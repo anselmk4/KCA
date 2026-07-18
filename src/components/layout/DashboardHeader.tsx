@@ -79,6 +79,42 @@ export function DashboardHeader({ onMenuClick, role = "student" }: DashboardHead
     }
   };
 
+  // Real-time notifications update subscription for student dashboard
+  useEffect(() => {
+    if (!userId) return;
+
+    fetchNotifications(userId);
+
+    let channel: any;
+    const initRealtime = async () => {
+      const { supabase } = await import("@/lib/supabase/client");
+      channel = supabase
+        .channel(`realtime-notifications-${userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${userId}`
+          },
+          () => {
+            fetchNotifications(userId);
+          }
+        )
+        .subscribe();
+    };
+    initRealtime();
+
+    return () => {
+      if (channel) {
+        import("@/lib/supabase/client").then(({ supabase }) => {
+          supabase.removeChannel(channel);
+        });
+      }
+    };
+  }, [userId]);
+
   useEffect(() => {
     setSession(getSimulatedSession());
     const handler = () => setSession(getSimulatedSession());

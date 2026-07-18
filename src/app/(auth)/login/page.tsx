@@ -235,7 +235,7 @@ function LoginForm() {
 
       {/* RIGHT PANEL: Login Form */}
       <div className="lg:col-span-6 flex items-center justify-center p-6 md:p-12 bg-zinc-50 dark:bg-zinc-950">
-        <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-zinc-200/80 dark:border-white/10 p-8 md:p-10 relative overflow-hidden transition-all">
+        <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-zinc-200/80 dark:border-white/10 p-5 sm:p-8 md:p-10 relative overflow-hidden transition-all">
 
           {/* Top Brand representing mobile view logo */}
           <div className="flex flex-col items-center mb-8">
@@ -375,7 +375,7 @@ function LoginForm() {
               <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-3 text-center">
                 Accès rapide démo
               </p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button
                   type="button"
                   disabled={loading || googleLoading}

@@ -216,6 +216,39 @@ export default function CourseDetailPage() {
   const [collaboratorError, setCollaboratorError] = useState("");
   const [collaboratorSuccess, setCollaboratorSuccess] = useState("");
   const [collaboratorLoading, setCollaboratorLoading] = useState(false);
+  const [isCollaborator, setIsCollaborator] = useState(false);
+  const [ownerName, setOwnerName] = useState("");
+
+  const loadCollaborators = useCallback(async () => {
+    try {
+      const { data: collabData, error: collabErr } = await (supabase as any)
+        .from("course_collaborators")
+        .select("id, collaborator_id")
+        .eq("course_id", courseId);
+
+      if (collabErr || !collabData || collabData.length === 0) {
+        setCollaborators([]);
+        return;
+      }
+
+      const ids = collabData.map((c: any) => c.collaborator_id);
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", ids);
+
+      const profilesMap = new Map(profilesData?.map((p: any) => [p.id, p]));
+      const mapped = collabData.map((c: any) => ({
+        id: c.id,
+        collaborator_id: c.collaborator_id,
+        profiles: profilesMap.get(c.collaborator_id) || null
+      }));
+
+      setCollaborators(mapped);
+    } catch (err) {
+      console.error("Error loading collaborators:", err);
+    }
+  }, [courseId]);
 
   // ─── Load all data from Supabase ──────────────────────────
   const loadData = useCallback(async (silent = false) => {
@@ -238,6 +271,22 @@ export default function CourseDetailPage() {
       }
       setCourse(courseData as unknown as CourseData);
       const cd = courseData as unknown as Record<string, unknown>;
+
+      const isCollab = courseData.instructor_id !== user.id;
+      setIsCollaborator(isCollab);
+
+      if (isCollab) {
+        const { data: ownerProfile } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", courseData.instructor_id)
+          .maybeSingle();
+        if (ownerProfile) {
+          setOwnerName(ownerProfile.full_name || "");
+        }
+      } else {
+        setOwnerName("");
+      }
       // Categories
       const { data: catData } = await supabase
         .from("categories")
@@ -321,11 +370,7 @@ export default function CourseDetailPage() {
       setHomeworks(hwData || []);
 
       // Fetch Collaborators
-      const { data: collabData } = await (supabase as any)
-        .from("course_collaborators")
-        .select("id, collaborator_id, profiles!collaborator_id(full_name, email)")
-        .eq("course_id", courseId);
-      setCollaborators(collabData || []);
+      await loadCollaborators();
 
     } catch (err) {
       console.error("[CourseBuilder] loadData error:", err);
@@ -890,11 +935,7 @@ export default function CourseDetailPage() {
       setCollaboratorSearchEmail("");
       
       // Reload collaborators
-      const { data: collabData } = await (supabase as any)
-        .from("course_collaborators")
-        .select("id, collaborator_id, profiles!collaborator_id(full_name, email)")
-        .eq("course_id", courseId);
-      setCollaborators(collabData || []);
+      await loadCollaborators();
 
     } catch (err: any) {
       console.error("Error adding collaborator:", err.message);
@@ -918,11 +959,7 @@ export default function CourseDetailPage() {
 
       alert(`Collaborateur retiré avec succès.`);
       // Reload collaborators
-      const { data: collabData } = await (supabase as any)
-        .from("course_collaborators")
-        .select("id, collaborator_id, profiles!collaborator_id(full_name, email)")
-        .eq("course_id", courseId);
-      setCollaborators(collabData || []);
+      await loadCollaborators();
     } catch (err: any) {
       console.error("Error removing collaborator:", err.message);
       alert("Erreur lors de la suppression : " + err.message);
@@ -1051,6 +1088,21 @@ export default function CourseDetailPage() {
           </span>
         </div>
       </div>
+
+      {/* Collaborator Banner */}
+      {isCollaborator && (
+        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-4 flex items-start gap-3 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+          <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-450 shrink-0 mt-0.5" />
+          <div>
+            <h4 className="text-xs font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider mb-1">
+              Co-gestion de cours
+            </h4>
+            <p className="text-xs text-amber-700 dark:text-amber-405 leading-relaxed font-medium">
+              Vous êtes collaborateur sur ce cours. Vous co-gérez ce cours avec <strong className="font-bold text-amber-850 dark:text-amber-200">{ownerName || "l'auteur principal"}</strong>.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Course Title Block */}
       <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">

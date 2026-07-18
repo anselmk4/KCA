@@ -567,7 +567,7 @@ function RegisterForm() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-zinc-200 dark:border-white/10 p-8 md:p-10 relative overflow-hidden transition-all duration-300">
+    <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-zinc-200 dark:border-white/10 p-5 sm:p-8 md:p-10 relative overflow-hidden transition-all duration-300">
 
       {/* Progress Bar */}
       {role !== null && (

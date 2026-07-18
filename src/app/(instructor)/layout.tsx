@@ -51,6 +51,7 @@ const menuItems = [
   { icon: Share2, label: "Affiliation", href: "/instructor/affiliate" },
   { icon: CreditCard, label: "Abonnement", href: "/instructor/billing" },
   { icon: MessageSquare, label: "Messages", href: "/instructor/messages" },
+  { icon: Bell, label: "Notifications", href: "/instructor/notifications" },
   { icon: Users2, label: "Communauté", href: "/instructor/community" },
   { icon: Settings, label: "Paramètres", href: "/instructor/settings" },
 ];
@@ -119,8 +120,10 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
         .eq("id", notif.id);
       setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
       setNotificationsOpen(false);
-      if (notif.link) {
-        window.location.href = notif.link;
+      if (notif.link && notif.link !== "/" && notif.link !== "/instructor") {
+        router.push(notif.link);
+      } else {
+        router.push("/instructor/notifications");
       }
     } catch (err) {
       console.error("Error clicking notification:", err);
@@ -202,8 +205,39 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
     loadConversations();
     const handleStorageChange = () => loadConversations();
     window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    window.addEventListener("kuettu_chat_update", handleStorageChange);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("kuettu_chat_update", handleStorageChange);
+    };
   }, [session]);
+
+  // Real-time notifications update subscription
+  useEffect(() => {
+    if (!userId) return;
+
+    fetchNotifications(userId);
+
+    const channel = supabase
+      .channel(`realtime-notifications-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`
+        },
+        () => {
+          fetchNotifications(userId);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   const isActive = (href: string) => {
     if (href === "/instructor") return pathname === "/instructor";
@@ -485,6 +519,15 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
                           );
                         })
                       )}
+                    </div>
+                    <div className="p-2 border-t border-zinc-100 dark:border-zinc-800 text-center">
+                      <Link
+                        href="/instructor/notifications"
+                        onClick={() => setNotificationsOpen(false)}
+                        className="block py-1.5 text-xxs font-bold text-teal-600 hover:text-teal-700 dark:text-teal-400 transition-colors"
+                      >
+                        Voir toutes les notifications
+                      </Link>
                     </div>
                   </div>
                 )}
