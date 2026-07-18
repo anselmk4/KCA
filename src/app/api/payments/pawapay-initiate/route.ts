@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Parse request body
     const body = await req.json();
-    const { amount, phoneNumber, carrier, type, itemId, couponId, country } = body;
+    const { amount, phoneNumber, carrier, type, itemId, couponId, country, payInstallment } = body;
 
     if (!amount || !phoneNumber || !carrier || !type || !itemId) {
       return NextResponse.json({ error: 'Paramètres manquants' }, { status: 400 });
@@ -63,6 +63,49 @@ export async function POST(req: NextRequest) {
       ? supabaseAdmin 
       : supabase;
 
+    // Server-side verification and calculation of price + discount to prevent tampering
+    let calculatedAmount = amount;
+    let subtotal = amount;
+    let discountAmount = 0;
+
+    if (type === 'STUDENT_COURSE') {
+      const { data: course } = await supabaseAdmin
+        .from('courses')
+        .select('price, allow_installments, installments_count')
+        .eq('id', itemId)
+        .maybeSingle();
+
+      if (course) {
+        const originalPrice = parseFloat(course.price as any) || 0;
+        let baseAmount = originalPrice;
+
+        if (payInstallment && course.allow_installments && course.installments_count) {
+          baseAmount = Math.round(originalPrice / course.installments_count);
+        }
+
+        subtotal = baseAmount;
+
+        if (couponId) {
+          const { data: coupon } = await supabaseAdmin
+            .from('coupons')
+            .select('*')
+            .eq('id', couponId)
+            .eq('is_active', true)
+            .maybeSingle();
+
+          if (coupon) {
+            if (coupon.discount_type === 'PERCENTAGE') {
+              discountAmount = Math.round(baseAmount * (parseFloat(coupon.discount_value as any) / 100));
+            } else if (coupon.discount_type === 'FIXED') {
+              discountAmount = parseFloat(coupon.discount_value as any) || 0;
+            }
+          }
+        }
+
+        calculatedAmount = Math.max(0, baseAmount - discountAmount);
+      }
+    }
+
     // 5. Save PENDING records in database (USD equivalent for bookkeeping and DB constraints)
     try {
       const orderNumber = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
@@ -71,10 +114,10 @@ export async function POST(req: NextRequest) {
         order_number: orderNumber,
         user_id: user.id,
         status: 'PENDING',
-        subtotal: amount,
-        discount_amount: 0,
+        subtotal: subtotal,
+        discount_amount: discountAmount,
         tax_amount: 0,
-        total: amount,
+        total: calculatedAmount,
         currency: 'USD', // Standardized currency in DB to match prices
         coupon_id: couponId || null,
         created_at: new Date().toISOString(),
@@ -89,9 +132,9 @@ export async function POST(req: NextRequest) {
           id: crypto.randomUUID(),
           order_id: orderId,
           course_id: itemId,
-          unit_price: amount,
-          discount_amount: 0,
-          final_price: amount,
+          unit_price: subtotal,
+          discount_amount: discountAmount,
+          final_price: calculatedAmount,
           created_at: new Date().toISOString()
         } as any);
 
@@ -102,7 +145,7 @@ export async function POST(req: NextRequest) {
         id: paymentId,
         order_id: orderId,
         user_id: user.id,
-        amount: amount,
+        amount: calculatedAmount,
         currency: 'USD',
         status: 'PENDING',
         provider: 'MOBILE_MONEY',
@@ -135,14 +178,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Convert amount to local currency for billing the user via PawaPay Mobile Money
-    const localAmount = Math.round(amount * countryConfig.exchangeRate);
+    const localAmount = Math.round(calculatedAmount * countryConfig.exchangeRate);
 
     // Build meaningful payment description for mobile money statement (max 22 chars)
     let statementDescription = "Ansella Academy";
     if (type === 'INSTRUCTOR_PLAN') {
       statementDescription = `Ansella Plan ${itemId.toUpperCase()}`.substring(0, 22);
     } else if (type === 'STUDENT_COURSE') {
-      statementDescription = `Ansella Cours $${amount}`.substring(0, 22);
+      statementDescription = `Ansella Cours $${calculatedAmount}`.substring(0, 22);
     }
 
     // 6. Request deposit via PawaPay sandbox API

@@ -475,7 +475,7 @@ export default function PaymentPage() {
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [method, course?.id, discountedAmount, router]);
+  }, [method, course?.id, discountedAmount, payInstallment, appliedCoupon, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -506,7 +506,8 @@ export default function PaymentPage() {
               type: 'STUDENT_COURSE',
               itemId: course.id,
               couponId: appliedCoupon?.id || null,
-              country: userCountry
+              country: userCountry,
+              payInstallment
             }),
           });
 
@@ -536,7 +537,8 @@ export default function PaymentPage() {
               amount: discountedAmount,
               type: 'STUDENT_COURSE',
               itemId: course.id,
-              couponId: appliedCoupon?.id || null
+              couponId: appliedCoupon?.id || null,
+              payInstallment
             }),
           });
 
