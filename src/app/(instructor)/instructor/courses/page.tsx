@@ -415,9 +415,9 @@ export default function InstructorCoursesPage() {
                 key={course.id}
                 className="group bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:border-teal-300 dark:hover:border-teal-700 hover:shadow-lg transition-all duration-200"
               >
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 px-6 py-5 items-center">
+                <div className="flex flex-col lg:grid lg:grid-cols-12 gap-4 px-6 py-5 items-center">
                   {/* Course Info */}
-                  <div className="col-span-4 flex items-center gap-3">
+                  <div className="lg:col-span-4 w-full flex items-center gap-3">
                     {course.thumbnail_url ? (
                       <div className="shrink-0 w-11 h-11 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 relative bg-zinc-100 dark:bg-zinc-800">
                         <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
@@ -427,7 +427,7 @@ export default function InstructorCoursesPage() {
                         <BookOpen className="w-5 h-5 text-white" />
                       </div>
                     )}
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="font-semibold text-zinc-900 dark:text-white text-sm truncate">{course.title}</p>
                       {cleanDesc && (
                         <p className="text-[11px] text-zinc-400 truncate mt-0.5">{cleanDesc}</p>
@@ -438,63 +438,70 @@ export default function InstructorCoursesPage() {
                     </div>
                   </div>
 
-                  {/* Syllabus */}
-                  <div className="col-span-2 text-center">
-                    <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                      {t("student.payment.applyCoupon", "sect.").toLowerCase().includes("appliqu") ? `${sectionCount} sect. · ${lessonCount} lessons` : `${sectionCount} sect. · ${lessonCount} leçons`}
-                    </p>
-                    <p className="text-[10px] text-zinc-400 mt-0.5">{t("student.payment.applyCoupon", "Programme").toLowerCase().includes("appliqu") ? "Curriculum" : "Programme"}</p>
+                  {/* Grid layout wrapper for stats on mobile/tablet */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:contents gap-4 w-full lg:w-auto border-t border-b lg:border-none border-zinc-100 dark:border-zinc-800/60 py-4 lg:py-0 my-1 lg:my-0">
+                    {/* Syllabus */}
+                    <div className="lg:col-span-2 text-center">
+                      <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        {t("student.payment.applyCoupon", "sect.").toLowerCase().includes("appliqu") ? `${sectionCount} sect. · ${lessonCount} lessons` : `${sectionCount} sect. · ${lessonCount} leçons`}
+                      </p>
+                      <p className="text-[10px] text-zinc-400 mt-0.5">{t("student.payment.applyCoupon", "Programme").toLowerCase().includes("appliqu") ? "Curriculum" : "Programme"}</p>
+                    </div>
+
+                    {/* Students */}
+                    <div className="lg:col-span-1 flex flex-col items-center gap-0.5">
+                      <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{enrollCount}</span>
+                      <span className="text-[10px] text-zinc-400 flex items-center gap-0.5"><Users className="w-3 h-3" /> {t("student.payment.applyCoupon", "inscrits").toLowerCase().includes("appliqu") ? "enrolled" : "inscrits"}</span>
+                    </div>
+
+                    {/* Revenue */}
+                    <div className="lg:col-span-1 flex flex-col items-center gap-0.5">
+                      <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{revenue.toLocaleString()}$</span>
+                      <span className="text-[10px] text-zinc-400 flex items-center gap-0.5"><DollarSign className="w-3 h-3" /> {t("student.payment.applyCoupon", "revenu").toLowerCase().includes("appliqu") ? "revenue" : "revenu"}</span>
+                    </div>
+
+                    {/* Price */}
+                    <div className="lg:col-span-1 flex flex-col items-center gap-0.5">
+                      <span className="text-sm font-bold text-zinc-900 dark:text-white">
+                        {course.price > 0 ? `${course.price.toLocaleString()}$` : t("student.discover.free", "Gratuit")}
+                      </span>
+                      <span className="text-[10px] text-zinc-400 mt-0.5 lg:hidden">{t("student.payment.applyCoupon", "Prix").toLowerCase().includes("appliqu") ? "Price" : "Prix"}</span>
+                    </div>
                   </div>
 
-                  {/* Students */}
-                  <div className="col-span-1 flex flex-col items-center gap-0.5">
-                    <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{enrollCount}</span>
-                    <span className="text-[10px] text-zinc-400 flex items-center gap-0.5"><Users className="w-3 h-3" /> {t("student.payment.applyCoupon", "inscrits").toLowerCase().includes("appliqu") ? "enrolled" : "inscrits"}</span>
-                  </div>
+                  {/* Status & Actions container on mobile */}
+                  <div className="flex flex-row lg:contents items-center justify-between lg:justify-end gap-4 w-full lg:w-auto mt-2 lg:mt-0">
+                    {/* Status */}
+                    <div className="lg:col-span-1 flex justify-center">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${statusColors[course.status]}`}>
+                        {getStatusLabel(course.status)}
+                      </span>
+                    </div>
 
-                  {/* Revenue */}
-                  <div className="col-span-1 flex flex-col items-center gap-0.5">
-                    <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{revenue.toLocaleString()}$</span>
-                    <span className="text-[10px] text-zinc-400 flex items-center gap-0.5"><DollarSign className="w-3 h-3" /> {t("student.payment.applyCoupon", "revenu").toLowerCase().includes("appliqu") ? "revenue" : "revenu"}</span>
-                  </div>
-
-                  {/* Status */}
-                  <div className="col-span-1 flex justify-center">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${statusColors[course.status]}`}>
-                      {getStatusLabel(course.status)}
-                    </span>
-                  </div>
-
-                  {/* Price */}
-                  <div className="col-span-1 flex justify-center">
-                    <span className="text-sm font-bold text-zinc-900 dark:text-white">
-                      {course.price > 0 ? `${course.price.toLocaleString()}$` : t("student.discover.free", "Gratuit")}
-                    </span>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="col-span-2 flex items-center justify-end gap-2">
-                    <Link
-                      href={`/instructor/courses/${course.id}`}
-                      className="inline-flex items-center gap-1 px-3 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold rounded-xl transition-all shadow-sm"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                      {t("student.payment.applyCoupon", "Gérer").toLowerCase().includes("appliqu") ? "Manage" : "Gérer"}
-                    </Link>
-                    <Link
-                      href={`/courses/${course.id}/preview`}
-                      className="p-2 bg-zinc-50 dark:bg-zinc-800 text-zinc-500 rounded-lg text-xs hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
-                      title={t("student.payment.applyCoupon", "Aperçu public").toLowerCase().includes("appliqu") ? "Public Preview" : "Aperçu public"}
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(course.id)}
-                      className="p-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 rounded-lg text-xs hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
-                      title={t("student.payment.applyCoupon", "Supprimer le cours").toLowerCase().includes("appliqu") ? "Delete Course" : "Supprimer le cours"}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {/* Actions */}
+                    <div className="lg:col-span-2 flex items-center justify-end gap-2 shrink-0">
+                      <Link
+                        href={`/instructor/courses/${course.id}`}
+                        className="inline-flex items-center gap-1 px-3 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold rounded-xl transition-all shadow-sm cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        {t("student.payment.applyCoupon", "Gérer").toLowerCase().includes("appliqu") ? "Manage" : "Gérer"}
+                      </Link>
+                      <Link
+                        href={`/courses/${course.id}/preview`}
+                        className="p-2 bg-zinc-50 dark:bg-zinc-800 text-zinc-500 rounded-lg text-xs hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                        title={t("student.payment.applyCoupon", "Aperçu public").toLowerCase().includes("appliqu") ? "Public Preview" : "Aperçu public"}
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(course.id)}
+                        className="p-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 rounded-lg text-xs hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                        title={t("student.payment.applyCoupon", "Supprimer le cours").toLowerCase().includes("appliqu") ? "Delete Course" : "Supprimer le cours"}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

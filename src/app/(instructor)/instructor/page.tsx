@@ -203,7 +203,7 @@ export default function InstructorDashboardPage() {
             {language === "en" ? "Here is an overview of your teaching activity." : "Voici un aperçu de votre activité d'enseignement."}
           </p>
         </div>
-        <div className="bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-800/40 rounded-2xl px-5 py-3 text-right">
+        <div className="bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-800/40 rounded-2xl px-5 py-3 text-left md:text-right">
           <span className="block text-xxs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-widest">
             {language === "en" ? "Your Academy" : "Votre Académie"}
           </span>

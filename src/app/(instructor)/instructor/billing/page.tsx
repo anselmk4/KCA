@@ -525,7 +525,7 @@ export default function BillingPage() {
         ) : (
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+              <table className="w-full text-left text-sm min-w-[650px]">
                 <thead className="bg-zinc-55 dark:bg-zinc-800/30 text-zinc-500 dark:text-zinc-400 text-xs font-semibold uppercase tracking-wider border-b border-zinc-100 dark:border-zinc-805">
                   <tr>
                     <th className="px-6 py-3">{t("student.payment.applyCoupon", "Description").toLowerCase().includes("appliqu") ? "Description" : "Description"}</th>

@@ -356,10 +356,10 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
+      <div className="flex-1 lg:ml-64 flex flex-col min-h-screen min-w-0 overflow-x-hidden">
         {/* Header */}
         <header className="h-16 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 md:px-8 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-30">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3">
             {/* Hamburger */}
             <button
               className="lg:hidden p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
@@ -374,7 +374,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
               </span>
             )}
             {session?.plan && (
-              <span className={`text-[10px] tracking-wider font-bold px-2.5 py-0.5 rounded-full uppercase border ${
+              <span className={`text-[10px] tracking-wider font-bold px-2.5 py-0.5 rounded-full uppercase border hidden min-[400px]:inline-block ${
                 session.plan === "MAX"
                   ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-900/50"
                   : session.plan === "PRO"
@@ -386,7 +386,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3">
             <LanguageSwitcher />
             <ThemeToggle />
 

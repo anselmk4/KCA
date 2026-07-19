@@ -238,7 +238,7 @@ export default function AnalyticsPage() {
             {t("student.payment.applyCoupon", "Aucune inscription").toLowerCase().includes("appliqu") ? "No enrollments recorded during this period." : "Aucune inscription enregistrée sur cette période."}
           </div>
         ) : (
-          <div className="flex items-end gap-3 h-40 pt-4">
+          <div className="flex items-end gap-1.5 sm:gap-3 h-40 pt-4">
             {data.weeklyLabels.map((week, i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
                 <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity">
