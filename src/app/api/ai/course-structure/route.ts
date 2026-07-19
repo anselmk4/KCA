@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
 Tu dois générer exactement ${numChapters || 3} chapitres.
 Chaque chapitre doit avoir un titre pertinent et une liste de leçons avec un titre clair et une durée estimée en minutes (comprise entre 5 et 30 minutes).`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${geminiKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

@@ -33,7 +33,7 @@ Tu devez utiliser exclusivement les structures de balises HTML suivantes (compat
         const userPromptText = `Génère une leçon riche, complète et pédagogique pour le sujet suivant : "${prompt}".
 Assure-toi d'inclure au moins 2 sections (avec h2), plusieurs paragraphes de texte riches et explicatifs (div text), des exemples concrets ou blocs de code si pertinent, et au moins un bloc d'information (div info, style success ou warning).`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${geminiKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
