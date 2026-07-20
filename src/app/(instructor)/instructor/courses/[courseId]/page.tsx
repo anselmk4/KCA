@@ -256,6 +256,7 @@ export default function CourseDetailPage() {
     if (!silent) setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push("/login"); return; }
       setUserId(user.id);
 
       // User Profile Plan
