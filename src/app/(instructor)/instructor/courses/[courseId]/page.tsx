@@ -119,6 +119,7 @@ export default function CourseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [userPlan, setUserPlan] = useState<string>("FREE");
 
   const [activeTab, setActiveTab] = useState<TabType>("programme");
   const editorRef = useRef<HTMLDivElement>(null);
@@ -255,8 +256,17 @@ export default function CourseDetailPage() {
     if (!silent) setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push("/login"); return; }
       setUserId(user.id);
+
+      // User Profile Plan
+      const { data: profData } = await supabase
+        .from("profiles")
+        .select("plan")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profData?.plan) {
+        setUserPlan(profData.plan);
+      }
 
       // Course
       const { data: courseData } = await supabase
@@ -508,6 +518,10 @@ export default function CourseDetailPage() {
   };
 
   const handleGenerateStructureAi = async () => {
+    if (userPlan === "FREE") {
+      alert("La génération de la structure par IA est réservée aux abonnés du Plan Base ou supérieur. Veuillez mettre à niveau votre abonnement pour débloquer cette fonctionnalité.");
+      return;
+    }
     if (!aiStructurePrompt.trim()) return;
     setGeneratingStructure(true);
     try {
@@ -538,6 +552,10 @@ export default function CourseDetailPage() {
     }
   };
   const handleGenerateLessonContentAi = async () => {
+    if (userPlan === "FREE") {
+      alert("La génération du contenu de leçons par IA est réservée aux abonnés du Plan Base ou supérieur. Veuillez mettre à niveau votre abonnement pour débloquer cette fonctionnalité.");
+      return;
+    }
     if (!selectedLessonId) return;
     const defaultPrompt = `Leçon sur "${lessonForm.title}"` + (lessonForm.description ? `, description: ${lessonForm.description}` : "");
     const userPrompt = prompt("Sujet ou consignes spécifiques pour générer le contenu de la leçon :", defaultPrompt);
@@ -1715,6 +1733,23 @@ export default function CourseDetailPage() {
                 <Sparkles className="w-5 h-5" />
                 <h3>Générer la Structure avec l'IA</h3>
               </div>
+
+              {userPlan === "FREE" && (
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between gap-3 shadow-xs">
+                  <div>
+                    <span className="font-bold flex items-center gap-1.5 text-amber-900 dark:text-amber-200 text-xs">
+                      ⚡ Réservé au Plan Base et supérieur
+                    </span>
+                    <p className="mt-0.5 opacity-90 text-[11px]">Passez au Plan Base pour débloquer la génération IA de chapitres et leçons.</p>
+                  </div>
+                  <Link
+                    href="/instructor/billing"
+                    className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs whitespace-nowrap transition-all shadow-sm hover:scale-102"
+                  >
+                    Changer de plan
+                  </Link>
+                </div>
+              )}
               
               <div className="space-y-4">
                 <div>

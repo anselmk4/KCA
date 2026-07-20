@@ -16,6 +16,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Le prompt de génération est obligatoire." }, { status: 400 });
     }
 
+    // Verify user subscription plan (Gated to BASE, PRO, MAX)
+    const { data: userProfile } = await supabase
+      .from("profiles")
+      .select("plan")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const userPlan = userProfile?.plan || "FREE";
+    if (userPlan === "FREE") {
+      return NextResponse.json(
+        { error: "La génération de leçons par IA est réservée aux abonnés du Plan Base ou supérieur. Veuillez passer au plan supérieur pour utiliser cette fonction." },
+        { status: 403 }
+      );
+    }
+
     let generatedHtml = "";
 
     const geminiKey = process.env.GEMINI_API_KEY;

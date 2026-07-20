@@ -61,6 +61,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Verify user subscription plan (Gated to BASE, PRO, MAX)
+    const { data: userProfile } = await clientToUse
+      .from("profiles")
+      .select("plan")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const userPlan = userProfile?.plan || "FREE";
+    if (userPlan === "FREE") {
+      return NextResponse.json(
+        { error: "La génération par IA est réservée aux abonnés du Plan Base ou supérieur. Veuillez passer au plan supérieur pour utiliser cette fonction." },
+        { status: 403 }
+      );
+    }
+
     let structure: Array<{ title: string; lessons: Array<{ title: string; duration_minutes: number }> }> = [];
 
     const geminiKey = process.env.GEMINI_API_KEY;
