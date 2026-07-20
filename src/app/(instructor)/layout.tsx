@@ -149,16 +149,25 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
       setUnconfirmed(localStorage.getItem("kuettu_unconfirmed_email") === "true");
     }
 
-    // Fetch academy name, plan and notifications from Supabase profile
+    // Fetch academy name, plan, email verification status and notifications from Supabase profile
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) {
         setUserId(user.id);
         fetchNotifications(user.id);
         const { data: profile } = await supabase
           .from("profiles")
-          .select("academy_name, full_name, plan")
+          .select("academy_name, full_name, plan, email_verified")
           .eq("id", user.id)
           .single();
+
+        // Check if email is verified in Supabase Auth or Profile
+        if (user.email_confirmed_at || profile?.email_verified) {
+          setUnconfirmed(false);
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("kuettu_unconfirmed_email");
+          }
+        }
+
         if (profile?.academy_name) {
           setAcademyName(profile.academy_name);
         } else if (profile?.full_name) {
