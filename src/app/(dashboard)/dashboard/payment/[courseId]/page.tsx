@@ -605,6 +605,20 @@ export default function PaymentPage() {
           created_at: new Date().toISOString()
         } as any);
 
+        if (appliedCoupon?.id) {
+          const { data: couponData } = await supabase
+            .from('coupons')
+            .select('current_uses')
+            .eq('id', appliedCoupon.id)
+            .maybeSingle();
+          
+          const newUses = (couponData?.current_uses || 0) + 1;
+          await supabase
+            .from('coupons')
+            .update({ current_uses: newUses } as any)
+            .eq('id', appliedCoupon.id);
+        }
+
         await supabase.from('order_items').insert({
           id: crypto.randomUUID(),
           order_id: orderId,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { capturePayPalOrder } from "@/lib/paypal";
 import { createClient as createDirectClient } from "@supabase/supabase-js";
+import { incrementCouponUses } from "@/lib/supabase/orders-helper";
 
 // Service client to bypass RLS for administrative operations
 const supabaseAdmin = createDirectClient(
@@ -160,6 +161,9 @@ export async function POST(req: NextRequest) {
         console.error("[paypal-capture-order] Error inserting order:", orderInsertErr.message);
         return NextResponse.json({ error: `Erreur d'enregistrement de commande: ${orderInsertErr.message}` }, { status: 500 });
       }
+
+      // Increment coupon uses if applicable
+      await incrementCouponUses(dbOrderId, dbClient);
 
       // Write Order Item
       const { error: itemInsertErr } = await dbClient.from("order_items").insert({

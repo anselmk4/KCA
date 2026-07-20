@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createNotification } from '@/lib/supabase/notifications-helper';
+import { incrementCouponUses } from '@/lib/supabase/orders-helper';
 import crypto from 'crypto';
 
 const supabaseAdmin = createClient(
@@ -110,6 +111,9 @@ export async function POST(req: NextRequest) {
           .eq('id', payment.order_id);
 
         if (orderUpdateErr) console.error('[webhook-pawapay] Order update error:', orderUpdateErr.message);
+
+        // Increment coupon usages if applicable
+        await incrementCouponUses(payment.order_id, supabaseAdmin);
 
         // Parse method field: CARRIER::TYPE::ITEM_ID
         const methodParts = (payment.method || '').split('::');

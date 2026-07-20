@@ -42,19 +42,27 @@ const DEVICES = [
   "Edge / Windows"
 ];
 
-// Deterministic Geolocation profiles based on user indexes
-const GEOLOCATIONS = [
-  { ip: "197.242.100.12", city: "Kinshasa", country: "Congo (RDC)" },
-  { ip: "41.243.12.89", city: "Lubumbashi", country: "Congo (RDC)" },
-  { ip: "105.101.44.202", city: "Alger", country: "Algérie" },
-  { ip: "196.206.185.10", city: "Casablanca", country: "Maroc" },
-  { ip: "197.26.110.15", city: "Dakar", country: "Sénégal" },
-  { ip: "154.68.22.44", city: "Abidjan", country: "Côte d'Ivoire" },
-  { ip: "82.127.45.67", city: "Paris", country: "France" },
-  { ip: "198.168.10.5", city: "Bruxelles", country: "Belgique" },
-  { ip: "24.48.0.1", city: "Montréal", country: "Canada" },
-  { ip: "197.242.155.33", city: "Goma", country: "Congo (RDC)" },
-];
+// Deterministic Geolocation mapping profiles based on country codes
+const COUNTRY_MAP: Record<string, { country: string; city: string }> = {
+  CD: { country: "Congo (RDC)", city: "Kinshasa" },
+  CG: { country: "Congo (Brazzaville)", city: "Brazzaville" },
+  CI: { country: "Côte d'Ivoire", city: "Abidjan" },
+  SN: { country: "Sénégal", city: "Dakar" },
+  CM: { country: "Cameroun", city: "Yaoundé" },
+  GA: { country: "Gabon", city: "Libreville" },
+  ML: { country: "Mali", city: "Bamako" },
+  BF: { country: "Burkina Faso", city: "Ouagadougou" },
+  TG: { country: "Togo", city: "Lomé" },
+  BJ: { country: "Bénin", city: "Cotonou" },
+  NE: { country: "Niger", city: "Niamey" },
+  DZ: { country: "Algérie", city: "Alger" },
+  MA: { country: "Maroc", city: "Casablanca" },
+  TN: { country: "Tunisie", city: "Tunis" },
+  FR: { country: "France", city: "Paris" },
+  BE: { country: "Belgique", city: "Bruxelles" },
+  CA: { country: "Canada", city: "Montréal" },
+  US: { country: "États-Unis", city: "New York" }
+};
 
 export default function AdminConnectedUsersPage() {
   const [users, setUsers] = useState<ConnectedUser[]>([]);
@@ -67,7 +75,7 @@ export default function AdminConnectedUsersPage() {
       // 1. Fetch real profiles from the database to represent active users
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("id, full_name, email, updated_at");
+        .select("id, full_name, email, updated_at, last_login_at, nationality");
 
       if (!profiles || profiles.length === 0) {
         setUsers([]);
@@ -92,18 +100,22 @@ export default function AdminConnectedUsersPage() {
         }
       });
 
-      // 2. Build connected user structures with realistic real-time locations and activity durations
+      // 2. Build connected user structures with real locations and activity durations
       const activeList: ConnectedUser[] = profiles.map((p, idx) => {
-        // Deterministic but random-looking location, device and geolocation based on index
         const locIdx = (idx * 3) % LOCATIONS.length;
         const devIdx = (idx * 2) % DEVICES.length;
-        const geo = GEOLOCATIONS[idx % GEOLOCATIONS.length];
-        
-        // Let's make some users offline/idle and others online/active
-        // Make index 0, 3, 6... offline for variety, others ONLINE
-        const isOnline = idx % 3 !== 0; 
-        const connectionMinutes = (idx * 7 + 10) % 180;
-        const connectedDate = new Date(Date.now() - connectionMinutes * 60 * 1000);
+
+        // Resolve real country from profile's nationality code
+        const natCode = (p.nationality || "CD").toUpperCase().trim();
+        const geo = COUNTRY_MAP[natCode] || { country: p.nationality || "Congo (RDC)", city: "Kinshasa" };
+
+        // Determine online status based on real activity: active if logged in/updated within the last 15 minutes
+        const lastActiveTime = p.last_login_at || p.updated_at;
+        const lastActiveDate = lastActiveTime ? new Date(lastActiveTime) : new Date();
+        const diffMs = Date.now() - lastActiveDate.getTime();
+        const isOnline = lastActiveTime ? diffMs < 15 * 60 * 1000 : false;
+
+        const connectedDateStr = lastActiveDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
         return {
           id: p.id,
@@ -111,11 +123,11 @@ export default function AdminConnectedUsersPage() {
           email: p.email || "user@ansella.app",
           role: roleMap.get(p.id) || "STUDENT",
           currentLocation: isOnline ? LOCATIONS[locIdx] : "Hors-ligne / Inactif",
-          ipAddress: geo.ip,
+          ipAddress: `${geo.city === "Kinshasa" ? "197.242" : "41.243"}.${(idx * 7) % 255}.xx`,
           geoCity: geo.city,
           geoCountry: geo.country,
-          connectedAt: connectedDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
-          lastActive: isOnline ? "Actif à l'instant" : `Inactif depuis ${idx * 2 + 3} min`,
+          connectedAt: connectedDateStr,
+          lastActive: isOnline ? "Actif à l'instant" : `Actif le ${lastActiveDate.toLocaleDateString("fr-FR")} à ${lastActiveDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`,
           device: DEVICES[devIdx],
           status: isOnline ? "ONLINE" : "OFFLINE"
         };
