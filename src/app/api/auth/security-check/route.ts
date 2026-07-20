@@ -58,9 +58,12 @@ export async function POST(req: NextRequest) {
         throw new Error("Invalid payload signature");
       }
 
-      // Check age (expiry limit 5 minutes = 300,000 ms)
+      // Check age with clock skew tolerance (allow up to 15m future drift and 30m validity)
       const ageMs = now - payload.t;
-      if (ageMs < 0 || ageMs > 5 * 60 * 1000) {
+      const maxFutureDriftMs = 15 * 60 * 1000;
+      const maxAgeMs = 30 * 60 * 1000;
+
+      if (ageMs < -maxFutureDriftMs || ageMs > maxAgeMs) {
         return NextResponse.json(
           { error: "Le test de sécurité a expiré. Veuillez le recharger." },
           { status: 400 }
