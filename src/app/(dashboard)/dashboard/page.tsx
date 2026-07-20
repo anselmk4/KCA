@@ -22,6 +22,7 @@ import {
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
+import { stripHtml } from "@/lib/utils";
 
 interface Profile {
   id: string;
@@ -404,7 +405,7 @@ export default function DashboardPage() {
                       )}
                     </div>
                     <h4 className="font-bold text-zinc-900 dark:text-white mb-1 line-clamp-2 text-sm">{course.title}</h4>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4 line-clamp-2">{course.description}</p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4 line-clamp-2">{stripHtml(course.description)}</p>
                     <div className="flex justify-between items-center text-sm">
                       <span className="font-bold text-zinc-900 dark:text-white">
                         {course.price > 0 ? `$${course.price}` : "Gratuit"}

@@ -18,6 +18,7 @@ import {
   Edit3,
   Trash2
 } from "lucide-react";
+import { stripHtml } from "@/lib/utils";
 
 interface AdminCourseItem {
   id: string;
@@ -294,7 +295,7 @@ export default function AdminCoursesPage() {
                 {/* Details */}
                 <div className="space-y-2">
                   <h3 className="font-bold text-zinc-900 dark:text-white line-clamp-1">{course.title}</h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 h-8">{course.description}</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 h-8">{stripHtml(course.description)}</p>
                 </div>
 
                 <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-2 gap-3 text-xs text-zinc-500 dark:text-zinc-400">

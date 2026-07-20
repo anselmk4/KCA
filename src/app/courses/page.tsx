@@ -292,7 +292,7 @@ function CourseCard({ course }: { course: Course }) {
             {course.title}
           </h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-450 line-clamp-3 leading-relaxed">
-            {course.description}
+            {stripHtml(course.description)}
           </p>
         </div>
 

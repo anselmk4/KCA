@@ -23,6 +23,7 @@ import {
   Lock,
   Check,
 } from "lucide-react";
+import { stripHtml } from "@/lib/utils";
 import { supabase } from "@/lib/supabase/client";
 
 // ─────────────────────────────────────────────────────────
@@ -1056,7 +1057,7 @@ export default function CourseLearnPage() {
                   {activeLesson.description && (
                     <div className="p-4 bg-zinc-50 dark:bg-zinc-800/20 rounded-xl border border-zinc-200/50">
                       <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Résumé de la leçon :</p>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{activeLesson.description}</p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{stripHtml(activeLesson.description)}</p>
                     </div>
                   )}
                   <div className="prose dark:prose-invert max-w-none text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed pt-2">
