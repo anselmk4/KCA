@@ -358,7 +358,7 @@ function RegisterForm() {
       const { error: authErr } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback?next=/auth/confirmed`,
           queryParams: {
             role: selectedRole,
             academy_name: academyName || (selectedRole === "INSTRUCTOR" ? "Mon Académie" : ""),

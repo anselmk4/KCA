@@ -82,10 +82,10 @@ export async function GET(request: Request) {
 
       if (type === 'signup' || next === '/auth/confirmed') {
         return redirectWithCookies(
-          `${origin}/auth/confirmed?code=${code}&next=${encodeURIComponent(next)}`
+          `${origin}/auth/confirmed?code=${code}&next=${encodeURIComponent(next)}&error=${encodeURIComponent(exchangeError.message)}`
         );
       }
-      return redirectWithCookies(`${origin}/login?error=auth-failed`);
+      return redirectWithCookies(`${origin}/login?error=auth-failed&reason=${encodeURIComponent(exchangeError.message)}`);
     }
 
     const { data: { user } } = await supabase.auth.getUser();

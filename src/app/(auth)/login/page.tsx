@@ -123,6 +123,14 @@ function LoginForm() {
     }
   };
 
+  useEffect(() => {
+    const errorParam = searchParams.get("error");
+    const reasonParam = searchParams.get("reason");
+    if (errorParam || reasonParam) {
+      setError(reasonParam ? `Erreur d'authentification : ${reasonParam}` : "L'authentification Google a échoué. Veuillez réessayer.");
+    }
+  }, [searchParams]);
+
   const handleGoogleLogin = async () => {
     setError(null);
     setGoogleLoading(true);
@@ -130,7 +138,7 @@ function LoginForm() {
       const { error: authErr } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback?next=/auth/confirmed`,
         },
       });
       if (authErr) throw authErr;
