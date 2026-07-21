@@ -134,6 +134,12 @@ export async function POST(req: NextRequest) {
           const studentName = studentProfile?.full_name || 'Un apprenant';
           const quizTitle = quizData?.title || 'le Quiz';
 
+          const { data: instructorProfile } = await supabase
+            .from('profiles')
+            .select('email, full_name')
+            .eq('id', courseData.instructor_id)
+            .maybeSingle();
+
           await createNotification({
             userId: courseData.instructor_id,
             title: "Quiz validé !",
@@ -141,6 +147,19 @@ export async function POST(req: NextRequest) {
             type: "SUCCESS",
             link: `/instructor/students`
           });
+
+          if (instructorProfile?.email) {
+            const { sendInstructorStudentProgressEmail } = await import('@/lib/email');
+            await sendInstructorStudentProgressEmail(
+              instructorProfile.email,
+              instructorProfile.full_name || 'Formateur',
+              studentName,
+              courseData.title,
+              "QUIZ",
+              quizTitle,
+              scorePercent
+            );
+          }
         }
       } catch (err) {
         console.error('[API quiz-attempts POST] Error sending notification:', err);

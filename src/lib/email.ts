@@ -245,6 +245,57 @@ export async function sendInvoiceEmail(
   await sendEmail(to, `Facture Ansella #${orderNumber}`, body);
 }
 
+/**
+ * Facture de souscription de Plan Formateur (BASE, PRO, MAX)
+ */
+export async function sendInstructorPlanInvoiceEmail(
+  instructorEmail: string,
+  instructorName: string,
+  orderNumber: string,
+  amount: number,
+  planName: string
+) {
+  const dateStr = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  const body = `
+    <h2>Facture de souscription Formateur 🧾</h2>
+    <p>Bonjour <strong>${instructorName}</strong>,</p>
+    <p>Félicitations pour l'activation de votre abonnement Formateur <strong>Plan ${planName}</strong>. Votre paiement a été traité et votre facture est officiellement disponible.</p>
+
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; margin: 20px 0;">
+      <p style="margin: 0 0 6px 0; font-size: 13px; color: #64748b;">N° Facture : <strong style="color: #0f172a;">${orderNumber}</strong></p>
+      <p style="margin: 0 0 6px 0; font-size: 13px; color: #64748b;">Forfait : <strong style="color: #4f46e5;">Plan Formateur ${planName}</strong></p>
+      <p style="margin: 0; font-size: 13px; color: #64748b;">Date d'émission : <strong style="color: #0f172a;">${dateStr}</strong></p>
+    </div>
+
+    <table class="invoice-table">
+      <thead>
+        <tr>
+          <th>Description du service</th>
+          <th style="text-align: right;">Montant Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <strong style="color: #1e1b4b;">Abonnement Mensuel Plan ${planName}</strong><br>
+            <span style="font-size: 12px; color: #64748b;">Accès illimité aux fonctionnalités avancées d'enseignement & publication</span>
+          </td>
+          <td style="text-align: right; font-weight: 700;">$${amount.toFixed(2)} USD</td>
+        </tr>
+        <tr class="total-row">
+          <td>Total réglé</td>
+          <td style="text-align: right; color: #4f46e5;">$${amount.toFixed(2)} USD</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="text-align: center; margin-top: 30px;">
+      <a href="https://ansella.app/instructor" class="btn">Accéder à mon Espace Formateur</a>
+    </div>
+  `;
+  await sendEmail(instructorEmail, `Facture Abonnement Formateur #${orderNumber}`, body);
+}
+
 export async function sendInstructorCoursePurchasedEmail(
   instructorEmail: string,
   instructorName: string,
@@ -269,6 +320,51 @@ export async function sendInstructorCoursePurchasedEmail(
     </div>
   `;
   await sendEmail(instructorEmail, `Nouvelle inscription à votre cours : ${courseTitle}`, body);
+}
+
+/**
+ * Notification au Formateur quand un Apprenant termine un Cours, Chapitre ou Quiz
+ */
+export async function sendInstructorStudentProgressEmail(
+  instructorEmail: string,
+  instructorName: string,
+  studentName: string,
+  courseTitle: string,
+  itemType: "COURSE" | "CHAPTER" | "QUIZ",
+  itemTitle: string,
+  score?: number
+) {
+  let actionText = "";
+  let icon = "🎯";
+  if (itemType === "COURSE") {
+    actionText = `a **entièrement terminé** votre formation **"${courseTitle}"** ! 🎉`;
+    icon = "🏆";
+  } else if (itemType === "QUIZ") {
+    actionText = `a réussi l'évaluation **"${itemTitle}"** (Score: ${score !== undefined ? `${score}%` : 'Validé'}).`;
+    icon = "📝";
+  } else {
+    actionText = `a terminé le chapitre **"${itemTitle}"** dans la formation **"${courseTitle}"**.`;
+    icon = "📚";
+  }
+
+  const body = `
+    <h2>Progression d'un étudiant ! ${icon}</h2>
+    <p>Bonjour <strong>${instructorName}</strong>,</p>
+    <p>L'apprenant <strong>${studentName}</strong> ${actionText}</p>
+
+    <div style="background-color: #eef2ff; border: 1px solid #c7d2fe; border-radius: 12px; padding: 18px; margin: 20px 0; border-left: 4px solid #4f46e5;">
+      <p style="margin: 0 0 5px 0; font-size: 14px; color: #1e1b4b;"><strong>Étudiant :</strong> ${studentName}</p>
+      <p style="margin: 0 0 5px 0; font-size: 13px; color: #3730a3;"><strong>Formation :</strong> ${courseTitle}</p>
+      <p style="margin: 0; font-size: 13px; color: #3730a3;"><strong>Étape franchie :</strong> ${itemTitle} ${score !== undefined ? `(${score}%)` : ''}</p>
+    </div>
+
+    <p>Vous pouvez suivre la progression complète de l'ensemble de vos étudiants sur votre tableau de bord.</p>
+
+    <div style="text-align: center; margin-top: 30px;">
+      <a href="https://ansella.app/instructor/students" class="btn">Suivre mes étudiants</a>
+    </div>
+  `;
+  await sendEmail(instructorEmail, `${icon} ${studentName} a progressé dans ${courseTitle}`, body);
 }
 
 export async function sendInstructorCourseValidatedEmail(
@@ -305,24 +401,56 @@ export async function sendLiveSessionNotificationEmail(
   const body = `
     <h2>Session Live en direct ! 🎥</h2>
     <p>Bonjour <strong>${studentName}</strong>,</p>
-    <p>Une session de cours en direct vient d'être démarrée pour la formation <strong>${courseTitle}</strong> :</p>
+    <p>Votre formateur vient de lancer une session de cours en direct pour la formation <strong>${courseTitle}</strong> :</p>
     
     <div style="background-color: #eef2ff; border-radius: 12px; padding: 16px; margin: 20px 0; border-left: 4px solid #4f46e5; color: #1e1b4b;">
       <p style="margin: 0 0 5px 0; font-weight: bold; font-size: 15px;">${sessionTitle}</p>
       <p style="margin: 0; font-size: 13px; color: #475569;">Horaire de la session : ${sessionTime}</p>
     </div>
 
-    <p>Rejoignez directement vos formateurs et collègues de promotion via le bouton ci-dessous :</p>
+    <p>Rejoignez directement votre formateur et vos collègues de promotion via le bouton ci-dessous :</p>
 
     <div style="text-align: center; margin-top: 30px;">
       <a href="${sessionLink || "https://ansella.app/dashboard/courses"}" class="btn">Rejoindre le Live</a>
     </div>
   `;
-  await sendEmail(studentEmail, `🔴 Ansella Live : ${sessionTitle}`, body);
+  await sendEmail(studentEmail, `🔴 Session Live en direct : ${sessionTitle}`, body);
 }
 
 /**
- * 1. Notification de paiement d'un formateur (Versement / Payout effectué)
+ * Notification à l'Apprenant pour le Déblocage & Délivrance de son Certificat
+ */
+export async function sendStudentCertificateIssuedEmail(
+  studentEmail: string,
+  studentName: string,
+  courseTitle: string,
+  certificateNumber: string,
+  certificateUrl?: string
+) {
+  const dateStr = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  const body = `
+    <h2>Votre Certificat Officiel est débloqué ! 🏅</h2>
+    <p>Bonjour <strong>${studentName}</strong>,</p>
+    <p>Toutes nos félicitations ! Ayant validé avec succès l'ensemble des modules et évaluations de la formation <strong>"${courseTitle}"</strong>, votre **Certificat Officiel de Réussite ANSELLA** est débloqué et disponible.</p>
+
+    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px; padding: 22px; margin: 24px 0; text-align: center; border-left: 5px solid #16a34a;">
+      <span style="font-size: 42px;">🏆</span>
+      <h3 style="margin: 12px 0 6px 0; color: #15803d; font-size: 18px;">Certificat d'Excellence</h3>
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: #166534;">Délivré le ${dateStr}</p>
+      <p style="margin: 0; font-size: 12px; color: #15803d; font-weight: bold;">Code de vérification unique : ${certificateNumber}</p>
+    </div>
+
+    <p>Ce certificat atteste officiellement de vos compétences et peut être directement téléchargé en PDF et partagé sur votre profil LinkedIn.</p>
+
+    <div style="text-align: center; margin-top: 30px;">
+      <a href="${certificateUrl || `https://ansella.app/dashboard/certificates`}" class="btn" style="background-color: #16a34a;">Télécharger mon Certificat PDF</a>
+    </div>
+  `;
+  await sendEmail(studentEmail, `🏆 Votre Certificat Officiel Ansella : ${courseTitle}`, body);
+}
+
+/**
+ * Notification de paiement d'un formateur (Versement / Payout effectué)
  */
 export async function sendInstructorPayoutCompletedEmail(
   instructorEmail: string,
@@ -354,7 +482,7 @@ export async function sendInstructorPayoutCompletedEmail(
 }
 
 /**
- * 2. Reçu de transaction détaillé pour l'apprenant
+ * Reçu de transaction détaillé pour l'apprenant
  */
 export async function sendStudentTransactionReceiptEmail(
   studentEmail: string,
@@ -409,7 +537,7 @@ export async function sendStudentTransactionReceiptEmail(
 }
 
 /**
- * 3. Notification de déblocage d'un cours par un apprenant
+ * Notification de déblocage d'un cours par un apprenant
  */
 export async function sendStudentCourseUnlockedEmail(
   studentEmail: string,
@@ -436,7 +564,7 @@ export async function sendStudentCourseUnlockedEmail(
 }
 
 /**
- * 4. Alerte Quota 10 apprenants pour Formateur Plan FREE (Incitation Upgrade)
+ * Alerte Quota 10 apprenants pour Formateur Plan FREE (Incitation Upgrade)
  */
 export async function sendInstructorFreeQuotaWarningEmail(
   instructorEmail: string,
@@ -469,7 +597,7 @@ export async function sendInstructorFreeQuotaWarningEmail(
 }
 
 /**
- * 5. Rappel d'expiration de souscription Formateur (3 jours avant ou Jour J)
+ * Rappel d'expiration de souscription Formateur (3 jours avant ou Jour J)
  */
 export async function sendInstructorSubscriptionExpiryReminderEmail(
   instructorEmail: string,

@@ -143,13 +143,13 @@ export async function GET(req: NextRequest) {
 
             const orderNumber = orderData?.order_number || `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-            await sendInvoiceEmail(
+            const { sendInstructorPlanInvoiceEmail } = await import("@/lib/email");
+            await sendInstructorPlanInvoiceEmail(
               instructorProfile.email,
               instructorProfile.full_name || "Formateur",
               orderNumber,
               payment.amount,
-              `Abonnement Formateur — Plan ${planVal}`,
-              `Référence : ${orderNumber} — Accès illimité aux fonctionnalités Formateur Plan ${planVal}.`
+              planVal
             );
           }
         } catch (emailErr) {

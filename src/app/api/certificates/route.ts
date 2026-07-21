@@ -200,6 +200,23 @@ export async function POST(req: NextRequest) {
         type: "SUCCESS",
         link: `/dashboard/certificates`
       });
+
+      const { data: studentProfile } = await activeClient
+        .from('profiles')
+        .select('email, full_name')
+        .eq('id', targetStudentId)
+        .maybeSingle();
+
+      if (studentProfile?.email) {
+        const { sendStudentCertificateIssuedEmail } = await import('@/lib/email');
+        await sendStudentCertificateIssuedEmail(
+          studentProfile.email,
+          studentProfile.full_name || 'Apprenant',
+          course.title,
+          code,
+          `https://ansella.app/dashboard/certificates`
+        );
+      }
     } catch (err) {
       console.error('[API certificates POST] Error triggering notification:', err);
     }
