@@ -243,11 +243,15 @@ export async function GET(req: NextRequest) {
                   payment.amount
                 );
               }
+
+              // Check FREE instructor 10 students quota
+              const { checkInstructorStudentQuota } = await import("@/lib/supabase/notifications-helper");
+              await checkInstructorStudentQuota(courseData.instructor_id);
             }
           }
 
           if (studentEmail) {
-            const { sendInvoiceEmail } = await import("@/lib/email");
+            const { sendStudentTransactionReceiptEmail, sendStudentCourseUnlockedEmail } = await import("@/lib/email");
             const { data: orderData } = await supabaseAdmin
               .from("orders")
               .select("order_number")
@@ -256,13 +260,23 @@ export async function GET(req: NextRequest) {
 
             const orderNumber = orderData?.order_number || `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-            await sendInvoiceEmail(
+            // Send Detailed Transaction Receipt
+            await sendStudentTransactionReceiptEmail(
               studentEmail,
               studentName,
               orderNumber,
               payment.amount,
+              "USD",
               courseTitle,
-              "Accès complet et illimité à la formation."
+              "Mobile Money"
+            );
+
+            // Send Course Unlocked Email
+            await sendStudentCourseUnlockedEmail(
+              studentEmail,
+              studentName,
+              courseTitle,
+              courseId
             );
           }
         } catch (notifErr) {

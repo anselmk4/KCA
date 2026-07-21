@@ -38,14 +38,15 @@ function getEmailTemplate(title: string, bodyContent: string): string {
     .header h1 {
       color: #ffffff;
       margin: 0;
-      font-size: 24px;
+      font-size: 26px;
       font-weight: 800;
       letter-spacing: 0.05em;
     }
     .header p {
       color: #ccfbf1;
       margin: 5px 0 0 0;
-      font-size: 14px;
+      font-size: 13px;
+      font-weight: 500;
     }
     .content {
       padding: 30px 24px;
@@ -62,14 +63,16 @@ function getEmailTemplate(title: string, bodyContent: string): string {
     }
     .btn {
       display: inline-block;
-      padding: 12px 24px;
+      padding: 12px 26px;
       background-color: #0f766e;
       color: #ffffff !important;
       text-decoration: none;
       font-weight: bold;
-      border-radius: 8px;
+      border-radius: 10px;
       margin-top: 15px;
       text-align: center;
+      font-size: 14px;
+      box-shadow: 0 2px 5px rgba(15, 118, 110, 0.2);
     }
     .invoice-table {
       width: 100%;
@@ -78,11 +81,12 @@ function getEmailTemplate(title: string, bodyContent: string): string {
     }
     .invoice-table th {
       text-align: left;
-      padding: 8px;
+      padding: 10px 8px;
       background-color: #f3f4f6;
       font-size: 12px;
       color: #4b5563;
       text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
     .invoice-table td {
       padding: 12px 8px;
@@ -102,14 +106,15 @@ function getEmailTemplate(title: string, bodyContent: string): string {
     <div class="container">
       <div class="header">
         <h1>ANSELLA</h1>
-        <p>L'apprentissage en toute liberté</p>
+        <p>L'apprentissage & l'enseignement en toute liberté</p>
       </div>
       <div class="content">
         ${bodyContent}
       </div>
       <div class="footer">
-        © ${new Date().getFullYear()} Ansella. Tous droits réservés.<br>
-        Besoin d'aide ? <a href="mailto:support@ansella.app" style="color: #0f766e; text-decoration: none;">Contactez le support</a>
+        © ${new Date().getFullYear()} Ansella Inc. Tous droits réservés.<br>
+        Plateforme éducative certifiante globale.<br>
+        <a href="mailto:support@ansella.app" style="color: #0f766e; text-decoration: none; font-weight: 600;">Contactez le Support Ansella</a>
       </div>
     </div>
   </div>
@@ -276,4 +281,188 @@ export async function sendLiveSessionNotificationEmail(
     </div>
   `;
   await sendEmail(studentEmail, `🔴 Ansella Live : ${sessionTitle}`, body);
+}
+
+/**
+ * 1. Notification de paiement d'un formateur (Versement / Payout effectué)
+ */
+export async function sendInstructorPayoutCompletedEmail(
+  instructorEmail: string,
+  instructorName: string,
+  amount: number,
+  paymentMethod: string,
+  reference: string
+) {
+  const dateStr = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  const body = `
+    <h2 style="margin-top: 0; color: #111827;">Votre versement a été effectué avec succès ! 💰</h2>
+    <p>Bonjour <strong>${instructorName}</strong>,</p>
+    <p>Nous vous informons que votre demande de versement de commissions a été validée et exécutée avec succès.</p>
+
+    <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 18px; margin: 20px 0; border-left: 5px solid #10b981;">
+      <p style="margin: 0 0 8px 0; font-size: 14px; color: #065f46;"><strong>Montant versé :</strong> <span style="font-size: 18px; font-weight: 800; color: #047857;">$${amount.toFixed(2)} USD</span></p>
+      <p style="margin: 0 0 5px 0; font-size: 13px; color: #047857;"><strong>Moyen de paiement :</strong> ${paymentMethod}</p>
+      <p style="margin: 0 0 5px 0; font-size: 13px; color: #047857;"><strong>Référence de transaction :</strong> ${reference}</p>
+      <p style="margin: 0; font-size: 12px; color: #059669;"><strong>Date de transfert :</strong> ${dateStr}</p>
+    </div>
+
+    <p>Les fonds sont désormais disponibles sur votre compte récepteur. Merci pour votre contribution et la qualité de vos enseignements sur la plateforme ANSELLA.</p>
+
+    <div style="text-align: center; margin-top: 30px;">
+      <a href="https://ansella.app/instructor/earnings" class="btn" style="background-color: #059669;">Consulter mes revenus</a>
+    </div>
+  `;
+  await sendEmail(instructorEmail, `💰 Versement effectué : $${amount.toFixed(2)} USD transférés`, body);
+}
+
+/**
+ * 2. Reçu de transaction détaillé pour l'apprenant
+ */
+export async function sendStudentTransactionReceiptEmail(
+  studentEmail: string,
+  studentName: string,
+  orderNumber: string,
+  amount: number,
+  currency: string,
+  courseTitle: string,
+  paymentMethod: string
+) {
+  const dateStr = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  const displayAmount = currency.toUpperCase() === "CDF" ? `${amount.toLocaleString("fr-FR")} FC` : `$${amount.toFixed(2)} USD`;
+
+  const body = `
+    <h2 style="margin-top: 0; color: #111827;">Reçu de transaction confirmée 💳</h2>
+    <p>Bonjour <strong>${studentName}</strong>,</p>
+    <p>Votre paiement a été traité et votre commande est officiellement confirmée.</p>
+
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; margin: 20px 0;">
+      <p style="margin: 0 0 6px 0; font-size: 13px; color: #64748b;">N° d'Ordre : <strong style="color: #0f172a;">${orderNumber}</strong></p>
+      <p style="margin: 0 0 6px 0; font-size: 13px; color: #64748b;">Moyen de paiement : <strong style="color: #0f172a;">${paymentMethod}</strong></p>
+      <p style="margin: 0; font-size: 13px; color: #64748b;">Date : <strong style="color: #0f172a;">${dateStr}</strong></p>
+    </div>
+
+    <table class="invoice-table">
+      <thead>
+        <tr>
+          <th>Formation commandée</th>
+          <th style="text-align: right;">Montant</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <strong style="color: #0f766e;">${courseTitle}</strong><br>
+            <span style="font-size: 12px; color: #64748b;">Accès complet et illimité à la formation certifiante</span>
+          </td>
+          <td style="text-align: right; font-weight: 700;">${displayAmount}</td>
+        </tr>
+        <tr class="total-row">
+          <td>Total payé</td>
+          <td style="text-align: right; color: #0f766e;">${displayAmount}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="text-align: center; margin-top: 30px;">
+      <a href="https://ansella.app/dashboard/courses" class="btn">Accéder immédiatement à ma formation</a>
+    </div>
+  `;
+  await sendEmail(studentEmail, `Reçu de paiement Ansella #${orderNumber}`, body);
+}
+
+/**
+ * 3. Notification de déblocage d'un cours par un apprenant
+ */
+export async function sendStudentCourseUnlockedEmail(
+  studentEmail: string,
+  studentName: string,
+  courseTitle: string,
+  courseId: string
+) {
+  const body = `
+    <h2 style="margin-top: 0; color: #111827;">Votre formation est maintenant débloquée ! 🎓</h2>
+    <p>Bonjour <strong>${studentName}</strong>,</p>
+    <p>Bonne nouvelle ! Votre accès à la formation certifiante <strong>"${courseTitle}"</strong> vient d'être débloqué avec succès.</p>
+
+    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 18px; margin: 20px 0; text-align: center;">
+      <span style="font-size: 32px;">🔓</span>
+      <h3 style="margin: 10px 0 5px 0; color: #15803d;">Accès Déverrouillé</h3>
+      <p style="margin: 0; font-size: 13px; color: #166534;">Vous pouvez désormais visionner les leçons vidéo, télécharger les ressources et passer vos évaluations.</p>
+    </div>
+
+    <div style="text-align: center; margin-top: 30px;">
+      <a href="https://ansella.app/dashboard/courses/${courseId}" class="btn" style="background-color: #16a34a;">Commencer à apprendre</a>
+    </div>
+  `;
+  await sendEmail(studentEmail, `🎓 Accès débloqué : ${courseTitle}`, body);
+}
+
+/**
+ * 4. Alerte Quota 10 apprenants pour Formateur Plan FREE (Incitation Upgrade)
+ */
+export async function sendInstructorFreeQuotaWarningEmail(
+  instructorEmail: string,
+  instructorName: string,
+  studentCount: number
+) {
+  const body = `
+    <h2 style="margin-top: 0; color: #111827;">Félicitations pour vos ${studentCount} étudiants ! 🚀</h2>
+    <p>Bonjour <strong>${instructorName}</strong>,</p>
+    <p>Votre académie prend de l'ampleur ! Vous avez atteint <strong>${studentCount} étudiants inscrits</strong> sur votre compte gratuit Plan FREE.</p>
+
+    <div style="background-color: #fff7ed; border: 1px solid #fed7aa; border-radius: 12px; padding: 20px; margin: 20px 0; border-left: 5px solid #f97316;">
+      <h3 style="margin: 0 0 8px 0; color: #c2410c;">⚠️ Vous approchez de la limite du Plan Gratuit</h3>
+      <p style="margin: 0 0 12px 0; font-size: 13px; color: #9a3412;">
+        Le plan FREE est limité pour l'accueil de nouveaux apprenants et prélève des frais de commission de 20%. Pour accueillir un nombre illimité d'étudiants, publier plusieurs formations et réduire vos frais à 0%, passez au plan supérieur !
+      </p>
+      <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #7c2d12;">
+        <li>Accès illimité aux étudiants</li>
+        <li>Publications de cours multiples</li>
+        <li>Taux de commission préférentiel (jusqu'à 0%)</li>
+        <li>Support prioritaire & Certificats personnalisés</li>
+      </ul>
+    </div>
+
+    <div style="text-align: center; margin-top: 30px;">
+      <a href="https://ansella.app/instructor/billing" class="btn" style="background-color: #ea580c;">Passer au Plan Supérieur</a>
+    </div>
+  `;
+  await sendEmail(instructorEmail, `🚀 Cap des 10 étudiants atteint ! Débloquez le potentiel de votre académie`, body);
+}
+
+/**
+ * 5. Rappel d'expiration de souscription Formateur (3 jours avant ou Jour J)
+ */
+export async function sendInstructorSubscriptionExpiryReminderEmail(
+  instructorEmail: string,
+  instructorName: string,
+  planName: string,
+  daysRemaining: number
+) {
+  const isUrgent = daysRemaining <= 0;
+  const titleText = isUrgent
+    ? `Votre abonnement Plan ${planName} a expiré ! ⚠️`
+    : `Rappel : Votre abonnement Plan ${planName} expire dans ${daysRemaining} jours ⏳`;
+
+  const body = `
+    <h2 style="margin-top: 0; color: #111827;">${titleText}</h2>
+    <p>Bonjour <strong>${instructorName}</strong>,</p>
+    <p>${
+      isUrgent
+        ? `Votre forfait formateur <strong>Plan ${planName}</strong> est arrivé à son terme. Sans renouvellement, votre compte est rétrogradé au plan gratuit et vos cours supplémentaires passeront en brouillon.`
+        : `Votre forfait formateur <strong>Plan ${planName}</strong> arrive bientôt à échéance (dans ${daysRemaining} jours).`
+    }</p>
+
+    <div style="background-color: ${isUrgent ? '#fef2f2' : '#fefce8'}; border: 1px solid ${isUrgent ? '#fecaca' : '#fef08a'}; border-radius: 12px; padding: 18px; margin: 20px 0; border-left: 5px solid ${isUrgent ? '#ef4444' : '#eab308'};">
+      <p style="margin: 0 0 5px 0; font-size: 14px; color: ${isUrgent ? '#991b1b' : '#854d0e'};"><strong>Plan actuel :</strong> Plan ${planName}</p>
+      <p style="margin: 0; font-size: 13px; color: ${isUrgent ? '#7f1d1d' : '#713f12'};">
+        Renouvelez dès maintenant pour conserver vos avantages, vos cours publiés actifs et vos taux de commission réduits.
+      </p>
+    </div>
+
+    <div style="text-align: center; margin-top: 30px;">
+      <a href="https://ansella.app/instructor/billing" class="btn" style="background-color: ${isUrgent ? '#dc2626' : '#d97706'};">Renouveler mon abonnement</a>
+    </div>
+  `;
+  await sendEmail(instructorEmail, titleText, body);
 }

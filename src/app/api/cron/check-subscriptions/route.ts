@@ -82,16 +82,50 @@ export async function GET(req: NextRequest) {
           }
         }
 
-        // 3. Send notification
+        // 3. Send notification & email reminder
+        const { sendInstructorSubscriptionExpiryReminderEmail } = await import('@/lib/email');
+
+        await sendInstructorSubscriptionExpiryReminderEmail(
+          instructor.email,
+          instructor.full_name || 'Formateur',
+          instructor.plan,
+          0
+        );
+
         await createNotification({
           userId: instructor.id,
           title: "Abonnement expiré",
           message: `Votre abonnement au plan ${instructor.plan} est arrivé à terme. Votre compte a été automatiquement rétrogradé au plan gratuit FREE.`,
           type: "WARNING",
-          link: `/instructor/billing`
+          link: `/instructor/billing`,
+          sendEmailCopy: false
         });
 
         downgradedCount++;
+      } else {
+        // Check if subscription is 3 days from expiration (between 27 and 29 days old)
+        const twentySevenDaysAgo = new Date(Date.now() - 27 * 24 * 60 * 60 * 1000).toISOString();
+        const twentyEightDaysAgo = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString();
+
+        if (new Date(lastPaidDate) < new Date(twentySevenDaysAgo) && new Date(lastPaidDate) >= new Date(twentyEightDaysAgo)) {
+          const { sendInstructorSubscriptionExpiryReminderEmail } = await import('@/lib/email');
+
+          await sendInstructorSubscriptionExpiryReminderEmail(
+            instructor.email,
+            instructor.full_name || 'Formateur',
+            instructor.plan,
+            3
+          );
+
+          await createNotification({
+            userId: instructor.id,
+            title: "⏳ Rappel d'échéance d'abonnement",
+            message: `Votre abonnement Formateur au Plan ${instructor.plan} expire dans 3 jours. Renouvelez-le dès maintenant pour préserver vos avantages.`,
+            type: "WARNING",
+            link: `/instructor/billing`,
+            sendEmailCopy: false
+          });
+        }
       }
     }
 

@@ -50,6 +50,27 @@ export async function POST(req: NextRequest) {
               updated_at: new Date().toISOString()
             })
             .eq('id', payoutId);
+
+          try {
+            const { sendInstructorPayoutCompletedEmail } = await import('@/lib/email');
+            const { data: instProfile } = await supabaseAdmin
+              .from('profiles')
+              .select('email, full_name')
+              .eq('id', payout.instructor_id)
+              .maybeSingle();
+
+            if (instProfile?.email) {
+              await sendInstructorPayoutCompletedEmail(
+                instProfile.email,
+                instProfile.full_name || 'Formateur',
+                payout.amount,
+                payout.payout_method || 'Mobile Money',
+                payoutId
+              );
+            }
+          } catch (payoutEmailErr) {
+            console.error('[webhook-pawapay] Error sending payout email:', payoutEmailErr);
+          }
         } else if (status === 'FAILED') {
           console.log(`[webhook-pawapay] Payout ${payoutId} has FAILED. Updating database...`);
           await supabaseAdmin

@@ -1,4 +1,5 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { sendEmail } from '@/lib/email';
 
 const supabaseAdmin = createSupabaseClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,6 +14,7 @@ export async function createNotification(params: {
   message: string;
   type?: NotificationType;
   link?: string;
+  sendEmailCopy?: boolean;
 }) {
   try {
     const { error } = await supabaseAdmin
@@ -26,10 +28,98 @@ export async function createNotification(params: {
         is_read: false,
         created_at: new Date().toISOString()
       });
+
     if (error) {
       console.error("[Notifications Helper] Error inserting notification:", error.message);
     }
+
+    // Automatically send an HTML email copy when requested or for notifications
+    const shouldSendEmail = params.sendEmailCopy !== false;
+    if (shouldSendEmail && params.userId) {
+      try {
+        const { data: profile } = await supabaseAdmin
+          .from("profiles")
+          .select("email, full_name")
+          .eq("id", params.userId)
+          .maybeSingle();
+
+        if (profile?.email) {
+          const ctaLink = params.link
+            ? (params.link.startsWith("http") ? params.link : `https://ansella.app${params.link}`)
+            : "https://ansella.app/dashboard";
+
+          const body = `
+            <h2 style="margin-top: 0; color: #111827;">${params.title}</h2>
+            <p>Bonjour <strong>${profile.full_name || 'Cher membre'}</strong>,</p>
+            <p style="font-size: 15px; color: #374151; line-height: 1.6;">${params.message}</p>
+            
+            <div style="text-align: center; margin-top: 25px;">
+              <a href="${ctaLink}" class="btn">Consulter sur la plateforme</a>
+            </div>
+          `;
+
+          await sendEmail(profile.email, params.title, body);
+        }
+      } catch (emailErr) {
+        console.error("[Notifications Helper] Failed to send email copy:", emailErr);
+      }
+    }
   } catch (err) {
     console.error("[Notifications Helper] Exception in createNotification:", err);
+  }
+}
+
+/**
+ * Helper: Check if a FREE instructor reached 10 students and trigger quota email & notification
+ */
+export async function checkInstructorStudentQuota(instructorId: string) {
+  try {
+    const { data: instructorProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('email, full_name, plan')
+      .eq('id', instructorId)
+      .maybeSingle();
+
+    if (!instructorProfile || instructorProfile.plan !== 'FREE') return;
+
+    // Fetch instructor's courses
+    const { data: courses } = await supabaseAdmin
+      .from('courses')
+      .select('id')
+      .eq('instructor_id', instructorId);
+
+    if (!courses || courses.length === 0) return;
+
+    const courseIds = courses.map((c) => c.id);
+
+    // Count enrollments across all instructor's courses
+    const { count } = await supabaseAdmin
+      .from('enrollments')
+      .select('id', { count: 'exact', head: true })
+      .in('course_id', courseIds);
+
+    const totalStudents = count || 0;
+
+    // Trigger quota alert when student count reaches or exceeds 10
+    if (totalStudents >= 10) {
+      const { sendInstructorFreeQuotaWarningEmail } = await import('@/lib/email');
+
+      await sendInstructorFreeQuotaWarningEmail(
+        instructorProfile.email,
+        instructorProfile.full_name || 'Formateur',
+        totalStudents
+      );
+
+      await createNotification({
+        userId: instructorId,
+        title: "🚀 Cap des 10 étudiants atteint !",
+        message: `Félicitations ! Votre académie compte désormais ${totalStudents} étudiants inscrits. Vous approchez de la limite du Plan FREE. Passez au plan supérieur pour un nombre d'étudiants illimité et 0% de commission !`,
+        type: "WARNING",
+        link: "/instructor/billing",
+        sendEmailCopy: false // avoid double email since sendInstructorFreeQuotaWarningEmail was sent
+      });
+    }
+  } catch (err) {
+    console.error('[Notifications Helper] Exception checking instructor quota:', err);
   }
 }
