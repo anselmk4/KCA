@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   Sparkles,
   ArrowRight,
@@ -11,15 +11,13 @@ import {
   DollarSign,
   Image as ImageIcon,
   CheckCircle2,
-  Layers,
   CreditCard,
-  Target,
   FileText,
-  Tag,
-  ShieldCheck,
   Zap,
-  HelpCircle,
   Eye,
+  UploadCloud,
+  FileImage,
+  Loader2,
 } from "lucide-react";
 
 interface CourseCreationWizardModalProps {
@@ -52,12 +50,37 @@ const CATEGORIES = [
   "Autre Domaine",
 ];
 
-const PRESET_THUMBNAILS = [
-  "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop", // AI Abstract
-  "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?q=80&w=1000&auto=format&fit=crop", // Crypto Blockchain
-  "https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=1000&auto=format&fit=crop", // Finance Chart
-  "https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=1000&auto=format&fit=crop", // Data Analytics
-  "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=1000&auto=format&fit=crop", // Cyber Security
+const PRESET_CARDS = [
+  {
+    id: "ai",
+    name: "IA & High Tech",
+    bg: "bg-gradient-to-br from-indigo-600 via-purple-600 to-teal-500",
+    url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80",
+  },
+  {
+    id: "crypto",
+    name: "Web3 & Crypto",
+    bg: "bg-gradient-to-br from-teal-600 via-emerald-600 to-cyan-500",
+    url: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?auto=format&fit=crop&w=600&q=80",
+  },
+  {
+    id: "finance",
+    name: "Finance & Bourse",
+    bg: "bg-gradient-to-br from-amber-500 via-orange-600 to-red-600",
+    url: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=600&q=80",
+  },
+  {
+    id: "data",
+    name: "Data & Code",
+    bg: "bg-gradient-to-br from-blue-600 via-indigo-700 to-cyan-600",
+    url: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=600&q=80",
+  },
+  {
+    id: "biz",
+    name: "Business & Stratégie",
+    bg: "bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-800",
+    url: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=600&q=80",
+  },
 ];
 
 export function CourseCreationWizardModal({
@@ -82,8 +105,12 @@ export function CourseCreationWizardModal({
   const [level, setLevel] = useState("Tous niveaux");
 
   // Step 3: Thumbnail & Media
-  const [thumbnailUrl, setThumbnailUrl] = useState(PRESET_THUMBNAILS[0]);
+  const [selectedPreset, setSelectedPreset] = useState(PRESET_CARDS[0]);
+  const [thumbnailUrl, setThumbnailUrl] = useState(PRESET_CARDS[0].url);
   const [customThumbnail, setCustomThumbnail] = useState("");
+  const [imageError, setImageError] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [fileName, setFileName] = useState("");
 
   // Step 4: Prerequisites & Confirmation
   const [prerequisites, setPrerequisites] = useState("Aucun prérequis nécessaire");
@@ -108,6 +135,37 @@ export function CourseCreationWizardModal({
     if (step > 1) setStep(step - 1);
   };
 
+  const handleLocalFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("L'image choisie dépasse la taille maximale autorisée de 5 Mo.");
+      return;
+    }
+
+    setUploadingImage(true);
+    setFileName(file.name);
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (result) {
+        setThumbnailUrl(result);
+        setCustomThumbnail(result);
+        setImageError(false);
+      }
+      setUploadingImage(false);
+    };
+
+    reader.onerror = () => {
+      alert("Erreur lors du chargement de votre fichier image.");
+      setUploadingImage(false);
+    };
+
+    reader.readAsDataURL(file);
+  };
+
   const handleFinalSubmit = async () => {
     if (!title.trim()) {
       alert("Le titre du cours est obligatoire.");
@@ -115,7 +173,7 @@ export function CourseCreationWizardModal({
       return;
     }
 
-    const finalThumbnail = customThumbnail.trim() || thumbnailUrl;
+    const activeImage = customThumbnail.trim() || thumbnailUrl || PRESET_CARDS[0].url;
 
     await onSubmit({
       title: title.trim(),
@@ -127,7 +185,7 @@ export function CourseCreationWizardModal({
       installmentsEnabled: isPaid && installmentsEnabled,
       installmentCount,
       level,
-      thumbnailUrl: finalThumbnail,
+      thumbnailUrl: activeImage,
       prerequisites,
     });
   };
@@ -136,18 +194,16 @@ export function CourseCreationWizardModal({
     { num: 1, label: "Identité", icon: FileText },
     { num: 2, label: "Tarification", icon: CreditCard },
     { num: 3, label: "Visuel & Aperçu", icon: ImageIcon },
-    { num: 4, label: "Confirmation", icon: RocketIcon },
+    { num: 4, label: "Confirmation", icon: Zap },
   ];
 
-  function RocketIcon(props: any) {
-    return <Zap {...props} />;
-  }
+  const activeImage = customThumbnail.trim() || thumbnailUrl;
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         
-        {/* Modal Header & Step Indicator */}
+        {/* Header & Stepper */}
         <div className="bg-gradient-to-r from-zinc-900 via-teal-950 to-zinc-900 p-6 text-white relative shrink-0">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -159,7 +215,7 @@ export function CourseCreationWizardModal({
                   Assistant de Création de Cours
                 </h2>
                 <p className="text-xs text-teal-200/70">
-                  Configurez votre académie en 4 étapes simples et intuitives.
+                  Configurez votre formation en 4 étapes simples et visuelles.
                 </p>
               </div>
             </div>
@@ -171,10 +227,9 @@ export function CourseCreationWizardModal({
             </button>
           </div>
 
-          {/* Stepper progress bar */}
+          {/* Stepper Progress */}
           <div className="grid grid-cols-4 gap-2 pt-2 border-t border-white/10">
             {stepsList.map((s) => {
-              const Icon = s.icon;
               const isActive = step === s.num;
               const isDone = step > s.num;
 
@@ -215,10 +270,10 @@ export function CourseCreationWizardModal({
           </div>
         </div>
 
-        {/* Step Body Container */}
+        {/* Step Body */}
         <div className="p-6 sm:p-8 overflow-y-auto flex-1 space-y-6">
           
-          {/* STEP 1: Identité & Description */}
+          {/* STEP 1 */}
           {step === 1 && (
             <div className="space-y-5 animate-in fade-in duration-300">
               <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3">
@@ -240,7 +295,7 @@ export function CourseCreationWizardModal({
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Ex: Masterclass IA & Automation : De Zéro à Pro"
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 font-medium transition-all"
+                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-medium transition-all"
                 />
               </div>
 
@@ -309,7 +364,7 @@ export function CourseCreationWizardModal({
             </div>
           )}
 
-          {/* STEP 2: Tarification & Paiement par tranches */}
+          {/* STEP 2 */}
           {step === 2 && (
             <div className="space-y-6 animate-in fade-in duration-300">
               <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3">
@@ -322,7 +377,6 @@ export function CourseCreationWizardModal({
                 </p>
               </div>
 
-              {/* Toggle Gratuit / Payant */}
               <div className="grid grid-cols-2 gap-4">
                 <button
                   type="button"
@@ -384,7 +438,6 @@ export function CourseCreationWizardModal({
                     </div>
                   </div>
 
-                  {/* Payment by Installments (Tranches) Option */}
                   <div className="pt-4 border-t border-zinc-200 dark:border-zinc-700/60 space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -436,7 +489,7 @@ export function CourseCreationWizardModal({
             </div>
           )}
 
-          {/* STEP 3: Visuel de Couverture & Live Preview */}
+          {/* STEP 3: Visuel & Image Locale */}
           {step === 3 && (
             <div className="space-y-6 animate-in fade-in duration-300">
               <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3">
@@ -445,65 +498,118 @@ export function CourseCreationWizardModal({
                   Étape 3 : Visuel de Couverture & Aperçu en Direct
                 </h3>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  Choisissez une couverture captivante et vérifiez son rendu instantané dans le catalogue.
+                  Importez une image locale depuis votre appareil ou sélectionnez une couverture thématique HD.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                {/* Left: Thumbnail Selector */}
-                <div className="space-y-4">
-                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
-                    Suggérer une couverture prédéfinie
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {PRESET_THUMBNAILS.map((img, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => {
-                          setThumbnailUrl(img);
-                          setCustomThumbnail("");
-                        }}
-                        className={`relative aspect-video rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
-                          thumbnailUrl === img && !customThumbnail
-                            ? "border-teal-500 ring-2 ring-teal-500/50 scale-95 shadow-lg"
-                            : "border-transparent opacity-70 hover:opacity-100"
-                        }`}
-                      >
-                        <img src={img} alt="Thumbnail preset" className="w-full h-full object-cover" />
-                      </button>
-                    ))}
+                
+                {/* Left Controls: File Upload & Presets */}
+                <div className="space-y-5">
+                  
+                  {/* File Upload Box */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
+                      📁 Importer une image depuis votre ordinateur
+                    </label>
+                    <label className="border-2 border-dashed border-teal-500/40 hover:border-teal-500 bg-teal-50/40 dark:bg-teal-950/10 hover:bg-teal-50 dark:hover:bg-teal-950/20 rounded-2xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition-all group">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLocalFileUpload}
+                        className="hidden"
+                      />
+                      <div className="w-12 h-12 rounded-2xl bg-teal-100 dark:bg-teal-900/40 text-teal-600 dark:text-teal-400 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                        {uploadingImage ? <Loader2 className="w-6 h-6 animate-spin" /> : <UploadCloud className="w-6 h-6" />}
+                      </div>
+                      <p className="text-xs font-bold text-zinc-900 dark:text-white">
+                        {fileName ? `Fichier prêt : ${fileName}` : "Cliquez pour parcourir vos fichiers"}
+                      </p>
+                      <p className="text-[10px] text-zinc-400 mt-1">PNG, JPG, WEBP jusqu&apos;à 5 Mo</p>
+                    </label>
                   </div>
 
+                  {/* Preset Cards Selector */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
+                      Ou choisir une illustration haute qualité
+                    </label>
+                    <div className="grid grid-cols-3 gap-2.5">
+                      {PRESET_CARDS.map((card) => (
+                        <button
+                          key={card.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedPreset(card);
+                            setThumbnailUrl(card.url);
+                            setCustomThumbnail("");
+                            setImageError(false);
+                          }}
+                          className={`relative aspect-video rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${card.bg} flex flex-col justify-end p-2 ${
+                            thumbnailUrl === card.url && !customThumbnail
+                              ? "border-teal-500 ring-2 ring-teal-500/50 scale-95 shadow-md"
+                              : "border-transparent opacity-80 hover:opacity-100"
+                          }`}
+                        >
+                          <img
+                            src={card.url}
+                            alt={card.name}
+                            className="absolute inset-0 w-full h-full object-cover mix-blend-overlay"
+                            onError={(e) => {
+                              (e.target as any).style.display = "none";
+                            }}
+                          />
+                          <span className="relative z-10 text-[10px] font-bold text-white shadow-sm drop-shadow-md">
+                            {card.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Custom URL Input */}
                   <div>
                     <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
-                      Ou coller une URL d&apos;image personnalisée
+                      Ou saisir l&apos;URL directe d&apos;une image
                     </label>
                     <input
                       type="url"
                       value={customThumbnail}
-                      onChange={(e) => setCustomThumbnail(e.target.value)}
-                      placeholder="https://images.unsplash.com/photo-..."
+                      onChange={(e) => {
+                        setCustomThumbnail(e.target.value);
+                        setImageError(false);
+                      }}
+                      placeholder="https://mon-site.com/image.jpg"
                       className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                     />
                   </div>
                 </div>
 
-                {/* Right: Live Preview Card in Discover Style */}
+                {/* Right: Live Card Preview */}
                 <div className="p-4 bg-zinc-100 dark:bg-zinc-800/30 rounded-3xl border border-zinc-200/80 dark:border-zinc-700/60 space-y-3">
                   <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <Eye className="w-3.5 h-3.5 text-teal-600" /> Aperçu en direct dans le catalogue (/discover)
+                    <Eye className="w-3.5 h-3.5 text-teal-600" /> Rendu en temps réel dans le catalogue (/discover)
                   </p>
 
                   <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-lg group">
-                    <div className="aspect-video relative overflow-hidden bg-zinc-800">
-                      <img
-                        src={customThumbnail.trim() || thumbnailUrl}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
+                    <div className="aspect-video relative overflow-hidden bg-gradient-to-br from-zinc-800 to-zinc-950 flex items-center justify-center">
+                      {!imageError && activeImage ? (
+                        <img
+                          src={activeImage}
+                          alt="Live Course Preview"
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          onError={() => setImageError(true)}
+                        />
+                      ) : (
+                        <div className={`w-full h-full ${selectedPreset.bg} flex items-center justify-center p-4 text-center`}>
+                          <p className="text-white font-extrabold text-sm drop-shadow-md">
+                            {title || "Aperçu du cours"}
+                          </p>
+                        </div>
+                      )}
+                      
                       <div className="absolute top-3 left-3 flex items-center gap-2">
-                        <span className="bg-zinc-900/80 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                        <span className="bg-zinc-900/85 backdrop-blur-md text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-md">
                           {category.split("&")[0]}
                         </span>
                       </div>
@@ -526,12 +632,12 @@ export function CourseCreationWizardModal({
                       </h4>
 
                       <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2">
-                        {shortDescription.trim() || "La description courte s'affichera ici..."}
+                        {shortDescription.trim() || "La description courte apparaîtra ici..."}
                       </p>
 
                       {isPaid && installmentsEnabled && (
                         <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 text-[10px] text-teal-600 dark:text-teal-400 font-bold flex items-center gap-1">
-                          <CreditCard className="w-3 h-3" />
+                          <CreditCard className="w-3.5 h-3.5" />
                           Disponible en {installmentCount}x {installmentAmount}$ / mois
                         </div>
                       )}
@@ -542,7 +648,7 @@ export function CourseCreationWizardModal({
             </div>
           )}
 
-          {/* STEP 4: Prérequis & Confirmation Finale */}
+          {/* STEP 4 */}
           {step === 4 && (
             <div className="space-y-6 animate-in fade-in duration-300">
               <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3">
@@ -551,7 +657,7 @@ export function CourseCreationWizardModal({
                   Étape 4 : Récapitulatif & Finalisation
                 </h3>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  Vérifiez la configuration finale avant de créer votre cours.
+                  Vérifiez la configuration complète avant d&apos;enregistrer votre cours.
                 </p>
               </div>
 
@@ -570,8 +676,8 @@ export function CourseCreationWizardModal({
 
               {/* Summary Card */}
               <div className="p-5 bg-gradient-to-br from-teal-500/10 via-emerald-500/5 to-transparent border border-teal-500/20 rounded-3xl space-y-4">
-                <h4 className="text-xs font-bold text-teal-900 dark:text-teal-200 uppercase tracking-wider">
-                  Fiche Récapitulative du Cours
+                <h4 className="text-xs font-bold text-teal-900 dark:text-teal-200 uppercase tracking-wider flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-teal-600" /> Fiche Récapitulative Prête à l&apos;Enregistrement
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -608,7 +714,7 @@ export function CourseCreationWizardModal({
 
         </div>
 
-        {/* Modal Footer Controls */}
+        {/* Footer Controls */}
         <div className="p-4 sm:p-6 bg-zinc-50 dark:bg-zinc-900/90 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 shrink-0">
           {step > 1 ? (
             <button
@@ -647,7 +753,7 @@ export function CourseCreationWizardModal({
                   "Création du cours..."
                 ) : (
                   <>
-                    <Zap className="w-4 h-4 fill-white" /> Créer & Lancer le Cours
+                    <Zap className="w-4 h-4 fill-white" /> Créer & Enregistrer le Cours
                   </>
                 )}
               </button>
