@@ -103,10 +103,11 @@ export async function GET(req: NextRequest) {
       // Increment coupon usages if applicable
       await incrementCouponUses(payment.order_id, supabaseAdmin);
 
-      // Parse method field: CARRIER::TYPE::ITEM_ID
+      // Parse method field: CARRIER::TYPE::ITEM_ID::CYCLE
       const methodParts = (payment.method || '').split('::');
       const paymentType = methodParts[1] || '';
       const itemId = methodParts[2] || '';
+      const billingCycle = (methodParts[3] || 'MONTHLY').toUpperCase();
 
       if (paymentType === 'INSTRUCTOR_PLAN' && itemId) {
         // Activate Instructor Plan
@@ -117,10 +118,12 @@ export async function GET(req: NextRequest) {
           .update({ plan: planVal } as any)
           .eq('id', payment.user_id);
 
+        const cycleLabel = billingCycle === 'ANNUAL' ? 'Annuel (1 an)' : 'Mensuel';
+
         await createNotification({
           userId: payment.user_id,
           title: "Abonnement activé !",
-          message: `Félicitations, votre abonnement Ansella au plan ${planVal} est maintenant activé !`,
+          message: `Félicitations, votre abonnement Ansella au plan ${planVal} (${cycleLabel}) est maintenant activé !`,
           type: "SUCCESS",
           link: `/instructor/billing`
         });
@@ -134,7 +137,6 @@ export async function GET(req: NextRequest) {
             .maybeSingle();
 
           if (instructorProfile?.email) {
-            const { sendInvoiceEmail } = await import("@/lib/email");
             const { data: orderData } = await supabaseAdmin
               .from("orders")
               .select("order_number")
@@ -149,7 +151,7 @@ export async function GET(req: NextRequest) {
               instructorProfile.full_name || "Formateur",
               orderNumber,
               payment.amount,
-              planVal
+              `${planVal} — ${cycleLabel}`
             );
           }
         } catch (emailErr) {

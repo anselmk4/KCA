@@ -135,13 +135,31 @@ function PaymentContent() {
     });
   }, [searchParams]);
 
-  const planDetails = {
-    BASE: { name: "Plan Base", price: 19, desc: "Jusqu'à 3 cours actifs et 50 apprenants. Commission 10%." },
-    PRO: { name: "Plan Pro", price: 49, desc: "Jusqu'à 10 cours actifs et 200 apprenants." },
-    MAX: { name: "Plan Max", price: 200, desc: "Cours et apprenants illimités, 0% commission." }
+  const cycleParam = searchParams.get("cycle")?.toUpperCase();
+  const isAnnual = cycleParam === "ANNUAL";
+
+  const rawPrices = {
+    BASE: 19,
+    PRO: 49,
+    MAX: 200
   };
 
-  const currentPlanDetails = planDetails[plan];
+  const baseMonthlyPrice = rawPrices[plan] || 49;
+  const annualTotalBeforeDiscount = baseMonthlyPrice * 12;
+  const discountAmount = isAnnual ? Math.round(annualTotalBeforeDiscount * 0.10 * 100) / 100 : 0;
+  const finalPrice = isAnnual ? Math.round((annualTotalBeforeDiscount - discountAmount) * 100) / 100 : baseMonthlyPrice;
+
+  const currentPlanDetails = {
+    name: plan === "BASE" ? "Plan Base" : (plan === "MAX" ? "Plan Max" : "Plan Pro"),
+    price: finalPrice,
+    basePrice: baseMonthlyPrice,
+    isAnnual,
+    annualTotalBeforeDiscount,
+    discountAmount,
+    desc: plan === "BASE" 
+      ? "Jusqu'à 3 cours actifs et 50 apprenants. Commission 10%." 
+      : (plan === "MAX" ? "Cours et apprenants illimités, 0% commission." : "Jusqu'à 10 cours actifs et 200 apprenants. Commission 2%.")
+  };
 
   /**
    * Called after any successful payment to show success state and redirect.
@@ -373,6 +391,7 @@ function PaymentContent() {
             carrier: carrier,
             type: "INSTRUCTOR_PLAN",
             itemId: plan,
+            cycle: isAnnual ? "ANNUAL" : "MONTHLY",
             country: userCountry,
             currency: userCountry === "CD" ? momoCurrency : countryConfig.currency,
           }),
@@ -539,17 +558,38 @@ function PaymentContent() {
             <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-4">
               <h3 className="font-bold text-zinc-900 dark:text-white">Récapitulatif de la commande</h3>
               <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800">
-                <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{currentPlanDetails.name}</p>
+                <div className="flex justify-between items-start">
+                  <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{currentPlanDetails.name}</p>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                    isAnnual ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300" : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                  }`}>
+                    {isAnnual ? "Annuel (1 an)" : "Mensuel"}
+                  </span>
+                </div>
                 <p className="text-xs text-zinc-500 mt-1">{currentPlanDetails.desc}</p>
               </div>
-              <div className="flex justify-between items-center pt-3 border-t border-zinc-100 dark:border-zinc-800 text-sm">
-                <span className="text-zinc-500">Sous-total</span>
-                <span className="font-semibold text-zinc-800 dark:text-zinc-200">{currentPlanDetails.price},00 $</span>
-              </div>
-              <div className="flex justify-between items-center pt-3 border-t border-zinc-100 dark:border-zinc-800 text-sm font-bold">
-                <span className="text-zinc-900 dark:text-white">Total récurrent</span>
-                <span className="text-teal-600 dark:text-teal-400">{currentPlanDetails.price},00 $ / mois</span>
-              </div>
+
+              {isAnnual ? (
+                <>
+                  <div className="flex justify-between items-center pt-3 border-t border-zinc-100 dark:border-zinc-800 text-xs">
+                    <span className="text-zinc-500">Tarif annuel brut (12 x ${currentPlanDetails.basePrice})</span>
+                    <span className="font-semibold text-zinc-800 dark:text-zinc-200">${currentPlanDetails.annualTotalBeforeDiscount.toFixed(2)} USD</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                    <span>Réduction souscription annuelle (-10%)</span>
+                    <span>-${currentPlanDetails.discountAmount.toFixed(2)} USD</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-3 border-t border-zinc-100 dark:border-zinc-800 text-sm font-bold">
+                    <span className="text-zinc-900 dark:text-white">Total à payer (12 mois)</span>
+                    <span className="text-indigo-600 dark:text-indigo-400 font-extrabold text-base">${currentPlanDetails.price.toFixed(2)} USD</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between items-center pt-3 border-t border-zinc-100 dark:border-zinc-800 text-sm font-bold">
+                  <span className="text-zinc-900 dark:text-white">Total récurrent</span>
+                  <span className="text-teal-600 dark:text-teal-400">${currentPlanDetails.price.toFixed(2)} USD / mois</span>
+                </div>
+              )}
             </div>
 
             <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-2xl flex items-start gap-3">

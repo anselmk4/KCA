@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Parse request body
     const body = await req.json();
-    const { amount, phoneNumber, carrier, type, itemId, couponId, country, payInstallment, currency } = body;
+    const { amount, phoneNumber, carrier, type, itemId, cycle, couponId, country, payInstallment, currency } = body;
 
     if (!amount || !phoneNumber || !carrier || !type || !itemId) {
       return NextResponse.json({ error: 'Paramètres manquants' }, { status: 400 });
@@ -149,8 +149,8 @@ export async function POST(req: NextRequest) {
         currency: 'USD',
         status: 'PENDING',
         provider: 'MOBILE_MONEY',
-        // Encode carrier, type and itemId for webhook resolution (no schema change needed)
-        method: `${carrier}::${type}::${itemId}`,
+        // Encode carrier, type, itemId and cycle for webhook resolution
+        method: `${carrier}::${type}::${itemId}::${cycle || 'MONTHLY'}`,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       } as any);
