@@ -59,6 +59,21 @@ export async function POST(req: Request) {
           minute: "2-digit"
         });
 
+        // Batch insert in-app notifications
+        const notificationInserts = profiles.map(p => ({
+          user_id: p.id,
+          title: isPublic ? "Nouveau live public !" : "Live programmé !",
+          message: isPublic 
+            ? `Un live public a été programmé : "${title}". Rejoignez-nous !`
+            : `Un live a été programmé avec vous comme invité : "${title}".`,
+          type: "INFO",
+          link: "/dashboard/live",
+          is_read: false,
+          created_at: new Date().toISOString()
+        }));
+
+        await supabaseAdmin.from("notifications").insert(notificationInserts);
+
         for (const profile of profiles) {
           if (profile.email) {
             await sendLiveSessionNotificationEmail(
