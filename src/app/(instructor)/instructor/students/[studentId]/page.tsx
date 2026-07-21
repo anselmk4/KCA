@@ -456,6 +456,39 @@ export default function StudentDetailPage() {
                           </div>
                         </div>
 
+                        {/* Detailed Quiz Results Breakdown */}
+                        {courseQuizzes.length > 0 && (
+                          <div className="space-y-3">
+                            <h4 className="text-xs font-bold text-zinc-550 dark:text-zinc-450 uppercase tracking-wider">Résultats Détaillés des Quiz (QCM)</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {courseQuizzes.map((quiz) => {
+                                const quizAtts = attempts.filter(a => a.quiz_id === quiz.id);
+                                const hasPassed = quizAtts.some(a => a.passed);
+                                const bestScore = quizAtts.length > 0 ? Math.max(...quizAtts.map(a => a.score)) : 0;
+
+                                return (
+                                  <div key={quiz.id} className="p-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl flex items-center justify-between">
+                                    <div>
+                                      <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{quiz.title}</p>
+                                      <p className="text-[10px] text-zinc-400 mt-0.5">
+                                        {quizAtts.length} tentative{quizAtts.length > 1 ? "s" : ""} · Seuil: {quiz.pass_percentage || 80}%
+                                      </p>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className={`text-sm font-black ${hasPassed ? "text-green-600" : quizAtts.length > 0 ? "text-amber-500" : "text-zinc-400"}`}>
+                                        {quizAtts.length > 0 ? `${bestScore}%` : "Non fait"}
+                                      </span>
+                                      {hasPassed && (
+                                        <p className="text-[9px] font-bold text-green-500 uppercase">Validé ✓</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Manual release button */}
                         <div className="bg-zinc-50 dark:bg-zinc-800/20 p-4 rounded-2xl border border-zinc-150 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                           <div className="space-y-1 flex-1">

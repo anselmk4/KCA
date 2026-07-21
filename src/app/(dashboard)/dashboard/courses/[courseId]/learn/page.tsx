@@ -917,44 +917,115 @@ export default function CourseLearnPage() {
                   )}
                 </form>
               ) : (
-                <div className="text-center py-10 space-y-6 animate-in zoom-in-95 duration-200">
-                  <div className="inline-flex p-4 rounded-full bg-zinc-50 dark:bg-zinc-800">
-                    <Award className={`w-16 h-16 ${quizPassed ? "text-green-500 animate-bounce" : "text-amber-500 animate-pulse"}`} />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-2xl font-black text-zinc-900 dark:text-white">Score : {scorePercent}%</h3>
-                    <p className={`text-sm font-bold ${quizPassed ? "text-green-500" : "text-red-500"}`}>
+                <div className="space-y-6 animate-in zoom-in-95 duration-200">
+                  {/* Summary Banner */}
+                  <div className="text-center py-8 bg-zinc-50 dark:bg-zinc-800/30 rounded-2xl border border-zinc-150 dark:border-zinc-800 space-y-4">
+                    <div className="inline-flex p-4 rounded-full bg-white dark:bg-zinc-900 shadow-md">
+                      <Award className={`w-16 h-16 ${quizPassed ? "text-green-500 animate-bounce" : "text-amber-500 animate-pulse"}`} />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-2xl font-black text-zinc-900 dark:text-white">Score obtenu : {scorePercent}%</h3>
+                      <p className={`text-sm font-bold ${quizPassed ? "text-green-500" : "text-red-500"}`}>
+                        {quizPassed
+                          ? "✓ Félicitations ! Vous avez validé ce test avec succès."
+                          : `✗ Score insuffisant. Minimum requis : ${activeQuiz.passPercentage}%.`}
+                      </p>
+                    </div>
+                    <p className="text-xs text-zinc-500 max-w-md mx-auto leading-relaxed">
                       {quizPassed
-                        ? "✓ Félicitations ! Vous avez validé ce test avec succès."
-                        : `✗ Score insuffisant. Minimum requis : ${activeQuiz.passPercentage}%.`}
+                        ? "Ce test est validé et comptabilisé dans les critères de déblocage de votre certificat final."
+                        : "Révisez les leçons de ce module et consultez la correction ci-dessous avant de retenter votre chance."}
                     </p>
-                  </div>
-                  <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-                    {quizPassed
-                      ? "Ce test est validé et comptabilisé dans les critères de déblocage de votre certificat final."
-                      : "Révisez les leçons de ce module et retentez votre chance."}
-                  </p>
-                  <div className="flex justify-center gap-4 pt-4 flex-wrap">
-                    <button
-                      onClick={() => { setQuizSubmitted(false); setSelectedAnswers({}); }}
-                      className="px-5 py-2.5 bg-white dark:bg-zinc-800 border rounded-xl text-xs font-bold hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors cursor-pointer flex items-center gap-1.5"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" /> Recommencer
-                    </button>
-                    <button
-                      onClick={() => { setActiveQuiz(null); if (lessons.length > 0) setActiveLesson(lessons[0]); }}
-                      className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors"
-                    >
-                      Retourner aux leçons
-                    </button>
-                    {quizPassed && hasCertificate && (
-                      <Link
-                        href="/dashboard/certificates"
-                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-500/10 flex items-center gap-1.5 animate-pulse"
+                    <div className="flex justify-center gap-3 pt-2 flex-wrap">
+                      <button
+                        onClick={() => { setQuizSubmitted(false); setSelectedAnswers({}); }}
+                        className="px-5 py-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-bold hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors cursor-pointer flex items-center gap-1.5"
                       >
-                        <Award className="w-3.5 h-3.5" /> Voir mon Certificat
-                      </Link>
-                    )}
+                        <RefreshCw className="w-3.5 h-3.5" /> Recommencer le test
+                      </button>
+                      <button
+                        onClick={() => { setActiveQuiz(null); if (lessons.length > 0) setActiveLesson(lessons[0]); }}
+                        className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors cursor-pointer"
+                      >
+                        Retourner aux leçons
+                      </button>
+                      {quizPassed && hasCertificate && (
+                        <Link
+                          href="/dashboard/certificates"
+                          className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-500/10 flex items-center gap-1.5 animate-pulse"
+                        >
+                          <Award className="w-3.5 h-3.5" /> Voir mon Certificat
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Detailed Correction & Results for each Question */}
+                  <div className="space-y-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                    <h4 className="font-bold text-sm text-zinc-900 dark:text-white flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-blue-600" />
+                      Détail des résultats & correction question par question :
+                    </h4>
+                    {activeQuizQuestions.map((q, idx) => {
+                      const userChoice = selectedAnswers[q.id];
+                      const isCorrect = userChoice === q.correctIndex;
+
+                      return (
+                        <div
+                          key={q.id}
+                          className={`p-5 rounded-2xl border transition-all space-y-3 ${
+                            isCorrect
+                              ? "bg-green-50/40 dark:bg-green-950/10 border-green-200 dark:border-green-900/30"
+                              : "bg-red-50/40 dark:bg-red-950/10 border-red-200 dark:border-red-900/30"
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <p className="text-sm font-bold text-zinc-900 dark:text-white flex gap-2">
+                              <span className={isCorrect ? "text-green-600 font-black" : "text-red-600 font-black"}>Q{idx + 1}.</span>
+                              <span>{q.text}</span>
+                            </p>
+                            <span className={`text-xs font-extrabold px-2.5 py-1 rounded-full shrink-0 flex items-center gap-1 ${
+                              isCorrect ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                            }`}>
+                              {isCorrect ? "✓ Correct" : "✗ Incorrect"}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                            {q.choices.map((choice, cIdx) => {
+                              const isSelectedByUser = userChoice === cIdx;
+                              const isActualCorrect = q.correctIndex === cIdx;
+
+                              let choiceStyle = "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400";
+                              if (isActualCorrect) {
+                                choiceStyle = "bg-green-100/80 dark:bg-green-900/30 border-green-500 text-green-900 dark:text-green-200 font-bold shadow-sm";
+                              } else if (isSelectedByUser && !isCorrect) {
+                                choiceStyle = "bg-red-100/80 dark:bg-red-900/30 border-red-500 text-red-900 dark:text-red-200 font-bold line-through";
+                              }
+
+                              return (
+                                <div
+                                  key={cIdx}
+                                  className={`p-3 rounded-xl border text-xs flex items-center justify-between transition-all ${choiceStyle}`}
+                                >
+                                  <span>{choice}</span>
+                                  {isActualCorrect && (
+                                    <span className="text-[10px] font-black uppercase text-green-700 dark:text-green-400 bg-green-200/60 dark:bg-green-900/40 px-2 py-0.5 rounded-md">
+                                      ✓ Bonne réponse
+                                    </span>
+                                  )}
+                                  {isSelectedByUser && !isActualCorrect && (
+                                    <span className="text-[10px] font-black uppercase text-red-700 dark:text-red-400 bg-red-200/60 dark:bg-red-900/40 px-2 py-0.5 rounded-md">
+                                      Votre choix
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
