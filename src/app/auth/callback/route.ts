@@ -87,10 +87,31 @@ export async function GET(request: Request) {
  * Bootstraps the user's profile and roles in the database using admin privileges and returns the resolved role name.
  */
 async function bootstrapUserAndGetRole(user: any): Promise<string> {
-  // Read intended role from metadata — default to STUDENT
-  const targetRole: string = (user.user_metadata?.role || 'STUDENT').toUpperCase();
   const fullName =
     user.user_metadata?.full_name || user.email?.split('@')[0] || 'Utilisateur';
+
+  // Check existing DB roles first (for returning users)
+  const { data: existingUserRoles } = await supabaseAdmin
+    .from('user_roles')
+    .select('roles(name)')
+    .eq('user_id', user.id);
+
+  const existingRoleNames: string[] =
+    existingUserRoles?.map((ur: any) => ur.roles?.name).filter(Boolean) || [];
+
+  let targetRole: string;
+  if (existingRoleNames.length > 0) {
+    if (existingRoleNames.includes('SUPER_ADMIN')) targetRole = 'SUPER_ADMIN';
+    else if (existingRoleNames.includes('ADMIN')) targetRole = 'ADMIN';
+    else if (existingRoleNames.includes('FINANCE_ADMIN')) targetRole = 'FINANCE_ADMIN';
+    else if (existingRoleNames.includes('ACADEMIC_ADMIN')) targetRole = 'ACADEMIC_ADMIN';
+    else if (existingRoleNames.includes('SUPPORT_AGENT')) targetRole = 'SUPPORT_AGENT';
+    else if (existingRoleNames.includes('INSTRUCTOR')) targetRole = 'INSTRUCTOR';
+    else if (existingRoleNames.includes('TEACHING_ASSISTANT')) targetRole = 'TEACHING_ASSISTANT';
+    else targetRole = 'STUDENT';
+  } else {
+    targetRole = (user.user_metadata?.role || 'STUDENT').toUpperCase();
+  }
 
   console.log(`[callback] bootstrapUserAndGetRole — targetRole=${targetRole}, userId=${user.id}`);
 

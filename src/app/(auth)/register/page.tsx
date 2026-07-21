@@ -349,9 +349,24 @@ function RegisterForm() {
     setFormError(null);
     setGoogleLoading(true);
     try {
+      const selectedRole = role || "STUDENT";
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("kuettu_registration_role", selectedRole);
+      }
+
       const { error: authErr } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            role: selectedRole,
+            academy_name: academyName || (selectedRole === "INSTRUCTOR" ? "Mon Académie" : null),
+            bio: bio || null,
+            student_level: studentLevel || "Débutant",
+            interest_course: interestCourse || "blockchain",
+          },
+        },
       });
       if (authErr) throw authErr;
     } catch (err: any) {
@@ -792,7 +807,11 @@ function RegisterForm() {
                     <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.92c-1.04.7-2.38 1.12-3.83 1.12-3.19 0-5.93-2.74-6.86-5.78l-3.86 3C3.19 20.22 7.21 23 12 23z" />
                   </svg>
                 )}
-                <span>{language === "en" ? "Sign up with Google (Learner Profile)" : "S'inscrire avec Google (Profil Apprenant)"}</span>
+                <span>
+                  {role === "INSTRUCTOR"
+                    ? (language === "en" ? "Sign up with Google (Instructor Profile)" : "S'inscrire avec Google (Profil Formateur)")
+                    : (language === "en" ? "Sign up with Google (Learner Profile)" : "S'inscrire avec Google (Profil Apprenant)")}
+                </span>
               </button>
             </div>
           )}
