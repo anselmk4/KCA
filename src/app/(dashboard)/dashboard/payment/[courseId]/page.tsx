@@ -55,6 +55,7 @@ export default function PaymentPage() {
   const [userCountry, setUserCountry] = useState("CD");
   const [momoProvider, setMomoProvider] = useState("VODACOM_MPESA_COD");
   const [momoPhone, setMomoPhone] = useState("");
+  const [momoCurrency, setMomoCurrency] = useState<"USD" | "CDF">("USD");
 
   const countryConfig = getPawaPayConfigForCountry(userCountry) || getPawaPayConfigForCountry("CD")!;
 
@@ -530,6 +531,7 @@ export default function PaymentPage() {
               itemId: course.id,
               couponId: appliedCoupon?.id || null,
               country: userCountry,
+              currency: userCountry === "CD" ? momoCurrency : countryConfig.currency,
               payInstallment
             }),
           });
@@ -881,11 +883,48 @@ export default function PaymentPage() {
                       <option value="UG">🇺🇬 Ouganda</option>
                     </select>
                   </div>
+
+                  {/* Currency Selector for DRC */}
+                  {userCountry === "CD" && (
+                    <div className="mb-3">
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                        Devise du compte Mobile Money (RDC)
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setMomoCurrency("USD")}
+                          className={`px-3 py-2.5 border rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                            momoCurrency === "USD"
+                              ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 shadow-sm"
+                              : "border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-400"
+                          }`}
+                        >
+                          <span>💵 USD ($)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMomoCurrency("CDF")}
+                          className={`px-3 py-2.5 border rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                            momoCurrency === "CDF"
+                              ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 shadow-sm"
+                              : "border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-400"
+                          }`}
+                        >
+                          <span>🇨🇩 CDF (FC)</span>
+                        </button>
+                      </div>
+                      <p className="text-xxs text-zinc-400 mt-1">
+                        Total à régler : {momoCurrency === "USD" ? `$${discountedAmount} USD` : `FC ${(discountedAmount * countryConfig.exchangeRate).toLocaleString()} CDF`}
+                      </p>
+                    </div>
+                  )}
+
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">{t("student.payment.carrier", "Opérateur Mobile")}</label>
                       <span className="text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-650 px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-750">
-                        Currency : {countryConfig.currency}
+                        Currency : {userCountry === "CD" ? momoCurrency : countryConfig.currency}
                       </span>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Parse request body
     const body = await req.json();
-    const { amount, phoneNumber, carrier, type, itemId, couponId, country, payInstallment } = body;
+    const { amount, phoneNumber, carrier, type, itemId, couponId, country, payInstallment, currency } = body;
 
     if (!amount || !phoneNumber || !carrier || !type || !itemId) {
       return NextResponse.json({ error: 'Paramètres manquants' }, { status: 400 });
@@ -179,8 +179,17 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
 
-    // Convert amount to local currency for billing the user via PawaPay Mobile Money
-    const localAmount = Math.round(calculatedAmount * countryConfig.exchangeRate);
+    // Convert amount to target currency for billing the user via PawaPay Mobile Money
+    const isDRC = countryConfig.countryCode === 'CD';
+    const isUSDRequested = (currency || '').toUpperCase() === 'USD';
+
+    let targetCurrency = countryConfig.currency;
+    let targetAmount = Math.round(calculatedAmount * countryConfig.exchangeRate);
+
+    if (isDRC && isUSDRequested) {
+      targetCurrency = 'USD';
+      targetAmount = Math.round(calculatedAmount);
+    }
 
     // Build meaningful payment description for mobile money statement (max 22 chars, alphanumeric & spaces only)
     let statementDescription = "Ansella Academy";
@@ -192,10 +201,10 @@ export async function POST(req: NextRequest) {
     // Strict PawaPay rule: only alphanumeric and spaces
     statementDescription = statementDescription.replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 22);
 
-    // 6. Request deposit via PawaPay sandbox API
+    // 6. Request deposit via PawaPay API
     const depositResult = await initiatePawaPayDeposit({
-      amount: localAmount,
-      currency: countryConfig.currency,
+      amount: targetAmount,
+      currency: targetCurrency,
       correspondent: carrier,
       phoneNumber: formattedPhone,
       depositId: paymentId,
