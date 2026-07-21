@@ -280,26 +280,26 @@ export default function StudentDetailPage() {
       {/* Student Profile Card */}
       <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
         {/* Decorative gradient header */}
-        <div className="h-24 bg-gradient-to-r from-teal-600 via-teal-500 to-emerald-400 relative">
+        <div className="h-28 bg-gradient-to-r from-teal-600 via-teal-500 to-emerald-400 relative">
           <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }} />
         </div>
 
-        <div className="px-8 pb-8">
-          {/* Avatar */}
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 -mt-8 mb-6">
-            <div className="flex items-end gap-4">
-              <div className="w-16 h-16 rounded-2xl border-4 border-white dark:border-zinc-900 bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center font-extrabold text-xl text-teal-600 dark:text-teal-400 shadow-lg">
+        <div className="px-6 sm:px-8 pb-8">
+          {/* Avatar and Info Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div className="flex items-start sm:items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl border-4 border-white dark:border-zinc-900 bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center font-extrabold text-2xl text-teal-600 dark:text-teal-400 shadow-xl -mt-10 shrink-0">
                 {initials}
               </div>
-              <div className="pb-1">
-                <h1 className="text-xl font-bold text-zinc-900 dark:text-white">{student.name}</h1>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5" />
+              <div className="pt-2 sm:pt-1">
+                <h1 className="text-2xl font-extrabold text-zinc-900 dark:text-white tracking-tight">{student.name}</h1>
+                <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 mt-0.5">
+                  <Mail className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                   {student.email}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 pb-1">
+            <div className="flex items-center gap-2 pt-1 sm:pt-0">
               <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800">
                 Plan {student.plan}
               </span>
