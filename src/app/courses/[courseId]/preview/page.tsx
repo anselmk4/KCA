@@ -379,47 +379,61 @@ export default function CoursePreviewPlayerPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col font-sans">
-      {/* Header */}
-      <header className="h-16 border-b border-zinc-200 dark:border-zinc-850 px-6 flex items-center justify-between shrink-0 bg-white/80 dark:bg-zinc-900/40 backdrop-blur-md sticky top-0 z-30">
-        <div className="flex items-center gap-4 min-w-0">
+      {/* Senior UX Header */}
+      <header className="h-16 border-b border-zinc-200/80 dark:border-zinc-800 px-4 sm:px-6 flex items-center justify-between shrink-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl sticky top-0 z-40 shadow-sm">
+        <div className="flex items-center gap-3.5 min-w-0">
           <button
             onClick={() => router.push(`/instructor/courses/${course.id}`)}
-            className="p-2 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-xl transition-all shrink-0 cursor-pointer"
+            className="p-2.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-teal-50 dark:hover:bg-teal-950/40 hover:text-teal-600 border border-zinc-200 dark:border-zinc-700 rounded-xl transition-all shrink-0 cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+            title="Retourner à l'éditeur"
           >
-            <ArrowLeft className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden md:inline">Éditer le cours</span>
           </button>
-          <div className="min-w-0">
-            <h1 className="text-sm font-extrabold truncate text-zinc-900 dark:text-white">{course.title}</h1>
-            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mt-0.5">
-              Mode Prévisualisation Instructeur
+          
+          <div className="min-w-0 border-l border-zinc-200 dark:border-zinc-800 pl-3.5">
+            <h1 className="text-sm sm:text-base font-extrabold truncate text-zinc-900 dark:text-white flex items-center gap-2">
+              {course.title}
+            </h1>
+            <p className="text-[10px] text-teal-600 dark:text-teal-400 font-extrabold uppercase tracking-wider flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
+              Aperçu en direct Instructeur
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0">
           <ThemeToggle />
+
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden p-2 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
+            className="lg:hidden p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs flex items-center gap-1.5"
           >
             <Menu className="w-4 h-4" />
+            <span>Programme</span>
           </button>
-          <div className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-xs">
-            <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
-            <span className="font-extrabold text-teal-600 dark:text-teal-400 uppercase">Aperçu interactif</span>
-          </div>
+
+          <Link
+            href={`/instructor/courses/${course.id}`}
+            className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-extrabold text-xs shadow-md shadow-teal-500/20 transition-all cursor-pointer"
+          >
+            Modifier le cours
+          </Link>
         </div>
       </header>
 
       {/* Main Container */}
       <div className="flex-1 flex min-h-0 relative overflow-hidden">
         {/* Left Sidebar */}
-        <aside className={`w-[280px] sm:w-80 border-r border-zinc-200 dark:border-zinc-850 bg-white/50 dark:bg-zinc-900/20 shrink-0 flex flex-col min-h-0 transition-transform lg:translate-x-0 z-20 absolute lg:relative inset-y-0 left-0 ${
+        <aside className={`w-[290px] sm:w-84 border-r border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-900/40 shrink-0 flex flex-col min-h-0 transition-transform lg:translate-x-0 z-20 absolute lg:relative inset-y-0 left-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}>
-          <div className="p-4 border-b border-zinc-200 dark:border-zinc-850 bg-zinc-50 dark:bg-zinc-900/40 flex justify-between items-center">
-            <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Programme du cours</span>
-            <span className="text-[10px] font-extrabold px-2 py-0.5 bg-zinc-200 dark:bg-zinc-800 text-zinc-650 dark:text-zinc-300 rounded-full">
+          <div className="p-4 border-b border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 flex justify-between items-center">
+            <div>
+              <span className="text-xs font-extrabold text-zinc-900 dark:text-white uppercase tracking-wider block">Programme du cours</span>
+              <span className="text-[10px] text-zinc-400 font-medium">Structure aperçue par l&apos;étudiant</span>
+            </div>
+            <span className="text-[10px] font-extrabold px-2.5 py-1 bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-900/50 rounded-full">
               {sections.length} Chapitres
             </span>
           </div>
