@@ -83,6 +83,43 @@ export default function StudentDetailPage() {
   const [savingGrade, setSavingGrade] = useState<string | null>(null);
   const [unlockingCertCourseId, setUnlockingCertCourseId] = useState<string | null>(null);
 
+  // AI Auto-Grader state
+  const [aiGradingSubId, setAiGradingSubId] = useState<string | null>(null);
+  const [aiEvaluationMap, setAiEvaluationMap] = useState<Record<string, any>>({});
+  const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
+
+  async function handleAIGrade(subId: string) {
+    setAiGradingSubId(subId);
+    try {
+      const res = await fetch("/api/ai/grade-homework", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submissionId: subId }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.code === "PLAN_UPGRADE_REQUIRED" || res.status === 403) {
+          setShowUpgradeModal(true);
+          return;
+        }
+        alert(data.error || "Erreur lors de la correction par l'IA.");
+        return;
+      }
+
+      if (data.evaluation) {
+        setAiEvaluationMap((prev) => ({ ...prev, [subId]: data.evaluation }));
+        setGradingSubId(subId);
+        setEditGrade(data.evaluation.suggestedGrade.toString());
+        setEditFeedback(data.evaluation.summaryFeedback);
+      }
+    } catch (err: any) {
+      alert(err.message || "Erreur de connexion lors de la correction par l'IA.");
+    } finally {
+      setAiGradingSubId(null);
+    }
+  }
+
   useEffect(() => {
     const session = getSimulatedSession();
     if (!session?.userId) { router.replace("/login"); return; }
@@ -569,6 +606,33 @@ export default function StudentDetailPage() {
                                         {/* Grade form or details */}
                                         {isGradingThis ? (
                                           <div className="p-3 bg-zinc-50 dark:bg-zinc-800/35 border border-zinc-150 dark:border-zinc-800 rounded-lg space-y-3">
+                                            {aiEvaluationMap[sub.id] && (
+                                              <div className="p-3.5 bg-gradient-to-r from-blue-900/30 to-indigo-900/30 border border-blue-500/30 rounded-xl space-y-2 text-xs">
+                                                <div className="flex items-center justify-between">
+                                                  <span className="font-bold text-blue-300 flex items-center gap-1.5">
+                                                    ✨ Évaluation par Copilot IA (Plan BASE)
+                                                  </span>
+                                                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300">
+                                                    Note Suggérée : {aiEvaluationMap[sub.id].suggestedGrade} / 100
+                                                  </span>
+                                                </div>
+                                                <p className="text-zinc-300 text-[11px] leading-relaxed">
+                                                  {aiEvaluationMap[sub.id].summaryFeedback}
+                                                </p>
+                                                {aiEvaluationMap[sub.id].rubricBreakdown && (
+                                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-blue-500/20">
+                                                    {aiEvaluationMap[sub.id].rubricBreakdown.map((r: any, idx: number) => (
+                                                      <div key={idx} className="p-2 bg-blue-950/40 rounded-lg text-[10px]">
+                                                        <p className="font-bold text-blue-200">{r.criterion}</p>
+                                                        <p className="text-blue-400 font-extrabold">{r.score}/100</p>
+                                                        <p className="text-zinc-400 text-[9px] mt-0.5">{r.comment}</p>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )}
+
                                             <div className="flex flex-col sm:flex-row gap-3">
                                               <div className="flex-1 space-y-1">
                                                 <label className="text-[10px] font-bold text-zinc-500">Note (0 - 100)</label>
@@ -625,16 +689,30 @@ export default function StudentDetailPage() {
                                                 <p className="text-xs text-zinc-500 italic">Pas encore de note attribuée.</p>
                                               )}
                                             </div>
-                                            <button
-                                              onClick={() => {
-                                                setGradingSubId(sub.id);
-                                                setEditGrade(sub.grade?.toString() || "");
-                                                setEditFeedback(sub.feedback || "");
-                                              }}
-                                              className="px-3 py-1.5 bg-white dark:bg-zinc-800 border rounded-lg text-[10px] font-bold hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors cursor-pointer shrink-0"
-                                            >
-                                              {sub.status === "GRADED" ? "Modifier la note" : "Évaluer"}
-                                            </button>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                              <button
+                                                onClick={() => handleAIGrade(sub.id)}
+                                                disabled={aiGradingSubId === sub.id}
+                                                className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border border-blue-400/30 rounded-lg text-[10px] font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                                              >
+                                                {aiGradingSubId === sub.id ? (
+                                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                                ) : (
+                                                  <span>✨ Auto-Correction IA</span>
+                                                )}
+                                              </button>
+
+                                              <button
+                                                onClick={() => {
+                                                  setGradingSubId(sub.id);
+                                                  setEditGrade(sub.grade?.toString() || "");
+                                                  setEditFeedback(sub.feedback || "");
+                                                }}
+                                                className="px-3 py-1.5 bg-white dark:bg-zinc-800 border rounded-lg text-[10px] font-bold hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                                              >
+                                                {sub.status === "GRADED" ? "Modifier la note" : "Évaluer"}
+                                              </button>
+                                            </div>
                                           </div>
                                         )}
                                       </div>
@@ -655,6 +733,47 @@ export default function StudentDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Plan Upgrade Gating Modal */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto text-xl font-bold">
+              ✨
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+                Copilot IA d'Évaluation & Auto-Grader
+              </h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 leading-relaxed">
+                La correction automatique et l'évaluation personnalisée des devoirs par l'IA sont réservées aux abonnés du <strong>Plan BASE (19$/mois)</strong> ou supérieur.
+              </p>
+            </div>
+            <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl text-left space-y-2">
+              <p className="text-xs font-bold text-amber-800 dark:text-amber-300">Ce que comprend le Plan BASE :</p>
+              <ul className="text-xs text-amber-700 dark:text-amber-400 space-y-1">
+                <li className="flex items-center gap-1.5">✓ Note et grille d'évaluation IA instantanées</li>
+                <li className="flex items-center gap-1.5">✓ Feedbacks pédagogiques personnalisés pour les élèves</li>
+                <li className="flex items-center gap-1.5">✓ Validation des notes en 1 seul clic</li>
+              </ul>
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                onClick={() => setShowUpgradeModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                Plus tard
+              </button>
+              <Link
+                href="/instructor/billing"
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-teal-500 text-white text-xs font-bold shadow-lg shadow-blue-500/20 hover:scale-[1.02] transition-transform text-center"
+              >
+                Passer au Plan BASE (19$)
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

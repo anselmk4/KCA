@@ -48,6 +48,7 @@ export function Pricing() {
       features: isEn ? [
         "Up to 3 active courses",
         "Up to 50 enrolled learners",
+        "✨ AI Homework Auto-Grader included",
         "Simple validation quizzes",
         "Mobile Money & Card payment",
         "Transaction fee: 10%",
@@ -55,6 +56,7 @@ export function Pricing() {
       ] : [
         "Jusqu'à 3 cours actifs",
         "Jusqu'à 50 apprenants inscrits",
+        "✨ Auto-Grader & Correction Devoirs par IA",
         "Quiz de validation simples",
         "Encaissement Mobile Money & Carte",
         "Frais de transaction : 10%",
@@ -74,6 +76,7 @@ export function Pricing() {
       features: isEn ? [
         "Up to 10 active courses",
         "Up to 200 enrolled learners",
+        "✨ AI Evaluation Copilot & Auto-Grader",
         "Unlimited quizzes and exams",
         "Automated achievement certificates",
         "Reduced transaction fee: 5%",
@@ -81,6 +84,7 @@ export function Pricing() {
       ] : [
         "Jusqu'à 10 cours actifs",
         "Jusqu'à 200 apprenants inscrits",
+        "✨ Copilot IA d'Évaluation & Auto-Grader inclus",
         "Quiz et examens illimités",
         "Certificats de réussite automatisés",
         "Frais de transaction réduits : 5%",
