@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Users, Search, TrendingUp, BookOpen, Award, DollarSign,
   ArrowRight, Filter, ChevronDown, Loader2, UserCheck,
-  AlertCircle, Clock, CheckCircle2, Circle
+  AlertCircle, Clock, CheckCircle2, Circle, Sparkles
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { getSimulatedSession } from "@/lib/rbac";
@@ -86,6 +86,69 @@ export default function StudentsPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPayment, setFilterPayment] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
+
+  // AI Retention Guard state
+  const [retentionStudent, setRetentionStudent] = useState<any | null>(null);
+  const [analyzingRetention, setAnalyzingRetention] = useState<boolean>(false);
+  const [retentionData, setRetentionData] = useState<any | null>(null);
+  const [sendingRetentionMsg, setSendingRetentionMsg] = useState<boolean>(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
+
+  async function handleRunRetentionGuard(studentObj: any) {
+    setRetentionStudent(studentObj);
+    setAnalyzingRetention(true);
+    setRetentionData(null);
+    try {
+      const res = await fetch("/api/ai/retention-guard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId: studentObj.studentId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.code === "PLAN_UPGRADE_REQUIRED" || res.status === 403) {
+          setShowUpgradeModal(true);
+          setRetentionStudent(null);
+          return;
+        }
+        alert(data.error || "Erreur lors du diagnostic IA.");
+        return;
+      }
+      setRetentionData(data);
+    } catch (err: any) {
+      alert(err.message || "Erreur de connexion lors du diagnostic IA.");
+    } finally {
+      setAnalyzingRetention(false);
+    }
+  }
+
+  async function handleSendRetentionMessage() {
+    if (!retentionData || !retentionStudent) return;
+    setSendingRetentionMsg(true);
+    try {
+      const res = await fetch("/api/ai/retention-guard/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentId: retentionStudent.studentId,
+          message: retentionData.evaluation.aiReactivationMessage,
+          courseTitle: retentionData.courseTitle
+        }),
+      });
+      if (res.ok) {
+        alert("✨ Message de relance IA envoyé avec succès à l'étudiant !");
+        setRetentionStudent(null);
+        setRetentionData(null);
+      } else {
+        const errData = await res.json();
+        alert(errData.error || "Erreur lors de l'envoi du message.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Erreur réseau.");
+    } finally {
+      setSendingRetentionMsg(false);
+    }
+  }
 
   useEffect(() => {
     const s = getSimulatedSession();
@@ -296,17 +359,25 @@ export default function StudentsPage() {
         })}
       </div>
 
-      {/* Alert bar */}
+      {/* Alert bar with AI Retention Guard trigger */}
       {atRiskCount > 0 && (
-        <div className="flex items-center gap-3 px-5 py-3.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl">
-          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
-          <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
-            {t("student.payment.applyCoupon", "dépassé").toLowerCase().includes("appliqu") ? (
-              <><span className="font-bold">{atRiskCount} student{atRiskCount > 1 ? "s" : ""}</span> have not yet exceeded 20% progress. Consider following up.</>
-            ) : (
-              <><span className="font-bold">{atRiskCount} apprenant{atRiskCount > 1 ? "s" : ""}</span> n&apos;ont pas encore dépassé 20% de progression. Pensez à les relancer.</>
-            )}
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-5 py-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border border-amber-200 dark:border-amber-800/50 rounded-2xl shadow-sm">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
+              <span className="font-bold">{atRiskCount} apprenant{atRiskCount > 1 ? "s" : ""}</span> n&apos;ont pas encore dépassé 20% de progression ou sont inactifs.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              const firstAtRisk = grouped.find(s => s.avgProgress < 20);
+              if (firstAtRisk) handleRunRetentionGuard(firstAtRisk);
+            }}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold rounded-xl shadow-sm transition-all shrink-0 cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            🛡️ AI Retention Guard — Diagnostic & Relance IA
+          </button>
         </div>
       )}
 
@@ -385,56 +456,34 @@ export default function StudentsPage() {
           </div>
 
           {filtered.map(student => {
-            const initials = student.studentName.split(" ").map(n => n[0] || "").join("").slice(0, 2).toUpperCase();
-            const primaryEnrollment = student.enrollments[0];
-            const payBadge = getPaymentBadge(primaryEnrollment?.paymentStatus || "none");
+            const payBadge = getPaymentBadge(student.enrollments[0]?.paymentStatus || "none");
             const isAtRisk = student.avgProgress < 20;
 
             return (
               <div
                 key={student.studentId}
-                className="group bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:border-teal-300 dark:hover:border-teal-700 hover:shadow-lg transition-all duration-200"
+                className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl hover:border-teal-500/30 transition-all shadow-sm group"
               >
-                {/* Main row */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 px-6 py-5 items-center">
-                  {/* Student info */}
+                <div className="p-5 lg:px-6 grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+                  {/* Student Info */}
                   <div className="col-span-3 flex items-center gap-3">
-                    <div className="relative shrink-0">
-                      <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm ${isAtRisk ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400"}`}>
-                        {initials}
-                      </div>
-                      {student.hasCertificate && (
-                        <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center">
-                          <Award className="w-2.5 h-2.5 text-white" />
-                        </span>
-                      )}
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white font-bold text-sm flex items-center justify-center shrink-0">
+                      {student.studentName.slice(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-semibold text-zinc-900 dark:text-white text-sm truncate">{student.studentName}</p>
+                      <p className="font-bold text-zinc-900 dark:text-white text-sm truncate">{student.studentName}</p>
                       <p className="text-xs text-zinc-400 truncate">{student.studentEmail}</p>
-                      <p className="text-[10px] text-zinc-400 mt-0.5 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        Inscrit {new Date(student.lastActivity).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
-                      </p>
                     </div>
                   </div>
 
                   {/* Courses */}
                   <div className="col-span-3">
-                    <div className="space-y-1.5">
-                      {student.enrollments.slice(0, 2).map(e => (
-                        <div key={e.courseId} className="flex items-center gap-2">
-                          <BookOpen className="w-3 h-3 text-zinc-400 shrink-0" />
-                          <span className="text-xs text-zinc-600 dark:text-zinc-400 truncate">{e.courseTitle}</span>
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${STATUS_COLORS[e.enrollmentStatus] || STATUS_COLORS.INACTIVE}`}>
-                            {e.enrollmentStatus === "ACTIVE" ? "Actif" : e.enrollmentStatus === "COMPLETED" ? "Terminé" : e.enrollmentStatus}
-                          </span>
-                        </div>
-                      ))}
-                      {student.enrollments.length > 2 && (
-                        <p className="text-[10px] text-zinc-400">+ {student.enrollments.length - 2} autre{student.enrollments.length - 2 > 1 ? "s" : ""}</p>
-                      )}
-                    </div>
+                    <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                      {student.enrollments.length} cours inscrit{student.enrollments.length > 1 ? "s" : ""}
+                    </p>
+                    <p className="text-[11px] text-zinc-400 truncate mt-0.5">
+                      {student.enrollments.map(e => e.courseTitle).join(", ")}
+                    </p>
                   </div>
 
                   {/* Progress */}
@@ -446,8 +495,8 @@ export default function StudentsPage() {
                       </span>
                     </div>
                     {isAtRisk && (
-                      <span className="text-[9px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full">
-                        En retard
+                      <span className="text-[9px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        ⚠️ Risque Décrochage
                       </span>
                     )}
                   </div>
@@ -474,7 +523,15 @@ export default function StudentsPage() {
                   </div>
 
                   {/* Action */}
-                  <div className="col-span-1 flex justify-end">
+                  <div className="col-span-1 flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => handleRunRetentionGuard(student)}
+                      className="px-2.5 py-2 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/20 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200/50 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                      title="AI Retention Guard — Analyser le risque de décrochage"
+                    >
+                      🛡️ IA
+                    </button>
+
                     <Link
                       href={`/instructor/students/${student.studentId}`}
                       className="inline-flex items-center gap-1 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold rounded-xl transition-all shadow-sm shadow-teal-500/20 group-hover:shadow-teal-500/30"
@@ -484,43 +541,137 @@ export default function StudentsPage() {
                     </Link>
                   </div>
                 </div>
-
-                {/* Progress bars per course (expanded view) */}
-                {student.enrollments.length > 0 && (
-                  <div className="px-6 pb-4 pt-0">
-                    <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {student.enrollments.map(e => (
-                        <div key={e.courseId} className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-100 dark:border-zinc-800 rounded-xl p-3.5 space-y-2.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 truncate max-w-[150px]">{e.courseTitle}</span>
-                            <button
-                              onClick={() => handleRevokeStudent(student.studentId, e.courseId, e.courseTitle, student.studentName)}
-                              className="text-[10px] font-bold text-red-650 hover:text-red-750 hover:bg-red-50 dark:hover:bg-red-950/20 px-2.5 py-1 rounded-lg transition-colors border border-red-200/20"
-                              title="Révoquer l'apprenant de ce cours"
-                            >
-                              Révoquer
-                            </button>
-                          </div>
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between text-[10px]">
-                              <span className="text-zinc-400">Progression</span>
-                              <span className="font-bold text-zinc-700 dark:text-zinc-300">{e.progressPercent}%</span>
-                            </div>
-                            <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all duration-500 ${e.progressPercent >= 80 ? "bg-emerald-500" : e.progressPercent >= 40 ? "bg-blue-500" : "bg-amber-400"}`}
-                                style={{ width: `${e.progressPercent}%` }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* AI Retention Guard Diagnosis & Message Modal */}
+      {retentionStudent && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🛡️</span>
+                <div>
+                  <h3 className="font-bold text-zinc-900 dark:text-white">AI Retention Guard</h3>
+                  <p className="text-xs text-zinc-400">Analyse Anti-Décrochage : {retentionStudent.studentName}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setRetentionStudent(null)}
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {analyzingRetention ? (
+              <div className="py-12 text-center space-y-3">
+                <Loader2 className="w-8 h-8 text-amber-500 animate-spin mx-auto" />
+                <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Analyse comportementale en cours par l&apos;IA...</p>
+                <p className="text-xs text-zinc-400">Évaluation des rythmes d&apos;apprentissage et détection des facteurs de blocage.</p>
+              </div>
+            ) : retentionData ? (
+              <div className="space-y-4">
+                {/* Risk score pill */}
+                <div className="flex items-center justify-between p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl">
+                  <div>
+                    <p className="text-xs font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider">Risque d&apos;abandon</p>
+                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-200 mt-0.5">Niveau {retentionData.evaluation.riskLevel}</p>
+                  </div>
+                  <span className="text-2xl font-black text-amber-600 dark:text-amber-400">
+                    {retentionData.evaluation.riskScore}%
+                  </span>
+                </div>
+
+                {/* Risk factors */}
+                <div className="space-y-1.5">
+                  <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Facteurs de ralentissement observés :</p>
+                  <ul className="space-y-1">
+                    {retentionData.evaluation.riskFactors.map((rf: string, idx: number) => (
+                      <li key={idx} className="text-xs text-zinc-600 dark:text-zinc-400 flex items-start gap-1.5">
+                        <span className="text-amber-500 mt-0.5">•</span>
+                        <span>{rf}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Generated Reactivation Message */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Message de relance rédigé par l&apos;IA :</label>
+                  <textarea
+                    rows={6}
+                    value={retentionData.evaluation.aiReactivationMessage}
+                    onChange={(e) => setRetentionData({
+                      ...retentionData,
+                      evaluation: { ...retentionData.evaluation, aiReactivationMessage: e.target.value }
+                    })}
+                    className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                  />
+                </div>
+
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    onClick={() => setRetentionStudent(null)}
+                    className="flex-1 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    Fermer
+                  </button>
+                  <button
+                    onClick={handleSendRetentionMessage}
+                    disabled={sendingRetentionMsg}
+                    className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {sendingRetentionMsg ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "🚀 Envoyer la relance IA"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {/* Plan Upgrade Gating Modal */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto text-xl font-bold">
+              🛡️
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+                AI Retention Guard — Anti-Décrochage
+              </h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 leading-relaxed">
+                La détection automatique des risques d&apos;abandon et la génération de relances IA sont réservées aux abonnés du <strong>Plan BASE (19$/mois)</strong> ou supérieur.
+              </p>
+            </div>
+            <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl text-left space-y-2">
+              <p className="text-xs font-bold text-amber-800 dark:text-amber-300">Inclus dans le Plan BASE :</p>
+              <ul className="text-xs text-amber-700 dark:text-amber-400 space-y-1">
+                <li className="flex items-center gap-1.5">✓ Détection précoce des élèves inactifs</li>
+                <li className="flex items-center gap-1.5">✓ Messages de relance motivants générés par l&apos;IA</li>
+                <li className="flex items-center gap-1.5">✓ Envoi direct par notification & email en 1 clic</li>
+              </ul>
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                onClick={() => setShowUpgradeModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                Plus tard
+              </button>
+              <Link
+                href="/instructor/billing"
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 text-white text-xs font-bold shadow-lg shadow-amber-500/20 hover:scale-[1.02] transition-transform text-center"
+              >
+                Passer au Plan BASE (19$)
+              </Link>
+            </div>
+          </div>
         </div>
       )}
     </div>
