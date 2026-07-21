@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { Database } from '@/lib/supabase/types';
 
 // Service role admin client to bypass any client-side RLS constraints
 const supabaseAdmin = createSupabaseClient(
@@ -14,30 +16,61 @@ export async function GET(request: Request) {
   const tokenHash = searchParams.get('token_hash');
   const type = searchParams.get('type'); // 'signup', 'recovery', 'invite', etc.
   let next = searchParams.get('next') ?? '/dashboard';
+
   // Prevent Open Redirects: ensure it is a relative path starting with '/' and not '//'
   if (!next.startsWith('/') || next.startsWith('//')) {
     next = '/dashboard';
   }
 
-  const supabase = await createClient();
+  const cookieStore = await cookies();
+  const pendingCookiesToSet: Array<{ name: string; value: string; options?: any }> = [];
+
+  const supabase = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSetParam) {
+          cookiesToSetParam.forEach(({ name, value, options }) => {
+            try {
+              cookieStore.set(name, value, options);
+            } catch {
+              // Ignore if headers already sent
+            }
+            pendingCookiesToSet.push({ name, value, options });
+          });
+        },
+      },
+    }
+  );
+
+  const redirectWithCookies = (targetUrl: string) => {
+    const response = NextResponse.redirect(targetUrl);
+    pendingCookiesToSet.forEach(({ name, value, options }) => {
+      response.cookies.set(name, value, options);
+    });
+    return response;
+  };
 
   // ── Path 1: OTP / token_hash flow
-  // Modern Supabase email confirmation links send ?token_hash=...&type=signup
   if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: type as any });
 
     if (error) {
       console.error('[callback] verifyOtp error:', error.message);
-      return NextResponse.redirect(
+      return redirectWithCookies(
         `${origin}/login?error=auth-failed&reason=${encodeURIComponent(error.message)}`
       );
     }
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.redirect(`${origin}/login?error=auth-failed`);
+    if (!user) return redirectWithCookies(`${origin}/login?error=auth-failed`);
 
     const role = await bootstrapUserAndGetRole(user);
-    return NextResponse.redirect(`${origin}/auth/confirmed?role=${role}`);
+    return redirectWithCookies(`${origin}/auth/confirmed?role=${role}`);
   }
 
   // ── Path 2: OAuth PKCE code flow (Google OAuth + older Supabase magic links)
@@ -47,24 +80,22 @@ export async function GET(request: Request) {
     if (exchangeError) {
       console.error('[callback] exchangeCodeForSession error:', exchangeError.message);
 
-      // If code exchange fails and we were expecting an email confirmation,
-      // fall through to /auth/confirmed client-side so the SDK can retry.
       if (type === 'signup' || next === '/auth/confirmed') {
-        return NextResponse.redirect(
+        return redirectWithCookies(
           `${origin}/auth/confirmed?code=${code}&next=${encodeURIComponent(next)}`
         );
       }
-      return NextResponse.redirect(`${origin}/login?error=auth-failed`);
+      return redirectWithCookies(`${origin}/login?error=auth-failed`);
     }
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.redirect(`${origin}/login?error=auth-failed`);
+    if (!user) return redirectWithCookies(`${origin}/login?error=auth-failed`);
 
     const role = await bootstrapUserAndGetRole(user);
 
     // Always redirect to /auth/confirmed when that was the intended destination
     if (next === '/auth/confirmed') {
-      return NextResponse.redirect(`${origin}/auth/confirmed?role=${role}`);
+      return redirectWithCookies(`${origin}/auth/confirmed?role=${role}`);
     }
 
     // Otherwise redirect directly to the role dashboard
@@ -76,11 +107,11 @@ export async function GET(request: Request) {
     } else {
       targetRedirect = '/dashboard';
     }
-    return NextResponse.redirect(`${origin}${targetRedirect}`);
+    return redirectWithCookies(`${origin}${targetRedirect}`);
   }
 
   // Neither token_hash nor code present
-  return NextResponse.redirect(`${origin}/login?error=auth-failed`);
+  return redirectWithCookies(`${origin}/login?error=auth-failed`);
 }
 
 /**
