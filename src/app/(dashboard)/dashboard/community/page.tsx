@@ -226,24 +226,38 @@ export default function CommunityPage() {
         return "STUDENT";
       };
 
+      const lbUserMap: Record<string, LeaderboardUser> = {};
+      (lbUsers || []).forEach((u) => {
+        if (u.id) lbUserMap[u.id] = u;
+      });
+
       const enrichedPosts: Post[] = rawPosts.map((p) => {
-        const resolvedAuthorRole = resolveRole(p.user_id, p.author_role);
+        const lbUser = lbUserMap[p.user_id];
+        const currentUserName = (p.user_id === user?.id && currentUserProfile?.full_name) ? currentUserProfile.full_name : null;
+        const resolvedAuthorName = p.author_name || lbUser?.name || authorProfileMap[p.user_id]?.name || currentUserName || "Membre Ansella";
+        const resolvedAuthorAvatar = p.author_avatar || lbUser?.avatar || authorProfileMap[p.user_id]?.avatar || null;
+        const resolvedAuthorRole = (p.author_role && p.author_role !== "MEMBER") ? p.author_role : (lbUser?.role || resolveRole(p.user_id));
+
         return {
           ...p,
           category: (p.category as PostCategory) || "REFLECTIONS",
           likes_count: p.likes_count || 0,
-          author_name: p.author_name || authorProfileMap[p.user_id]?.name || "Membre Ansella",
-          author_avatar: p.author_avatar || authorProfileMap[p.user_id]?.avatar || null,
+          author_name: resolvedAuthorName,
+          author_avatar: resolvedAuthorAvatar,
           author_role: resolvedAuthorRole,
           showComments: false,
           comments: rawComments
             .filter((c) => c.post_id === p.id)
-            .map((c) => ({
-              ...c,
-              author_name: authorProfileMap[c.user_id]?.name || "Membre",
-              author_avatar: authorProfileMap[c.user_id]?.avatar || null,
-              author_role: resolveRole(c.user_id, c.author_role)
-            })),
+            .map((c) => {
+              const cLbUser = lbUserMap[c.user_id];
+              const cCurrentUserName = (c.user_id === user?.id && currentUserProfile?.full_name) ? currentUserProfile.full_name : null;
+              return {
+                ...c,
+                author_name: c.author_name || cLbUser?.name || authorProfileMap[c.user_id]?.name || cCurrentUserName || "Membre",
+                author_avatar: c.author_avatar || cLbUser?.avatar || authorProfileMap[c.user_id]?.avatar || null,
+                author_role: c.author_role || cLbUser?.role || resolveRole(c.user_id)
+              };
+            }),
         };
       });
 
@@ -326,13 +340,18 @@ export default function CommunityPage() {
     setSubmitting(true);
 
     try {
+      const currentUserRole = currentUserProfile?.role || (currentUserProfile?.plan && currentUserProfile.plan !== "FREE" ? "INSTRUCTOR" : "STUDENT");
+
       const payload = {
         user_id: currentUser.id,
         category: postCategory,
         title: postTitle.trim() || null,
         content: postContent.trim(),
         resource_url: postResourceUrl.trim() || null,
-        likes_count: 0
+        likes_count: 0,
+        author_name: currentUserProfile?.full_name || currentUser?.email?.split("@")[0] || "Membre",
+        author_avatar: currentUserProfile?.avatar_url || null,
+        author_role: currentUserRole,
       };
 
       const { data, error } = await db
@@ -345,8 +364,6 @@ export default function CommunityPage() {
         console.warn("[CreatePost] DB insert warning, applying local optimistic state:", error);
       }
 
-      const currentUserRole = currentUserProfile?.role || (currentUserProfile?.plan && currentUserProfile.plan !== "FREE" ? "INSTRUCTOR" : "STUDENT");
-
       const newPostObj: Post = {
         id: data?.id || `local-${Date.now()}`,
         user_id: currentUser.id,
@@ -356,7 +373,7 @@ export default function CommunityPage() {
         resource_url: postResourceUrl.trim() || null,
         likes_count: 0,
         created_at: new Date().toISOString(),
-        author_name: currentUserProfile?.full_name || "Moi",
+        author_name: currentUserProfile?.full_name || currentUser?.email?.split("@")[0] || "Moi",
         author_avatar: currentUserProfile?.avatar_url || null,
         author_role: currentUserRole,
         comments: [],
