@@ -359,10 +359,9 @@ function RegisterForm() {
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
-          data: {
+          queryParams: {
             role: selectedRole,
-            academy_name: academyName || (selectedRole === "INSTRUCTOR" ? "Mon Académie" : null),
-            bio: bio || null,
+            academy_name: academyName || (selectedRole === "INSTRUCTOR" ? "Mon Académie" : ""),
             student_level: studentLevel || "Débutant",
             interest_course: interestCourse || "blockchain",
           },
