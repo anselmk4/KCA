@@ -755,20 +755,13 @@ export default function PaymentPage() {
           </div>
 
           <div className="space-y-3 pt-4">
-            <button
-              onClick={() => checkPaymentStatus(false)}
-              disabled={verifying}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm cursor-pointer"
-            >
-              {verifying ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Vérification...</span>
-                </>
-              ) : (
-                <span>J'ai saisi mon code PIN</span>
-              )}
-            </button>
+            <div className="w-full py-3.5 px-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/30 text-blue-700 dark:text-blue-300 font-bold rounded-xl flex items-center justify-center gap-2.5 text-xs shadow-sm">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
+              </span>
+              <span>Détection automatique en cours dès la saisie de votre code PIN...</span>
+            </div>
 
             {/* Sandbox Simulation Button */}
             {isSandboxMode && (

@@ -495,20 +495,13 @@ function PaymentContent() {
           </div>
 
           <div className="space-y-3 max-w-sm mx-auto pt-2">
-            <button
-              onClick={() => checkPaymentStatus(false)}
-              disabled={verifying}
-              className="w-full py-3 bg-teal-600 hover:bg-teal-500 disabled:bg-teal-400 text-white font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm cursor-pointer"
-            >
-              {verifying ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Vérification du paiement...</span>
-                </>
-              ) : (
-                <span>J'ai saisi mon code PIN</span>
-              )}
-            </button>
+            <div className="w-full py-3.5 px-4 bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-900/30 text-teal-700 dark:text-teal-300 font-bold rounded-xl flex items-center justify-center gap-2.5 text-xs shadow-sm">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-teal-500"></span>
+              </span>
+              <span>Détection automatique dès la saisie de votre PIN...</span>
+            </div>
 
             {/* Sandbox Simulation Button */}
             {isSandboxMode && (
