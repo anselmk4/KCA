@@ -8,7 +8,6 @@ import { useLanguage } from "@/context/LanguageContext";
 
 export function Pricing() {
   const { language } = useLanguage();
-  const [billingCycle, setBillingCycle] = useState<"MONTHLY" | "ANNUAL">("ANNUAL");
 
   const isEn = language === "en";
 
@@ -17,8 +16,6 @@ export function Pricing() {
       id: "free",
       name: isEn ? "Plan Free" : "Plan Free",
       monthlyPrice: 0,
-      annualTotal: 0,
-      annualMonthlyEquiv: 0,
       description: isEn 
         ? "Perfect for launching your academy and validating your first courses with a small group of learners."
         : "Parfait pour lancer votre académie et valider vos premiers cours auprès d'un petit groupe d'apprenants.",
@@ -45,8 +42,6 @@ export function Pricing() {
       id: "base",
       name: isEn ? "Plan Base" : "Plan Base",
       monthlyPrice: 19,
-      annualTotal: 205.20,
-      annualMonthlyEquiv: 17.10,
       description: isEn 
         ? "For serious creators launching their academy."
         : "Pour les créateurs sérieux qui lancent leur académie.",
@@ -73,8 +68,6 @@ export function Pricing() {
       id: "pro",
       name: isEn ? "Plan Pro" : "Plan Pro",
       monthlyPrice: 49,
-      annualTotal: 529.20,
-      annualMonthlyEquiv: 44.10,
       description: isEn 
         ? "The ideal solution for professional instructors and growing academies."
         : "La solution idéale pour les formateurs professionnels et les académies en croissance.",
@@ -101,17 +94,15 @@ export function Pricing() {
       id: "max",
       name: isEn ? "Plan Max" : "Plan Max",
       monthlyPrice: 200,
-      annualTotal: 2160.00,
-      annualMonthlyEquiv: 180.00,
       description: isEn 
-        ? "For large academies and training schools demanding unlimited power and dedicated assistance."
+        ? "For large academies and training schools requiring unlimited power and dedicated support."
         : "Pour les grandes académies et les écoles de formation exigeant une puissance et un accompagnement sans limites.",
       features: isEn ? [
         "Unlimited online courses",
         "Unlimited learners",
-        "Unlimited quizzes, exams, and certificates",
+        "Unlimited quizzes, exams and certificates",
         "0% transaction fee",
-        "Custom domain name (e.g., school.com)",
+        "Custom domain name (e.g. school.com)",
         "Dedicated account manager & WhatsApp"
       ] : [
         "Cours en ligne illimités",
@@ -167,40 +158,9 @@ export function Pricing() {
           </h2>
           <p className="text-base text-zinc-650 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed">
             {isEn 
-              ? "Choose the plan that matches your academy's development stage. Save 10% on annual billing."
-              : "Choisissez le forfait qui correspond au niveau de développement de votre académie. Économisez 10% sur la facturation annuelle."}
+              ? "Choose the plan that matches your academy's development stage."
+              : "Choisissez le forfait qui correspond au niveau de développement de votre académie."}
           </p>
-
-          {/* Billing Cycle Toggle Switch */}
-          <div className="pt-4 flex justify-center">
-            <div className="bg-zinc-200/80 dark:bg-zinc-800/80 p-1.5 rounded-2xl flex items-center gap-1 border border-zinc-300 dark:border-zinc-700/60 shadow-inner">
-              <button
-                type="button"
-                onClick={() => setBillingCycle("MONTHLY")}
-                className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  billingCycle === "MONTHLY"
-                    ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-                }`}
-              >
-                {isEn ? "Monthly Billing" : "Facturation Mensuelle"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setBillingCycle("ANNUAL")}
-                className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  billingCycle === "ANNUAL"
-                    ? "bg-indigo-600 text-white shadow-sm shadow-indigo-500/20"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-                }`}
-              >
-                <span>{isEn ? "Annual Billing" : "Facturation Annuelle"}</span>
-                <span className="bg-amber-400 text-zinc-950 font-black text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-0.5">
-                  <Sparkles className="w-2.5 h-2.5 fill-current" /> -10%
-                </span>
-              </button>
-            </div>
-          </div>
         </motion.div>
         
         {/* Plans list */}
@@ -212,12 +172,6 @@ export function Pricing() {
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
         >
           {rawPlans.map((plan, index) => {
-            const isAnnual = billingCycle === "ANNUAL";
-            const displayPrice = isAnnual && plan.annualTotal > 0
-              ? `$${plan.annualTotal.toFixed(2)}`
-              : `$${plan.monthlyPrice}`;
-            const displayUnit = isAnnual && plan.annualTotal > 0 ? (isEn ? "/ year" : "/ an") : (isEn ? "/ month" : "/ mois");
-
             return (
               <motion.div 
                 key={index} 
@@ -239,14 +193,9 @@ export function Pricing() {
                   
                   <div>
                     <div className="flex items-baseline">
-                      <span className="text-3xl font-black text-zinc-900 dark:text-white">{displayPrice}</span>
-                      <span className="text-xs text-zinc-500 ml-1.5">{displayUnit}</span>
+                      <span className="text-3xl font-black text-zinc-900 dark:text-white">${plan.monthlyPrice}</span>
+                      <span className="text-xs text-zinc-500 ml-1.5">{isEn ? "/ month" : "/ mois"}</span>
                     </div>
-                    {isAnnual && plan.annualTotal > 0 && (
-                      <p className="text-[11px] text-amber-600 dark:text-amber-400 font-bold mt-1">
-                        {isEn ? `Equivalent $${plan.annualMonthlyEquiv.toFixed(2)}/mo (-10%)` : `Soit $${plan.annualMonthlyEquiv.toFixed(2)}/mois (-10%)`}
-                      </p>
-                    )}
                   </div>
 
                   <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed min-h-[48px]">{plan.description}</p>
@@ -255,7 +204,7 @@ export function Pricing() {
                 {/* Action Button */}
                 <div className="mb-8">
                   <Link 
-                    href={`/register?plan=${plan.id}&cycle=${billingCycle.toLowerCase()}`}
+                    href={`/register?plan=${plan.id}`}
                     className={`block w-full py-3.5 px-4 text-center rounded-xl text-xs font-bold transition-all ${
                       plan.popular
                         ? "bg-teal-500 hover:bg-teal-400 text-zinc-950 shadow-md shadow-teal-500/20"

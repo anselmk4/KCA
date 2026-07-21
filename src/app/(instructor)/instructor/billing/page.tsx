@@ -14,7 +14,7 @@ export default function BillingPage() {
   const [coursesCount, setCoursesCount] = useState(0);
   const [totalStudents, setTotalStudents] = useState(0);
   const [currentPlan, setCurrentPlan] = useState<string>("FREE");
-  const [billingCycle, setBillingCycle] = useState<"MONTHLY" | "ANNUAL">("ANNUAL");
+  const [billingCycle, setBillingCycle] = useState<"MONTHLY" | "ANNUAL">("MONTHLY");
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);

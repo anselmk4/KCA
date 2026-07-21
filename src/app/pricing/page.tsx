@@ -7,15 +7,11 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 
 export default function PricingPage() {
-  const [billingCycle, setBillingCycle] = useState<"MONTHLY" | "ANNUAL">("ANNUAL");
-
   const rawPlans = [
     {
       id: "free",
       name: "Plan Free",
       monthlyPrice: 0,
-      annualTotal: 0,
-      annualMonthlyEquiv: 0,
       description: "Parfait pour lancer votre académie et valider vos premiers cours auprès d'un petit groupe d'apprenants.",
       features: [
         "1 cours actif maximum",
@@ -33,8 +29,6 @@ export default function PricingPage() {
       id: "base",
       name: "Plan Base",
       monthlyPrice: 19,
-      annualTotal: 205.20,
-      annualMonthlyEquiv: 17.10,
       description: "Pour les créateurs sérieux qui lancent leur académie.",
       features: [
         "Jusqu'à 3 cours actifs",
@@ -52,8 +46,6 @@ export default function PricingPage() {
       id: "pro",
       name: "Plan Pro",
       monthlyPrice: 49,
-      annualTotal: 529.20,
-      annualMonthlyEquiv: 44.10,
       description: "La solution idéale pour les formateurs professionnels et les académies en croissance.",
       features: [
         "Jusqu'à 10 cours actifs",
@@ -71,8 +63,6 @@ export default function PricingPage() {
       id: "max",
       name: "Plan Max",
       monthlyPrice: 200,
-      annualTotal: 2160.00,
-      annualMonthlyEquiv: 180.00,
       description: "Pour les grandes académies et les écoles de formation exigeant une puissance et un accompagnement sans limites.",
       features: [
         "Cours en ligne illimités",
@@ -124,50 +114,13 @@ export default function PricingPage() {
               </span>
             </h1>
             <p className="text-lg text-zinc-650 dark:text-zinc-400">
-              Choisissez le plan parfait pour le niveau de développement de votre académie. Économisez 10% en optant pour la facturation annuelle.
+              Choisissez le plan parfait pour le niveau de développement de votre académie.
             </p>
-
-            {/* Billing Cycle Toggle Switch */}
-            <div className="pt-2 flex justify-center">
-              <div className="bg-zinc-200/80 dark:bg-zinc-800/80 p-1.5 rounded-2xl flex items-center gap-1 border border-zinc-300 dark:border-zinc-700/60 shadow-inner">
-                <button
-                  type="button"
-                  onClick={() => setBillingCycle("MONTHLY")}
-                  className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    billingCycle === "MONTHLY"
-                      ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm"
-                      : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-                  }`}
-                >
-                  Facturation Mensuelle
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBillingCycle("ANNUAL")}
-                  className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    billingCycle === "ANNUAL"
-                      ? "bg-indigo-600 text-white shadow-sm shadow-indigo-500/20"
-                      : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-                  }`}
-                >
-                  <span>Facturation Annuelle</span>
-                  <span className="bg-amber-400 text-zinc-950 font-black text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-0.5">
-                    <Sparkles className="w-2.5 h-2.5 fill-current" /> -10%
-                  </span>
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Pricing Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {rawPlans.map((plan, index) => {
-              const isAnnual = billingCycle === "ANNUAL";
-              const displayPrice = isAnnual && plan.annualTotal > 0
-                ? `$${plan.annualTotal.toFixed(2)}`
-                : `$${plan.monthlyPrice}`;
-              const displayUnit = isAnnual && plan.annualTotal > 0 ? "/ an" : "/ mois";
-
               return (
                 <div 
                   key={index} 
@@ -188,14 +141,9 @@ export default function PricingPage() {
                     
                     <div>
                       <div className="flex items-baseline">
-                        <span className="text-3xl font-black text-zinc-900 dark:text-white">{displayPrice}</span>
-                        <span className="text-xs text-zinc-500 ml-1.5">{displayUnit}</span>
+                        <span className="text-3xl font-black text-zinc-900 dark:text-white">${plan.monthlyPrice}</span>
+                        <span className="text-xs text-zinc-500 ml-1.5">/ mois</span>
                       </div>
-                      {isAnnual && plan.annualTotal > 0 && (
-                        <p className="text-[11px] text-amber-600 dark:text-amber-400 font-bold mt-1">
-                          Soit ${plan.annualMonthlyEquiv.toFixed(2)}/mois (-10% de réduction)
-                        </p>
-                      )}
                     </div>
 
                     <p className="text-xs text-zinc-650 dark:text-zinc-400 leading-relaxed min-h-[48px]">{plan.description}</p>
@@ -203,7 +151,7 @@ export default function PricingPage() {
 
                   <div className="mb-8">
                     <Link 
-                      href={`/register?plan=${plan.id}&cycle=${billingCycle.toLowerCase()}`}
+                      href={`/register?plan=${plan.id}`}
                       className={`block w-full py-3.5 px-4 text-center rounded-xl text-xs font-bold transition-all ${
                         plan.popular
                           ? "bg-teal-500 hover:bg-teal-450 text-zinc-950 shadow-md shadow-teal-500/20"
