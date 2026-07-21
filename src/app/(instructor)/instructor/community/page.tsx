@@ -45,7 +45,7 @@ export default function InstructorCommunityPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in relative">
+    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in relative">
       
       {/* Overlay Banner for FREE plan */}
       {isFreePlan && (
