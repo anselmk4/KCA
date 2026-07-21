@@ -1,16 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Check, Star, HelpCircle, ArrowRight, ShieldCheck, CreditCard, Sparkles } from "lucide-react";
+import { Check, Star, HelpCircle, ShieldCheck, CreditCard, Sparkles } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 
 export default function PricingPage() {
-  const plans = [
+  const [billingCycle, setBillingCycle] = useState<"MONTHLY" | "ANNUAL">("ANNUAL");
+
+  const rawPlans = [
     {
+      id: "free",
       name: "Plan Free",
-      price: "0$",
-      unit: "/ mois",
+      monthlyPrice: 0,
+      annualTotal: 0,
+      annualMonthlyEquiv: 0,
       description: "Parfait pour lancer votre académie et valider vos premiers cours auprès d'un petit groupe d'apprenants.",
       features: [
         "1 cours actif maximum",
@@ -22,13 +27,14 @@ export default function PricingPage() {
       ],
       popular: false,
       buttonText: "Commencer gratuitement",
-      href: "/register?plan=free",
       colorClass: "text-teal-400"
     },
     {
+      id: "base",
       name: "Plan Base",
-      price: "19$",
-      unit: "/ mois",
+      monthlyPrice: 19,
+      annualTotal: 205.20,
+      annualMonthlyEquiv: 17.10,
       description: "Pour les créateurs sérieux qui lancent leur académie.",
       features: [
         "Jusqu'à 3 cours actifs",
@@ -40,13 +46,14 @@ export default function PricingPage() {
       ],
       popular: false,
       buttonText: "Démarrer avec le Plan Base",
-      href: "/register?plan=base",
       colorClass: "text-indigo-400"
     },
     {
+      id: "pro",
       name: "Plan Pro",
-      price: "49$",
-      unit: "/ mois",
+      monthlyPrice: 49,
+      annualTotal: 529.20,
+      annualMonthlyEquiv: 44.10,
       description: "La solution idéale pour les formateurs professionnels et les académies en croissance.",
       features: [
         "Jusqu'à 10 cours actifs",
@@ -58,13 +65,14 @@ export default function PricingPage() {
       ],
       popular: true,
       buttonText: "Démarrer avec le Plan Pro",
-      href: "/register?plan=pro",
       colorClass: "text-teal-400"
     },
     {
+      id: "max",
       name: "Plan Max",
-      price: "200$",
-      unit: "/ mois",
+      monthlyPrice: 200,
+      annualTotal: 2160.00,
+      annualMonthlyEquiv: 180.00,
       description: "Pour les grandes académies et les écoles de formation exigeant une puissance et un accompagnement sans limites.",
       features: [
         "Cours en ligne illimités",
@@ -76,7 +84,6 @@ export default function PricingPage() {
       ],
       popular: false,
       buttonText: "Activer le Plan Max",
-      href: "/register?plan=max",
       colorClass: "text-pink-400"
     }
   ];
@@ -104,7 +111,7 @@ export default function PricingPage() {
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-500/5 rounded-full blur-[120px] pointer-events-none" />
         <div className="absolute bottom-10 left-10 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-[150px] pointer-events-none" />
 
-        <div className="container mx-auto px-4 md:px-8 max-w-6xl space-y-24 relative z-10">
+        <div className="container mx-auto px-4 md:px-8 max-w-6xl space-y-16 relative z-10">
           {/* Title Header */}
           <div className="text-center max-w-3xl mx-auto space-y-6">
             <span className="text-xs font-bold text-teal-400 bg-teal-400/10 border border-teal-500/20 px-3.5 py-1 rounded-full uppercase tracking-widest">
@@ -117,59 +124,107 @@ export default function PricingPage() {
               </span>
             </h1>
             <p className="text-lg text-zinc-650 dark:text-zinc-400">
-              Choisissez le plan parfait pour le niveau de développement de votre académie.
+              Choisissez le plan parfait pour le niveau de développement de votre académie. Économisez 10% en optant pour la facturation annuelle.
             </p>
+
+            {/* Billing Cycle Toggle Switch */}
+            <div className="pt-2 flex justify-center">
+              <div className="bg-zinc-200/80 dark:bg-zinc-800/80 p-1.5 rounded-2xl flex items-center gap-1 border border-zinc-300 dark:border-zinc-700/60 shadow-inner">
+                <button
+                  type="button"
+                  onClick={() => setBillingCycle("MONTHLY")}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    billingCycle === "MONTHLY"
+                      ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm"
+                      : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                  }`}
+                >
+                  Facturation Mensuelle
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBillingCycle("ANNUAL")}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    billingCycle === "ANNUAL"
+                      ? "bg-indigo-600 text-white shadow-sm shadow-indigo-500/20"
+                      : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                  }`}
+                >
+                  <span>Facturation Annuelle</span>
+                  <span className="bg-amber-400 text-zinc-950 font-black text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-0.5">
+                    <Sparkles className="w-2.5 h-2.5 fill-current" /> -10%
+                  </span>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Pricing Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-6">
-            {plans.map((plan, index) => (
-              <div 
-                key={index} 
-                className={`group relative rounded-3xl p-8 border flex flex-col h-full bg-white/40 dark:bg-zinc-950/40 backdrop-blur-md transition-all duration-300 ${
-                  plan.popular 
-                    ? "shadow-[0_0_30px_rgba(20,184,166,0.1)] border-teal-500/80 bg-teal-50/10 dark:bg-[#09101f]/60" 
-                    : "border-zinc-200 dark:border-zinc-800/85 hover:border-zinc-300 dark:hover:border-zinc-700/80 hover:bg-zinc-50/20 dark:hover:bg-zinc-900/10"
-                }`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-teal-500 text-zinc-950 px-4 py-1 text-xxs font-black uppercase tracking-widest rounded-full shadow-lg flex items-center gap-1">
-                    <Star className="w-3 h-3 fill-zinc-950" /> Recommandé
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {rawPlans.map((plan, index) => {
+              const isAnnual = billingCycle === "ANNUAL";
+              const displayPrice = isAnnual && plan.annualTotal > 0
+                ? `$${plan.annualTotal.toFixed(2)}`
+                : `$${plan.monthlyPrice}`;
+              const displayUnit = isAnnual && plan.annualTotal > 0 ? "/ an" : "/ mois";
+
+              return (
+                <div 
+                  key={index} 
+                  className={`group relative rounded-3xl p-8 border flex flex-col h-full bg-white/40 dark:bg-zinc-950/40 backdrop-blur-md transition-all duration-300 ${
+                    plan.popular 
+                      ? "shadow-[0_0_30px_rgba(20,184,166,0.1)] border-teal-500/80 bg-teal-50/10 dark:bg-[#09101f]/60" 
+                      : "border-zinc-200 dark:border-zinc-800/85 hover:border-zinc-300 dark:hover:border-zinc-700/80 hover:bg-zinc-50/20 dark:hover:bg-zinc-900/10"
+                  }`}
+                >
+                  {plan.popular && (
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-teal-500 text-zinc-950 px-4 py-1 text-xxs font-black uppercase tracking-widest rounded-full shadow-lg flex items-center gap-1">
+                      <Star className="w-3 h-3 fill-zinc-950" /> Recommandé
+                    </div>
+                  )}
+
+                  <div className="space-y-4 mb-8 text-left">
+                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white group-hover:text-teal-500 dark:group-hover:text-teal-450 transition-colors">{plan.name}</h3>
+                    
+                    <div>
+                      <div className="flex items-baseline">
+                        <span className="text-3xl font-black text-zinc-900 dark:text-white">{displayPrice}</span>
+                        <span className="text-xs text-zinc-500 ml-1.5">{displayUnit}</span>
+                      </div>
+                      {isAnnual && plan.annualTotal > 0 && (
+                        <p className="text-[11px] text-amber-600 dark:text-amber-400 font-bold mt-1">
+                          Soit ${plan.annualMonthlyEquiv.toFixed(2)}/mois (-10% de réduction)
+                        </p>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-zinc-650 dark:text-zinc-400 leading-relaxed min-h-[48px]">{plan.description}</p>
                   </div>
-                )}
 
-                <div className="space-y-4 mb-8 text-left">
-                  <h3 className="text-lg font-bold text-zinc-900 dark:text-white group-hover:text-teal-500 dark:group-hover:text-teal-450 transition-colors">{plan.name}</h3>
-                  <div className="flex items-baseline">
-                    <span className="text-4xl font-black text-zinc-900 dark:text-white">{plan.price}</span>
-                    <span className="text-xs text-zinc-500 ml-1.5">{plan.unit}</span>
+                  <div className="mb-8">
+                    <Link 
+                      href={`/register?plan=${plan.id}&cycle=${billingCycle.toLowerCase()}`}
+                      className={`block w-full py-3.5 px-4 text-center rounded-xl text-xs font-bold transition-all ${
+                        plan.popular
+                          ? "bg-teal-500 hover:bg-teal-450 text-zinc-950 shadow-md shadow-teal-500/20"
+                          : "bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white border border-zinc-250 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                      }`}
+                    >
+                      {plan.buttonText}
+                    </Link>
                   </div>
-                  <p className="text-xs text-zinc-650 dark:text-zinc-400 leading-relaxed min-h-[48px]">{plan.description}</p>
-                </div>
 
-                <div className="mb-8">
-                  <Link 
-                    href={plan.href}
-                    className={`block w-full py-3.5 px-4 text-center rounded-xl text-xs font-bold transition-all ${
-                      plan.popular
-                        ? "bg-teal-500 hover:bg-teal-450 text-zinc-950 shadow-md shadow-teal-500/20"
-                        : "bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white border border-zinc-250 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
-                    }`}
-                  >
-                    {plan.buttonText}
-                  </Link>
+                  <ul className="space-y-3.5 mt-auto text-xs text-zinc-600 dark:text-zinc-400 text-left">
+                    {plan.features.map((feature, fIdx) => (
+                      <li key={fIdx} className="flex items-start gap-2.5">
+                        <Check className={`w-4 h-4 shrink-0 mt-0.5 ${plan.popular ? "text-teal-500 dark:text-teal-400" : "text-zinc-500"}`} />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-
-                <ul className="space-y-3.5 mt-auto text-xs text-zinc-600 dark:text-zinc-400 text-left">
-                  {plan.features.map((feature, fIdx) => (
-                    <li key={fIdx} className="flex items-start gap-2.5">
-                      <Check className={`w-4 h-4 shrink-0 mt-0.5 ${plan.popular ? "text-teal-500 dark:text-teal-400" : "text-zinc-500"}`} />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Secure Payment Badges */}
@@ -180,7 +235,7 @@ export default function PricingPage() {
             </div>
             <div className="flex items-center gap-3">
               <CreditCard className="w-6 h-6 text-teal-500 dark:text-teal-400" />
-              <span>Abonnement mensuel flexible</span>
+              <span>Facturation souple (Mensuelle ou Annuelle -10%)</span>
             </div>
             <div className="flex items-center gap-3">
               <Sparkles className="w-6 h-6 text-teal-500 dark:text-teal-400" />
