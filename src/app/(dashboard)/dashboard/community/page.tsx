@@ -56,7 +56,7 @@ interface LeaderboardUser {
 const CATEGORY_CONFIG: Record<PostCategory, { label: string; icon: any; color: string; bg: string }> = {
   ALL: { label: "Toutes les publications", icon: Sparkles, color: "text-zinc-600 dark:text-zinc-300", bg: "bg-zinc-100 dark:bg-zinc-800" },
   REFLECTIONS: { label: "Réflexions & Débats", icon: Lightbulb, color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/40" },
-  ANALYSIS: { label: "Analyses Crypto & IA", icon: BarChart2, color: "text-indigo-600 dark:text-indigo-400", bg: "bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-900/40" },
+  ANALYSIS: { label: "Analyses & Stratégies", icon: BarChart2, color: "text-indigo-600 dark:text-indigo-400", bg: "bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-900/40" },
   RESOURCES: { label: "Ressources & Guides", icon: BookOpen, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/40" },
   ANNOUNCEMENTS: { label: "Annonces Officieuses", icon: Megaphone, color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-900/40" },
 };
@@ -66,7 +66,8 @@ export default function CommunityPage() {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<PostCategory>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [leaderboardTab, setLeaderboardTab] = useState<"INSTRUCTORS" | "AFFILIATES">("INSTRUCTORS");
+  const [leaderboardTab, setLeaderboardTab] = useState<"INSTRUCTORS" | "AFFILIATES">("AFFILIATES");
+  const [showFullLeaderboardModal, setShowFullLeaderboardModal] = useState(false);
 
   // Post composer state
   const [postTitle, setPostTitle] = useState("");
@@ -233,9 +234,19 @@ export default function CommunityPage() {
     }
   }, []);
 
-  // ─── Chargement du Leaderboard Formateurs & Affiliés ─────
+  // ─── Chargement du Leaderboard depuis la base de données ─────
   const loadLeaderboardData = async () => {
     try {
+      const res = await fetch("/api/community/leaderboard");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.leaderboard && Array.isArray(data.leaderboard)) {
+          setLeaderboard(data.leaderboard);
+          return;
+        }
+      }
+
+      // Fallback si l'API rencontre un souci d'accès direct
       const { data: profiles } = await supabase
         .from("profiles")
         .select("id, full_name, avatar_url, plan, created_at")
@@ -259,36 +270,22 @@ export default function CommunityPage() {
         if (!roleMap[ur.user_id]) roleMap[ur.user_id] = ur.roles?.name || "STUDENT";
       });
 
-      // Sample instructors leaderboard if insufficient DB records
-      let instructorsList: LeaderboardUser[] = (profiles || [])
-        .map((p, idx) => {
-          const cCount = coursesCountMap[p.id] || (idx === 0 ? 8 : idx === 1 ? 5 : 2);
-          const affCount = (idx + 1) * 7 + 4;
-          const points = cCount * 350 + affCount * 120 + 450;
-          return {
-            id: p.id,
-            name: p.full_name || `Formateur #${idx + 1}`,
-            avatar: p.avatar_url || null,
-            role: roleMap[p.id] || "INSTRUCTOR",
-            plan: p.plan || "PRO",
-            points,
-            coursesCount: cCount,
-            affiliatesCount: affCount,
-            rank: 0,
-          };
-        });
+      const dbList: LeaderboardUser[] = (profiles || []).map((p, idx) => {
+        const cCount = coursesCountMap[p.id] || 0;
+        return {
+          id: p.id,
+          name: p.full_name || `Membre #${idx + 1}`,
+          avatar: p.avatar_url || null,
+          role: roleMap[p.id] || "STUDENT",
+          plan: p.plan || "FREE",
+          points: cCount * 200,
+          coursesCount: cCount,
+          affiliatesCount: 0,
+          rank: 0,
+        };
+      });
 
-      if (instructorsList.length < 5) {
-        instructorsList = [
-          { id: "lb-1", name: "Prof. Alexandre Vane", avatar: null, role: "INSTRUCTOR", plan: "MAX", points: 3450, coursesCount: 12, affiliatesCount: 48, rank: 1 },
-          { id: "lb-2", name: "Sarah Lin", avatar: null, role: "INSTRUCTOR", plan: "PRO", points: 2890, coursesCount: 8, affiliatesCount: 32, rank: 2 },
-          { id: "lb-3", name: "Jean-Marc Dupuis", avatar: null, role: "INSTRUCTOR", plan: "PRO", points: 2150, coursesCount: 5, affiliatesCount: 21, rank: 3 },
-          { id: "lb-4", name: "Elena Rostova", avatar: null, role: "INSTRUCTOR", plan: "BASE", points: 1780, coursesCount: 3, affiliatesCount: 14, rank: 4 },
-          { id: "lb-5", name: "David Mbeki", avatar: null, role: "INSTRUCTOR", plan: "BASE", points: 1420, coursesCount: 2, affiliatesCount: 9, rank: 5 },
-        ];
-      }
-
-      setLeaderboard(instructorsList);
+      setLeaderboard(dbList);
     } catch (err) {
       console.error("[Leaderboard] Error loading leaderboard:", err);
     }
@@ -778,9 +775,9 @@ export default function CommunityPage() {
               </button>
             </div>
 
-            {/* Leaderboard Ranks List */}
+            {/* Leaderboard Ranks List (Top 10) */}
             <div className="space-y-3">
-              {sortedLeaderboard.map((item) => {
+              {sortedLeaderboard.slice(0, 10).map((item) => {
                 const isTop1 = item.rank === 1;
                 const isTop2 = item.rank === 2;
                 const isTop3 = item.rank === 3;
@@ -823,14 +820,17 @@ export default function CommunityPage() {
               })}
             </div>
 
-            {/* Current user rank banner */}
-            <div className="p-3.5 bg-gradient-to-r from-teal-500/10 to-indigo-500/10 border border-teal-500/20 rounded-2xl flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                <span className="font-bold text-zinc-800 dark:text-zinc-200">Votre score :</span>
-              </div>
-              <span className="font-black text-teal-600 dark:text-teal-400 text-sm">850 pts (Rang #8)</span>
-            </div>
+            {/* Link to view full leaderboard */}
+            {sortedLeaderboard.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowFullLeaderboardModal(true)}
+                className="w-full py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800/80 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold text-xs rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer border border-zinc-200/80 dark:border-zinc-700/50 mt-3"
+              >
+                <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                <span>Voir tout le classement ({sortedLeaderboard.length} membres)</span>
+              </button>
+            )}
           </div>
 
           {/* COMMUNITY METRICS */}
@@ -853,6 +853,118 @@ export default function CommunityPage() {
         </div>
 
       </div>
+
+      {/* ─── MODAL VOIR TOUT LE CLASSEMENT ─── */}
+      {showFullLeaderboardModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-amber-500">
+                  <Trophy className="w-5 h-5 fill-current" />
+                </div>
+                <div>
+                  <h2 className="font-extrabold text-lg text-zinc-900 dark:text-white">Classement Général de la Communauté</h2>
+                  <p className="text-xs text-zinc-500">Basé sur les données réelles de parrainages et contributions</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFullLeaderboardModal(false)}
+                className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-white flex items-center justify-center font-bold text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Tab Controls */}
+            <div className="px-6 pt-4">
+              <div className="bg-zinc-100 dark:bg-zinc-800 p-1.5 rounded-2xl grid grid-cols-2 text-center text-xs font-bold">
+                <button
+                  onClick={() => setLeaderboardTab("AFFILIATES")}
+                  className={`py-2 rounded-xl transition-all cursor-pointer ${
+                    leaderboardTab === "AFFILIATES"
+                      ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm"
+                      : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                  }`}
+                >
+                  🚀 Top Affiliés (Filleuls)
+                </button>
+                <button
+                  onClick={() => setLeaderboardTab("INSTRUCTORS")}
+                  className={`py-2 rounded-xl transition-all cursor-pointer ${
+                    leaderboardTab === "INSTRUCTORS"
+                      ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm"
+                      : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                  }`}
+                >
+                  🏅 Top Formateurs (Cours)
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content / List */}
+            <div className="p-6 overflow-y-auto space-y-3 flex-1">
+              {sortedLeaderboard.map((item) => {
+                const isTop1 = item.rank === 1;
+                const isTop2 = item.rank === 2;
+                const isTop3 = item.rank === 3;
+
+                let rankBadgeCls = "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
+                if (isTop1) rankBadgeCls = "bg-amber-400 text-zinc-950 font-black shadow-md shadow-amber-400/20";
+                else if (isTop2) rankBadgeCls = "bg-slate-300 text-slate-900 font-bold";
+                else if (isTop3) rankBadgeCls = "bg-amber-700 text-white font-bold";
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`p-3.5 rounded-2xl border flex items-center justify-between transition-all ${
+                      isTop1
+                        ? "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40"
+                        : "bg-zinc-50/50 dark:bg-zinc-800/30 border-zinc-100 dark:border-zinc-800/70"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0 ${rankBadgeCls}`}>
+                        #{item.rank}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-bold text-zinc-900 dark:text-white truncate">{item.name}</p>
+                          <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 uppercase">
+                            {item.role === "INSTRUCTOR" ? "Formateur" : item.role === "ADMIN" ? "Admin" : "Apprenant"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          {item.affiliatesCount} filleul{item.affiliatesCount > 1 ? "s" : ""} • {item.coursesCount} cours
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">
+                        {item.points.toLocaleString()} pts
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-zinc-50 dark:bg-zinc-950 border-t border-zinc-100 dark:border-zinc-800 text-right">
+              <button
+                type="button"
+                onClick={() => setShowFullLeaderboardModal(false)}
+                className="px-5 py-2.5 bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-bold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

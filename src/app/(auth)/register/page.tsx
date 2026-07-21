@@ -97,14 +97,25 @@ const COUNTRIES = [
 
 const INSTRUCTOR_DOMAINS = [
   { value: "blockchain", label: "Blockchain & Cryptomonnaies", icon: "⛓️" },
-  { value: "trading", label: "Trading & Finance", icon: "📈" },
+  { value: "trading", label: "Finance & Trading", icon: "📈" },
+  { value: "ai", label: "Intelligence Artificielle & Data", icon: "🤖" },
+  { value: "development", label: "Développement & Informatique", icon: "💻" },
+  { value: "business", label: "Business & Entrepreneuriat", icon: "🚀" },
+  { value: "marketing", label: "Marketing Digital & Com", icon: "📢" },
+  { value: "design", label: "Design, Vidéo & Graphisme", icon: "🎨" },
+  { value: "languages", label: "Langues & Dev Personnel", icon: "🗣️" },
+  { value: "other", label: "Autre / Domaine personnalisé", icon: "✏️" },
+];
+
+const STUDENT_DOMAINS = [
+  { value: "blockchain", label: "Blockchain & Cryptos", icon: "⛓️" },
+  { value: "trading", label: "Finance & Trading", icon: "📈" },
   { value: "ai", label: "Intelligence Artificielle", icon: "🤖" },
-  { value: "web3", label: "Web3 & NFT", icon: "🌐" },
-  { value: "defi", label: "DeFi & Yield Farming", icon: "💎" },
-  { value: "security", label: "Cybersécurité & Audit", icon: "🔒" },
-  { value: "development", label: "Développement Blockchain", icon: "💻" },
-  { value: "entrepreneurship", label: "Entrepreneuriat & Startups", icon: "🚀" },
-  { value: "other", label: "Autre / Personnalisé", icon: "✏️" },
+  { value: "development", label: "Développement Web & IT", icon: "💻" },
+  { value: "business", label: "Business & Entrepreneuriat", icon: "🚀" },
+  { value: "marketing", label: "Marketing Digital", icon: "📢" },
+  { value: "design", label: "Design & Création", icon: "🎨" },
+  { value: "other", label: "Autre / Domaine spécifique", icon: "✏️" },
 ];
 
 const TOTAL_STEPS = 4;
@@ -196,6 +207,7 @@ function RegisterForm() {
   // Student
   const [studentLevel, setStudentLevel] = useState("Débutant");
   const [interestCourse, setInterestCourse] = useState("blockchain");
+  const [customStudentDomain, setCustomStudentDomain] = useState("");
 
   // State
   const [formError, setFormError] = useState<string | null>(null);
@@ -298,6 +310,9 @@ function RegisterForm() {
       if (!academyName.trim()) { setFormError("Le nom de votre académie est requis."); return false; }
       if (thematic === "other" && !customThematic.trim()) { setFormError("Veuillez spécifier votre domaine d'enseignement."); return false; }
       if (!bio.trim()) { setFormError("Une courte bio est requise."); return false; }
+    }
+    if (step === 3 && role === "STUDENT") {
+      if (interestCourse === "other" && !customStudentDomain.trim()) { setFormError("Veuillez spécifier votre domaine d'intérêt."); return false; }
     }
     return true;
   };
@@ -1082,12 +1097,7 @@ function RegisterForm() {
                   {language === "en" ? "Domain that interests you the most" : "Domaine qui vous intéresse le plus"}
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { value: "blockchain", label: "Blockchain", icon: "⛓️" },
-                    { value: "trading", label: "Trading", icon: "📈" },
-                    { value: "ai", label: language === "en" ? "Artificial Intelligence" : "Intelligence Artificielle", icon: "🤖" },
-                    { value: "web3", label: "Web3 & NFT", icon: "🌐" },
-                  ].map((course) => (
+                  {STUDENT_DOMAINS.map((course) => (
                     <button
                       key={course.value}
                       type="button"
