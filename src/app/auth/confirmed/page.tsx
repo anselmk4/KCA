@@ -114,10 +114,18 @@ function ConfirmedContent() {
 
         setStatusText("Vérification de votre session...");
 
+        // Client-side fallback: if PKCE code is in searchParams, attempt client exchange
+        const codeParam = searchParams.get("code");
+        if (codeParam) {
+          try {
+            await supabase.auth.exchangeCodeForSession(codeParam);
+          } catch (codeErr) {
+            console.warn("[confirmed] client code exchange fallback info:", codeErr);
+          }
+        }
+
         // Always wait for the session to be fully established client-side.
-        // For students we skip fixRole, so without this wait the session
-        // wouldn't be ready when the browser hits /dashboard (middleware blocks it).
-        const session = await waitForSession();
+        let session = await waitForSession();
 
         if (session?.user) {
           setHasSession(true);

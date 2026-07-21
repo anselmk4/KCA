@@ -78,40 +78,26 @@ export async function GET(request: Request) {
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
     if (exchangeError) {
-      console.error('[callback] exchangeCodeForSession error:', exchangeError.message);
-
-      if (type === 'signup' || next === '/auth/confirmed') {
-        return redirectWithCookies(
-          `${origin}/auth/confirmed?code=${code}&next=${encodeURIComponent(next)}&error=${encodeURIComponent(exchangeError.message)}`
-        );
-      }
-      return redirectWithCookies(`${origin}/login?error=auth-failed&reason=${encodeURIComponent(exchangeError.message)}`);
+      console.warn('[callback] server exchangeCodeForSession warning:', exchangeError.message);
+      // Pass code to client-side /auth/confirmed so client SDK can complete the exchange
+      return redirectWithCookies(
+        `${origin}/auth/confirmed?code=${encodeURIComponent(code)}&next=${encodeURIComponent(next)}`
+      );
     }
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return redirectWithCookies(`${origin}/login?error=auth-failed`);
+    if (!user) {
+      return redirectWithCookies(
+        `${origin}/auth/confirmed?code=${encodeURIComponent(code)}&next=${encodeURIComponent(next)}`
+      );
+    }
 
     const role = await bootstrapUserAndGetRole(user);
-
-    // Always redirect to /auth/confirmed when that was the intended destination
-    if (next === '/auth/confirmed') {
-      return redirectWithCookies(`${origin}/auth/confirmed?role=${role}`);
-    }
-
-    // Otherwise redirect directly to the role dashboard
-    let targetRedirect: string;
-    if (['SUPER_ADMIN', 'ADMIN', 'FINANCE_ADMIN', 'ACADEMIC_ADMIN', 'SUPPORT_AGENT'].includes(role)) {
-      targetRedirect = '/admin';
-    } else if (['INSTRUCTOR', 'TEACHING_ASSISTANT'].includes(role)) {
-      targetRedirect = '/instructor';
-    } else {
-      targetRedirect = '/dashboard';
-    }
-    return redirectWithCookies(`${origin}${targetRedirect}`);
+    return redirectWithCookies(`${origin}/auth/confirmed?role=${role}&code=${encodeURIComponent(code)}`);
   }
 
-  // Neither token_hash nor code present
-  return redirectWithCookies(`${origin}/login?error=auth-failed`);
+  // Neither token_hash nor code present: fallback to /auth/confirmed for client-side hash/session detection
+  return redirectWithCookies(`${origin}/auth/confirmed`);
 }
 
 /**
