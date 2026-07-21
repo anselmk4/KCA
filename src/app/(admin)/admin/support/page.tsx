@@ -72,13 +72,14 @@ export default function AdminSupportPage() {
       const updated = getDB();
       const ticket = updated.supportTickets.find((t: any) => t.id === selectedId);
       if (ticket && ticket.userId) {
-        const { createNotification } = await import('@/lib/supabase/notifications-helper');
-        await createNotification({
-          userId: ticket.userId,
+        const { supabase } = await import("@/lib/supabase/client");
+        await supabase.from("notifications").insert({
+          user_id: ticket.userId,
           title: "Support technique !",
           message: `Le support technique a répondu à votre ticket : "${ticket.subject}".`,
           type: "INFO",
-          link: `/dashboard/support`
+          link: `/dashboard/support`,
+          is_read: false
         });
       }
     } catch (err) {
