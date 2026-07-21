@@ -19,6 +19,7 @@ import Link from "next/link";
 import { getSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
+import { CourseCreationWizardModal } from "@/components/courses/CourseCreationWizardModal";
 
 type StatusFilter = "ALL" | "DRAFT" | "REVIEW" | "PUBLISHED" | "ARCHIVED";
 
@@ -228,23 +229,43 @@ export default function InstructorCoursesPage() {
     }
   };
 
-  const handleCreate = async () => {
-    if (!newTitle.trim()) return;
+  const handleWizardSubmit = async (courseData: {
+    title: string;
+    description: string;
+    shortDescription: string;
+    category: string;
+    price: number;
+    isPaid: boolean;
+    installmentsEnabled: boolean;
+    installmentCount: number;
+    level: string;
+    thumbnailUrl: string;
+    prerequisites: string;
+  }) => {
     setCreating(true);
-    const slug = newTitle
+    const slug = courseData.title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
+      .replace(/(^-|-$)/g, "") + "-" + Math.floor(Math.random() * 1000);
 
     const instructorId = session?.userId || "u3";
+
+    const mapLevel = (lvl: string): "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "EXPERT" => {
+      if (lvl.includes("Débutant")) return "BEGINNER";
+      if (lvl.includes("Intermédiaire")) return "INTERMEDIATE";
+      if (lvl.includes("Avancé") || lvl.includes("Expert")) return "ADVANCED";
+      return "BEGINNER";
+    };
 
     const { error } = await supabase
       .from("courses")
       .insert({
-        title: newTitle.trim(),
+        title: courseData.title,
         slug,
-        description: newDescription.trim() || "Nouveau cours en préparation.",
-        price: parseFloat(newPrice) || 0,
+        description: courseData.description,
+        price: courseData.price,
+        level: mapLevel(courseData.level),
+        thumbnail_url: courseData.thumbnailUrl,
         instructor_id: instructorId,
         status: "DRAFT"
       });
@@ -254,9 +275,6 @@ export default function InstructorCoursesPage() {
       alert("Erreur lors de la création du cours: " + error.message);
     } else {
       await loadDashboardData();
-      setNewTitle("");
-      setNewDescription("");
-      setNewPrice("");
       setShowCreateModal(false);
     }
     setCreating(false);
@@ -510,57 +528,13 @@ export default function InstructorCoursesPage() {
         </div>
       )}
 
-      {/* Create Course Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl w-full max-w-lg">
-            <div className="p-6 border-b border-zinc-200 dark:border-zinc-800">
-              <h2 className="text-lg font-bold text-zinc-900 dark:text-white">{t("student.payment.applyCoupon", "Nouveau Cours").toLowerCase().includes("appliqu") ? "New Course" : "Nouveau Cours"}</h2>
-              <p className="text-sm text-zinc-500 mt-1">{t("student.payment.applyCoupon", "Remplissez").toLowerCase().includes("appliqu") ? "Fill in the basic information." : "Remplissez les informations de base."}</p>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
-                  {t("student.payment.applyCoupon", "Titre du cours").toLowerCase().includes("appliqu") ? "Course Title *" : "Titre du cours *"}
-                </label>
-                <input
-                  type="text"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder={t("student.payment.applyCoupon", "Ex").toLowerCase().includes("appliqu") ? "e.g. Introduction to DeFi" : "Ex: Introduction au DeFi"}
-                  className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">{t("student.payment.applyCoupon", "Prix").toLowerCase().includes("appliqu") ? "Price ($)" : "Prix ($)"}</label>
-                <input
-                  type="number"
-                  value={newPrice}
-                  onChange={(e) => setNewPrice(e.target.value)}
-                  placeholder={t("student.payment.applyCoupon", "0 = Gratuit").toLowerCase().includes("appliqu") ? "0 = Free" : "0 = Gratuit"}
-                  min="0"
-                  className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
-                />
-              </div>
-            </div>
-            <div className="p-6 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-end gap-3">
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2.5 text-sm font-medium text-zinc-650 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors cursor-pointer"
-              >
-                {t("student.payment.applyCoupon", "Annuler").toLowerCase().includes("appliqu") ? "Cancel" : "Annuler"}
-              </button>
-              <button
-                onClick={handleCreate}
-                disabled={!newTitle.trim() || creating}
-                className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors cursor-pointer"
-              >
-                {creating ? (t("student.payment.applyCoupon", "Création").toLowerCase().includes("appliqu") ? "Creating..." : "Création...") : (t("student.payment.applyCoupon", "Créer le cours").toLowerCase().includes("appliqu") ? "Create Course" : "Créer le cours")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Multi-step Course Creation Onboarding Wizard Modal */}
+      <CourseCreationWizardModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleWizardSubmit}
+        creating={creating}
+      />
 
       {/* Limit Alert Modal */}
       {showLimitModal && (
