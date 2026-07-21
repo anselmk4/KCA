@@ -92,13 +92,20 @@ export default function CommunityPage() {
       if (user) {
         const { data: prof } = await supabase
           .from("profiles")
-          .select("id, full_name, avatar_url, plan")
+          .select("id, full_name, avatar_url, plan, role")
           .eq("id", user.id)
           .maybeSingle();
         setCurrentUserProfile(prof);
       }
 
-      // 1. Fetch posts
+      // 1. Load Leaderboard first to get server-resolved user roles
+      const lbUsers = await loadLeaderboardData();
+      const lbRoleMap: Record<string, string> = {};
+      (lbUsers || []).forEach((u) => {
+        if (u.id && u.role) lbRoleMap[u.id] = u.role;
+      });
+
+      // 2. Fetch posts
       let rawPosts: any[] = [];
       try {
         const { data, error } = await db
@@ -157,28 +164,6 @@ export default function CommunityPage() {
         ];
       }
 
-      // Fetch profiles for posts
-      const authorIds = [...new Set(rawPosts.map((p) => p.user_id))];
-      const { data: authorProfiles } = await supabase
-        .from("profiles")
-        .select("id, full_name, avatar_url")
-        .in("id", authorIds);
-
-      const authorMap: Record<string, { name: string; avatar: string | null }> = {};
-      authorProfiles?.forEach((p) => {
-        authorMap[p.id] = { name: p.full_name, avatar: p.avatar_url };
-      });
-
-      const { data: userRoles } = await supabase
-        .from("user_roles")
-        .select("user_id, roles(name)")
-        .in("user_id", authorIds);
-
-      const roleMap: Record<string, string> = {};
-      (userRoles || []).forEach((ur: any) => {
-        if (!roleMap[ur.user_id]) roleMap[ur.user_id] = ur.roles?.name || "STUDENT";
-      });
-
       // Fetch comments if table exists
       let rawComments: any[] = [];
       try {
@@ -193,39 +178,76 @@ export default function CommunityPage() {
         console.warn("[Community] comments table query fallback:", e);
       }
 
-      const commenterIds = [...new Set(rawComments.map((c) => c.user_id))];
-      let commenterMap: Record<string, { name: string; avatar: string | null }> = {};
-      if (commenterIds.length > 0) {
-        const { data: commenters } = await supabase
-          .from("profiles")
-          .select("id, full_name, avatar_url")
-          .in("id", commenterIds);
-        commenters?.forEach((p) => {
-          commenterMap[p.id] = { name: p.full_name, avatar: p.avatar_url };
-        });
-      }
+      const allUserIds = [...new Set([
+        ...rawPosts.map((p) => p.user_id),
+        ...rawComments.map((c) => c.user_id)
+      ])];
 
-      const enrichedPosts: Post[] = rawPosts.map((p) => ({
-        ...p,
-        category: (p.category as PostCategory) || "REFLECTIONS",
-        likes_count: p.likes_count || 0,
-        author_name: p.author_name || authorMap[p.user_id]?.name || "Membre Ansella",
-        author_avatar: p.author_avatar || authorMap[p.user_id]?.avatar || null,
-        author_role: p.author_role || roleMap[p.user_id] || "STUDENT",
-        showComments: false,
-        comments: rawComments
-          .filter((c) => c.post_id === p.id)
-          .map((c) => ({
-            ...c,
-            author_name: commenterMap[c.user_id]?.name || "Membre",
-            author_avatar: commenterMap[c.user_id]?.avatar || null
-          })),
-      }));
+      // Fetch profile details for all post and comment authors
+      const { data: authorProfiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url, plan, role")
+        .in("id", allUserIds);
+
+      const authorProfileMap: Record<string, { name: string; avatar: string | null; plan: string | null; role: string | null }> = {};
+      authorProfiles?.forEach((p: any) => {
+        authorProfileMap[p.id] = { name: p.full_name, avatar: p.avatar_url, plan: p.plan, role: p.role };
+      });
+
+      // Check courses to see who is an instructor
+      const { data: instructorCourses } = await supabase
+        .from("courses")
+        .select("instructor_id")
+        .in("instructor_id", allUserIds);
+
+      const instructorSet = new Set((instructorCourses || []).map((c: any) => c.instructor_id));
+
+      // Check user_roles table
+      const { data: userRolesData } = await supabase
+        .from("user_roles")
+        .select("user_id, roles(name)")
+        .in("user_id", allUserIds);
+
+      const dbRoleMap: Record<string, string> = {};
+      (userRolesData || []).forEach((ur: any) => {
+        if (ur.user_id && !dbRoleMap[ur.user_id]) {
+          dbRoleMap[ur.user_id] = ur.roles?.name || "STUDENT";
+        }
+      });
+
+      // Helper to accurately resolve role
+      const resolveRole = (userId: string, defaultRole?: string): string => {
+        if (lbRoleMap[userId]) return lbRoleMap[userId];
+        if (instructorSet.has(userId)) return "INSTRUCTOR";
+        if (authorProfileMap[userId]?.role) return authorProfileMap[userId].role!;
+        if (authorProfileMap[userId]?.plan && authorProfileMap[userId].plan !== "FREE") return "INSTRUCTOR";
+        if (dbRoleMap[userId]) return dbRoleMap[userId];
+        if (defaultRole && defaultRole !== "MEMBER") return defaultRole;
+        return "STUDENT";
+      };
+
+      const enrichedPosts: Post[] = rawPosts.map((p) => {
+        const resolvedAuthorRole = resolveRole(p.user_id, p.author_role);
+        return {
+          ...p,
+          category: (p.category as PostCategory) || "REFLECTIONS",
+          likes_count: p.likes_count || 0,
+          author_name: p.author_name || authorProfileMap[p.user_id]?.name || "Membre Ansella",
+          author_avatar: p.author_avatar || authorProfileMap[p.user_id]?.avatar || null,
+          author_role: resolvedAuthorRole,
+          showComments: false,
+          comments: rawComments
+            .filter((c) => c.post_id === p.id)
+            .map((c) => ({
+              ...c,
+              author_name: authorProfileMap[c.user_id]?.name || "Membre",
+              author_avatar: authorProfileMap[c.user_id]?.avatar || null,
+              author_role: resolveRole(c.user_id, c.author_role)
+            })),
+        };
+      });
 
       setPosts(enrichedPosts);
-
-      // 2. Fetch or Generate Leaderboard data
-      await loadLeaderboardData();
 
     } catch (err) {
       console.error("[Community] General load error:", err);
@@ -235,14 +257,14 @@ export default function CommunityPage() {
   }, []);
 
   // ─── Chargement du Leaderboard depuis la base de données ─────
-  const loadLeaderboardData = async () => {
+  const loadLeaderboardData = async (): Promise<LeaderboardUser[]> => {
     try {
       const res = await fetch("/api/community/leaderboard");
       if (res.ok) {
         const data = await res.json();
         if (data.leaderboard && Array.isArray(data.leaderboard)) {
           setLeaderboard(data.leaderboard);
-          return;
+          return data.leaderboard;
         }
       }
 
@@ -286,8 +308,10 @@ export default function CommunityPage() {
       });
 
       setLeaderboard(dbList);
+      return dbList;
     } catch (err) {
       console.error("[Leaderboard] Error loading leaderboard:", err);
+      return [];
     }
   };
 
@@ -321,6 +345,8 @@ export default function CommunityPage() {
         console.warn("[CreatePost] DB insert warning, applying local optimistic state:", error);
       }
 
+      const currentUserRole = currentUserProfile?.role || (currentUserProfile?.plan && currentUserProfile.plan !== "FREE" ? "INSTRUCTOR" : "STUDENT");
+
       const newPostObj: Post = {
         id: data?.id || `local-${Date.now()}`,
         user_id: currentUser.id,
@@ -332,7 +358,7 @@ export default function CommunityPage() {
         created_at: new Date().toISOString(),
         author_name: currentUserProfile?.full_name || "Moi",
         author_avatar: currentUserProfile?.avatar_url || null,
-        author_role: "MEMBER",
+        author_role: currentUserRole,
         comments: [],
         showComments: false
       };
@@ -438,8 +464,11 @@ export default function CommunityPage() {
 
   // Sorted leaderboard
   const sortedLeaderboard = useMemo(() => {
-    const list = [...leaderboard];
+    let list = [...leaderboard];
     if (leaderboardTab === "INSTRUCTORS") {
+      list = list.filter(
+        (item) => item.role === "INSTRUCTOR" || item.role === "TEACHING_ASSISTANT" || item.coursesCount > 0
+      );
       list.sort((a, b) => b.coursesCount * 200 + b.points - (a.coursesCount * 200 + a.points));
     } else {
       list.sort((a, b) => b.affiliatesCount * 150 + b.points - (a.affiliatesCount * 150 + a.points));
@@ -448,9 +477,10 @@ export default function CommunityPage() {
   }, [leaderboard, leaderboardTab]);
 
   const roleBadge = (role: string) => {
-    if (role === "INSTRUCTOR")
+    const r = (role || "").toUpperCase();
+    if (r === "INSTRUCTOR" || r === "TEACHING_ASSISTANT")
       return <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">Formateur</span>;
-    if (role === "ADMIN" || role === "SUPER_ADMIN")
+    if (r.includes("ADMIN") || r === "SUPPORT_AGENT")
       return <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">Admin</span>;
     return <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300">Apprenant</span>;
   };

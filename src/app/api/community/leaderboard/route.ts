@@ -75,12 +75,14 @@ export async function GET(req: NextRequest) {
       const affCount = affiliateCounts[p.id] || 0;
       const cCount = coursesCountMap[p.id] || 0;
       const points = (affCount * 100) + (cCount * 50) + (p.affiliate_points || 0);
+      const rawRole = roleMap[p.id] || p.role;
+      const determinedRole = rawRole || (cCount > 0 || (p.plan && p.plan !== "FREE") ? "INSTRUCTOR" : "STUDENT");
 
       return {
         id: p.id,
         name: p.full_name || p.email?.split("@")[0] || "Membre Ansella",
         avatar: p.avatar_url || null,
-        role: roleMap[p.id] || "STUDENT",
+        role: determinedRole,
         plan: p.plan || "FREE",
         points,
         coursesCount: cCount,
