@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { AlertCircle, ArrowRight, Loader2, Sparkles, BookOpen, ShieldCheck, Cpu, Coins } from "lucide-react";
 import { initDB } from "@/lib/db";
-import { loginWithEmail, fetchUserProfile } from "@/lib/supabase/auth-helpers";
+import { loginWithEmail, fetchUserProfile, ensureProfile } from "@/lib/supabase/auth-helpers";
 import { supabase } from "@/lib/supabase/client";
 import { setSimulatedSession } from "@/lib/rbac";
 import { Captcha } from "@/components/ui/Captcha";
@@ -36,30 +36,38 @@ function LoginForm() {
       try {
         const { data: { session: activeSession } } = await supabase.auth.getSession();
         if (activeSession?.user) {
-          const profile = await fetchUserProfile(activeSession.user.id);
-          if (profile) {
-            setSimulatedSession({
-              userId: profile.id,
-              name: profile.full_name,
-              email: profile.email,
-              role: profile.role,
-              status: profile.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
-              plan: profile.plan,
-            });
+          const user = activeSession.user;
+          let profile = await fetchUserProfile(user.id);
 
-            if (profile.role === 'INSTRUCTOR' || profile.role === 'TEACHING_ASSISTANT') {
-              router.replace('/instructor');
-            } else if (
-              profile.role === 'SUPER_ADMIN' ||
-              profile.role === 'ADMIN' ||
-              profile.role === 'FINANCE_ADMIN' ||
-              profile.role === 'ACADEMIC_ADMIN' ||
-              profile.role === 'SUPPORT_AGENT'
-            ) {
-              router.replace('/admin');
-            } else {
-              router.replace('/dashboard');
-            }
+          if (!profile) {
+            const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Utilisateur';
+            const intendedRole = (user.user_metadata?.role || 'STUDENT').toUpperCase() as any;
+            await ensureProfile(user.id, user.email!, fullName, intendedRole);
+            profile = await fetchUserProfile(user.id);
+          }
+
+          const userRole = profile?.role || (user.user_metadata?.role as any) || 'STUDENT';
+          const userName = profile?.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Utilisateur';
+          const userPlan = profile?.plan || 'FREE';
+          const userStatus = profile?.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE';
+
+          setSimulatedSession({
+            userId: user.id,
+            name: userName,
+            email: user.email || '',
+            role: userRole,
+            status: userStatus,
+            plan: userPlan,
+          });
+
+          if (userRole === 'INSTRUCTOR' || userRole === 'TEACHING_ASSISTANT') {
+            router.replace('/instructor');
+          } else if (
+            ['SUPER_ADMIN', 'ADMIN', 'FINANCE_ADMIN', 'ACADEMIC_ADMIN', 'SUPPORT_AGENT'].includes(userRole)
+          ) {
+            router.replace('/admin');
+          } else {
+            router.replace('/dashboard');
           }
         }
       } catch (err) {
