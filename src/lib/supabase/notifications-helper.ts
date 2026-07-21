@@ -1,5 +1,4 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { sendEmail } from '@/lib/email';
 
 const supabaseAdmin = createSupabaseClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -58,7 +57,10 @@ export async function createNotification(params: {
             </div>
           `;
 
-          await sendEmail(profile.email, params.title, body);
+          if (typeof window === 'undefined') {
+            const { sendEmail } = await import('@/lib/email');
+            await sendEmail(profile.email, params.title, body);
+          }
         }
       } catch (emailErr) {
         console.error("[Notifications Helper] Failed to send email copy:", emailErr);
