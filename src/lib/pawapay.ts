@@ -222,6 +222,83 @@ export async function initiatePawaPayDeposit(params: {
   }
 }
 
+export interface PawaPayDepositStatusResponse {
+  success: boolean;
+  depositId: string;
+  status?: string;
+  failureCode?: string;
+  failureMessage?: string;
+  error?: string;
+}
+
+/**
+ * Fetch deposit status directly from PawaPay API (production or sandbox)
+ */
+export async function getPawaPayDepositStatus(depositId: string): Promise<PawaPayDepositStatusResponse> {
+  const apiKey = process.env.PAWAPAY_API_TOKEN || "pawapay_sandbox_placeholder_token_abc123";
+  const isProduction = process.env.PAWAPAY_ENVIRONMENT === "production";
+  const url = `${isProduction ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io"}/deposits/${depositId}`;
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`
+      }
+    });
+
+    const responseText = await response.text();
+    console.log("[PawaPayService] PawaPay deposit status response:", response.status, "body:", responseText);
+
+    if (!response.ok) {
+      return {
+        success: false,
+        depositId,
+        error: `HTTP ${response.status}: ${responseText}`
+      };
+    }
+
+    let data: any = {};
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      data = {};
+    }
+
+    // PawaPay deposit status API can return an array of objects or a single object
+    const depositObj = Array.isArray(data) ? data[0] : data;
+
+    if (!depositObj) {
+      return {
+        success: false,
+        depositId,
+        error: "Aucune donnée de dépôt retournée par PawaPay."
+      };
+    }
+
+    const status = depositObj.status;
+    const failureCode = depositObj.failureCode?.failureCode || (typeof depositObj.failureCode === 'string' ? depositObj.failureCode : undefined) || depositObj.rejectionReason?.rejectionCode;
+    const failureMessage = depositObj.failureCode?.failureMessage || depositObj.rejectionReason?.rejectionMessage;
+
+    return {
+      success: true,
+      depositId,
+      status: status || "PENDING",
+      failureCode,
+      failureMessage
+    };
+
+  } catch (err: any) {
+    console.error("[PawaPayService] Network error during status check:", err);
+    return {
+      success: false,
+      depositId,
+      error: err.message || "Erreur réseau lors de la vérification PawaPay"
+    };
+  }
+}
+
+
 export interface InitiatePayoutResponse {
   success: boolean;
   payoutId: string;

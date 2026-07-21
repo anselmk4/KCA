@@ -294,37 +294,51 @@ export default function PaymentPage() {
     discountedAmount = Math.round(discountedAmount);
   }
 
-  const checkPaymentStatus = async () => {
+  const checkPaymentStatus = async (isSilent = false) => {
     if (!paymentId) return;
-    setVerifying(true);
+    if (!isSilent) setVerifying(true);
     try {
-      const { data, error } = await supabase
-        .from('payments')
-        .select('status, failure_reason')
-        .eq('id', paymentId)
-        .maybeSingle();
-      
-      if (error) throw error;
-      if (data?.status === 'PAID') {
+      const res = await fetch(`/api/payments/pawapay-check-status?depositId=${paymentId}`);
+      const data = await res.json();
+
+      if (data.status === 'PAID') {
         setShowPendingState(false);
         setSuccess(true);
         router.refresh();
         setTimeout(() => {
           router.push("/dashboard/courses");
         }, 3000);
-      } else if (data?.status === 'FAILED') {
-        alert(`Le paiement a échoué : ${data.failure_reason || "Transaction refusée par l'opérateur."}`);
+        return true;
+      } else if (data.status === 'FAILED') {
         setShowPendingState(false);
+        if (!isSilent) {
+          alert(`Le paiement a échoué : ${data.failureReason || "Transaction refusée par l'opérateur."}`);
+        }
+        return false;
       } else {
-        alert("Paiement toujours en attente. Assurez-vous d'avoir validé l'opération en saisissant votre code PIN secret sur votre téléphone.");
+        if (!isSilent) {
+          alert("Paiement toujours en attente. Assurez-vous d'avoir validé l'opération en saisissant votre code PIN secret sur votre téléphone.");
+        }
+        return false;
       }
     } catch (err: any) {
       console.error('[payment] Error checking status:', err);
-      alert("Erreur lors de la vérification du statut : " + (err.message || err));
+      if (!isSilent) alert("Erreur lors de la vérification du statut : " + (err.message || err));
+      return false;
     } finally {
-      setVerifying(false);
+      if (!isSilent) setVerifying(false);
     }
   };
+
+  // Auto-polling PawaPay payment status every 5 seconds when pending
+  useEffect(() => {
+    if (showPendingState && paymentId && method === 'momo') {
+      const interval = setInterval(() => {
+        checkPaymentStatus(true);
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [showPendingState, paymentId, method]);
 
   const simulateSuccess = async () => {
     if (!paymentId) return;
@@ -364,6 +378,7 @@ export default function PaymentPage() {
       setSimulating(false);
     }
   };
+
 
   // Sandbox auto-simulation helper for Mobile Money - only auto-simulate on localhost
   useEffect(() => {
@@ -739,7 +754,7 @@ export default function PaymentPage() {
 
           <div className="space-y-3 pt-4">
             <button
-              onClick={checkPaymentStatus}
+              onClick={() => checkPaymentStatus(false)}
               disabled={verifying}
               className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm cursor-pointer"
             >
