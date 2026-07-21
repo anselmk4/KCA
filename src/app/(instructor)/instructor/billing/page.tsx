@@ -452,6 +452,9 @@ export default function BillingPage() {
                 <li className="flex items-center gap-2 text-xs font-bold text-amber-600 dark:text-amber-400">
                   <span>🛡️ AI Retention Guard (Relance IA)</span>
                 </li>
+                <li className="flex items-center gap-2 text-xs font-bold text-teal-600 dark:text-teal-400">
+                  <span>📝 Générateur IA de Quizz & Examens</span>
+                </li>
                 <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
                   <Check className="w-4 h-4 text-teal-600" /> 10% frais de transaction
                 </li>
@@ -517,6 +520,9 @@ export default function BillingPage() {
                 </li>
                 <li className="flex items-center gap-2 text-xs font-bold text-amber-600 dark:text-amber-400">
                   <span>🛡️ AI Retention Guard (Détection Décrochage IA)</span>
+                </li>
+                <li className="flex items-center gap-2 text-xs font-bold text-teal-600 dark:text-teal-400">
+                  <span>📝 Générateur IA de Quizz & Examens</span>
                 </li>
                 <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
                   <Check className="w-4 h-4 text-teal-600" /> 2% frais de transaction

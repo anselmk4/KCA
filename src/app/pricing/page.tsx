@@ -35,7 +35,7 @@ export default function PricingPage() {
         "Jusqu'à 50 apprenants inscrits",
         "✨ Auto-Grader & Correction Devoirs par IA",
         "🛡️ AI Retention Guard (Relance Anti-Décrochage)",
-        "Quiz de validation simples",
+        "📝 Générateur IA de Quizz & Examens sur-mesure",
         "Encaissement Mobile Money & Carte",
         "Frais de transaction : 10%",
         "Support par email"
@@ -54,7 +54,7 @@ export default function PricingPage() {
         "Jusqu'à 200 apprenants inscrits",
         "✨ Copilot IA d'Évaluation & Auto-Grader inclus",
         "🛡️ AI Retention Guard (Détection Décrochage IA)",
-        "Quiz et examens illimités",
+        "📝 Générateur IA de Quizz & Examens sur-mesure",
         "Certificats de réussite automatisés",
         "Frais de transaction réduits : 5%",
         "Support prioritaire sous 24h"
@@ -73,7 +73,7 @@ export default function PricingPage() {
         "Apprenants illimités",
         "✨ Auto-Grader & Copilot IA illimité",
         "🛡️ AI Retention Guard & Relance Auto illimitée",
-        "Quiz, examens et diplômes illimités",
+        "📝 Générateur IA de Quizz & Examens sur-mesure",
         "0% de frais de transaction",
         "Nom de domaine personnalisé (ex: ecole.com)",
         "Gestionnaire de compte dédié & WhatsApp"

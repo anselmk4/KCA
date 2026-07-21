@@ -50,7 +50,7 @@ export function Pricing() {
         "Up to 50 enrolled learners",
         "✨ AI Homework Auto-Grader included",
         "🛡️ AI Retention Guard (Anti-Drop-out Relance)",
-        "Simple validation quizzes",
+        "📝 AI Quiz & Exam Generator",
         "Mobile Money & Card payment",
         "Transaction fee: 10%",
         "Email support"
@@ -59,7 +59,7 @@ export function Pricing() {
         "Jusqu'à 50 apprenants inscrits",
         "✨ Auto-Grader & Correction Devoirs par IA",
         "🛡️ AI Retention Guard (Relance Anti-Décrochage)",
-        "Quiz de validation simples",
+        "📝 Générateur IA de Quizz & Examens sur-mesure",
         "Encaissement Mobile Money & Carte",
         "Frais de transaction : 10%",
         "Support par email"
@@ -80,7 +80,7 @@ export function Pricing() {
         "Up to 200 enrolled learners",
         "✨ AI Evaluation Copilot & Auto-Grader",
         "🛡️ AI Retention Guard & Proactive Follow-up",
-        "Unlimited quizzes and exams",
+        "📝 AI Quiz & Exam Generator",
         "Automated achievement certificates",
         "Reduced transaction fee: 5%",
         "Priority 24h support"
@@ -89,7 +89,7 @@ export function Pricing() {
         "Jusqu'à 200 apprenants inscrits",
         "✨ Copilot IA d'Évaluation & Auto-Grader inclus",
         "🛡️ AI Retention Guard (Détection Décrochage IA)",
-        "Quiz et examens illimités",
+        "📝 Générateur IA de Quizz & Examens sur-mesure",
         "Certificats de réussite automatisés",
         "Frais de transaction réduits : 5%",
         "Support prioritaire sous 24h"
