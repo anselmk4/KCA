@@ -498,7 +498,7 @@ export default function CommunityPage() {
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-teal-950 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
         <div className="relative z-10 space-y-3 max-w-2xl">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 text-xs font-bold uppercase tracking-wider">
-            <Sparkles className="w-3.5 h-3.5 fill-current" /> Espace Communautaire Kajabi
+            <Sparkles className="w-3.5 h-3.5 fill-current" /> Espace Communautaire Ansella
           </span>
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight leading-tight">
             Échangez, Débattez & Accélérez votre Maîtrise
