@@ -36,6 +36,7 @@ import {
   RefreshCw,
   Mail,
   AlertCircle,
+  Eye,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import RichEditor from "@/components/editor/RichEditor";
@@ -1123,52 +1124,87 @@ export default function CourseDetailPage() {
         </div>
       )}
 
-      {/* Course Title Block */}
-      <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-xs uppercase tracking-wider font-extrabold px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-850 dark:text-zinc-300">
-              {course.category || "Général"}
-            </span>
-            <span className={`text-xs uppercase tracking-wider font-extrabold px-2.5 py-0.5 rounded-full ${
-              course.status === "PUBLISHED"
-                ? "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400"
-                : course.status === "REVIEW"
-                ? "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
-                : "bg-zinc-100 text-zinc-500 dark:bg-zinc-850 dark:text-zinc-400"
-            }`}>
-              {course.status === "PUBLISHED" ? "En ligne" : course.status === "DRAFT" ? "Brouillon" : course.status === "REVIEW" ? "En révision" : "Archivé"}
-            </span>
+      {/* Senior UX Hero Header Card */}
+      <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-teal-950 rounded-3xl p-6 sm:p-8 text-white border border-zinc-800 shadow-xl relative overflow-hidden">
+        {/* Background glow decorator */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="space-y-3 flex-1">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="text-[11px] uppercase tracking-wider font-extrabold px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                {course.category || "Général"}
+              </span>
+              <span className={`text-[11px] uppercase tracking-wider font-extrabold px-3 py-1 rounded-full border ${
+                course.status === "PUBLISHED"
+                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                  : course.status === "REVIEW"
+                  ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                  : "bg-zinc-800 text-zinc-400 border-zinc-700"
+              }`}>
+                ● {course.status === "PUBLISHED" ? "En ligne (Publié)" : course.status === "DRAFT" ? "Brouillon" : course.status === "REVIEW" ? "En révision" : "Archivé"}
+              </span>
+            </div>
+
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
+              {course.title}
+            </h1>
+
+            <div className="flex items-center gap-4 text-xs text-zinc-300 font-medium flex-wrap pt-1">
+              <span className="flex items-center gap-1.5 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
+                <BookOpen className="w-3.5 h-3.5 text-teal-400" />
+                {sections.length} Chapitre{sections.length > 1 ? "s" : ""} ({totalLessons} Leçon{totalLessons > 1 ? "s" : ""})
+              </span>
+              <span className="flex items-center gap-1.5 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
+                <Clock className="w-3.5 h-3.5 text-teal-400" />
+                {totalDuration} min au total
+              </span>
+              <span className="flex items-center gap-1.5 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
+                <Users className="w-3.5 h-3.5 text-teal-400" />
+                {enrollments.length} Étudiant{enrollments.length > 1 ? "s" : ""}
+              </span>
+            </div>
           </div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-zinc-900 dark:text-white mt-3 leading-tight">{course.title}</h1>
-          <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-2 flex items-center gap-4 flex-wrap">
-            <span>{sections.length} Chapitre{sections.length > 1 ? "s" : ""}</span>
-            <span>{totalLessons} Leçon{totalLessons > 1 ? "s" : ""}</span>
-            <span>{totalDuration} min</span>
-            <span>{enrollments.length} Étudiant{enrollments.length > 1 ? "s" : ""}</span>
-          </p>
-        </div>
-        <div className="flex gap-4 self-start md:self-auto">
-          <div className="bg-zinc-50 dark:bg-zinc-850 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800/80 text-center min-w-[110px]">
-            <p className="text-2xl font-extrabold text-teal-600">{avgProgress}%</p>
-            <p className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider mt-1">Prog. Moyenne</p>
-          </div>
-          <div className="bg-zinc-50 dark:bg-zinc-850 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800/80 text-center min-w-[110px]">
-            <p className="text-2xl font-extrabold text-zinc-900 dark:text-white">{course.price > 0 ? `${course.price}$` : "Gratuit"}</p>
-            <p className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider mt-1">Tarif</p>
+
+          {/* Actions & Stats */}
+          <div className="flex items-center gap-3 shrink-0 flex-wrap">
+            <div className="bg-white/5 border border-white/10 p-3 rounded-2xl text-center min-w-[90px]">
+              <p className="text-xl font-extrabold text-teal-400">{avgProgress}%</p>
+              <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider mt-0.5">Progression</p>
+            </div>
+            <div className="bg-white/5 border border-white/10 p-3 rounded-2xl text-center min-w-[90px]">
+              <p className="text-xl font-extrabold text-white">{course.price > 0 ? `${course.price}$` : "Gratuit"}</p>
+              <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider mt-0.5">Tarif</p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Link
+                href={`/courses/${course.id}/preview`}
+                target="_blank"
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-white/10 cursor-pointer"
+              >
+                <Eye className="w-3.5 h-3.5" /> Aperçu Public
+              </Link>
+              <button
+                onClick={() => setShowAiStructureModal(true)}
+                className="px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white rounded-xl text-xs font-extrabold shadow-lg shadow-teal-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" /> Assistant IA
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Tabs list */}
-      <div className="flex border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto gap-1">
+      {/* Senior UX Navigation Tabs Bar */}
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl p-1.5 shadow-sm flex items-center gap-1.5 overflow-x-auto">
         {[
-          { id: "programme", label: "Programme", icon: BookOpen },
-          { id: "description", label: "Description", icon: Edit3 },
-          { id: "quizzes", label: "Quiz", icon: ClipboardCheck },
-          { id: "students", label: "Étudiants", icon: Users },
-          { id: "price", label: "Prix", icon: DollarSign },
-          { id: "settings", label: "Paramètres", icon: Settings },
+          { id: "programme", label: "Programme", icon: BookOpen, count: `${sections.length} chap.` },
+          { id: "description", label: "Présentation & SEO", icon: Edit3 },
+          { id: "quizzes", label: "Quiz & Évaluations", icon: ClipboardCheck, count: quizzes.length },
+          { id: "students", label: "Apprenants", icon: Users, count: enrollments.length },
+          { id: "price", label: "Tarif & Tranches", icon: DollarSign },
+          { id: "settings", label: "Paramètres & Accès", icon: Settings },
         ].map((tab) => {
           const Icon = tab.icon;
           const active = activeTab === tab.id;
@@ -1176,14 +1212,21 @@ export default function CourseDetailPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as TabType)}
-              className={`flex items-center gap-2 px-5 py-4 border-b-2 font-semibold text-sm transition-all whitespace-nowrap cursor-pointer ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all whitespace-nowrap cursor-pointer ${
                 active
-                  ? "border-teal-500 text-teal-600 dark:text-teal-400"
-                  : "border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:border-zinc-300"
+                  ? "bg-teal-600 text-white shadow-md shadow-teal-600/20"
+                  : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800"
               }`}
             >
               <Icon className="w-4 h-4" />
-              {tab.label}
+              <span>{tab.label}</span>
+              {tab.count !== undefined && (
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${
+                  active ? "bg-white/20 text-white" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
+                }`}>
+                  {tab.count}
+                </span>
+              )}
             </button>
           );
         })}
