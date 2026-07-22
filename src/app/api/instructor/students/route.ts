@@ -140,15 +140,38 @@ export async function GET(req: NextRequest) {
       const orderIds = orderItems?.map(oi => oi.order_id) || [];
 
       const payDataByCourse = new Map<string, { status: string; amount: number; date: string | null }>();
+
+      // 1. Check for any PAID payments for this student
+      const { data: paidUserPayments } = await dbClient
+        .from("payments")
+        .select("order_id, status, amount, paid_at, created_at, method")
+        .eq("user_id", studentId)
+        .eq("status", "PAID");
+
+      paidUserPayments?.forEach(p => {
+        const methodParts = (p.method || "").split("::");
+        const cId = methodParts[2] || (p.order_id ? orderItemCourseMap.get(p.order_id) : null);
+        if (cId) {
+          payDataByCourse.set(cId, { status: "PAID", amount: p.amount, date: p.paid_at || p.created_at });
+        }
+      });
+
+      // 2. Fallback to order items payments if no PAID record found
       if (orderIds.length > 0) {
         const { data: payments } = await dbClient
           .from("payments")
-          .select("order_id, status, amount, paid_at, created_at")
+          .select("order_id, status, amount, paid_at, created_at, method")
           .eq("user_id", studentId)
           .in("order_id", orderIds);
         payments?.forEach(p => {
-          const cId = orderItemCourseMap.get(p.order_id);
-          if (cId) payDataByCourse.set(cId, { status: p.status, amount: p.amount, date: p.paid_at || p.created_at });
+          const methodParts = (p.method || "").split("::");
+          const cId = methodParts[2] || orderItemCourseMap.get(p.order_id);
+          if (cId) {
+            const existing = payDataByCourse.get(cId);
+            if (!existing || p.status === "PAID") {
+              payDataByCourse.set(cId, { status: p.status, amount: p.amount, date: p.paid_at || p.created_at });
+            }
+          }
         });
       }
 
@@ -227,15 +250,45 @@ export async function GET(req: NextRequest) {
     const orderItemMap = new Map(orderItems?.map(oi => [oi.order_id, oi.course_id]) || []);
 
     let paymentMap = new Map<string, { status: string; amount: number; userId: string }>();
+
+    // 1. Fetch all PAID payments for these students to ensure PAID status takes priority over any failed attempts
+    if (studentIds.length > 0) {
+      const { data: paidPayments } = await dbClient
+        .from("payments")
+        .select("order_id, status, amount, user_id, method")
+        .in("user_id", studentIds)
+        .eq("status", "PAID");
+
+      paidPayments?.forEach(p => {
+        const methodParts = (p.method || "").split("::");
+        const courseId = methodParts[2] || orderItemMap.get(p.order_id);
+        if (courseId) {
+          const key = `${p.user_id}_${courseId}`;
+          const current = paymentMap.get(key);
+          const newAmount = (current?.amount || 0) + (p.amount || 0);
+          paymentMap.set(key, { status: "PAID", amount: newAmount > 0 ? newAmount : p.amount, userId: p.user_id });
+        }
+      });
+    }
+
+    // 2. Fetch order items payments (fallback to populate non-PAID attempts only if no PAID record exists)
     if (orderIds.length > 0) {
       const { data: payments } = await dbClient
         .from("payments")
-        .select("order_id, status, amount, user_id")
+        .select("order_id, status, amount, user_id, method")
         .in("order_id", orderIds);
+
       payments?.forEach(p => {
-        const courseId = orderItemMap.get(p.order_id);
+        const methodParts = (p.method || "").split("::");
+        const courseId = methodParts[2] || orderItemMap.get(p.order_id);
         if (courseId) {
-          paymentMap.set(`${p.user_id}_${courseId}`, { status: p.status, amount: p.amount, userId: p.user_id });
+          const key = `${p.user_id}_${courseId}`;
+          const existing = paymentMap.get(key);
+          if (!existing) {
+            paymentMap.set(key, { status: p.status, amount: p.amount, userId: p.user_id });
+          } else if (existing.status !== "PAID" && p.status === "PAID") {
+            paymentMap.set(key, { status: "PAID", amount: p.amount, userId: p.user_id });
+          }
         }
       });
     }

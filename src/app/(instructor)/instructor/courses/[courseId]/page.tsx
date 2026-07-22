@@ -121,6 +121,7 @@ export default function CourseDetailPage() {
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [userPlan, setUserPlan] = useState<string>("FREE");
+  const [totalCourseRevenue, setTotalCourseRevenue] = useState<number>(0);
 
   const [activeTab, setActiveTab] = useState<TabType>("programme");
   const editorRef = useRef<HTMLDivElement>(null);
@@ -372,7 +373,44 @@ export default function CourseDetailPage() {
         .from("enrollments")
         .select("*, profiles!student_id(full_name, email)")
         .eq("course_id", courseId);
-      setEnrollments((enrollmentsData || []) as EnrollmentData[]);
+      const enrList = (enrollmentsData || []) as EnrollmentData[];
+      setEnrollments(enrList);
+
+      // Calculate total generated revenue for this course
+      const { data: cOrderItems } = await supabase
+        .from("order_items")
+        .select("order_id")
+        .eq("course_id", courseId);
+
+      let revSum = 0;
+      const cOrderIds = cOrderItems?.map((oi) => oi.order_id) || [];
+      if (cOrderIds.length > 0) {
+        const { data: cPayments } = await supabase
+          .from("payments")
+          .select("amount")
+          .in("order_id", cOrderIds)
+          .eq("status", "PAID");
+        if (cPayments && cPayments.length > 0) {
+          revSum = cPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        }
+      }
+
+      // If no payments found via order_items, fallback to direct payments or paid enrollments
+      if (revSum === 0 && enrList.length > 0 && (courseData.price || 0) > 0) {
+        const { data: directPayments } = await supabase
+          .from("payments")
+          .select("amount")
+          .eq("status", "PAID")
+          .like("method", `%${courseId}%`);
+
+        if (directPayments && directPayments.length > 0) {
+          revSum = directPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        } else {
+          revSum = enrList.length * (Number(courseData.price) || 0);
+        }
+      }
+
+      setTotalCourseRevenue(revSum);
 
       // Homeworks
       const { data: hwData } = await (supabase as any)
@@ -1168,6 +1206,10 @@ export default function CourseDetailPage() {
 
           {/* Actions & Stats */}
           <div className="flex items-center gap-3 shrink-0 flex-wrap">
+            <div className="bg-emerald-500/10 border border-emerald-500/30 p-3 rounded-2xl text-center min-w-[110px]">
+              <p className="text-xl font-extrabold text-emerald-400">{totalCourseRevenue.toLocaleString()}$</p>
+              <p className="text-[10px] text-emerald-300 uppercase font-bold tracking-wider mt-0.5">Revenus Générés</p>
+            </div>
             <div className="bg-white/5 border border-white/10 p-3 rounded-2xl text-center min-w-[90px]">
               <p className="text-xl font-extrabold text-teal-400">{avgProgress}%</p>
               <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider mt-0.5">Progression</p>
@@ -2155,11 +2197,19 @@ export default function CourseDetailPage() {
             <div className="pb-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between flex-wrap gap-4">
               <div>
                 <h3 className="font-bold text-zinc-900 dark:text-white text-base">Inscriptions & Cohortes</h3>
-                <p className="text-zinc-400 text-xs mt-0.5">{enrollments.length} étudiant{enrollments.length > 1 ? "s" : ""} inscrits</p>
+                <p className="text-zinc-400 text-xs mt-0.5">{enrollments.length} étudiant{enrollments.length > 1 ? "s" : ""} inscrit{enrollments.length > 1 ? "s" : ""}</p>
               </div>
-              <button onClick={() => setShowInviteModal(true)} className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer">
-                <UserPlus className="w-3.5 h-3.5" /> Enrôler un Étudiant
-              </button>
+
+              <div className="flex items-center gap-3">
+                <div className="px-3.5 py-1.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                  <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>Revenus Générés : {totalCourseRevenue.toLocaleString()}$</span>
+                </div>
+
+                <button onClick={() => setShowInviteModal(true)} className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer">
+                  <UserPlus className="w-3.5 h-3.5" /> Enrôler un Étudiant
+                </button>
+              </div>
             </div>
             {enrollments.length === 0 ? (
               <div className="py-20 text-center">
