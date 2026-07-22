@@ -22,6 +22,7 @@ interface BookingSession {
   date: string;
   time: string;
   durationMin: number;
+  videoPlatform: "ANSELLA_LIVE" | "GOOGLE_MEET" | "ZOOM" | "CUSTOM";
   meetingUrl: string;
   status: "CONFIRMED" | "PENDING" | "COMPLETED";
 }
@@ -35,7 +36,8 @@ const MOCK_SESSIONS: BookingSession[] = [
     date: "Aujourd'hui, 22 Juillet",
     time: "15:00 - 15:45",
     durationMin: 45,
-    meetingUrl: "https://meet.google.com/abc-defg-hij",
+    videoPlatform: "ANSELLA_LIVE",
+    meetingUrl: "https://meet.jit.si/ansella-live-coaching-b1",
     status: "CONFIRMED",
   },
   {
@@ -46,6 +48,7 @@ const MOCK_SESSIONS: BookingSession[] = [
     date: "Demain, 23 Juillet",
     time: "10:30 - 11:15",
     durationMin: 45,
+    videoPlatform: "GOOGLE_MEET",
     meetingUrl: "https://meet.google.com/xyz-uvwx-rst",
     status: "CONFIRMED",
   },
@@ -59,12 +62,32 @@ export function CoachBookingTab() {
   const [slotDay, setSlotDay] = useState("Lundi");
   const [slotStartTime, setSlotStartTime] = useState("14:00");
   const [slotDuration, setSlotDuration] = useState("45");
-  const [slotPrice, setSlotPrice] = useState("0");
+  const [videoPlatform, setVideoPlatform] = useState<"ANSELLA_LIVE" | "GOOGLE_MEET" | "ZOOM" | "CUSTOM">("ANSELLA_LIVE");
+  const [customUrl, setCustomUrl] = useState("");
 
   const handleAddSlot = (e: React.FormEvent) => {
     e.preventDefault();
-    alert(`Plage horaire ajoutée pour les élèves : ${slotDay} à partir de ${slotStartTime} (${slotDuration} min)`);
+    const finalUrl =
+      videoPlatform === "ANSELLA_LIVE"
+        ? `https://meet.jit.si/ansella-live-coaching-${Date.now()}`
+        : customUrl.trim() || "https://meet.google.com/ansella-live";
+
+    const newSess: BookingSession = {
+      id: `b_${Date.now()}`,
+      studentName: "Élève Inscrit",
+      studentEmail: "eleve@ansella.app",
+      courseTitle: "Formation Continue",
+      date: `${slotDay}, Prochaine session`,
+      time: `${slotStartTime} - 45m`,
+      durationMin: parseInt(slotDuration),
+      videoPlatform,
+      meetingUrl: finalUrl,
+      status: "CONFIRMED",
+    };
+
+    setSessions([newSess, ...sessions]);
     setShowAddSlotModal(false);
+    alert(`Plage horaire Ansella Live créée avec le lien : ${finalUrl}`);
   };
 
   return (
@@ -212,6 +235,37 @@ export function CoachBookingTab() {
                   className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium"
                 />
               </div>
+
+              <div>
+                <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                  Interface de Visioconférence
+                </label>
+                <select
+                  value={videoPlatform}
+                  onChange={(e) => setVideoPlatform(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium"
+                >
+                  <option value="ANSELLA_LIVE">🟢 Ansella Live (Jitsi Meet - Gratuit & Inclus Par Défaut)</option>
+                  <option value="GOOGLE_MEET">🔵 Google Meet</option>
+                  <option value="ZOOM">🔷 Zoom</option>
+                  <option value="CUSTOM">🌐 Lien Personnalisé / Autre</option>
+                </select>
+              </div>
+
+              {videoPlatform === "CUSTOM" && (
+                <div>
+                  <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                    Lien Visio Personnalisé
+                  </label>
+                  <input
+                    type="url"
+                    value={customUrl}
+                    onChange={(e) => setCustomUrl(e.target.value)}
+                    placeholder="https://votre-lien-visio.com"
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium"
+                  />
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-2 pt-3">
                 <button
