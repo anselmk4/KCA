@@ -76,10 +76,12 @@ export async function GET(req: NextRequest) {
     const orderItemMap = new Map(orderItems.map((oi) => [oi.order_id, oi.course_id]));
 
     // 4. Fetch payments using dbClient (which bypasses RLS when using service role key, otherwise falls back to instructor session)
+    // Filter strictly by status = "PAID" to clean up failed/cancelled transactions from accounting calculations
     const { data: payments, error: paymentsError } = await dbClient
       .from("payments")
       .select("id, order_id, amount, status, paid_at, user_id, provider")
-      .in("order_id", orderIds);
+      .in("order_id", orderIds)
+      .eq("status", "PAID");
 
     if (paymentsError || !payments || payments.length === 0) {
       return NextResponse.json({

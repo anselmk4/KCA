@@ -82,6 +82,35 @@ export default function StudentDetailPage() {
   const [editFeedback, setEditFeedback] = useState<string>("");
   const [savingGrade, setSavingGrade] = useState<string | null>(null);
   const [unlockingCertCourseId, setUnlockingCertCourseId] = useState<string | null>(null);
+  const [revokingCourseId, setRevokingCourseId] = useState<string | null>(null);
+
+  async function handleRevokeCourse(courseId: string, courseTitle: string) {
+    if (!student) return;
+    const confirm = window.confirm(`Êtes-vous sûr de vouloir révoquer ${student.name} du cours "${courseTitle}" ?`);
+    if (!confirm) return;
+
+    setRevokingCourseId(courseId);
+    try {
+      const res = await fetch("/api/instructor/students/revoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId: student.id, courseId }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur lors de la révocation.");
+
+      alert(data.message || "Apprenant révoqué du cours avec succès.");
+      setStudent({
+        ...student,
+        courses: student.courses.filter((c) => c.courseId !== courseId),
+      });
+    } catch (err: any) {
+      alert("Erreur lors de la révocation : " + err.message);
+    } finally {
+      setRevokingCourseId(null);
+    }
+  }
 
   // AI Auto-Grader state
   const [aiGradingSubId, setAiGradingSubId] = useState<string | null>(null);
@@ -374,15 +403,27 @@ export default function StudentDetailPage() {
                       </div>
                     </div>
 
-                    {/* CTA: go to student progress for this course */}
-                    <Link
-                      href={`/dashboard/courses/${course.courseId}/learn`}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold rounded-xl transition-all shadow-sm shrink-0"
-                    >
-                      <PlayCircle className="w-3.5 h-3.5" />
-                      Voir la progression
-                      <ExternalLink className="w-3 h-3 opacity-70" />
-                    </Link>
+                    {/* CTA: go to student progress & Revoke course */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleRevokeCourse(course.courseId, course.courseTitle)}
+                        disabled={revokingCourseId === course.courseId}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                        title="Révoquer l'étudiant de cette formation"
+                      >
+                        <span>🚫</span>
+                        <span>{revokingCourseId === course.courseId ? "Révocation..." : "Révoquer"}</span>
+                      </button>
+
+                      <Link
+                        href={`/dashboard/courses/${course.courseId}/learn`}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold rounded-xl transition-all shadow-sm shrink-0"
+                      >
+                        <PlayCircle className="w-3.5 h-3.5" />
+                        Voir la progression
+                        <ExternalLink className="w-3 h-3 opacity-70" />
+                      </Link>
+                    </div>
                   </div>
 
                   {/* Body: Progress + Payment + Certificate */}

@@ -49,10 +49,11 @@ export default function AdminTransactionsPage() {
       setLoading(true);
     }
     try {
-      // 1. Get all payments
+      // 1. Get all successful payments (filtering out FAILED and CANCELLED for clean accounting)
       const { data: payments } = await supabase
         .from("payments")
         .select("id, order_id, user_id, amount, status, provider, paid_at")
+        .eq("status", "PAID")
         .order("paid_at", { ascending: false });
 
       if (!payments || payments.length === 0) {

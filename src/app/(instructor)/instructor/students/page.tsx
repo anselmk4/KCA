@@ -177,15 +177,16 @@ export default function StudentsPage() {
     if (!confirm) return;
 
     try {
-      const { error } = await supabase
-        .from('enrollments')
-        .delete()
-        .eq('student_id', studentId)
-        .eq('course_id', courseId);
+      const res = await fetch("/api/instructor/students/revoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId, courseId }),
+      });
 
-      if (error) throw error;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur de révocation.");
 
-      alert(`L'apprenant ${studentName} a été révoqué du cours "${courseTitle}" avec succès.`);
+      alert(data.message || `L'apprenant ${studentName} a été révoqué du cours "${courseTitle}" avec succès.`);
       if (session?.userId) {
         fetchStudents(session.userId);
       }
@@ -531,6 +532,20 @@ export default function StudentsPage() {
                     >
                       <span>🛡️</span>
                       <span className="hidden sm:inline text-[11px]">Relance IA</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        const firstEnrollment = student.enrollments[0];
+                        if (firstEnrollment) {
+                          handleRevokeStudent(student.studentId, firstEnrollment.courseId, firstEnrollment.courseTitle, student.studentName);
+                        }
+                      }}
+                      className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200/60 dark:border-red-800/40 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+                      title="Révoquer l'accès de l'étudiant à ce cours"
+                    >
+                      <span>🚫</span>
+                      <span className="hidden sm:inline text-[11px]">Révoquer</span>
                     </button>
 
                     <Link
