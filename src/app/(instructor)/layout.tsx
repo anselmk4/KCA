@@ -32,6 +32,7 @@ import {
   Trash2,
   Loader2,
   Share2,
+  UserCheck,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { getSimulatedSession, setSimulatedSession, clearSimulatedSession } from "@/lib/rbac";
@@ -52,6 +53,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
   const menuItems = [
     { icon: LayoutDashboard, label: t("instructor.sidebar.dashboard"), href: "/instructor" },
     { icon: BookOpen, label: t("instructor.sidebar.myCourses"), href: "/instructor/courses" },
+    { icon: UserCheck, label: language === "en" ? "Coach & Mentoring" : "Coach & Mentorat", href: "/instructor/coach" },
     { icon: Ticket, label: language === "en" ? "Promo Codes / Coupons" : "Codes promo / Coupons", href: "/instructor/coupons" },
     { icon: Users, label: t("instructor.sidebar.students"), href: "/instructor/students" },
     { icon: Video, label: language === "en" ? "Live Sessions" : "Sessions live", href: "/instructor/live" },
