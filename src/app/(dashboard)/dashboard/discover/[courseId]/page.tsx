@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Lock, Users, Tag, User, ChevronLeft, Loader2 } from "lucide-react";
+import { Lock, Users, Tag, User, ChevronLeft, Loader2, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -372,14 +372,21 @@ export default function CoursePreviewPage() {
               </div>
             </div>
 
-            {/* Installment payment info */}
+            {/* High-visibility Vibrant Red Installment Payment Banner */}
             {course.allowInstallments && !isEnrolled && (
-              <div className="p-3 bg-teal-50/50 dark:bg-teal-950/10 border border-teal-100/50 dark:border-teal-900/30 rounded-xl text-center">
-                <p className="text-xs font-semibold text-teal-700 dark:text-teal-400">
-                  {t("student.payment.installmentSubtitle", "Option multi-tranches").includes("mensua") ? "Installment plan available" : "Option multi-tranches disponible"}
-                </p>
-                <p className="text-[10px] text-zinc-450 mt-0.5">
-                  {t("student.payment.installmentSubtitle", "Payez").includes("mensua") ? `Pay in ${course.installmentsCount} installments: only $${Math.round(course.price / (course.installmentsCount || 1))} per installment.` : `Payez en ${course.installmentsCount} fois : seulement ${Math.round(course.price / (course.installmentsCount || 1))}$ par tranche.`}
+              <div className="p-4 bg-gradient-to-r from-red-600 via-rose-600 to-red-700 border-2 border-red-500 rounded-2xl text-center text-white shadow-xl shadow-red-600/30">
+                <div className="flex items-center justify-center gap-2 font-black text-sm uppercase tracking-wider text-white">
+                  <Sparkles className="w-4 h-4 text-amber-300 fill-amber-300 shrink-0" />
+                  <span>
+                    {t("student.payment.installmentSubtitle", "Option multi-tranches disponible").includes("mensua")
+                      ? "🔥 Installment Plan Available"
+                      : "🔥 Option Multi-Tranches Disponible"}
+                  </span>
+                </div>
+                <p className="text-xs font-black text-white mt-1.5 leading-snug drop-shadow-sm">
+                  {t("student.payment.installmentSubtitle", "Payez").includes("mensua")
+                    ? `Pay in ${course.installmentsCount} installments: ONLY $${Math.round(course.price / (course.installmentsCount || 1))} per installment!`
+                    : `Payez en ${course.installmentsCount} fois : seulement ${Math.round(course.price / (course.installmentsCount || 1))}$ par tranche !`}
                 </p>
               </div>
             )}

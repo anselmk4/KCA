@@ -1033,32 +1033,39 @@ export default function PaymentPage() {
 
               {/* Billing Options Selector (Installments vs Full) */}
               {course.allowInstallments && (
-                <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-3">
-                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">{t("student.payment.applyCoupon", "Option").toLowerCase().includes("appliqu") ? "Billing Option" : "Option de facturation"}</label>
-                  <div className="grid grid-cols-2 gap-3">
+                <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl border border-zinc-200 dark:border-zinc-800 space-y-3">
+                  <label className="block text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider">
+                    {t("student.payment.applyCoupon", "Option").toLowerCase().includes("appliqu") ? "Billing Option" : "Option de facturation"}
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <button
                       type="button"
                       onClick={() => setPayInstallment(false)}
-                      className={`p-3 border rounded-xl text-xs font-semibold flex flex-col items-center gap-1 cursor-pointer transition-all ${
+                      className={`p-3.5 border-2 rounded-xl text-xs font-extrabold flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${
                         !payInstallment
-                          ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                          : "border-zinc-250 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 hover:border-zinc-400"
+                          ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 shadow-md"
+                          : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:border-zinc-400"
                       }`}
                     >
                       <span>{t("student.payment.applyCoupon", "Paiement unique").toLowerCase().includes("appliqu") ? "One-time payment" : "Paiement unique"}</span>
-                      <span className="text-xxs opacity-80">${course.price} USD</span>
+                      <span className="text-[11px] opacity-80 font-bold">${course.price} USD</span>
                     </button>
+
                     <button
                       type="button"
                       onClick={() => setPayInstallment(true)}
-                      className={`p-3 border rounded-xl text-xs font-semibold flex flex-col items-center gap-1 cursor-pointer transition-all ${
+                      className={`p-3.5 border-2 rounded-xl text-xs font-black flex flex-col items-center justify-center gap-1 cursor-pointer transition-all shadow-lg ${
                         payInstallment
-                          ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                          : "border-zinc-250 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 hover:border-zinc-400"
+                          ? "border-red-600 bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white ring-2 ring-red-500 scale-[1.02]"
+                          : "border-red-500 bg-red-600 text-white hover:bg-red-500 shadow-red-600/30"
                       }`}
                     >
-                      <span>{t("student.payment.installment", `En ${course.installmentsCount} fois`)}</span>
-                      <span className="text-xxs opacity-80">${finalAmount} USD / {t("student.payment.applyCoupon", "mois").toLowerCase().includes("appliqu") ? "month" : "mois"}</span>
+                      <span className="uppercase tracking-wider flex items-center gap-1">
+                        🔥 {t("student.payment.installment", `Payez en ${course.installmentsCount} fois`)}
+                      </span>
+                      <span className="text-xs font-black text-white">
+                        ${finalAmount} USD / {t("student.payment.applyCoupon", "mois").toLowerCase().includes("appliqu") ? "month" : "mois"}
+                      </span>
                     </button>
                   </div>
                 </div>
