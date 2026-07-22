@@ -21,6 +21,7 @@ interface AdminPayoutItem {
   instructorName: string;
   amount: number;
   status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED';
+  paymentReference?: string;
   createdAt: string;
 }
 
@@ -181,6 +182,7 @@ export default function AdminPayoutsPage() {
         instructorName: profileMap.get(p.instructor_id) || 'Formateur Kuettu',
         amount: p.amount || 0,
         status: p.status || 'PENDING',
+        paymentReference: p.payment_reference || '',
         createdAt: p.created_at || new Date().toISOString(),
       }));
 
@@ -444,6 +446,7 @@ export default function AdminPayoutsPage() {
                 <thead className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider">
                   <tr>
                     <th className="px-6 py-4 font-semibold">Formateur</th>
+                    <th className="px-6 py-4 font-semibold">Coordonnées Mobile Money</th>
                     <th className="px-6 py-4 font-semibold">Date de Demande</th>
                     <th className="px-6 py-4 font-semibold">Montant à reverser</th>
                     <th className="px-6 py-4 font-semibold">Statut</th>
@@ -462,8 +465,13 @@ export default function AdminPayoutsPage() {
                           <p className="text-[10px] text-zinc-400 font-mono">ID: {p.instructorId.slice(0, 8)}...</p>
                         </div>
                       </td>
+                      <td className="px-6 py-4">
+                        <span className="font-extrabold text-teal-600 dark:text-teal-400 text-xs bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-900/40 px-2.5 py-1 rounded-lg">
+                          {p.paymentReference || "—"}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 text-zinc-500 text-xs">
-                        {new Date(p.createdAt).toLocaleDateString()} at {new Date(p.createdAt).toLocaleTimeString()}
+                        {new Date(p.createdAt).toLocaleDateString("fr-FR")} à {new Date(p.createdAt).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit' })}
                       </td>
                       <td className="px-6 py-4 font-bold text-red-600">
                         {p.amount}$

@@ -47,6 +47,22 @@ interface LocalPayout {
   notes: string | null;
 }
 
+interface CountryOption {
+  code: string;
+  name: string;
+  prefix: string;
+  hasCurrencyChoice: boolean;
+}
+
+const PAYOUT_COUNTRIES: CountryOption[] = [
+  { code: "CD", name: "Congo (RDC) 🇨🇩", prefix: "+243", hasCurrencyChoice: true },
+  { code: "CM", name: "Cameroun 🇨🇲", prefix: "+237", hasCurrencyChoice: false },
+  { code: "CI", name: "Côte d'Ivoire 🇨🇮", prefix: "+225", hasCurrencyChoice: false },
+  { code: "SN", name: "Sénégal 🇸🇳", prefix: "+221", hasCurrencyChoice: false },
+  { code: "RW", name: "Rwanda 🇷🇼", prefix: "+250", hasCurrencyChoice: false },
+  { code: "UG", name: "Ouganda 🇺🇬", prefix: "+256", hasCurrencyChoice: false },
+];
+
 const PLAN_COMMISSION_CONFIG: Record<string, { commissionRate: number; instructorShare: number; label: string; badgeColor: string }> = {
   FREE: { commissionRate: 0.20, instructorShare: 0.80, label: "Gratuit (20% commission)", badgeColor: "bg-zinc-100 text-zinc-650 dark:bg-zinc-800 dark:text-zinc-405" },
   BASE: { commissionRate: 0.10, instructorShare: 0.90, label: "Basique (10% commission)", badgeColor: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
@@ -72,6 +88,8 @@ export default function EarningsPage() {
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [withdrawCarrier, setWithdrawCarrier] = useState<string>("MPESA");
+  const [withdrawCountry, setWithdrawCountry] = useState<string>("CD");
+  const [withdrawCurrency, setWithdrawCurrency] = useState<"USD" | "CDF">("USD");
   const [withdrawPhone, setWithdrawPhone] = useState<string>("");
   const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
   const [withdrawMessage, setWithdrawMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -80,6 +98,8 @@ export default function EarningsPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editPayoutId, setEditPayoutId] = useState<string>("");
   const [editCarrier, setEditCarrier] = useState<string>("MPESA");
+  const [editCountry, setEditCountry] = useState<string>("CD");
+  const [editCurrency, setEditCurrency] = useState<"USD" | "CDF">("USD");
   const [editPhone, setEditPhone] = useState<string>("");
   const [submittingEdit, setSubmittingEdit] = useState(false);
   const [editMessage, setEditMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -290,10 +310,14 @@ export default function EarningsPage() {
       return;
     }
 
-    if (!withdrawPhone || withdrawPhone.length < 9) {
+    const cleanDigits = withdrawPhone.replace(/\D/g, "").replace(/^0+/, "");
+    if (!cleanDigits || cleanDigits.length < 7) {
       setWithdrawMessage({ type: "error", text: "Veuillez entrer un numéro de téléphone valide." });
       return;
     }
+
+    const selectedCountryObj = PAYOUT_COUNTRIES.find(c => c.code === withdrawCountry) || PAYOUT_COUNTRIES[0];
+    const fullPhone = `${selectedCountryObj.prefix}${cleanDigits}`;
 
     setSubmittingWithdraw(true);
     try {
@@ -304,7 +328,9 @@ export default function EarningsPage() {
           amount: amountNum,
           paymentMethod: "MOBILE_MONEY",
           carrier: withdrawCarrier,
-          phoneNumber: withdrawPhone
+          phoneNumber: fullPhone,
+          currency: withdrawCountry === "CD" ? withdrawCurrency : "USD",
+          country: withdrawCountry
         }),
       });
 
@@ -315,7 +341,6 @@ export default function EarningsPage() {
 
       setWithdrawMessage({ type: "success", text: "Votre demande de retrait a été enregistrée avec succès !" });
       setWithdrawAmount("");
-      setWithdrawPhone("");
       
       // Reload earnings data to update the payouts list and balance
       fetchEarningsData();
@@ -359,11 +384,41 @@ export default function EarningsPage() {
   // Open edit modal
   const handleOpenEditModal = (payout: LocalPayout) => {
     setEditPayoutId(payout.id);
-    const parts = payout.payment_reference.split(":");
-    const carrier = parts[0]?.trim() || "MPESA";
-    const phone = parts[1]?.trim() || "";
-    setEditCarrier(carrier);
-    setEditPhone(phone);
+    const ref = payout.payment_reference || "";
+    let carrierStr = "MPESA";
+    let currencyStr: "USD" | "CDF" = "USD";
+    let phoneStr = ref;
+
+    if (ref.includes(":")) {
+      const parts = ref.split(":");
+      const carrierPart = parts[0]?.trim() || "";
+      phoneStr = parts[1]?.trim() || "";
+      if (carrierPart.includes("(CDF)")) {
+        currencyStr = "CDF";
+      } else if (carrierPart.includes("(USD)")) {
+        currencyStr = "USD";
+      }
+      carrierStr = carrierPart.replace(/\(.*\)/, "").trim() || "MPESA";
+    }
+
+    setEditCarrier(carrierStr);
+    setEditCurrency(currencyStr);
+
+    let matchedCountry = PAYOUT_COUNTRIES[0];
+    for (const c of PAYOUT_COUNTRIES) {
+      if (phoneStr.startsWith(c.prefix) || phoneStr.startsWith(c.prefix.replace("+", ""))) {
+        matchedCountry = c;
+        break;
+      }
+    }
+    setEditCountry(matchedCountry.code);
+    const cleanDigits = phoneStr
+      .replace(matchedCountry.prefix, "")
+      .replace(matchedCountry.prefix.replace("+", ""), "")
+      .replace(/\D/g, "")
+      .replace(/^0+/, "");
+    setEditPhone(cleanDigits);
+
     setEditMessage(null);
     setIsEditModalOpen(true);
   };
@@ -373,10 +428,14 @@ export default function EarningsPage() {
     e.preventDefault();
     setEditMessage(null);
 
-    if (!editPhone || editPhone.length < 9) {
+    const cleanDigits = editPhone.replace(/\D/g, "").replace(/^0+/, "");
+    if (!cleanDigits || cleanDigits.length < 7) {
       setEditMessage({ type: "error", text: "Veuillez entrer un numéro de téléphone valide." });
       return;
     }
+
+    const selectedCountryObj = PAYOUT_COUNTRIES.find(c => c.code === editCountry) || PAYOUT_COUNTRIES[0];
+    const fullPhone = `${selectedCountryObj.prefix}${cleanDigits}`;
 
     setSubmittingEdit(true);
     try {
@@ -386,7 +445,9 @@ export default function EarningsPage() {
         body: JSON.stringify({
           id: editPayoutId,
           carrier: editCarrier,
-          phoneNumber: editPhone,
+          phoneNumber: fullPhone,
+          currency: editCountry === "CD" ? editCurrency : "USD",
+          country: editCountry
         }),
       });
 
@@ -825,9 +886,63 @@ export default function EarningsPage() {
                   placeholder="Ex: 50"
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}
-                  className="w-full px-4 py-3 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-955 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-650 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-955 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-teal-650 focus:border-transparent transition-all"
                 />
               </div>
+
+              {/* Country Selection */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-350">Pays de Réception Mobile Money</label>
+                <select
+                  value={withdrawCountry}
+                  onChange={(e) => setWithdrawCountry(e.target.value)}
+                  className="w-full px-4 py-3 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-955 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-teal-650"
+                >
+                  {PAYOUT_COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name} ({c.prefix})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* DRC Currency choice (USD vs CDF) */}
+              {withdrawCountry === "CD" && (
+                <div className="space-y-1.5 p-3.5 bg-teal-50/60 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-900/40 rounded-2xl">
+                  <label className="block text-[11px] font-black text-teal-900 dark:text-teal-300 uppercase tracking-wider">
+                    Devise de réception PawaPay (RDC)
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setWithdrawCurrency("USD")}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
+                        withdrawCurrency === "USD"
+                          ? "border-teal-600 bg-teal-600 text-white shadow-md shadow-teal-600/20"
+                          : "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-900 hover:border-zinc-400"
+                      }`}
+                    >
+                      <span>💵 USD ($ Dollars)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWithdrawCurrency("CDF")}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
+                        withdrawCurrency === "CDF"
+                          ? "border-teal-600 bg-teal-600 text-white shadow-md shadow-teal-600/20"
+                          : "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-900 hover:border-zinc-400"
+                      }`}
+                    >
+                      <span>🇨🇩 CDF (FC Francs)</span>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-teal-700 dark:text-teal-400 font-medium pt-1">
+                    {withdrawCurrency === "USD"
+                      ? "💡 PawaPay transférera les fonds directement en DOLLARS (USD) vers votre portefeuille Mobile Money."
+                      : "💡 PawaPay convertira le montant et créditera votre portefeuille en FRANCS CONGOLAIS (CDF)."}
+                  </p>
+                </div>
+              )}
 
               {/* Carrier selection */}
               <div className="space-y-1">
@@ -854,21 +969,27 @@ export default function EarningsPage() {
                 </div>
               </div>
 
-              {/* Phone number input */}
+              {/* Phone number input with pre-filled prefix */}
               <div className="space-y-1">
-                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-350">Numéro de téléphone du compte</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-3.5 text-zinc-400"><Phone className="w-4 h-4" /></span>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="Ex: 0820000000"
-                    value={withdrawPhone}
-                    onChange={(e) => setWithdrawPhone(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-955 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-655 focus:border-transparent transition-all"
-                  />
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-350">Numéro de téléphone (sans indicatif)</label>
+                <div className="flex items-center gap-2">
+                  <span className="px-3.5 py-3 bg-zinc-100 dark:bg-zinc-800 border border-zinc-250 dark:border-zinc-700 rounded-xl text-sm font-extrabold text-teal-600 dark:text-teal-400 shrink-0">
+                    {(PAYOUT_COUNTRIES.find(c => c.code === withdrawCountry) || PAYOUT_COUNTRIES[0]).prefix}
+                  </span>
+                  <div className="relative flex-1">
+                    <input
+                      type="tel"
+                      required
+                      placeholder="Ex: 812345678"
+                      value={withdrawPhone}
+                      onChange={(e) => setWithdrawPhone(e.target.value.replace(/\D/g, "").replace(/^0+/, ""))}
+                      className="w-full px-4 py-3 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-955 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-teal-655 transition-all"
+                    />
+                  </div>
                 </div>
-                <p className="text-[10px] text-zinc-400 dark:text-zinc-500">Le retrait sera envoyé directement vers ce numéro Mobile Money.</p>
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                  Numéro final : <strong className="text-zinc-700 dark:text-zinc-300">{(PAYOUT_COUNTRIES.find(c => c.code === withdrawCountry) || PAYOUT_COUNTRIES[0]).prefix}{withdrawPhone}</strong>
+                </p>
               </div>
 
               {/* Submit button */}
@@ -929,6 +1050,55 @@ export default function EarningsPage() {
                 </div>
               )}
 
+              {/* Country Selection */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-350">Pays de Réception Mobile Money</label>
+                <select
+                  value={editCountry}
+                  onChange={(e) => setEditCountry(e.target.value)}
+                  className="w-full px-4 py-3 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-955 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-teal-650"
+                >
+                  {PAYOUT_COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name} ({c.prefix})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* DRC Currency choice (USD vs CDF) */}
+              {editCountry === "CD" && (
+                <div className="space-y-1.5 p-3.5 bg-teal-50/60 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-900/40 rounded-2xl">
+                  <label className="block text-[11px] font-black text-teal-900 dark:text-teal-300 uppercase tracking-wider">
+                    Devise de réception PawaPay (RDC)
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setEditCurrency("USD")}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
+                        editCurrency === "USD"
+                          ? "border-teal-600 bg-teal-600 text-white shadow-md shadow-teal-600/20"
+                          : "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-900 hover:border-zinc-400"
+                      }`}
+                    >
+                      <span>💵 USD ($ Dollars)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditCurrency("CDF")}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
+                        editCurrency === "CDF"
+                          ? "border-teal-600 bg-teal-600 text-white shadow-md shadow-teal-600/20"
+                          : "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-900 hover:border-zinc-400"
+                      }`}
+                    >
+                      <span>🇨🇩 CDF (FC Francs)</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Carrier selection */}
               <div className="space-y-1">
                 <label className="text-xs font-bold text-zinc-700 dark:text-zinc-350">Opérateur Mobile Money</label>
@@ -954,19 +1124,23 @@ export default function EarningsPage() {
                 </div>
               </div>
 
-              {/* Phone number input */}
+              {/* Phone number input with pre-filled prefix */}
               <div className="space-y-1">
-                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-350">Numéro de téléphone du compte</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-3.5 text-zinc-400"><Phone className="w-4 h-4" /></span>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="Ex: 0820000000"
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-955 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-655 focus:border-transparent transition-all"
-                  />
+                <label className="text-xs font-bold text-zinc-700 dark:text-zinc-350">Numéro de téléphone (sans indicatif)</label>
+                <div className="flex items-center gap-2">
+                  <span className="px-3.5 py-3 bg-zinc-100 dark:bg-zinc-800 border border-zinc-250 dark:border-zinc-700 rounded-xl text-sm font-extrabold text-teal-600 dark:text-teal-400 shrink-0">
+                    {(PAYOUT_COUNTRIES.find(c => c.code === editCountry) || PAYOUT_COUNTRIES[0]).prefix}
+                  </span>
+                  <div className="relative flex-1">
+                    <input
+                      type="tel"
+                      required
+                      placeholder="Ex: 812345678"
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, "").replace(/^0+/, ""))}
+                      className="w-full px-4 py-3 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-955 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-teal-655 transition-all"
+                    />
+                  </div>
                 </div>
               </div>
 

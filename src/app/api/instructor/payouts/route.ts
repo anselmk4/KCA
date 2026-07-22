@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { amount, paymentMethod, carrier, phoneNumber } = body;
+    const { amount, paymentMethod, carrier, phoneNumber, currency, country } = body;
 
     if (!amount || amount <= 0) {
       return NextResponse.json({ error: 'Le montant de retrait doit être supérieur à 0.' }, { status: 400 });
@@ -35,6 +35,10 @@ export async function POST(req: NextRequest) {
     if (!paymentMethod || !carrier || !phoneNumber) {
       return NextResponse.json({ error: 'Informations de paiement incomplètes.' }, { status: 400 });
     }
+
+    const resolvedCurrency = (country === "CD" || phoneNumber?.includes("243")) ? (currency || "USD") : (currency || "USD");
+    const paymentRef = `${carrier.toUpperCase()} (${resolvedCurrency}): ${phoneNumber}`;
+    const payoutNotes = `Retrait Mobile Money (${carrier.toUpperCase()} - Wallet ${resolvedCurrency}) vers le numéro ${phoneNumber}.`;
 
     const dbClient = (process.env.SUPABASE_SERVICE_ROLE_KEY && 
                       process.env.SUPABASE_SERVICE_ROLE_KEY !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
@@ -119,8 +123,8 @@ export async function POST(req: NextRequest) {
         amount: amount,
         status: 'PENDING',
         payment_method: paymentMethod,
-        payment_reference: `${carrier.toUpperCase()}: ${phoneNumber}`,
-        notes: `Retrait demandé par Mobile Money (${carrier.toUpperCase()}) vers le numéro ${phoneNumber}.`,
+        payment_reference: paymentRef,
+        notes: payoutNotes,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       } as any)
@@ -233,11 +237,14 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, carrier, phoneNumber } = body;
+    const { id, carrier, phoneNumber, currency, country } = body;
 
     if (!id || !carrier || !phoneNumber) {
       return NextResponse.json({ error: 'Données manquantes' }, { status: 400 });
     }
+
+    const resolvedCurrency = (country === "CD" || phoneNumber?.includes("243")) ? (currency || "USD") : (currency || "USD");
+    const paymentRef = `${carrier.toUpperCase()} (${resolvedCurrency}): ${phoneNumber}`;
 
     const dbClient = (process.env.SUPABASE_SERVICE_ROLE_KEY && 
                       process.env.SUPABASE_SERVICE_ROLE_KEY !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
@@ -269,8 +276,8 @@ export async function PUT(req: NextRequest) {
     const { data: updatedPayout, error: updateErr } = await dbClient
       .from('payouts')
       .update({
-        payment_reference: `${carrier.toUpperCase()}: ${phoneNumber}`,
-        notes: `Coordonnées de retrait modifiées par l'instructeur le ${new Date().toLocaleDateString('fr-FR')}.`,
+        payment_reference: paymentRef,
+        notes: `Coordonnées modifiées par l'instructeur le ${new Date().toLocaleDateString('fr-FR')} (Wallet ${resolvedCurrency}).`,
         updated_at: new Date().toISOString()
       } as any)
       .eq('id', id)
