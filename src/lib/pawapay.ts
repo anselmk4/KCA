@@ -91,6 +91,32 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
       { id: "MOOV_CIV", name: "Moov Money" },
       { id: "WAVE_CIV", name: "Wave" }
     ]
+  },
+  {
+    countryCode: "ZM",
+    countryCode3: "ZMB",
+    names: ["zambie", "zambia", "république de zambie", "republic of zambia"],
+    currency: "ZMW",
+    phonePrefix: "260",
+    exchangeRate: 27,
+    operators: [
+      { id: "MTN_ZMB", name: "MTN Mobile Money" },
+      { id: "AIRTEL_ZMB", name: "Airtel Money" },
+      { id: "ZAMTEL_ZMB", name: "Zamtel Kwacha" }
+    ]
+  },
+  {
+    countryCode: "BJ",
+    countryCode3: "BEN",
+    names: ["bénin", "benin", "république du bénin", "republic of benin"],
+    currency: "XOF",
+    phonePrefix: "229",
+    exchangeRate: 600,
+    operators: [
+      { id: "MTN_BEN", name: "MTN Mobile Money" },
+      { id: "MOOV_BEN", name: "Moov Money" },
+      { id: "CELTIIS_BEN", name: "Celtiis Cash" }
+    ]
   }
 ];
 

@@ -279,9 +279,10 @@ export default function InstructorSettingsPage() {
                   <option value="CM">🇨🇲 Cameroun</option>
                   <option value="CI">🇨🇮 Côte d'Ivoire</option>
                   <option value="SN">🇸🇳 Sénégal</option>
+                  <option value="BJ">🇧🇯 Bénin</option>
+                  <option value="ZM">🇿🇲 Zambie</option>
                   <option value="RW">🇷🇼 Rwanda</option>
                   <option value="UG">🇺🇬 Ouganda</option>
-                  <option value="BJ">🇧🇯 Bénin</option>
                   <option value="BF">🇧🇫 Burkina Faso</option>
                   <option value="GA">🇬🇦 Gabon</option>
                   <option value="GN">🇬🇳 Guinée</option>

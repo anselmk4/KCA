@@ -873,6 +873,8 @@ export default function PaymentPage() {
                       <option value="CM">🇨🇲 Cameroun</option>
                       <option value="CI">🇨🇮 Côte d'Ivoire</option>
                       <option value="SN">🇸🇳 Sénégal</option>
+                      <option value="BJ">🇧🇯 Bénin</option>
+                      <option value="ZM">🇿🇲 Zambie</option>
                       <option value="RW">🇷🇼 Rwanda</option>
                       <option value="UG">🇺🇬 Ouganda</option>
                     </select>

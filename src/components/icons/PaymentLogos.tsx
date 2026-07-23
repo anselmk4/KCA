@@ -136,6 +136,27 @@ export function MoovLogo(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+// 11. Zamtel Kwacha (Zambia)
+export function ZamtelLogo(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" {...props}>
+      <rect width="24" height="24" rx="6" fill="#008751" />
+      <path d="M7 8H17L10 16H17" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// 12. Celtiis (Benin)
+export function CeltiisLogo(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" {...props}>
+      <rect width="24" height="24" rx="6" fill="#0E4B94" />
+      <circle cx="12" cy="12" r="6" fill="#FFC72C" />
+      <path d="M10 9C10 9 14 9 14 12C14 15 10 15 10 15" stroke="#0E4B94" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // Dynamic Operator Logo Component Helper
 export function OperatorLogo({ carrierId, className }: { carrierId: string; className?: string }) {
   const cleanId = (carrierId || "").toUpperCase();
@@ -157,6 +178,12 @@ export function OperatorLogo({ carrierId, className }: { carrierId: string; clas
   }
   if (cleanId.includes("MOOV")) {
     return <MoovLogo className={className || "h-7 w-auto object-contain"} />;
+  }
+  if (cleanId.includes("ZAMTEL")) {
+    return <ZamtelLogo className={className || "h-7 w-auto object-contain"} />;
+  }
+  if (cleanId.includes("CELTIIS")) {
+    return <CeltiisLogo className={className || "h-7 w-auto object-contain"} />;
   }
 
   return null;
