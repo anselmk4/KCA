@@ -8,6 +8,7 @@ import { ChevronLeft, CreditCard, Smartphone, ShieldCheck, QrCode, Loader2, Chec
 import { supabase } from "@/lib/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 import { getPawaPayConfigForCountry } from "@/lib/pawapay";
+import { OperatorLogo } from "@/components/icons/PaymentLogos";
 
 declare global {
   interface Window {
@@ -926,13 +927,14 @@ export default function PaymentPage() {
                           key={provider.id}
                           type="button"
                           onClick={() => setMomoProvider(provider.id)}
-                          className={`px-3 py-3 border rounded-xl text-xs font-semibold text-center transition-all cursor-pointer ${
+                          className={`p-3 border-2 rounded-2xl text-xs font-bold text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-2.5 ${
                             momoProvider === provider.id
-                              ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                              : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-400"
+                              ? "border-blue-600 bg-blue-50/60 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 shadow-md ring-2 ring-blue-500/20"
+                              : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:border-blue-300"
                           }`}
                         >
-                          {provider.name}
+                          <OperatorLogo carrierId={provider.id} className="h-8 w-auto max-h-8 object-contain rounded-lg p-0.5 bg-white shadow-xs" />
+                          <span className="leading-tight">{provider.name}</span>
                         </button>
                       ))}
                     </div>

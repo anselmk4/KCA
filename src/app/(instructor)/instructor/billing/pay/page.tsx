@@ -16,6 +16,7 @@ import Link from "next/link";
 import Script from "next/script";
 import { supabase } from "@/lib/supabase/client";
 import { getPawaPayConfigForCountry } from "@/lib/pawapay";
+import { OperatorLogo } from "@/components/icons/PaymentLogos";
 
 declare global {
   interface Window {
@@ -805,13 +806,14 @@ function PaymentContent() {
                       <div 
                         key={item.id}
                         onClick={() => setCarrier(item.id)}
-                        className={`p-2.5 rounded-lg border text-xs font-bold cursor-pointer text-center transition-all ${
+                        className={`p-3 rounded-2xl border-2 text-xs font-bold cursor-pointer text-center transition-all flex flex-col items-center justify-center gap-2 ${
                           carrier === item.id 
-                            ? "border-teal-500 bg-teal-50/15 text-teal-650 font-bold" 
-                            : "border-zinc-150 dark:border-zinc-800 hover:border-zinc-300 text-zinc-500"
+                            ? "border-teal-500 bg-teal-50/40 text-teal-700 dark:bg-teal-950/40 dark:text-teal-400 font-extrabold shadow-md ring-2 ring-teal-500/20" 
+                            : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-teal-300 text-zinc-600 dark:text-zinc-300"
                         }`}
                       >
-                        {item.name}
+                        <OperatorLogo carrierId={item.id} className="h-8 w-auto max-h-8 object-contain rounded-lg p-0.5 bg-white shadow-xs" />
+                        <span className="leading-tight">{item.name}</span>
                       </div>
                     ))}
                   </div>

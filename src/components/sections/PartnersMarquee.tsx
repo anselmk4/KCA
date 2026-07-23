@@ -9,16 +9,16 @@ import { Wallet, Smartphone, ShieldCheck, Sparkles } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 
 const payments = [
-  { name: "Airtel Money", logo: <AirtelMoneyLogo className="w-9 h-9 shrink-0 rounded-xl" /> },
-  { name: "Vodacom M-Pesa", logo: <MPesaLogo className="w-9 h-9 shrink-0 rounded-xl" /> },
-  { name: "Orange Money", logo: <OrangeMoneyLogo className="w-9 h-9 shrink-0 rounded-xl" /> },
-  { name: "PayPal", logo: <PayPalLogo className="w-9 h-9 shrink-0 rounded-xl" /> },
-  { name: "Solana", logo: <SolanaLogo className="w-9 h-9 shrink-0 rounded-xl" /> },
-  { name: "Ethereum", logo: <EthereumLogo className="w-9 h-9 shrink-0 rounded-xl" /> },
-  { name: "USDT Tether", logo: <TetherLogo className="w-9 h-9 shrink-0 rounded-xl" /> },
-  { name: "Moov Money", logo: <MoovLogo className="w-9 h-9 shrink-0 rounded-xl" /> },
-  { name: "Wave", logo: <WaveLogo className="w-9 h-9 shrink-0 rounded-xl" /> },
-  { name: "MTN MoMo", logo: <MtnMomoLogo className="w-9 h-9 shrink-0 rounded-xl" /> },
+  { name: "Airtel Money", logo: <AirtelMoneyLogo className="w-10 h-10 shrink-0 rounded-xl object-contain bg-white p-1 border border-zinc-100 shadow-sm" /> },
+  { name: "Vodacom M-Pesa", logo: <MPesaLogo className="w-10 h-10 shrink-0 rounded-xl object-contain bg-white p-1 border border-zinc-100 shadow-sm" /> },
+  { name: "Orange Money", logo: <OrangeMoneyLogo className="w-10 h-10 shrink-0 rounded-xl object-contain bg-white p-1 border border-zinc-100 shadow-sm" /> },
+  { name: "MTN MoMo", logo: <MtnMomoLogo className="w-10 h-10 shrink-0 rounded-xl object-contain bg-white p-1 border border-zinc-100 shadow-sm" /> },
+  { name: "Wave", logo: <WaveLogo className="w-10 h-10 shrink-0 rounded-xl object-contain bg-white p-1 border border-zinc-100 shadow-sm" /> },
+  { name: "PayPal", logo: <PayPalLogo className="w-10 h-10 shrink-0 rounded-xl" /> },
+  { name: "Solana", logo: <SolanaLogo className="w-10 h-10 shrink-0 rounded-xl" /> },
+  { name: "Ethereum", logo: <EthereumLogo className="w-10 h-10 shrink-0 rounded-xl" /> },
+  { name: "USDT Tether", logo: <TetherLogo className="w-10 h-10 shrink-0 rounded-xl" /> },
+  { name: "Moov Money", logo: <MoovLogo className="w-10 h-10 shrink-0 rounded-xl" /> },
 ];
 
 export function PartnersMarquee() {

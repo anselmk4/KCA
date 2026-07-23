@@ -23,6 +23,7 @@ import {
   Trash2
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import { OperatorLogo } from "@/components/icons/PaymentLogos";
 
 interface LocalTransaction {
   id: string;
@@ -1028,13 +1029,14 @@ export default function EarningsPage() {
                           key={carrier.id}
                           type="button"
                           onClick={() => setWithdrawCarrier(carrier.id)}
-                          className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all border cursor-pointer truncate ${
+                          className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all border cursor-pointer flex flex-col items-center justify-center gap-1.5 ${
                             withdrawCarrier === carrier.id
-                              ? "border-teal-650 bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-400"
-                              : "border-zinc-200 dark:border-zinc-700 text-zinc-655 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                              ? "border-teal-600 bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-400 font-extrabold shadow-sm ring-2 ring-teal-500/20"
+                              : "border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-655 hover:bg-zinc-50 dark:hover:bg-zinc-800"
                           }`}
                         >
-                          {carrier.label}
+                          <OperatorLogo carrierId={carrier.id} className="h-6 w-auto max-h-6 object-contain rounded-md p-0.5 bg-white shadow-xs" />
+                          <span className="truncate max-w-full leading-tight">{carrier.label}</span>
                         </button>
                       ))}
                     </div>
