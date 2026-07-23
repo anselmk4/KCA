@@ -8,6 +8,25 @@ const supabaseAdmin = createAdmin(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// ─── Helper: get caller role from user_roles table ─────────────────────────
+async function getCallerRole(userId: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from("user_roles")
+    .select("roles!inner(name)")
+    .eq("user_id", userId) as any;
+
+  if (error || !data || data.length === 0) return null;
+  // Return highest-priority role
+  const names: string[] = data.map((ur: any) => ur.roles?.name).filter(Boolean);
+  if (names.includes("SUPER_ADMIN")) return "SUPER_ADMIN";
+  if (names.includes("ADMIN")) return "ADMIN";
+  if (names.includes("FINANCE_ADMIN")) return "FINANCE_ADMIN";
+  if (names.includes("MODERATOR")) return "MODERATOR";
+  if (names.includes("ACADEMIC_ADMIN")) return "ACADEMIC_ADMIN";
+  if (names.includes("SUPPORT_AGENT")) return "SUPPORT_AGENT";
+  return names[0] || null;
+}
+
 // ─── GET – list all admin team members ────────────────────────────────────
 export async function GET(req: NextRequest) {
   try {
@@ -15,34 +34,58 @@ export async function GET(req: NextRequest) {
     const { data: { user }, error: authErr } = await supabase.auth.getUser();
     if (authErr || !user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    const callerRole = user.user_metadata?.role || "STUDENT";
+    const callerRole = await getCallerRole(user.id);
     if (callerRole !== "SUPER_ADMIN") {
-      return NextResponse.json({ error: "Accès refusé – SUPER_ADMIN requis" }, { status: 403 });
+      return NextResponse.json(
+        { error: `Accès refusé – SUPER_ADMIN requis (rôle détecté: ${callerRole || "aucun"})` },
+        { status: 403 }
+      );
     }
 
     // Fetch all users from auth
     const { data: { users }, error: usersErr } = await supabaseAdmin.auth.admin.listUsers({ perPage: 500 });
     if (usersErr) throw usersErr;
 
-    // Filter to admin roles only
+    // Fetch all user_roles with role names
+    const { data: allUserRoles } = await supabaseAdmin
+      .from("user_roles")
+      .select("user_id, roles!inner(name)") as any;
+
+    // Build user_id → role map
+    const roleMap = new Map<string, string>();
+    const ADMIN_ROLE_NAMES = ["SUPER_ADMIN", "ADMIN", "MODERATOR", "ACADEMIC_ADMIN", "FINANCE_ADMIN", "SUPPORT_AGENT"];
+
+    for (const ur of (allUserRoles || [])) {
+      const name = ur.roles?.name;
+      if (!ADMIN_ROLE_NAMES.includes(name)) continue;
+      const existing = roleMap.get(ur.user_id);
+      // Priority: SUPER_ADMIN > ADMIN > others
+      if (!existing || ADMIN_ROLE_NAMES.indexOf(name) < ADMIN_ROLE_NAMES.indexOf(existing)) {
+        roleMap.set(ur.user_id, name);
+      }
+    }
+
+    // Filter users that have an admin role
     const adminUsers = users
-      .filter(u => ADMIN_ROLES.includes(u.user_metadata?.role))
+      .filter(u => roleMap.has(u.id))
       .map(u => ({
         id: u.id,
         email: u.email || "",
         name: u.user_metadata?.full_name || u.email?.split("@")[0] || "Admin",
-        role: u.user_metadata?.role || "SUPPORT_AGENT",
+        role: roleMap.get(u.id) || "SUPPORT_AGENT",
         createdAt: u.created_at,
         lastSignIn: u.last_sign_in_at || null,
         emailConfirmed: !!u.email_confirmed_at,
       }));
 
     // Fetch admin_permissions overrides if table exists
+    let permsMap = new Map<string, any>();
     const { data: permsData } = await supabaseAdmin
       .from("admin_permissions")
       .select("user_id, granted_permissions, revoked_permissions, notes");
-
-    const permsMap = new Map((permsData || []).map((p: any) => [p.user_id, p]));
+    if (permsData) {
+      permsData.forEach((p: any) => permsMap.set(p.user_id, p));
+    }
 
     const enriched = adminUsers.map(u => ({
       ...u,
@@ -65,14 +108,16 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error: authErr } = await supabase.auth.getUser();
     if (authErr || !user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    const callerRole = user.user_metadata?.role || "STUDENT";
+    const callerRole = await getCallerRole(user.id);
     if (callerRole !== "SUPER_ADMIN") {
-      return NextResponse.json({ error: "Accès refusé – SUPER_ADMIN requis" }, { status: 403 });
+      return NextResponse.json(
+        { error: `Accès refusé – SUPER_ADMIN requis (rôle: ${callerRole || "aucun"})` },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();
     const { targetUserId, role, grantedPermissions = [], revokedPermissions = [], notes = "", action } = body;
-
     if (!targetUserId) return NextResponse.json({ error: "targetUserId requis" }, { status: 400 });
 
     // Cannot demote yourself
@@ -80,58 +125,64 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Vous ne pouvez pas révoquer votre propre accès" }, { status: 400 });
     }
 
+    // Resolve role_id from roles table
+    const { data: roleRow } = await supabaseAdmin
+      .from("roles")
+      .select("id")
+      .eq("name", role || "SUPPORT_AGENT")
+      .maybeSingle();
+
+    const { data: studentRoleRow } = await supabaseAdmin
+      .from("roles")
+      .select("id")
+      .eq("name", "STUDENT")
+      .maybeSingle();
+
     if (action === "revoke") {
-      // Revoke admin: downgrade to STUDENT
-      const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
-        user_metadata: { role: "STUDENT" }
-      });
-      if (updateErr) throw updateErr;
-
-      // Clean up admin_permissions entry
+      // Remove all admin roles for this user, set STUDENT
+      await supabaseAdmin.from("user_roles").delete().eq("user_id", targetUserId);
+      if (studentRoleRow?.id) {
+        await supabaseAdmin.from("user_roles").insert({ user_id: targetUserId, role_id: studentRoleRow.id });
+      }
+      // Also downgrade user_metadata for legacy compat
+      const { data: targetUser } = await supabaseAdmin.auth.admin.getUserById(targetUserId);
+      if (targetUser?.user) {
+        await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
+          user_metadata: { ...targetUser.user.user_metadata, role: "STUDENT" }
+        });
+      }
+      // Clean up admin_permissions
       await supabaseAdmin.from("admin_permissions").delete().eq("user_id", targetUserId);
-
       return NextResponse.json({ success: true, action: "revoked" });
     }
 
     if (action === "invite") {
-      // Invite a new admin by email
       const { email, name } = body;
       if (!email) return NextResponse.json({ error: "Email requis" }, { status: 400 });
 
-      // Check if user already exists
       const { data: { users: existing } } = await supabaseAdmin.auth.admin.listUsers({ perPage: 500 });
       const found = existing.find(u => u.email === email);
 
-      if (found) {
-        // Update existing user's role
-        await supabaseAdmin.auth.admin.updateUserById(found.id, {
-          user_metadata: { ...found.user_metadata, role: role || "SUPPORT_AGENT" }
+      const targetId = found?.id || (await (async () => {
+        const { data: newUser } = await supabaseAdmin.auth.admin.createUser({
+          email,
+          email_confirm: true,
+          user_metadata: { full_name: name || email.split("@")[0], role: role || "SUPPORT_AGENT" },
         });
+        return newUser.user?.id;
+      })());
 
-        await supabaseAdmin.from("admin_permissions").upsert({
-          user_id: found.id,
-          role: role || "SUPPORT_AGENT",
-          granted_permissions: grantedPermissions,
-          revoked_permissions: revokedPermissions,
-          notes,
-          assigned_by: user.id,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "user_id" });
+      if (!targetId) return NextResponse.json({ error: "Impossible de créer l'utilisateur" }, { status: 500 });
 
-        return NextResponse.json({ success: true, action: "updated_existing" });
+      // Set role in user_roles
+      if (roleRow?.id) {
+        await supabaseAdmin.from("user_roles").delete().eq("user_id", targetId);
+        await supabaseAdmin.from("user_roles").insert({ user_id: targetId, role_id: roleRow.id });
       }
 
-      // Create new user and send invite
-      const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        email_confirm: true,
-        user_metadata: { full_name: name || email.split("@")[0], role: role || "SUPPORT_AGENT" },
-      });
-
-      if (createErr) throw createErr;
-
+      // Upsert admin_permissions
       await supabaseAdmin.from("admin_permissions").upsert({
-        user_id: newUser.user.id,
+        user_id: targetId,
         role: role || "SUPPORT_AGENT",
         granted_permissions: grantedPermissions,
         revoked_permissions: revokedPermissions,
@@ -140,19 +191,25 @@ export async function POST(req: NextRequest) {
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
 
-      return NextResponse.json({ success: true, action: "invited", userId: newUser.user.id });
+      return NextResponse.json({ success: true, action: found ? "updated_existing" : "invited" });
     }
 
-    // Default: update role + permissions for existing user
+    // Default: update role for existing user
+    if (!roleRow?.id) return NextResponse.json({ error: `Rôle "${role}" introuvable` }, { status: 400 });
+
+    // Remove current roles then insert new one
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", targetUserId);
+    await supabaseAdmin.from("user_roles").insert({ user_id: targetUserId, role_id: roleRow.id });
+
+    // Also update user_metadata for legacy compat
     const { data: targetUser } = await supabaseAdmin.auth.admin.getUserById(targetUserId);
-    if (!targetUser.user) return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
+    if (targetUser?.user) {
+      await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
+        user_metadata: { ...targetUser.user.user_metadata, role }
+      });
+    }
 
-    const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
-      user_metadata: { ...targetUser.user.user_metadata, role }
-    });
-    if (updateErr) throw updateErr;
-
-    // Upsert admin_permissions
+    // Upsert admin_permissions overrides
     await supabaseAdmin.from("admin_permissions").upsert({
       user_id: targetUserId,
       role,

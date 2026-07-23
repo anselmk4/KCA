@@ -7,19 +7,41 @@ const supabaseAdmin = createAdmin(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// ─── Helper: get caller role from user_roles table ─────────────────────────
+async function getCallerRole(userId: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from("user_roles")
+    .select("roles!inner(name)")
+    .eq("user_id", userId) as any;
+
+  if (error || !data || data.length === 0) return null;
+  const names: string[] = data.map((ur: any) => ur.roles?.name).filter(Boolean);
+  const priority = ["SUPER_ADMIN", "ADMIN", "FINANCE_ADMIN", "MODERATOR", "ACADEMIC_ADMIN", "SUPPORT_AGENT"];
+  for (const p of priority) {
+    if (names.includes(p)) return p;
+  }
+  return names[0] || null;
+}
+
+const ADMIN_ROLES = ["SUPER_ADMIN", "ADMIN", "MODERATOR", "ACADEMIC_ADMIN", "FINANCE_ADMIN", "SUPPORT_AGENT"];
+
 // ─── GET – read all platform settings ────────────────────────────────────
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    const role = user?.user_metadata?.role || "STUDENT";
+    if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    const isAdmin = ["SUPER_ADMIN", "ADMIN", "MODERATOR", "ACADEMIC_ADMIN", "FINANCE_ADMIN", "SUPPORT_AGENT"].includes(role);
-    if (!isAdmin) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+    const role = await getCallerRole(user.id);
+    if (!role || !ADMIN_ROLES.includes(role)) {
+      return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+    }
 
-    // Public settings for all admins; private only for SUPER_ADMIN / FINANCE_ADMIN
+    // All admins get public settings; private only for SUPER_ADMIN / FINANCE_ADMIN
+    const isFinance = ["SUPER_ADMIN", "FINANCE_ADMIN"].includes(role);
+
     let query = supabaseAdmin.from("settings").select("*").order("group_name").order("key");
-    if (!["SUPER_ADMIN", "FINANCE_ADMIN"].includes(role)) {
+    if (!isFinance) {
       query = query.eq("is_public", true);
     }
     const { data, error } = await query;
@@ -37,46 +59,47 @@ export async function PUT(req: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    const role = user?.user_metadata?.role || "STUDENT";
+    if (!user) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-    if (!["SUPER_ADMIN", "ADMIN", "FINANCE_ADMIN"].includes(role)) {
+    const role = await getCallerRole(user.id);
+    if (!role || !["SUPER_ADMIN", "ADMIN", "FINANCE_ADMIN"].includes(role)) {
       return NextResponse.json({ error: "Accès refusé – permissions insuffisantes" }, { status: 403 });
     }
 
     const body = await req.json();
-    // body: { updates: Array<{ key: string; value: any }> }
     const { updates } = body as { updates: Array<{ key: string; value: unknown }> };
-
     if (!updates || !Array.isArray(updates) || updates.length === 0) {
       return NextResponse.json({ error: "Paramètre 'updates' requis" }, { status: 400 });
     }
 
     const results: string[] = [];
     for (const { key, value } of updates) {
-      // Finance settings restricted to SUPER_ADMIN and FINANCE_ADMIN
-      if (key.startsWith("platform.commission") || key.startsWith("platform.min_payout") || key.startsWith("platform.currency")) {
-        if (!["SUPER_ADMIN", "FINANCE_ADMIN"].includes(role)) {
-          results.push(`${key}: accès refusé`);
-          continue;
-        }
+      // Finance-restricted keys
+      const isFinanceKey = key.startsWith("platform.commission") ||
+        key.startsWith("platform.min_payout") ||
+        key.startsWith("platform.currency") ||
+        key.startsWith("platform.refund") ||
+        key.startsWith("platform.installments");
+
+      if (isFinanceKey && !["SUPER_ADMIN", "FINANCE_ADMIN"].includes(role)) {
+        results.push(`${key}: accès refusé`);
+        continue;
       }
 
       const { error } = await supabaseAdmin
         .from("settings")
-        .update({ value, updated_by: user!.id, updated_at: new Date().toISOString() })
+        .update({ value, updated_by: user.id, updated_at: new Date().toISOString() })
         .eq("key", key);
 
       if (error) {
-        // Try insert if not exists
+        // Insert if not exists
         const { error: insertErr } = await supabaseAdmin.from("settings").insert({
-          key,
-          value,
+          key, value,
           group_name: key.split(".")[0],
           is_public: true,
-          updated_by: user!.id,
+          updated_by: user.id,
         });
-        if (insertErr) results.push(`${key}: erreur – ${insertErr.message}`);
-        else results.push(`${key}: créé`);
+        results.push(insertErr ? `${key}: erreur – ${insertErr.message}` : `${key}: créé`);
       } else {
         results.push(`${key}: mis à jour`);
       }

@@ -6,13 +6,12 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, Users2, CreditCard, LogOut, ShieldAlert,
   LifeBuoy, BookOpen, Coins, Settings, Ticket, Activity, Menu, X,
-  Mail, ChevronRight, Shield,
+  Mail, ChevronRight, Shield, Loader2,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import {
-  getSimulatedSession, getAdminSidebarItems, ADMIN_ROLES,
-  ROLE_META, CurrentSession, Permission, Role,
-  hasPermission
+  getAdminSidebarItems, ADMIN_ROLES, ROLE_META,
+  Permission, Role,
 } from "@/lib/rbac";
 
 const ICON_MAP: Record<string, React.ReactNode> = {
@@ -29,40 +28,65 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   Settings:        <Settings className="w-5 h-5" />,
 };
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const router   = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [session, setSession] = useState<CurrentSession | null>(null);
+interface AdminUser {
+  role: string;
+  userId: string;
+  email: string;
+  name: string;
+  grantedPermissions: Permission[];
+  revokedPermissions: Permission[];
+}
 
-  const loadSession = useCallback(() => {
-    const s = getSimulatedSession();
-    if (!s) { router.replace("/login"); return; }
-    if (!ADMIN_ROLES.includes(s.role as Role)) {
-      const isInstructor = ["INSTRUCTOR", "TEACHING_ASSISTANT"].includes(s.role);
-      router.replace(isInstructor ? "/instructor" : "/dashboard");
-      return;
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const pathname  = usePathname();
+  const router    = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [adminUser, setAdminUser]     = useState<AdminUser | null>(null);
+  const [loading, setLoading]         = useState(true);
+
+  const loadAdminUser = useCallback(async () => {
+    try {
+      const res  = await fetch("/api/admin/me");
+      if (res.status === 401) { router.replace("/login"); return; }
+      const data = await res.json();
+
+      if (!data.role || !ADMIN_ROLES.includes(data.role as Role)) {
+        // Not an admin — redirect to appropriate dashboard
+        const isInstructor = ["INSTRUCTOR", "TEACHING_ASSISTANT"].includes(data.role);
+        router.replace(isInstructor ? "/instructor" : "/dashboard");
+        return;
+      }
+      setAdminUser(data);
+    } catch {
+      router.replace("/login");
+    } finally {
+      setLoading(false);
     }
-    setSession(s);
   }, [router]);
 
-  useEffect(() => {
-    loadSession();
-    window.addEventListener("storage", loadSession);
-    return () => window.removeEventListener("storage", loadSession);
-  }, [loadSession]);
+  useEffect(() => { loadAdminUser(); }, [loadAdminUser]);
 
-  if (!session) return null;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-[#0a0a0b]">
+        <div className="flex items-center gap-3 text-zinc-400">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-sm">Vérification des accès…</span>
+        </div>
+      </div>
+    );
+  }
 
-  const roleMeta = ROLE_META[session.role] || ROLE_META.SUPPORT_AGENT;
-  const menuItems = getAdminSidebarItems(
-    session.role as Role,
-    session.grantedPermissions || [],
-    session.revokedPermissions || []
+  if (!adminUser) return null;
+
+  const roleMeta   = ROLE_META[adminUser.role] || ROLE_META.SUPPORT_AGENT;
+  const menuItems  = getAdminSidebarItems(
+    adminUser.role as Role,
+    adminUser.grantedPermissions,
+    adminUser.revokedPermissions,
   );
 
-  // Initials for avatar
-  const initials = session.name
+  const initials = adminUser.name
     .split(" ").slice(0, 2).map(w => w[0]?.toUpperCase() || "").join("");
 
   return (
@@ -91,7 +115,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </span>
           </Link>
           <button
-            className="lg:hidden p-1.5 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+            className="lg:hidden p-1.5 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg"
             onClick={() => setSidebarOpen(false)}
           >
             <X className="w-4 h-4" />
@@ -133,14 +157,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Bottom user card */}
         <div className="p-3 border-t border-zinc-100 dark:border-zinc-800 flex flex-col gap-1 shrink-0">
-          {/* User card */}
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 mb-1">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-400 to-red-700 flex items-center justify-center text-white text-xs font-bold shrink-0">
               {initials || "AD"}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-zinc-900 dark:text-white truncate">{session.name}</p>
-              <p className="text-[10px] text-zinc-400 truncate">{session.email}</p>
+              <p className="text-xs font-semibold text-zinc-900 dark:text-white truncate">{adminUser.name}</p>
+              <p className="text-[10px] text-zinc-400 truncate">{adminUser.email}</p>
             </div>
           </div>
 
@@ -184,7 +207,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </button>
             <div className="flex items-center gap-2">
               <ShieldAlert className="w-4 h-4 text-red-500" />
-              <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">
+              <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 hidden sm:block">
                 Mode Administrateur
               </span>
             </div>

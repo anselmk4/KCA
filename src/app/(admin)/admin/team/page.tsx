@@ -95,12 +95,24 @@ export default function AdminTeamPage() {
   }, []);
 
   useEffect(() => {
-    const session = getSimulatedSession();
-    if (!session || session.role !== "SUPER_ADMIN") {
-      router.replace("/admin");
-      return;
+    async function verifyAndFetch() {
+      try {
+        const res = await fetch("/api/admin/me");
+        if (!res.ok) {
+          router.replace("/admin");
+          return;
+        }
+        const data = await res.json();
+        if (data.role !== "SUPER_ADMIN") {
+          router.replace("/admin");
+          return;
+        }
+        fetchMembers();
+      } catch {
+        router.replace("/admin");
+      }
     }
-    fetchMembers();
+    verifyAndFetch();
   }, [fetchMembers, router]);
 
   const handleInvite = async (e: React.FormEvent) => {
