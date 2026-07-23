@@ -409,18 +409,42 @@ export function resolvePawaPayCorrespondent(carrier: string, phoneNumber: string
     };
   }
 
+  // Parse USD / CDF choice from carrier string (e.g., "AIRTEL (USD)", "MPESA (CDF)", "AIRTEL")
+  const isUSD = carrier.toUpperCase().includes("USD");
+  const cleanCarrierName = carrier.replace(/\(.*\)/g, "").replace(/USD|CDF/gi, "").trim().toLowerCase();
+
   // Find operator matching the carrier name
-  const carrierLower = carrier.toLowerCase();
   const operator = countryConfig.operators.find(op => {
     const opName = op.name.toLowerCase();
     const opId = op.id.toLowerCase();
-    return opId.includes(carrierLower) || opName.includes(carrierLower);
-  }) || countryConfig.operators[0]; // Fallback to first operator if not explicitly matched
+    const shortOpId = opId.split("_")[0];
+    const shortOpName = opName.split(" ")[0];
+    return (
+      opId.includes(cleanCarrierName) ||
+      opName.includes(cleanCarrierName) ||
+      cleanCarrierName.includes(shortOpId) ||
+      cleanCarrierName.includes(shortOpName)
+    );
+  }) || countryConfig.operators[0];
+
+  // Currency logic: DRC (code CD / prefix 243) supports USD and CDF
+  let currency = countryConfig.currency;
+  let exchangeRate = countryConfig.exchangeRate;
+
+  if (countryConfig.countryCode === "CD" || countryConfig.phonePrefix === "243") {
+    if (isUSD) {
+      currency = "USD";
+      exchangeRate = 1;
+    } else {
+      currency = "CDF";
+      exchangeRate = countryConfig.exchangeRate || 2800;
+    }
+  }
 
   return {
     correspondent: operator.id,
-    currency: countryConfig.currency,
-    exchangeRate: countryConfig.exchangeRate,
+    currency,
+    exchangeRate,
     formattedPhone: cleanPhone
   };
 }
