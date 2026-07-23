@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
-    const { payoutId, action } = await req.json();
+    const { payoutId, action, reason } = await req.json();
     if (!payoutId || !action) {
       return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
     }
@@ -56,18 +56,51 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "reject") {
+      const rejectReason = reason || "Coordonnées de paiement à réviser ou non conformes.";
+
       // Update status to CANCELLED (Rejected)
       const { error: updateErr } = await supabaseAdmin
         .from("payouts")
         .update({
           status: "CANCELLED",
-          notes: `Demande de retrait rejetée par l'administrateur (${user.email}) le ${new Date().toLocaleDateString()}`,
+          notes: `Demande de retrait rejetée par l'administrateur (${user.email}). Motif : ${rejectReason}`,
           updated_at: new Date().toISOString()
         })
         .eq("id", payoutId);
 
       if (updateErr) {
         return NextResponse.json({ error: updateErr.message }, { status: 400 });
+      }
+
+      // Send in-app notification & email to instructor
+      try {
+        const { createNotification } = await import("@/lib/supabase/notifications-helper");
+        const { sendInstructorPayoutRejectedEmail } = await import("@/lib/email");
+
+        await createNotification({
+          userId: payout.instructor_id,
+          title: "Demande de retrait refusée",
+          message: `Votre demande de retrait de $${payout.amount.toFixed(2)} USD a été refusée. Motif : ${rejectReason}`,
+          type: "WARNING",
+          link: "/instructor/earnings"
+        });
+
+        const { data: instProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("email, full_name")
+          .eq("id", payout.instructor_id)
+          .maybeSingle();
+
+        if (instProfile?.email) {
+          await sendInstructorPayoutRejectedEmail(
+            instProfile.email,
+            instProfile.full_name || "Formateur",
+            payout.amount,
+            rejectReason
+          );
+        }
+      } catch (notifErr) {
+        console.error("[admin-payouts] Error sending rejection notifications:", notifErr);
       }
 
       return NextResponse.json({ success: true, status: "CANCELLED" });

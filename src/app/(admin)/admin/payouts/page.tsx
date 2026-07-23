@@ -233,6 +233,16 @@ export default function AdminPayoutsPage() {
     customAction?: 'accept' | 'manual_accept' | 'reject'
   ) => {
     if (processingId) return;
+
+    let reason: string | null = null;
+    if (customAction === 'reject' || (nextStatus === 'CANCELLED' && !customAction)) {
+      reason = prompt(
+        "Veuillez spécifier la raison du rejet (le formateur sera notifié par e-mail et notification in-app) :",
+        "Coordonnées Mobile Money non conformes ou erronées"
+      );
+      if (reason === null) return; // User cancelled prompt
+    }
+
     setProcessingId(payoutId);
     try {
       const action = customAction || (nextStatus === 'PAID' ? 'accept' : 'reject');
@@ -240,7 +250,7 @@ export default function AdminPayoutsPage() {
       const response = await fetch('/api/admin/payouts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ payoutId, action })
+        body: JSON.stringify({ payoutId, action, reason })
       });
 
       const data = await response.json();
@@ -259,10 +269,10 @@ export default function AdminPayoutsPage() {
       }
 
       setPayouts(prev => prev.map(p => p.id === payoutId ? { ...p, status: data.status || nextStatus } : p));
-      alert(`Demande de reversement traitée avec succès : ${data.status === 'PAID' ? 'Validée (Payée)' : 'Rejetée (Annulée)'}`);
+      alert(`Demande de reversement traitée avec succès : ${data.status === 'PAID' ? 'Validée (Payée)' : 'Rejetée (Notification & e-mail transmis au formateur)'}`);
     } catch (err: any) {
       console.error('Error updating payout status:', err.message);
-      alert('Erreur lors de la validation du reversement : ' + err.message);
+      alert('Erreur lors du traitement du reversement : ' + err.message);
     } finally {
       setProcessingId(null);
     }

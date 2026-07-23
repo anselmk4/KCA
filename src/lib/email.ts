@@ -626,6 +626,36 @@ export async function sendInstructorPayoutCompletedEmail(
 }
 
 /**
+ * Notification au Formateur en cas de rejet/refus de sa demande de versement
+ */
+export async function sendInstructorPayoutRejectedEmail(
+  instructorEmail: string,
+  instructorName: string,
+  amount: number,
+  reason: string
+) {
+  const dateStr = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  const body = `
+    <h2>Mise à jour concernant votre demande de versement ⚠️</h2>
+    <p>Bonjour <strong>${instructorName}</strong>,</p>
+    <p>Nous vous informons que votre demande de versement d'un montant de <strong>$${amount.toFixed(2)} USD</strong> n'a pas pu être traitée.</p>
+
+    <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 18px; margin: 20px 0; border-left: 4px solid #ef4444;">
+      <p style="margin: 0 0 6px 0; font-size: 14px; color: #991b1b;"><strong>Montant de la demande :</strong> $${amount.toFixed(2)} USD</p>
+      <p style="margin: 0 0 6px 0; font-size: 14px; color: #991b1b;"><strong>Motif du rejet :</strong> ${reason}</p>
+      <p style="margin: 0; font-size: 12px; color: #7f1d1d;"><strong>Date du rejet :</strong> ${dateStr}</p>
+    </div>
+
+    <p>Les fonds sont conservés sur votre solde disponible. Veuillez vérifier et mettre à jour vos coordonnées Mobile Money (opérateur, monnaie ou numéro) depuis votre espace formateur avant de soumettre une nouvelle demande.</p>
+
+    <div style="text-align: center; margin-top: 30px;">
+      <a href="https://ansella.app/instructor/earnings" class="btn" style="background-color: #ef4444;">Consulter mon compte et mes revenus</a>
+    </div>
+  `;
+  await sendEmail(instructorEmail, `⚠️ Information concernant votre demande de retrait de $${amount.toFixed(2)} USD`, body);
+}
+
+/**
  * Reçu de transaction détaillé pour l'apprenant
  */
 export async function sendStudentTransactionReceiptEmail(
