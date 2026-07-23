@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
       // Set columns on public.profiles structure (nationality and phone)
       nationality: country,
       phone: phone,
+      gender: gender || null,
     };
 
     if (finalRole === "INSTRUCTOR") {
