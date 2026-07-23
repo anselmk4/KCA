@@ -806,3 +806,32 @@ export async function sendInstructorSubscriptionExpiryReminderEmail(
   `;
   await sendEmail(instructorEmail, titleText, body);
 }
+
+/**
+ * Email de notification de rejet/demande de révision de cours au Formateur avec raison détaillée
+ */
+export async function sendInstructorCourseRejectedEmail(
+  instructorEmail: string,
+  instructorName: string,
+  courseTitle: string,
+  rejectionReason: string
+) {
+  const body = `
+    <h2>Modifications requises pour votre cours</h2>
+    <p>Bonjour <strong>${instructorName}</strong>,</p>
+    <p>Votre cours <strong>« ${courseTitle} »</strong> a été révisé par l'équipe d'administration d'Ansella. Des ajustements sont nécessaires avant sa mise en ligne.</p>
+
+    <div style="background-color: #fff7ed; border: 1px solid #fed7aa; border-radius: 12px; padding: 20px; margin: 20px 0; border-left: 4px solid #ea580c;">
+      <h3 style="margin: 0 0 8px 0; color: #c2410c;">📝 Remarques de l'équipe de modération :</h3>
+      <p style="margin: 0; font-size: 14px; color: #9a3412; white-space: pre-wrap;">${rejectionReason || 'Veuillez réviser la structure et le contenu du cours.'}</p>
+    </div>
+
+    <p>Le statut du cours est passé en <strong>Brouillon</strong>. Vous pouvez apporter les modifications et soumettre à nouveau votre cours pour validation dès qu'il est prêt.</p>
+
+    <div style="text-align: center; margin-top: 30px;">
+      <a href="https://ansella.app/instructor/courses" class="btn">Accéder à mes cours</a>
+    </div>
+  `;
+  await sendEmail(instructorEmail, `Modifications requises pour le cours : ${courseTitle}`, body);
+}
+

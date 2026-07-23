@@ -19,6 +19,7 @@ import {
   Trash2
 } from "lucide-react";
 import { stripHtml } from "@/lib/utils";
+import { CourseInspectionModal } from "@/components/admin/CourseInspectionModal";
 
 interface AdminCourseItem {
   id: string;
@@ -41,6 +42,7 @@ export default function AdminCoursesPage() {
   const [activeTab, setActiveTab] = useState<"ALL" | "REVIEW" | "PUBLISHED" | "DRAFT">("REVIEW");
   const [editingCourse, setEditingCourse] = useState<AdminCourseItem | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [inspectingCourseId, setInspectingCourseId] = useState<string | null>(null);
 
   const handleEditCourseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -318,43 +320,63 @@ export default function AdminCoursesPage() {
               </div>
 
               {/* Actions */}
-              <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-100 dark:border-zinc-800 flex gap-2">
-                {course.status === 'REVIEW' && (
-                  <>
+              <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-100 dark:border-zinc-800 flex flex-col gap-2">
+                <button
+                  onClick={() => setInspectingCourseId(course.id)}
+                  className="w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                >
+                  <BookOpen className="w-3.5 h-3.5" /> Inspecter & Éditer le Contenu
+                </button>
+
+                <div className="flex gap-2">
+                  {course.status === 'REVIEW' && (
+                    <>
+                      <button
+                        onClick={() => handleUpdateStatus(course.id, 'PUBLISHED')}
+                        className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <Check className="w-3 h-3" /> Approuver
+                      </button>
+                      <button
+                        onClick={() => setInspectingCourseId(course.id)}
+                        className="flex-1 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <X className="w-3 h-3" /> Rejeter avec motif
+                      </button>
+                    </>
+                  )}
+                  {course.status === 'PUBLISHED' && (
+                    <button
+                      onClick={() => handleUpdateStatus(course.id, 'ARCHIVED')}
+                      className="w-full py-1.5 bg-red-50 dark:bg-red-950/20 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1 transition-all border border-red-200 dark:border-red-900/30 cursor-pointer"
+                    >
+                      <Archive className="w-3 h-3" /> Archiver
+                    </button>
+                  )}
+                  {course.status === 'DRAFT' && (
                     <button
                       onClick={() => handleUpdateStatus(course.id, 'PUBLISHED')}
-                      className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      className="w-full py-1.5 bg-zinc-800 hover:bg-zinc-900 text-white rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
                     >
-                      <Check className="w-3.5 h-3.5" /> Approuver
+                      <Check className="w-3 h-3" /> Publier directement
                     </button>
-                    <button
-                      onClick={() => handleUpdateStatus(course.id, 'DRAFT')}
-                      className="flex-1 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <X className="w-3.5 h-3.5" /> Rejeter
-                    </button>
-                  </>
-                )}
-                {course.status === 'PUBLISHED' && (
-                  <button
-                    onClick={() => handleUpdateStatus(course.id, 'ARCHIVED')}
-                    className="w-full py-2 bg-red-50 dark:bg-red-950/20 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border border-red-200 dark:border-red-900/30 cursor-pointer"
-                  >
-                    <Archive className="w-3.5 h-3.5" /> Archiver la formation
-                  </button>
-                )}
-                {course.status === 'DRAFT' && (
-                  <button
-                    onClick={() => handleUpdateStatus(course.id, 'PUBLISHED')}
-                    className="w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Check className="w-3.5 h-3.5" /> Publier directement
-                  </button>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {/* Course Inspection & Editing Modal */}
+      {inspectingCourseId && (
+        <CourseInspectionModal
+          courseId={inspectingCourseId}
+          onClose={() => setInspectingCourseId(null)}
+          onStatusChanged={() => {
+            fetchCourses();
+          }}
+        />
       )}
       {/* Modal Edit Course Title */}
       {editingCourse && (
