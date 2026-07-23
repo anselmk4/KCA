@@ -57,22 +57,30 @@ export async function GET(
     }
 
     // 2. Sections
-    const { data: sections } = await supabaseAdmin
+    const { data: sections, error: secErr } = await supabaseAdmin
       .from("course_sections")
       .select("*")
       .eq("course_id", courseId)
-      .order("order", { ascending: true });
+      .order("sort_order", { ascending: true });
+
+    if (secErr) {
+      console.error("[api/admin/courses/[courseId]] sections query error:", secErr.message);
+    }
 
     const sectionIds = (sections || []).map(s => s.id);
 
     // 3. Lessons for all sections
     let lessons: any[] = [];
     if (sectionIds.length > 0) {
-      const { data: lessonData } = await supabaseAdmin
+      const { data: lessonData, error: lesErr } = await supabaseAdmin
         .from("lessons")
         .select("*")
         .in("section_id", sectionIds)
-        .order("order", { ascending: true });
+        .order("sort_order", { ascending: true });
+
+      if (lesErr) {
+        console.error("[api/admin/courses/[courseId]] lessons query error:", lesErr.message);
+      }
       lessons = lessonData || [];
     }
 
@@ -85,7 +93,14 @@ export async function GET(
     // Nest lessons inside sections
     const enrichedSections = (sections || []).map(sec => ({
       ...sec,
-      lessons: lessons.filter(l => l.section_id === sec.id),
+      order: sec.sort_order ?? sec.order ?? 0,
+      lessons: lessons
+        .filter(l => l.section_id === sec.id)
+        .map(l => ({
+          ...l,
+          duration_min: l.duration_minutes ?? l.duration_min ?? 0,
+          order: l.sort_order ?? l.order ?? 0,
+        })),
     }));
 
     return NextResponse.json({
@@ -95,7 +110,7 @@ export async function GET(
       stats: {
         totalSections: sections?.length || 0,
         totalLessons: lessons.length,
-        totalDurationMin: lessons.reduce((sum, l) => sum + (l.duration_min || l.durationMin || 0), 0),
+        totalDurationMin: lessons.reduce((sum, l) => sum + (l.duration_minutes || l.duration_min || 0), 0),
         hasQuiz: (quizzes?.length || 0) > 0,
       }
     });
@@ -157,7 +172,7 @@ export async function PUT(
           description,
           content,
           video_url,
-          duration_min,
+          duration_minutes: duration_min || 0,
           updated_at: new Date().toISOString()
         })
         .eq("id", lessonId)
@@ -175,7 +190,7 @@ export async function PUT(
 
       const { data: updatedSec, error } = await supabaseAdmin
         .from("course_sections")
-        .update({ title, order })
+        .update({ title, sort_order: order })
         .eq("id", sectionId)
         .select()
         .single();
