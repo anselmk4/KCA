@@ -39,7 +39,7 @@ CREATE INDEX IF NOT EXISTS admin_permissions_user_id_idx ON public.admin_permiss
   }
 
   // Step 2: Seed extended settings keys
-  const newSettings = [
+  const newSettings: any[] = [
     { key: 'platform.registration_open',         value: true,       description: 'Permettre les nouvelles inscriptions', group_name: 'general',       is_public: true  },
     { key: 'platform.maintenance_mode',           value: false,      description: 'Mode maintenance',                    group_name: 'general',       is_public: true  },
     { key: 'platform.installments_enabled',       value: true,       description: 'Paiements en tranches',               group_name: 'finance',       is_public: false },
