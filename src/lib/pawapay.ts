@@ -367,6 +367,15 @@ export async function initiatePawaPayPayout(params: {
       };
     }
 
+    if (data.status === "REJECTED" || data.status === "FAILED") {
+      const rejMsg = data.rejectionReason?.rejectionMessage || data.rejectionReason?.rejectionCode || data.status;
+      return {
+        success: false,
+        payoutId,
+        error: `PawaPay API (${data.status}) : ${rejMsg}`
+      };
+    }
+
     return {
       success: true,
       payoutId,

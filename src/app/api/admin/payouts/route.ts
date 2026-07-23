@@ -73,61 +73,58 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, status: "CANCELLED" });
     }
 
-    if (action === "accept") {
-      // 1. Process Mobile Money payout via PawaPay
-      // Format: ORANGE: 243891234567
+    if (action === "accept" || action === "manual_accept") {
       const ref = payout.payment_reference || "";
       const separatorIndex = ref.indexOf(":");
       
-      if (separatorIndex === -1) {
-        return NextResponse.json({ error: "Format de référence de paiement invalide (Opérateur: Numéro requis)" }, { status: 400 });
-      }
+      const carrier = separatorIndex !== -1 ? ref.substring(0, separatorIndex).trim() : "MOBILE_MONEY";
+      const phoneNumber = separatorIndex !== -1 ? ref.substring(separatorIndex + 1).trim() : ref.trim();
 
-      const carrier = ref.substring(0, separatorIndex).trim();
-      const phoneNumber = ref.substring(separatorIndex + 1).trim();
-
-      if (!carrier || !phoneNumber) {
-        return NextResponse.json({ error: "Informations de paiement invalides ou incomplètes" }, { status: 400 });
-      }
-
-      // 2. Resolve PawaPay operator and local currency conversion
       const resolveResult = resolvePawaPayCorrespondent(carrier, phoneNumber);
-      if (resolveResult.error) {
-        return NextResponse.json({ error: resolveResult.error }, { status: 400 });
-      }
-
-      // Convert payout USD amount to local currency
       const amountLocal = payout.amount * resolveResult.exchangeRate;
 
-      // 3. Initiate payout via PawaPay
-      const payoutResponse = await initiatePawaPayPayout({
-        payoutId: payoutId, // Use the database payout row ID as our unique payoutId for PawaPay tracking
-        amount: amountLocal,
-        currency: resolveResult.currency,
-        correspondent: resolveResult.correspondent,
-        phoneNumber: resolveResult.formattedPhone,
-        statementDescription: "Kuettu Payout"
-      });
+      let pawapayRef = `MANUAL-${Date.now()}`;
 
-      if (!payoutResponse.success) {
-        // Record the failure in payout notes but do not mark as PAID
-        await supabaseAdmin
-          .from("payouts")
-          .update({
-            notes: `Échec du reversement PawaPay: ${payoutResponse.error}. Résolu localement sous l'opérateur ${resolveResult.correspondent}.`,
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", payoutId);
+      if (action === "accept") {
+        // Generate a fresh unique transaction ID for PawaPay to prevent DUPLICATE_PAYOUT_ID rejections
+        const freshPayoutTxId = crypto.randomUUID();
 
-        return NextResponse.json({ error: `Erreur API PawaPay : ${payoutResponse.error}` }, { status: 400 });
+        // Initiate payout via PawaPay API
+        const payoutResponse = await initiatePawaPayPayout({
+          payoutId: freshPayoutTxId,
+          amount: amountLocal,
+          currency: resolveResult.currency,
+          correspondent: resolveResult.correspondent,
+          phoneNumber: resolveResult.formattedPhone,
+          statementDescription: "Ansella Payout"
+        });
+
+        if (!payoutResponse.success) {
+          // Record the failure in payout notes but DO NOT mark as PAID
+          await supabaseAdmin
+            .from("payouts")
+            .update({
+              notes: `[Échec PawaPay API] ${payoutResponse.error}. Résolu pour ${resolveResult.correspondent} (${resolveResult.currency}).`,
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", payoutId);
+
+          return NextResponse.json({ 
+            error: `Échec du virement PawaPay : ${payoutResponse.error}. Vous pouvez aussi utiliser l'option de validation manuelle après envoi direct.` 
+          }, { status: 400 });
+        }
+
+        pawapayRef = payoutResponse.payoutId;
       }
 
-      // 4. Success: update payout record status to PAID
+      // Success or Manual Validation: update payout record status to PAID
       const { error: updateErr } = await supabaseAdmin
         .from("payouts")
         .update({
           status: "PAID",
-          notes: `Reversement réussi de ${Math.round(amountLocal)} ${resolveResult.currency} via PawaPay (${resolveResult.correspondent}). Réf de transaction: ${payoutResponse.payoutId}`,
+          notes: action === "manual_accept" 
+            ? `Versement validé manuellement par l'administrateur (${user.email}). Réf : ${ref}` 
+            : `Reversement réussi de ${Math.round(amountLocal)} ${resolveResult.currency} via PawaPay (${resolveResult.correspondent}). Réf transaction: ${pawapayRef}`,
           processed_by: user.id,
           processed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -135,7 +132,7 @@ export async function POST(req: NextRequest) {
         .eq("id", payoutId);
 
       if (updateErr) {
-        return NextResponse.json({ error: `Paiement PawaPay effectué, mais erreur de mise à jour de la base de données: ${updateErr.message}` }, { status: 500 });
+        return NextResponse.json({ error: `Erreur de mise à jour de la base de données: ${updateErr.message}` }, { status: 500 });
       }
 
       // Send notification & email to instructor
@@ -173,7 +170,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         status: "PAID",
-        payoutId: payoutResponse.payoutId
+        payoutId: pawapayRef
       });
     }
 

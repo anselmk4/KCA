@@ -227,11 +227,15 @@ export default function AdminPayoutsPage() {
     loadData();
   }, []);
 
-  const handleUpdatePayoutStatus = async (payoutId: string, nextStatus: AdminPayoutItem['status']) => {
+  const handleUpdatePayoutStatus = async (
+    payoutId: string, 
+    nextStatus: AdminPayoutItem['status'],
+    customAction?: 'accept' | 'manual_accept' | 'reject'
+  ) => {
     if (processingId) return;
     setProcessingId(payoutId);
     try {
-      const action = nextStatus === 'PAID' ? 'accept' : 'reject';
+      const action = customAction || (nextStatus === 'PAID' ? 'accept' : 'reject');
       
       const response = await fetch('/api/admin/payouts', {
         method: 'POST',
@@ -241,11 +245,21 @@ export default function AdminPayoutsPage() {
 
       const data = await response.json();
       if (!response.ok) {
+        if (data.error && data.error.includes("PawaPay")) {
+          const confirmManual = confirm(
+            `${data.error}\n\nSouhaitez-vous valider ce paiement MANUELLEMENT (après envoi direct Mobile Money) ?`
+          );
+          if (confirmManual) {
+            setProcessingId(null);
+            await handleUpdatePayoutStatus(payoutId, 'PAID', 'manual_accept');
+            return;
+          }
+        }
         throw new Error(data.error || 'Une erreur est survenue lors du traitement du reversement.');
       }
 
       setPayouts(prev => prev.map(p => p.id === payoutId ? { ...p, status: data.status || nextStatus } : p));
-      alert(`Demande de reversement traitée avec succès : ${data.status === 'PAID' ? 'Validée (Payée via PawaPay)' : 'Rejetée (Annulée)'}`);
+      alert(`Demande de reversement traitée avec succès : ${data.status === 'PAID' ? 'Validée (Payée)' : 'Rejetée (Annulée)'}`);
     } catch (err: any) {
       console.error('Error updating payout status:', err.message);
       alert('Erreur lors de la validation du reversement : ' + err.message);
@@ -489,45 +503,57 @@ export default function AdminPayoutsPage() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         {p.status === 'PENDING' ? (
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-1.5 flex-wrap">
                             <button
                               disabled={processingId !== null}
-                              onClick={() => handleUpdatePayoutStatus(p.id, 'PAID')}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                              onClick={() => handleUpdatePayoutStatus(p.id, 'PAID', 'accept')}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
                                 processingId === p.id 
-                                  ? "bg-green-700/50 text-white/50 cursor-not-allowed"
+                                  ? "bg-teal-700/50 text-white/50 cursor-not-allowed"
                                   : processingId !== null
                                   ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
-                                  : "bg-green-600 hover:bg-green-700 text-white cursor-pointer"
+                                  : "bg-teal-600 hover:bg-teal-700 text-white cursor-pointer shadow-sm"
                               }`}
-                              title="Valider le reversement"
+                              title="Tenter le virement automatique via l'API PawaPay"
                             >
                               {processingId === p.id ? (
                                 <>
                                   <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" />
-                                  Traitement...
+                                  Virement...
                                 </>
                               ) : (
                                 <>
-                                  <Check className="w-3 h-3" /> Payer
+                                  <Check className="w-3 h-3" /> PawaPay API
                                 </>
                               )}
                             </button>
                             <button
                               disabled={processingId !== null}
-                              onClick={() => handleUpdatePayoutStatus(p.id, 'CANCELLED')}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                              onClick={() => handleUpdatePayoutStatus(p.id, 'PAID', 'manual_accept')}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                                processingId !== null
+                                  ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
+                                  : "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-sm"
+                              }`}
+                              title="Valider manuellement après transfert Mobile Money direct"
+                            >
+                              <Check className="w-3 h-3" /> Manuel
+                            </button>
+                            <button
+                              disabled={processingId !== null}
+                              onClick={() => handleUpdatePayoutStatus(p.id, 'CANCELLED', 'reject')}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
                                 processingId !== null
                                   ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
                                   : "bg-red-600 hover:bg-red-700 text-white cursor-pointer"
                               }`}
-                              title="Rejeter le reversement"
+                              title="Rejeter la demande"
                             >
                               <X className="w-3 h-3" /> Refuser
                             </button>
                           </div>
                         ) : (
-                          <span className="text-xs text-zinc-400">Aucune action requise</span>
+                          <span className="text-xs text-zinc-400 font-medium">Aucune action requise</span>
                         )}
                       </td>
                     </tr>
