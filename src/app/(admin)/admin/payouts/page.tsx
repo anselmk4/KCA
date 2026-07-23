@@ -255,16 +255,6 @@ export default function AdminPayoutsPage() {
 
       const data = await response.json();
       if (!response.ok) {
-        if (data.error && data.error.includes("PawaPay")) {
-          const confirmManual = confirm(
-            `${data.error}\n\nSouhaitez-vous valider ce paiement MANUELLEMENT (après envoi direct Mobile Money) ?`
-          );
-          if (confirmManual) {
-            setProcessingId(null);
-            await handleUpdatePayoutStatus(payoutId, 'PAID', 'manual_accept');
-            return;
-          }
-        }
         throw new Error(data.error || 'Une erreur est survenue lors du traitement du reversement.');
       }
 
@@ -272,7 +262,7 @@ export default function AdminPayoutsPage() {
       alert(`Demande de reversement traitée avec succès : ${data.status === 'PAID' ? 'Validée (Payée)' : 'Rejetée (Notification & e-mail transmis au formateur)'}`);
     } catch (err: any) {
       console.error('Error updating payout status:', err.message);
-      alert('Erreur lors du traitement du reversement : ' + err.message);
+      alert('Échec de l\'opération : ' + err.message);
     } finally {
       setProcessingId(null);
     }
