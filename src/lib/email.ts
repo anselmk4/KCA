@@ -183,7 +183,7 @@ async function writeMockEmailFile(recipient: string, subject: string, html: stri
 export async function sendEmail(to: string, subject: string, bodyContent: string) {
   const html = getEmailTemplate(subject, bodyContent);
 
-  // 1. Console Log
+  // 1. Console Log for local tracking
   console.log(`\n======================================================`);
   console.log(`[SEND EMAIL]`);
   console.log(`TO:      ${to}`);
@@ -191,8 +191,152 @@ export async function sendEmail(to: string, subject: string, bodyContent: string
   console.log(`BODY PREVIEW: ${bodyContent.replace(/<[^>]*>/g, "").substring(0, 150)}...`);
   console.log(`======================================================\n`);
 
-  // 2. Write to files in scratch folder for user inspection
+  // 2. Local File Logging for Debugging
   await writeMockEmailFile(to, subject, html);
+
+  // 3. Multi-Provider Production Email Dispatching
+  const resendKey = process.env.RESEND_API_KEY || process.env.RESEND_API_TOKEN || process.env.EMAIL_API_KEY;
+  const brevoKey = process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY;
+  const sendgridKey = process.env.SENDGRID_API_KEY;
+  const postmarkToken = process.env.POSTMARK_SERVER_TOKEN;
+  const webhookUrl = process.env.EMAIL_WEBHOOK_URL;
+
+  // A. Resend API (Recommended for Next.js / Vercel)
+  if (resendKey) {
+    try {
+      const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM || "Ansella Academy <notifications@ansella.app>";
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${resendKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: fromEmail,
+          to: [to],
+          subject: subject,
+          html: html,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        console.log(`[sendEmail] Successfully dispatched email via Resend to ${to} (ID: ${data.id})`);
+        return { success: true, provider: "Resend", id: data.id };
+      } else {
+        console.error("[sendEmail] Resend API error:", data);
+      }
+    } catch (err: any) {
+      console.error("[sendEmail] Failed to send email via Resend:", err?.message || err);
+    }
+  }
+
+  // B. Brevo / Sendinblue API
+  if (brevoKey) {
+    try {
+      const fromEmail = process.env.EMAIL_FROM || "notifications@ansella.app";
+      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "api-key": brevoKey,
+          "Content-Type": "application/json",
+          "accept": "application/json",
+        },
+        body: JSON.stringify({
+          sender: { name: "Ansella Academy", email: fromEmail },
+          to: [{ email: to }],
+          subject: subject,
+          htmlContent: html,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        console.log(`[sendEmail] Successfully dispatched email via Brevo to ${to}`);
+        return { success: true, provider: "Brevo" };
+      } else {
+        console.error("[sendEmail] Brevo API error:", data);
+      }
+    } catch (err: any) {
+      console.error("[sendEmail] Failed to send email via Brevo:", err?.message || err);
+    }
+  }
+
+  // C. SendGrid API
+  if (sendgridKey) {
+    try {
+      const fromEmail = process.env.EMAIL_FROM || "notifications@ansella.app";
+      const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${sendgridKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: to }] }],
+          from: { email: fromEmail, name: "Ansella Academy" },
+          subject: subject,
+          content: [{ type: "text/html", value: html }],
+        }),
+      });
+      if (res.ok) {
+        console.log(`[sendEmail] Successfully dispatched email via SendGrid to ${to}`);
+        return { success: true, provider: "SendGrid" };
+      } else {
+        const errText = await res.text();
+        console.error("[sendEmail] SendGrid API error:", errText);
+      }
+    } catch (err: any) {
+      console.error("[sendEmail] Failed to send email via SendGrid:", err?.message || err);
+    }
+  }
+
+  // D. Postmark API
+  if (postmarkToken) {
+    try {
+      const fromEmail = process.env.EMAIL_FROM || "notifications@ansella.app";
+      const res = await fetch("https://api.postmarkapp.com/email", {
+        method: "POST",
+        headers: {
+          "X-Postmark-Server-Token": postmarkToken,
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify({
+          From: fromEmail,
+          To: to,
+          Subject: subject,
+          HtmlBody: html,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        console.log(`[sendEmail] Successfully dispatched email via Postmark to ${to}`);
+        return { success: true, provider: "Postmark" };
+      } else {
+        console.error("[sendEmail] Postmark API error:", data);
+      }
+    } catch (err: any) {
+      console.error("[sendEmail] Failed to send email via Postmark:", err?.message || err);
+    }
+  }
+
+  // E. Email Webhook Gateway
+  if (webhookUrl) {
+    try {
+      const res = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, subject, html }),
+      });
+      if (res.ok) {
+        console.log(`[sendEmail] Successfully dispatched email via Webhook to ${to}`);
+        return { success: true, provider: "Webhook" };
+      }
+    } catch (err: any) {
+      console.error("[sendEmail] Failed to send email via Webhook:", err?.message || err);
+    }
+  }
+
+  return { success: true, provider: "Mock/Log" };
 }
 
 // --- Standardized Email Templates ---

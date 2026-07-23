@@ -138,6 +138,38 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Paiement PawaPay effectué, mais erreur de mise à jour de la base de données: ${updateErr.message}` }, { status: 500 });
       }
 
+      // Send notification & email to instructor
+      try {
+        const { createNotification } = await import("@/lib/supabase/notifications-helper");
+        const { sendInstructorPayoutCompletedEmail } = await import("@/lib/email");
+
+        await createNotification({
+          userId: payout.instructor_id,
+          title: "Versement effectué !",
+          message: `Votre demande de retrait de $${payout.amount.toFixed(2)} USD a été validée et transférée vers votre Mobile Money.`,
+          type: "SUCCESS",
+          link: "/instructor/earnings"
+        });
+
+        const { data: instProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("email, full_name")
+          .eq("id", payout.instructor_id)
+          .maybeSingle();
+
+        if (instProfile?.email) {
+          await sendInstructorPayoutCompletedEmail(
+            instProfile.email,
+            instProfile.full_name || "Formateur",
+            payout.amount,
+            payout.payment_method || "Mobile Money",
+            payout.payment_reference || payoutId
+          );
+        }
+      } catch (notifErr) {
+        console.error("[admin-payouts] Error sending payout notification:", notifErr);
+      }
+
       return NextResponse.json({
         success: true,
         status: "PAID",
