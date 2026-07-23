@@ -42,11 +42,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: coursesError.message }, { status: 400 });
     }
 
+    // Fetch instructor's payouts
+    const { data: payoutsData } = await dbClient
+      .from('payouts')
+      .select('id, amount, status, created_at, payment_method, payment_reference, notes')
+      .eq('instructor_id', user.id)
+      .order('created_at', { ascending: false });
+
+    const payoutsList = payoutsData || [];
+
     const courses = coursesData || [];
     if (courses.length === 0) {
       return NextResponse.json({
         plan: profile.plan || 'FREE',
         transactions: [],
+        payouts: payoutsList,
         totalRevenue: 0,
         pendingRevenue: 0,
         uniqueStudentsCount: 0
@@ -66,6 +76,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         plan: profile.plan || 'FREE',
         transactions: [],
+        payouts: payoutsList,
         totalRevenue: 0,
         pendingRevenue: 0,
         uniqueStudentsCount: 0
@@ -75,8 +86,7 @@ export async function GET(req: NextRequest) {
     const orderIds = orderItems.map((oi) => oi.order_id);
     const orderItemMap = new Map(orderItems.map((oi) => [oi.order_id, oi.course_id]));
 
-    // 4. Fetch payments using dbClient (which bypasses RLS when using service role key, otherwise falls back to instructor session)
-    // Filter strictly by status = "PAID" to clean up failed/cancelled transactions from accounting calculations
+    // 4. Fetch payments using dbClient
     const { data: payments, error: paymentsError } = await dbClient
       .from("payments")
       .select("id, order_id, amount, status, paid_at, user_id, provider")
@@ -87,6 +97,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         plan: profile.plan || 'FREE',
         transactions: [],
+        payouts: payoutsList,
         totalRevenue: 0,
         pendingRevenue: 0,
         uniqueStudentsCount: 0
@@ -126,24 +137,13 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // 7. Fetch all payouts for this instructor
-    const { data: payoutsData, error: payoutsErr } = await dbClient
-      .from('payouts')
-      .select('id, amount, status, created_at, payment_method, payment_reference, notes')
-      .eq('instructor_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (payoutsErr) {
-      console.warn('[API instructor/earnings GET] Payouts fetch warning:', payoutsErr.message);
-    }
-
     const hasServiceRole = !!(process.env.SUPABASE_SERVICE_ROLE_KEY && 
                               process.env.SUPABASE_SERVICE_ROLE_KEY !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
     return NextResponse.json({
       plan: profile.plan || 'FREE',
       transactions,
-      payouts: payoutsData || [],
+      payouts: payoutsList,
       hasServiceRole,
       supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || ''
     });
