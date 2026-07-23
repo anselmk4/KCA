@@ -47,20 +47,84 @@ interface LocalPayout {
   notes: string | null;
 }
 
+interface OperatorOption {
+  id: string;
+  label: string;
+}
+
 interface CountryOption {
   code: string;
   name: string;
   prefix: string;
   hasCurrencyChoice: boolean;
+  operators: OperatorOption[];
 }
 
 const PAYOUT_COUNTRIES: CountryOption[] = [
-  { code: "CD", name: "Congo (RDC) 🇨🇩", prefix: "+243", hasCurrencyChoice: true },
-  { code: "CM", name: "Cameroun 🇨🇲", prefix: "+237", hasCurrencyChoice: false },
-  { code: "CI", name: "Côte d'Ivoire 🇨🇮", prefix: "+225", hasCurrencyChoice: false },
-  { code: "SN", name: "Sénégal 🇸🇳", prefix: "+221", hasCurrencyChoice: false },
-  { code: "RW", name: "Rwanda 🇷🇼", prefix: "+250", hasCurrencyChoice: false },
-  { code: "UG", name: "Ouganda 🇺🇬", prefix: "+256", hasCurrencyChoice: false },
+  {
+    code: "CD",
+    name: "Congo (RDC) 🇨🇩",
+    prefix: "+243",
+    hasCurrencyChoice: true,
+    operators: [
+      { id: "MPESA", label: "M-Pesa" },
+      { id: "ORANGE", label: "Orange" },
+      { id: "AIRTEL", label: "Airtel" }
+    ]
+  },
+  {
+    code: "CM",
+    name: "Cameroun 🇨🇲",
+    prefix: "+237",
+    hasCurrencyChoice: false,
+    operators: [
+      { id: "MTN", label: "MTN MoMo" },
+      { id: "ORANGE", label: "Orange Money" }
+    ]
+  },
+  {
+    code: "CI",
+    name: "Côte d'Ivoire 🇨🇮",
+    prefix: "+225",
+    hasCurrencyChoice: false,
+    operators: [
+      { id: "MTN", label: "MTN MoMo" },
+      { id: "ORANGE", label: "Orange Money" },
+      { id: "MOOV", label: "Moov Money" },
+      { id: "WAVE", label: "Wave" }
+    ]
+  },
+  {
+    code: "SN",
+    name: "Sénégal 🇸🇳",
+    prefix: "+221",
+    hasCurrencyChoice: false,
+    operators: [
+      { id: "ORANGE", label: "Orange Money" },
+      { id: "WAVE", label: "Wave" },
+      { id: "FREE", label: "Free Money" }
+    ]
+  },
+  {
+    code: "RW",
+    name: "Rwanda 🇷🇼",
+    prefix: "+250",
+    hasCurrencyChoice: false,
+    operators: [
+      { id: "MTN", label: "MTN MoMo" },
+      { id: "AIRTEL", label: "Airtel Money" }
+    ]
+  },
+  {
+    code: "UG",
+    name: "Ouganda 🇺🇬",
+    prefix: "+256",
+    hasCurrencyChoice: false,
+    operators: [
+      { id: "MTN", label: "MTN MoMo" },
+      { id: "AIRTEL", label: "Airtel Money" }
+    ]
+  }
 ];
 
 const PLAN_COMMISSION_CONFIG: Record<string, { commissionRate: number; instructorShare: number; label: string; badgeColor: string }> = {
@@ -895,7 +959,14 @@ export default function EarningsPage() {
                 <label className="text-xs font-bold text-zinc-700 dark:text-zinc-350">Pays de Réception Mobile Money</label>
                 <select
                   value={withdrawCountry}
-                  onChange={(e) => setWithdrawCountry(e.target.value)}
+                  onChange={(e) => {
+                    const newCountry = e.target.value;
+                    setWithdrawCountry(newCountry);
+                    const countryObj = PAYOUT_COUNTRIES.find(c => c.code === newCountry) || PAYOUT_COUNTRIES[0];
+                    if (!countryObj.operators.some(op => op.id === withdrawCarrier)) {
+                      setWithdrawCarrier(countryObj.operators[0].id);
+                    }
+                  }}
                   className="w-full px-4 py-3 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-955 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-teal-650"
                 >
                   {PAYOUT_COUNTRIES.map((c) => (
@@ -947,26 +1018,28 @@ export default function EarningsPage() {
               {/* Carrier selection */}
               <div className="space-y-1">
                 <label className="text-xs font-bold text-zinc-700 dark:text-zinc-350">Opérateur Mobile Money</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { id: "MPESA", label: "M-Pesa" },
-                    { id: "ORANGE", label: "Orange" },
-                    { id: "AIRTEL", label: "Airtel" }
-                  ].map((carrier) => (
-                    <button
-                      key={carrier.id}
-                      type="button"
-                      onClick={() => setWithdrawCarrier(carrier.id)}
-                      className={`py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                        withdrawCarrier === carrier.id
-                          ? "border-teal-650 bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-400"
-                          : "border-zinc-200 dark:border-zinc-700 text-zinc-655 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                      }`}
-                    >
-                      {carrier.label}
-                    </button>
-                  ))}
-                </div>
+                {(() => {
+                  const countryObj = PAYOUT_COUNTRIES.find(c => c.code === withdrawCountry) || PAYOUT_COUNTRIES[0];
+                  const operators = countryObj.operators;
+                  return (
+                    <div className={`grid gap-2 ${operators.length > 3 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
+                      {operators.map((carrier) => (
+                        <button
+                          key={carrier.id}
+                          type="button"
+                          onClick={() => setWithdrawCarrier(carrier.id)}
+                          className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all border cursor-pointer truncate ${
+                            withdrawCarrier === carrier.id
+                              ? "border-teal-650 bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-400"
+                              : "border-zinc-200 dark:border-zinc-700 text-zinc-655 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                          }`}
+                        >
+                          {carrier.label}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Phone number input with pre-filled prefix */}
@@ -1055,7 +1128,14 @@ export default function EarningsPage() {
                 <label className="text-xs font-bold text-zinc-700 dark:text-zinc-350">Pays de Réception Mobile Money</label>
                 <select
                   value={editCountry}
-                  onChange={(e) => setEditCountry(e.target.value)}
+                  onChange={(e) => {
+                    const newCountry = e.target.value;
+                    setEditCountry(newCountry);
+                    const countryObj = PAYOUT_COUNTRIES.find(c => c.code === newCountry) || PAYOUT_COUNTRIES[0];
+                    if (!countryObj.operators.some(op => op.id === editCarrier)) {
+                      setEditCarrier(countryObj.operators[0].id);
+                    }
+                  }}
                   className="w-full px-4 py-3 border border-zinc-250 dark:border-zinc-700 bg-white dark:bg-zinc-955 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-teal-650"
                 >
                   {PAYOUT_COUNTRIES.map((c) => (
@@ -1102,26 +1182,28 @@ export default function EarningsPage() {
               {/* Carrier selection */}
               <div className="space-y-1">
                 <label className="text-xs font-bold text-zinc-700 dark:text-zinc-350">Opérateur Mobile Money</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { id: "MPESA", label: "M-Pesa" },
-                    { id: "ORANGE", label: "Orange" },
-                    { id: "AIRTEL", label: "Airtel" }
-                  ].map((carrier) => (
-                    <button
-                      key={carrier.id}
-                      type="button"
-                      onClick={() => setEditCarrier(carrier.id)}
-                      className={`py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                        editCarrier === carrier.id
-                          ? "border-teal-655 bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-400"
-                          : "border-zinc-200 dark:border-zinc-700 text-zinc-655 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                      }`}
-                    >
-                      {carrier.label}
-                    </button>
-                  ))}
-                </div>
+                {(() => {
+                  const countryObj = PAYOUT_COUNTRIES.find(c => c.code === editCountry) || PAYOUT_COUNTRIES[0];
+                  const operators = countryObj.operators;
+                  return (
+                    <div className={`grid gap-2 ${operators.length > 3 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
+                      {operators.map((carrier) => (
+                        <button
+                          key={carrier.id}
+                          type="button"
+                          onClick={() => setEditCarrier(carrier.id)}
+                          className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all border cursor-pointer truncate ${
+                            editCarrier === carrier.id
+                              ? "border-teal-655 bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-400"
+                              : "border-zinc-200 dark:border-zinc-700 text-zinc-655 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                          }`}
+                        >
+                          {carrier.label}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Phone number input with pre-filled prefix */}
