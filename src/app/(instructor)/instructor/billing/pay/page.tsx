@@ -18,7 +18,7 @@ import Script from "next/script";
 import { supabase } from "@/lib/supabase/client";
 import { getPawaPayConfigForCountry } from "@/lib/pawapay";
 import { OperatorLogo } from "@/components/icons/PaymentLogos";
-import { SOLANA_TREASURY_ADDRESS, getSolanaPayUri, getSolanaQrCodeUrl, connectSolanaWallet } from "@/lib/crypto";
+import { SOLANA_TREASURY_ADDRESS, getSolanaPayUri, getSolanaQrCodeUrl, getBackupQrCodeUrl, connectSolanaWallet } from "@/lib/crypto";
 
 declare global {
   interface Window {
@@ -766,11 +766,18 @@ function PaymentContent() {
                     <div className="relative p-4 bg-white rounded-2xl border border-zinc-200 flex flex-col items-center justify-center shadow-md group">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img 
-                        src={getSolanaQrCodeUrl(getSolanaPayUri({ amount: currentPlanDetails.price, label: "Ansella Academy", memo: `KCA-PLAN-${plan.toUpperCase()}` }), 200)}
+                        src={getSolanaQrCodeUrl(getSolanaPayUri({ amount: currentPlanDetails.price, label: "Ansella Academy", memo: `KCA-PLAN-${plan.toUpperCase()}` }), 220)}
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          const fallback = getBackupQrCodeUrl(getSolanaPayUri({ amount: currentPlanDetails.price, label: "Ansella Academy", memo: `KCA-PLAN-${plan.toUpperCase()}` }), 220);
+                          if (target.src !== fallback) {
+                            target.src = fallback;
+                          }
+                        }}
                         alt="Solana Pay QR Code"
-                        width={200}
-                        height={200}
-                        className="w-48 h-48 object-contain"
+                        width={220}
+                        height={220}
+                        className="w-48 h-48 object-contain rounded-lg"
                       />
                       <div className="mt-2 text-[10px] font-bold text-zinc-500">Scannez avec Phantom ou Solflare</div>
                     </div>
