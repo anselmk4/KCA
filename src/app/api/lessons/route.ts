@@ -1,11 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createAdmin } from '@supabase/supabase-js';
+
+const supabaseAdmin = createAdmin(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+async function canUserEditSection(userId: string, sectionId: string): Promise<boolean> {
+  const { data: section } = await supabaseAdmin
+    .from('course_sections')
+    .select('course_id')
+    .eq('id', sectionId)
+    .maybeSingle();
+
+  if (!section) return false;
+
+  const { data: course } = await supabaseAdmin
+    .from('courses')
+    .select('instructor_id')
+    .eq('id', section.course_id)
+    .maybeSingle();
+
+  if (!course) return false;
+  if (course.instructor_id === userId) return true;
+
+  const { data: collab } = await supabaseAdmin
+    .from('course_collaborators')
+    .select('id')
+    .eq('course_id', section.course_id)
+    .eq('collaborator_id', userId)
+    .maybeSingle();
+
+  if (collab) return true;
+
+  try {
+    const { data: userData } = await supabaseAdmin.auth.admin.getUserById(userId);
+    const metaRole = userData?.user?.user_metadata?.role;
+    if (metaRole === 'SUPER_ADMIN' || metaRole === 'ADMIN') return true;
+  } catch {
+    // Ignore Auth error
+  }
+
+  return false;
+}
 
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
-
-    // Verify auth session from cookie
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
@@ -18,32 +60,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'sectionId et title sont requis' }, { status: 400 });
     }
 
-    // Verify that the section belongs to a course owned by the current user (instructor)
-    const { data: section, error: sectionError } = await supabase
-      .from('course_sections')
-      .select('course_id')
-      .eq('id', sectionId)
-      .maybeSingle();
-
-    if (sectionError || !section) {
-      return NextResponse.json({ error: 'Section introuvable' }, { status: 404 });
-    }
-
-    const { data: course, error: courseError } = await supabase
-      .from('courses')
-      .select('instructor_id')
-      .eq('id', section.course_id)
-      .maybeSingle();
-
-    if (courseError || !course) {
-      return NextResponse.json({ error: 'Cours de la section introuvable' }, { status: 404 });
-    }
-
-    if (course.instructor_id !== user.id) {
+    const canEdit = await canUserEditSection(user.id, sectionId);
+    if (!canEdit) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
     }
 
-    const { data, error } = await supabase.from('lessons').insert({
+    const { data, error } = await supabaseAdmin.from('lessons').insert({
       id: id || undefined,
       section_id: sectionId,
       title,
@@ -70,7 +92,6 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const supabase = await createClient();
-
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
@@ -83,38 +104,18 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'id est requis' }, { status: 400 });
     }
 
-    // Get lesson and verify ownership through section and course
-    const { data: lesson, error: lessonError } = await supabase
+    const { data: lesson } = await supabaseAdmin
       .from('lessons')
       .select('section_id')
       .eq('id', id)
       .maybeSingle();
 
-    if (lessonError || !lesson) {
+    if (!lesson) {
       return NextResponse.json({ error: 'Leçon introuvable' }, { status: 404 });
     }
 
-    const { data: section, error: sectionError } = await supabase
-      .from('course_sections')
-      .select('course_id')
-      .eq('id', lesson.section_id)
-      .maybeSingle();
-
-    if (sectionError || !section) {
-      return NextResponse.json({ error: 'Section de la leçon introuvable' }, { status: 404 });
-    }
-
-    const { data: course, error: courseError } = await supabase
-      .from('courses')
-      .select('instructor_id')
-      .eq('id', section.course_id)
-      .maybeSingle();
-
-    if (courseError || !course) {
-      return NextResponse.json({ error: 'Cours de la leçon introuvable' }, { status: 404 });
-    }
-
-    if (course.instructor_id !== user.id) {
+    const canEdit = await canUserEditSection(user.id, lesson.section_id);
+    if (!canEdit) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
     }
 
@@ -127,7 +128,7 @@ export async function PUT(req: NextRequest) {
     if (updates.order !== undefined) sbUpdates.sort_order = updates.order;
     sbUpdates.updated_at = new Date().toISOString();
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('lessons')
       .update(sbUpdates as any)
       .eq('id', id)
@@ -148,7 +149,6 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const supabase = await createClient();
-
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
@@ -156,47 +156,26 @@ export async function DELETE(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
-
     if (!id) {
       return NextResponse.json({ error: 'id est requis' }, { status: 400 });
     }
 
-    // Get lesson and verify ownership through section and course
-    const { data: lesson, error: lessonError } = await supabase
+    const { data: lesson } = await supabaseAdmin
       .from('lessons')
       .select('section_id')
       .eq('id', id)
       .maybeSingle();
 
-    if (lessonError || !lesson) {
+    if (!lesson) {
       return NextResponse.json({ error: 'Leçon introuvable' }, { status: 404 });
     }
 
-    const { data: section, error: sectionError } = await supabase
-      .from('course_sections')
-      .select('course_id')
-      .eq('id', lesson.section_id)
-      .maybeSingle();
-
-    if (sectionError || !section) {
-      return NextResponse.json({ error: 'Section de la leçon introuvable' }, { status: 404 });
-    }
-
-    const { data: course, error: courseError } = await supabase
-      .from('courses')
-      .select('instructor_id')
-      .eq('id', section.course_id)
-      .maybeSingle();
-
-    if (courseError || !course) {
-      return NextResponse.json({ error: 'Cours de la leçon introuvable' }, { status: 404 });
-    }
-
-    if (course.instructor_id !== user.id) {
+    const canEdit = await canUserEditSection(user.id, lesson.section_id);
+    if (!canEdit) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
     }
 
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('lessons')
       .delete()
       .eq('id', id);

@@ -253,7 +253,7 @@ export default function CourseDetailPage() {
     }
   }, [courseId]);
 
-  // ─── Load all data from Supabase ──────────────────────────
+  // ─── Load all data from Supabase in fast parallel batches ──────────────────────────
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -261,22 +261,24 @@ export default function CourseDetailPage() {
       if (!user) { router.push("/login"); return; }
       setUserId(user.id);
 
-      // User Profile Plan
-      const { data: profData } = await supabase
-        .from("profiles")
-        .select("plan")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (profData?.plan) {
-        setUserPlan(profData.plan);
-      }
-
-      // Course
-      const { data: courseData } = await supabase
-        .from("courses")
-        .select("*")
-        .eq("id", courseId)
-        .maybeSingle();
+      // Fast Parallel Batch 1: Fetch Course, Profile Plan, Categories, Sections, Quizzes, Enrollments, Homeworks
+      const [
+        { data: courseData },
+        { data: profData },
+        { data: catData },
+        { data: sectionsData },
+        { data: quizzesData },
+        { data: enrollmentsData },
+        { data: hwData }
+      ] = await Promise.all([
+        supabase.from("courses").select("*").eq("id", courseId).maybeSingle(),
+        supabase.from("profiles").select("plan").eq("id", user.id).maybeSingle(),
+        supabase.from("categories").select("id, name").eq("is_active", true).order("name"),
+        supabase.from("course_sections").select("*").eq("course_id", courseId).order("sort_order"),
+        supabase.from("quizzes").select("*").eq("course_id", courseId),
+        supabase.from("enrollments").select("*, profiles!student_id(full_name, email)").eq("course_id", courseId),
+        (supabase as any).from("homeworks").select("*").eq("course_id", courseId)
+      ]);
 
       if (!courseData) {
         if (!silent) setLoading(false);
@@ -285,28 +287,22 @@ export default function CourseDetailPage() {
       setCourse(courseData as unknown as CourseData);
       const cd = courseData as unknown as Record<string, unknown>;
 
+      if (profData?.plan) {
+        setUserPlan(profData.plan);
+      }
+      setCategories(catData || []);
+      setHomeworks(hwData || []);
+
       const isCollab = courseData.instructor_id !== user.id;
       setIsCollaborator(isCollab);
 
       if (isCollab) {
-        const { data: ownerProfile } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", courseData.instructor_id)
-          .maybeSingle();
-        if (ownerProfile) {
-          setOwnerName(ownerProfile.full_name || "");
-        }
+        supabase.from("profiles").select("full_name").eq("id", courseData.instructor_id).maybeSingle().then(res => {
+          if (res.data) setOwnerName(res.data.full_name || "");
+        });
       } else {
         setOwnerName("");
       }
-      // Categories
-      const { data: catData } = await supabase
-        .from("categories")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name");
-      setCategories(catData || []);
 
       const levelMap: Record<string, string> = {
         'BEGINNER': 'Débutant',
@@ -327,107 +323,62 @@ export default function CourseDetailPage() {
       setInstallmentsCount(Number(cd.installments_count) || 2);
       setRequireSectionQuiz(cd.require_section_quiz !== undefined ? Boolean(cd.require_section_quiz) : true);
 
-      // Sections
-      const { data: sectionsData } = await supabase
-        .from("course_sections")
-        .select("*")
-        .eq("course_id", courseId)
-        .order("sort_order");
       const sects = (sectionsData || []) as SectionData[];
       setSections(sects);
       setExpandedSections(new Set(sects.map((s) => s.id)));
 
-      // Lessons
-      if (sects.length > 0) {
-        const { data: lessonsData } = await supabase
-          .from("lessons")
-          .select("*")
-          .in("section_id", sects.map((s) => s.id))
-          .order("sort_order");
-        setLessons((lessonsData || []) as LessonData[]);
-      } else {
-        setLessons([]);
-      }
-
-      // Quizzes
-      const { data: quizzesData } = await supabase
-        .from("quizzes")
-        .select("*")
-        .eq("course_id", courseId);
       const qzs = (quizzesData || []) as QuizData[];
       setQuizzes(qzs);
 
-      // Questions
-      if (qzs.length > 0) {
-        const { data: questionsData } = await supabase
-          .from("questions")
-          .select("*")
-          .in("quiz_id", qzs.map((q) => q.id));
-        setQuestions((questionsData || []) as QuestionData[]);
-      } else {
-        setQuestions([]);
-      }
-
-      // Enrollments with student profile
-      const { data: enrollmentsData } = await supabase
-        .from("enrollments")
-        .select("*, profiles!student_id(full_name, email)")
-        .eq("course_id", courseId);
       const enrList = (enrollmentsData || []) as EnrollmentData[];
       setEnrollments(enrList);
 
-      // Calculate total generated revenue for this course
-      const { data: cOrderItems } = await supabase
-        .from("order_items")
-        .select("order_id")
-        .eq("course_id", courseId);
+      // Fast Parallel Batch 2: Fetch Lessons & Questions simultaneously
+      const [lessonsRes, questionsRes] = await Promise.all([
+        sects.length > 0
+          ? supabase.from("lessons").select("*").in("section_id", sects.map((s) => s.id)).order("sort_order")
+          : Promise.resolve({ data: [] }),
+        qzs.length > 0
+          ? supabase.from("questions").select("*").in("quiz_id", qzs.map((q) => q.id))
+          : Promise.resolve({ data: [] })
+      ]);
 
-      let revSum = 0;
-      const cOrderIds = cOrderItems?.map((oi) => oi.order_id) || [];
-      if (cOrderIds.length > 0) {
-        const { data: cPayments } = await supabase
-          .from("payments")
-          .select("amount")
-          .in("order_id", cOrderIds)
-          .eq("status", "PAID");
-        if (cPayments && cPayments.length > 0) {
-          revSum = cPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      setLessons((lessonsRes.data || []) as LessonData[]);
+      setQuestions((questionsRes.data || []) as QuestionData[]);
+
+      // Asynchronous revenue calculation (doesn't block UI render)
+      (async () => {
+        let revSum = 0;
+        const { data: cOrderItems } = await supabase
+          .from("order_items")
+          .select("order_id")
+          .eq("course_id", courseId);
+        const cOrderIds = cOrderItems?.map((oi) => oi.order_id) || [];
+        if (cOrderIds.length > 0) {
+          const { data: cPayments } = await supabase
+            .from("payments")
+            .select("amount")
+            .in("order_id", cOrderIds)
+            .eq("status", "PAID");
+          if (cPayments && cPayments.length > 0) {
+            revSum = cPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+          }
         }
-      }
-
-      // If no payments found via order_items, fallback to direct payments or paid enrollments
-      if (revSum === 0 && enrList.length > 0 && (courseData.price || 0) > 0) {
-        const { data: directPayments } = await supabase
-          .from("payments")
-          .select("amount")
-          .eq("status", "PAID")
-          .like("method", `%${courseId}%`);
-
-        if (directPayments && directPayments.length > 0) {
-          revSum = directPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-        } else {
+        if (revSum === 0 && enrList.length > 0 && (courseData.price || 0) > 0) {
           revSum = enrList.length * (Number(courseData.price) || 0);
         }
-      }
+        setTotalCourseRevenue(revSum);
+      })();
 
-      setTotalCourseRevenue(revSum);
-
-      // Homeworks
-      const { data: hwData } = await (supabase as any)
-        .from("homeworks")
-        .select("*")
-        .eq("course_id", courseId);
-      setHomeworks(hwData || []);
-
-      // Fetch Collaborators
-      await loadCollaborators();
+      // Non-blocking load of collaborators
+      loadCollaborators();
 
     } catch (err) {
       console.error("[CourseBuilder] loadData error:", err);
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [courseId, router]);
+  }, [courseId, router, loadCollaborators]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
