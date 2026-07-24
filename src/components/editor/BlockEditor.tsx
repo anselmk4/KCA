@@ -85,29 +85,33 @@ export function formatGoogleEmbedUrl(rawUrl: string): string {
   let url = rawUrl.trim();
   if (!url) return "";
 
-  if (
-    url.includes("/preview") ||
-    url.includes("embedded=true") ||
-    url.includes("/pubhtml") ||
-    url.includes("/embed")
-  ) {
-    return url;
+  if (url.includes("docs.google.com/document/d/")) {
+    if (url.includes("/pub")) {
+      return url.includes("embedded=true") ? url : `${url}${url.includes("?") ? "&" : "?"}embedded=true`;
+    }
+    return url.replace(/\/(edit|view|pub)?(\?.*)?$/, "/preview");
   }
 
-  if (url.includes("docs.google.com/document/d/")) {
-    return url.replace(/\/(edit|view|pub)?(\?.*)?$/, "/preview");
-  }
   if (url.includes("docs.google.com/spreadsheets/d/")) {
+    if (url.includes("/pubhtml")) {
+      return url.includes("widget=true") ? url : `${url}${url.includes("?") ? "&" : "?"}widget=true&headers=false`;
+    }
     return url.replace(/\/(edit|view|pub)?(\?.*)?$/, "/preview");
   }
+
   if (url.includes("docs.google.com/presentation/d/")) {
+    if (url.includes("/embed")) return url;
     return url.replace(/\/(edit|view|pub)?(\?.*)?$/, "/embed?start=false&loop=false&delayms=3000");
   }
+
   if (url.includes("docs.google.com/forms/")) {
-    const separator = url.includes("?") ? "&" : "?";
-    return `${url}${separator}embedded=true`;
+    if (url.includes("embedded=true")) return url;
+    const sep = url.includes("?") ? "&" : "?";
+    return `${url}${sep}embedded=true`;
   }
+
   if (url.includes("drive.google.com/file/d/")) {
+    if (url.includes("/preview")) return url;
     return url.replace(/\/(view|edit)?(\?.*)?$/, "/preview");
   }
 
@@ -954,6 +958,21 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ value, onChange }) => 
                       </a>
                     </div>
                   )}
+
+                  {/* Help notice explaining Google permissions */}
+                  <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1.5 text-xs text-amber-800 dark:text-amber-300">
+                    <div className="flex items-center gap-2 font-bold text-amber-900 dark:text-amber-200">
+                      <span>💡</span> Comment débloquer l'affichage si Google indique "Contenu bloqué" ?
+                    </div>
+                    <p className="text-[11px] leading-relaxed">
+                      Si l'iframe indique que le document est bloqué par le propriétaire, assurez-vous d'avoir ouvert l'accès dans Google Docs :
+                    </p>
+                    <ol className="list-decimal pl-4 text-[11px] space-y-1 font-semibold">
+                      <li>Dans votre fichier Google Docs / Sheets / Slides : Cliquez sur le bouton bleu <strong>Partager</strong>.</li>
+                      <li>Sous <em>"Accès général"</em>, sélectionnez <strong>« Tous les utilisateurs disposant du lien »</strong>.</li>
+                      <li><em>(Ou méthode directe)</em> : Allez dans <strong>Fichier &gt; Partager &gt; Publier sur le web</strong> et copiez le lien généré.</li>
+                    </ol>
+                  </div>
                 </div>
               )}
 
