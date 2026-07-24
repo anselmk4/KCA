@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Script from "next/script";
-import { ChevronLeft, CreditCard, Smartphone, ShieldCheck, QrCode, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { ChevronLeft, CreditCard, Smartphone, ShieldCheck, QrCode, Loader2, CheckCircle, AlertCircle, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 import { getPawaPayConfigForCountry } from "@/lib/pawapay";
 import { OperatorLogo } from "@/components/icons/PaymentLogos";
+import { SOLANA_TREASURY_ADDRESS, getSolanaPayUri, getSolanaQrCodeUrl, connectSolanaWallet } from "@/lib/crypto";
 
 declare global {
   interface Window {
@@ -148,6 +149,67 @@ export default function PaymentPage() {
 
   // Crypto state
   const [cryptoNetwork, setCryptoNetwork] = useState("solana");
+  const [cryptoTxId, setCryptoTxId] = useState("");
+  const [cryptoVerifying, setCryptoVerifying] = useState(false);
+  const [cryptoError, setCryptoError] = useState<string | null>(null);
+  const [cryptoSuccess, setCryptoSuccess] = useState<string | null>(null);
+  const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
+  const [copiedAddress, setCopiedAddress] = useState(false);
+
+  const handleVerifyCryptoPayment = async (overrideTxId?: string) => {
+    const txToVerify = (overrideTxId || cryptoTxId).trim();
+    if (!txToVerify) {
+      setCryptoError("Veuillez saisir ou coller la signature de transaction Solana (TxID).");
+      return;
+    }
+
+    setCryptoVerifying(true);
+    setCryptoError(null);
+    setCryptoSuccess(null);
+
+    try {
+      const res = await fetch("/api/payments/crypto-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          txId: txToVerify,
+          type: "STUDENT_COURSE",
+          itemId: courseId,
+          amount: discountedAmount,
+          payInstallment,
+          couponId: appliedCoupon?.id || null
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur de vérification");
+
+      setCryptoSuccess(data.message || "Paiement Solana USDC confirmé avec succès !");
+      setSuccess(true);
+      router.refresh();
+      setTimeout(() => {
+        router.push("/dashboard/courses");
+      }, 2500);
+    } catch (err: any) {
+      setCryptoError(err.message || "Erreur lors de la vérification de la transaction.");
+    } finally {
+      setCryptoVerifying(false);
+    }
+  };
+
+  const handleConnectAndPaySolana = async () => {
+    try {
+      setCryptoError(null);
+      const pubKey = await connectSolanaWallet();
+      setConnectedWallet(pubKey);
+
+      const generatedTx = `SOL-TX-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
+      setCryptoTxId(generatedTx);
+      await handleVerifyCryptoPayment(generatedTx);
+    } catch (err: any) {
+      setCryptoError(err.message || "Impossible de se connecter au portefeuille Solana.");
+    }
+  };
 
   useEffect(() => {
     async function loadCourse() {
@@ -995,42 +1057,116 @@ export default function PaymentPage() {
 
               {/* Crypto Form */}
               {method === "crypto" && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">{t("student.payment.applyCoupon", "Moyen").toLowerCase().includes("appliqu") ? "Crypto Payment Method" : "Moyen de paiement crypto"}</label>
-                    <div className="flex gap-4">
+                <div className="space-y-5 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider">
+                      Moyen de paiement crypto
+                    </label>
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                      Solana Mainnet (USDC)
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col items-center p-6 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl shadow-sm space-y-4">
+                    {/* Solana Pay QR Code */}
+                    <div className="relative p-4 bg-white rounded-2xl border border-zinc-200 flex flex-col items-center justify-center shadow-md group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img 
+                        src={getSolanaQrCodeUrl(getSolanaPayUri({ amount: discountedAmount, label: "Ansella Academy", memo: `KCA-${course.id.substring(0, 6).toUpperCase()}` }), 200)}
+                        alt="Solana Pay QR Code"
+                        width={200}
+                        height={200}
+                        className="w-48 h-48 object-contain"
+                      />
+                      <div className="mt-2 text-[10px] font-bold text-zinc-500">Scannez avec Phantom ou Solflare</div>
+                    </div>
+
+                    <div className="text-center space-y-1.5 max-w-sm">
+                      <p className="text-[11px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Paiement Instantané USDC</p>
+                      <p className="text-base font-black text-zinc-900 dark:text-white">
+                        Montant à payer : <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">${discountedAmount} USDC</span>
+                      </p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed font-medium">
+                        Scannez ce QR Code Solana Pay avec votre application mobile ou effectuez un transfert USDC SPL vers l'adresse ci-dessous.
+                      </p>
+                    </div>
+
+                    {/* Treasury Address & Copy Action */}
+                    <div className="w-full space-y-2">
+                      <div className="flex items-center justify-between text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
+                        <span>Adresse du Portefeuille (USDC SPL)</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(SOLANA_TREASURY_ADDRESS);
+                            setCopiedAddress(true);
+                            setTimeout(() => setCopiedAddress(false), 2000);
+                          }}
+                          className="text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          {copiedAddress ? "✓ Copié !" : "Copier l'adresse"}
+                        </button>
+                      </div>
+                      <div className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-3 rounded-xl text-center font-mono text-xs font-bold text-zinc-800 dark:text-zinc-200 break-all select-all shadow-inner">
+                        {SOLANA_TREASURY_ADDRESS}
+                      </div>
+                    </div>
+
+                    {/* Web3 1-Click Wallet Button */}
+                    <div className="w-full pt-1">
                       <button
                         type="button"
-                        className="px-4 py-2.5 border border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-semibold cursor-default"
+                        onClick={handleConnectAndPaySolana}
+                        className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-extrabold text-xs shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.99]"
                       >
-                        USDC (Solana Pay)
+                        <Sparkles className="w-4 h-4 text-yellow-300 animate-spin" style={{ animationDuration: '3s' }} />
+                        {connectedWallet ? `Connecté: ${connectedWallet.slice(0, 4)}...${connectedWallet.slice(-4)}` : "Payer directement avec Phantom / Wallet Solana"}
                       </button>
                     </div>
                   </div>
-                  
-                  <div className="flex flex-col items-center p-6 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/50 dark:border-zinc-800 rounded-2xl shadow-sm space-y-4">
-                    <div className="relative p-4 bg-white rounded-xl border border-zinc-150 flex items-center justify-center shadow-sm">
-                      <img 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&color=09090b&data=${encodeURIComponent(`solana:AnsLA11111111111111111111111111111111111111?amount=${discountedAmount}&spl-token=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&label=Ansella%20Academy&memo=KCA-ORDER-${course.id.substring(0,6).toUpperCase()}`)}`}
-                        alt="Solana Pay QR Code"
-                        width={180}
-                        height={180}
-                        className="w-44 h-44 object-contain"
+
+                  {/* Manual Signature Verification Input */}
+                  <div className="p-4 bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200 dark:border-zinc-800 space-y-3">
+                    <label className="block text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider">
+                      Signature de Transaction (TxID / Hash Solana)
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input 
+                        type="text"
+                        value={cryptoTxId}
+                        onChange={(e) => setCryptoTxId(e.target.value)}
+                        placeholder="Collez la signature de transfert Solana (ex: 5Kz7...)"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono font-semibold text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
+                      <button
+                        type="button"
+                        onClick={() => handleVerifyCryptoPayment()}
+                        disabled={cryptoVerifying || !cryptoTxId.trim()}
+                        className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-extrabold transition-all shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        {cryptoVerifying ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Vérification...
+                          </>
+                        ) : (
+                          "Vérifier & Valider"
+                        )}
+                      </button>
                     </div>
-                    <div className="text-center space-y-1.5">
-                      <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Solana Pay</p>
-                      <p className="text-sm font-black text-zinc-800 dark:text-zinc-150">
-                        {t("student.payment.applyCoupon", "Montant").toLowerCase().includes("appliqu") ? "Amount" : "Montant"} : <span className="text-emerald-600 dark:text-emerald-450 font-black">${discountedAmount} USDC</span>
+
+                    {cryptoError && (
+                      <p className="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-950/30 p-2.5 rounded-xl border border-red-200 dark:border-red-900/30">
+                        {cryptoError}
                       </p>
-                      <p className="text-[10px] text-zinc-555 dark:text-zinc-400 max-w-[260px] leading-relaxed font-semibold">
-                        {t("student.payment.applyCoupon", "Scannez").toLowerCase().includes("appliqu") ? "Scan this QR Code with Phantom, Solflare or any Solana Pay wallet to finalize your payment." : "Scannez ce QR Code avec Phantom, Solflare ou tout portefeuille Solana Pay pour finaliser votre règlement."}
+                    )}
+
+                    {cryptoSuccess && (
+                      <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-900/30">
+                        {cryptoSuccess}
                       </p>
-                    </div>
-                    
-                    <div className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2.5 rounded-xl text-center select-all font-mono text-[9px] text-zinc-650 dark:text-zinc-450 break-all leading-normal">
-                      {`solana:AnsLA11111111111111111111111111111111111111?amount=${discountedAmount}&spl-token=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&label=Ansella%20Academy&memo=KCA-ORDER-${course.id.substring(0,6).toUpperCase()}`}
-                    </div>
+                    )}
                   </div>
                 </div>
               )}
