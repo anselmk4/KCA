@@ -346,27 +346,56 @@ export default function CourseDetailPage() {
       setLessons((lessonsRes.data || []) as LessonData[]);
       setQuestions((questionsRes.data || []) as QuestionData[]);
 
-      // Asynchronous revenue calculation (doesn't block UI render)
+      // Asynchronous revenue calculation (accurate real payments & order_items)
       (async () => {
         let revSum = 0;
         const { data: cOrderItems } = await supabase
           .from("order_items")
-          .select("order_id")
+          .select("order_id, final_price, unit_price")
           .eq("course_id", courseId);
-        const cOrderIds = cOrderItems?.map((oi) => oi.order_id) || [];
+
+        const cOrderIds = (cOrderItems || []).map((oi) => oi.order_id).filter(Boolean);
+
         if (cOrderIds.length > 0) {
           const { data: cPayments } = await supabase
             .from("payments")
-            .select("amount")
-            .in("order_id", cOrderIds)
-            .eq("status", "PAID");
+            .select("amount, status")
+            .in("order_id", cOrderIds);
+
           if (cPayments && cPayments.length > 0) {
-            revSum = cPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+            const valid = cPayments.filter((p) => {
+              const st = (p.status || "").toUpperCase();
+              return st === "PAID" || st === "COMPLETED" || st === "SUCCESS";
+            });
+            if (valid.length > 0) {
+              revSum = valid.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+            }
+          }
+
+          // Fallback: if no payment rows found, sum final_price / unit_price from order_items
+          if (revSum === 0 && cOrderItems && cOrderItems.length > 0) {
+            revSum = cOrderItems.reduce((sum, oi) => sum + (Number(oi.final_price ?? oi.unit_price) || 0), 0);
           }
         }
-        if (revSum === 0 && enrList.length > 0 && (courseData.price || 0) > 0) {
-          revSum = enrList.length * (Number(courseData.price) || 0);
+
+        // Direct payments fallback
+        if (revSum === 0) {
+          const { data: directPayments } = await supabase
+            .from("payments")
+            .select("amount, status")
+            .like("method", `%${courseId}%`);
+
+          if (directPayments && directPayments.length > 0) {
+            const validDirect = directPayments.filter((p) => {
+              const st = (p.status || "").toUpperCase();
+              return st === "PAID" || st === "COMPLETED" || st === "SUCCESS";
+            });
+            if (validDirect.length > 0) {
+              revSum = validDirect.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+            }
+          }
         }
+
         setTotalCourseRevenue(revSum);
       })();
 
