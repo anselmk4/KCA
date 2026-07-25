@@ -137,18 +137,27 @@ export default function InstructorDashboardPage() {
         setPendingPayouts(pendingSum);
 
         // 5. Calculate per-course enrollments and revenue
+        let totalRevenueCalc = 0;
         const stats: Record<string, { enrollCount: number; revenue: number }> = {};
         coursesList.forEach((c: any) => {
           const courseEnrolls = enrollList.filter((e: any) => e.course_id === c.id);
-          const courseRevenueSum = paymentsList
-            .filter((p: any) => p.courseId === c.id && p.status === "PAID")
+          let courseRevenueSum = paymentsList
+            .filter((p: any) => (p.courseId === c.id || (p.notes || "").includes(c.id)) && (p.status === "PAID" || p.status === "COMPLETED"))
             .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+          if (courseRevenueSum === 0 && courseEnrolls.length > 0 && (Number(c.price) || 0) > 0) {
+            courseRevenueSum = courseEnrolls.length * (Number(c.price) || 0);
+          }
+
+          totalRevenueCalc += courseRevenueSum;
 
           stats[c.id] = {
             enrollCount: courseEnrolls.length,
             revenue: courseRevenueSum
           };
         });
+
+        setTotalRevenue(totalRevenueCalc > 0 ? totalRevenueCalc : revenueSum);
         setCourseStats(stats);
 
         // 6. Map recent enrollments

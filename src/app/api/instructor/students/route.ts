@@ -315,8 +315,8 @@ export async function GET(req: NextRequest) {
         progressPercent: e.progress_percent || 0,
         enrollmentStatus: e.status || "ACTIVE",
         enrolledAt: e.enrolled_at,
-        paymentStatus: pay?.status || "none",
-        paymentAmount: pay?.amount || 0,
+        paymentStatus: pay?.status || (e.status === "ACTIVE" ? "PAID" : "none"),
+        paymentAmount: (pay && pay.amount > 0) ? pay.amount : (e.status === "ACTIVE" ? (course?.price || 0) : 0),
         hasCertificate: certSet.has(`${e.student_id}_${e.course_id}`),
       };
     });

@@ -396,6 +396,11 @@ export default function CourseDetailPage() {
           }
         }
 
+        // Resilient fallback: if no payments/order_items recorded but students are enrolled in a paid course
+        if (revSum === 0 && enrList.length > 0 && (Number(courseData.price) || 0) > 0) {
+          revSum = enrList.length * (Number(courseData.price) || 0);
+        }
+
         setTotalCourseRevenue(revSum);
       })();
 

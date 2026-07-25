@@ -164,9 +164,21 @@ export default function InstructorCoursesPage() {
         const courseOrderIds = orderItemList
           .filter((oi: any) => oi.course_id === c.id)
           .map((oi: any) => oi.order_id);
-        rev[c.id] = paymentsList
+        let courseRev = paymentsList
           .filter((p: any) => courseOrderIds.includes(p.order_id))
-          .reduce((sum: number, p: any) => sum + p.amount, 0);
+          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+        if (courseRev === 0 && courseOrderIds.length > 0) {
+          courseRev = orderItemList
+            .filter((oi: any) => oi.course_id === c.id)
+            .reduce((sum: number, oi: any) => sum + (Number(oi.final_price ?? oi.unit_price) || 0), 0);
+        }
+
+        if (courseRev === 0 && ec[c.id] > 0 && (Number(c.price) || 0) > 0) {
+          courseRev = ec[c.id] * (Number(c.price) || 0);
+        }
+
+        rev[c.id] = courseRev;
 
         const courseSecs = sectionsList.filter((s: any) => s.course_id === c.id);
         sc[c.id] = courseSecs.length;

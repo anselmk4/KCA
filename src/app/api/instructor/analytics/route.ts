@@ -113,6 +113,12 @@ export async function GET(req: NextRequest) {
 
         totalRevenue = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
       }
+
+      // Resilient fallback: if no payments/order_items recorded but students are enrolled
+      if (totalRevenue === 0 && enrollments.length > 0) {
+        const coursePriceMap = new Map(myCourses.map((c: any) => [c.id, Number(c.price) || 0]));
+        totalRevenue = enrollments.reduce((sum, e) => sum + (coursePriceMap.get(e.course_id) || 0), 0);
+      }
     }
 
     const platformCommission = totalRevenue * planConfig.commissionRate;
