@@ -37,15 +37,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Non autorisé. Rôle instructeur requis." }, { status: 403 });
     }
 
-    // 2. GATING CHECK: Must be on Plan BASE or higher (BASE, PRO, MAX)
-    const { data: userProfile } = await (dbClient as any)
-      .from("profiles")
-      .select("plan")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    const userPlan = userProfile?.plan || "BASE";
-
     // Determine target course topic
     let targetTopic = topic || "Évaluation de connaissances";
     let targetCourseId = courseId || null;
@@ -69,7 +60,7 @@ export async function POST(req: NextRequest) {
       passPercentage: 70,
       questions: [
         {
-          questionText: `Quel est l'objectif principal abordé dans "${targetTopic.slice(0, 30)}..." ?`,
+          questionText: `Quel est l'objectif principal abordé dans "${targetTopic.slice(0, 30)}..." ?`,
           explanation: "Cette notion est fondamentale pour maîtriser l'ensemble du module.",
           options: [
             { text: "Comprendre les principes théoriques et pratiques de base", isCorrect: true, explanation: "Exact ! C'est le fondement de la leçon." },
@@ -79,7 +70,7 @@ export async function POST(req: NextRequest) {
           ]
         },
         {
-          questionText: "Quelle est la meilleure pratique recommandée pour réussir ce chapitre ?",
+          questionText: "Quelle est la meilleure pratique recommandée pour réussir ce chapitre ?",
           explanation: "La régularité et la mise en pratique sont clés.",
           options: [
             { text: "Appliquer chaque concept avec des exercices pratiques", isCorrect: true, explanation: "Excellente réponse !" },
@@ -180,7 +171,7 @@ Structure JSON globale :
       }
     }
 
-    // Save to DB if saveToDb is true and courseId is provided
+    // Save to DB if saveToDb is true and targetCourseId is provided
     let createdQuizId = null;
     if (saveToDb && targetCourseId) {
       const { data: newQuiz, error: quizInsertErr } = await (dbClient as any)
@@ -188,25 +179,45 @@ Structure JSON globale :
         .insert({
           course_id: targetCourseId,
           section_id: sectionId || null,
-          title: generatedQuiz.quizTitle,
+          title: generatedQuiz.quizTitle || `Quiz - ${targetTopic.slice(0, 30)}`,
           pass_percentage: generatedQuiz.passPercentage || 70,
           created_at: new Date().toISOString()
         })
         .select()
         .single();
 
-      if (!quizInsertErr && newQuiz) {
+      if (quizInsertErr) {
+        console.error("[/api/ai/generate-quiz] quizInsertErr:", quizInsertErr);
+        return NextResponse.json({ error: "Erreur lors de la création du Quiz dans la base de données: " + quizInsertErr.message }, { status: 400 });
+      }
+
+      if (newQuiz && newQuiz.id) {
         createdQuizId = newQuiz.id;
 
-        // Insert questions
+        // Insert questions using exact DB schema columns: quiz_id, text, choices (string[]), correct_index (number)
         for (const q of generatedQuiz.questions) {
-          await (dbClient as any).from("questions").insert({
+          const choices: string[] = Array.isArray(q.options)
+            ? q.options.map((opt: any) => (typeof opt === "string" ? opt : (opt.text || opt.label || "")))
+            : ["Option A", "Option B", "Option C", "Option D"];
+
+          let correctIndex = 0;
+          if (Array.isArray(q.options)) {
+            const idx = q.options.findIndex((opt: any) => typeof opt === "object" && Boolean(opt.isCorrect));
+            if (idx >= 0) correctIndex = idx;
+          }
+
+          const questionText = q.questionText || (q as any).text || "Question d'évaluation";
+
+          const { error: qErr } = await (dbClient as any).from("questions").insert({
             quiz_id: newQuiz.id,
-            question_text: q.questionText,
-            explanation: q.explanation,
-            options: q.options,
-            created_at: new Date().toISOString()
+            text: questionText,
+            choices,
+            correct_index: correctIndex
           });
+
+          if (qErr) {
+            console.error("[/api/ai/generate-quiz] question insert error:", qErr);
+          }
         }
       }
     }
