@@ -194,6 +194,15 @@ export default function CourseDetailPage() {
   const [newQChoices, setNewQChoices] = useState(["", "", "", ""]);
   const [newQCorrect, setNewQCorrect] = useState("0");
 
+  // ─── AI Quiz Generator states ────────────────────────────
+  const [showAiQuizModal, setShowAiQuizModal] = useState(false);
+  const [aiQuizTopic, setAiQuizTopic] = useState("");
+  const [aiQuizSectionId, setAiQuizSectionId] = useState("");
+  const [aiQuizNumQuestions, setAiQuizNumQuestions] = useState(5);
+  const [aiQuizDifficulty, setAiQuizDifficulty] = useState("MOYEN");
+  const [aiQuizGenerating, setAiQuizGenerating] = useState(false);
+  const [aiQuizStepText, setAiQuizStepText] = useState("");
+
   // ─── Students tab states ──────────────────────────────────
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -751,6 +760,67 @@ export default function CourseDetailPage() {
         alert("Erreur : " + err.error);
       }
     } finally { setSaving(false); }
+  };
+
+  const openAiQuizModal = (sectionId?: string, sectionTitle?: string) => {
+    setAiQuizSectionId(sectionId || "");
+    setAiQuizTopic(sectionTitle ? `${course?.title || ""} - Chapitre : ${sectionTitle}` : (course?.title || ""));
+    setShowAiQuizModal(true);
+  };
+
+  const handleGenerateAiQuiz = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!aiQuizTopic.trim()) return;
+
+    setAiQuizGenerating(true);
+    setAiQuizStepText("Analyse du sujet et des objectifs pédagogiques du cours...");
+
+    try {
+      const stepTimer1 = setTimeout(() => {
+        setAiQuizStepText("Génération des questions QCM et des 4 options de réponse...");
+      }, 1500);
+
+      const stepTimer2 = setTimeout(() => {
+        setAiQuizStepText("Rédaction des explications pédagogiques détaillées...");
+      }, 3500);
+
+      const res = await fetch("/api/ai/generate-quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: aiQuizTopic.trim(),
+          courseId,
+          sectionId: aiQuizSectionId || undefined,
+          numQuestions: aiQuizNumQuestions,
+          difficulty: aiQuizDifficulty,
+          saveToDb: true
+        })
+      });
+
+      clearTimeout(stepTimer1);
+      clearTimeout(stepTimer2);
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Erreur lors de la génération du quiz par l'IA.");
+      }
+
+      setAiQuizStepText("Mise à jour du cours...");
+      await loadData(true);
+
+      if (data.savedQuizId) {
+        setSelectedQuizId(data.savedQuizId);
+      }
+
+      setShowAiQuizModal(false);
+      alert(`✨ Le Quiz "${data.quiz?.quizTitle || "Généré par l'IA"}" avec ${data.quiz?.questions?.length || aiQuizNumQuestions} questions a été créé avec succès !`);
+    } catch (err: any) {
+      console.error("[handleGenerateAiQuiz] Error:", err);
+      alert("Erreur lors de la génération du quiz : " + err.message);
+    } finally {
+      setAiQuizGenerating(false);
+      setAiQuizStepText("");
+    }
   };
 
   const handleDeleteQuiz = async (quizId: string) => {
@@ -2067,11 +2137,16 @@ export default function CourseDetailPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             <div className="lg:col-span-5 space-y-4">
               <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 shadow-sm space-y-4">
-                <div className="flex justify-between items-center pb-2 border-b border-zinc-100 dark:border-zinc-800">
+                <div className="flex justify-between items-center pb-2 border-b border-zinc-100 dark:border-zinc-800 flex-wrap gap-2">
                   <h3 className="font-bold text-zinc-900 dark:text-white text-base">Évaluations du cours</h3>
-                  <button onClick={() => setShowCreateQuizModal(true)} className="inline-flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer">
-                    <Plus className="w-3 h-3" /> Créer
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => openAiQuizModal()} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer">
+                      <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-pulse" /> Générer avec l'IA
+                    </button>
+                    <button onClick={() => setShowCreateQuizModal(true)} className="inline-flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer">
+                      <Plus className="w-3 h-3" /> Manuel
+                    </button>
+                  </div>
                 </div>
                 {quizzes.length === 0 ? (
                   <div className="py-8 text-center text-zinc-400">
@@ -2597,6 +2672,143 @@ export default function CourseDetailPage() {
                 Créer le quiz
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: AI Quiz Generator (Gemini) ── */}
+      {showAiQuizModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={() => !aiQuizGenerating && setShowAiQuizModal(false)}>
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="p-6 bg-gradient-to-r from-purple-900/10 via-indigo-900/10 to-teal-900/10 border-b border-zinc-150 dark:border-zinc-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-purple-500/20">
+                  <Sparkles className="w-5 h-5 text-yellow-300 animate-pulse" />
+                </div>
+                <div>
+                  <h2 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2">
+                    Générateur IA de Quiz
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800">Gemini 1.5 Pro</span>
+                  </h2>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Créez automatiquement un QCM d'évaluation complet avec explications.</p>
+                </div>
+              </div>
+              {!aiQuizGenerating && (
+                <button onClick={() => setShowAiQuizModal(false)} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-white p-1.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer">
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+
+            {/* Body */}
+            {aiQuizGenerating ? (
+              <div className="p-10 text-center space-y-6 animate-in fade-in">
+                <div className="relative w-20 h-20 mx-auto">
+                  <div className="absolute inset-0 rounded-full border-4 border-purple-500/20 border-t-purple-600 animate-spin" />
+                  <div className="absolute inset-2 rounded-full border-4 border-indigo-500/20 border-b-indigo-500 animate-spin flex items-center justify-center">
+                    <Sparkles className="w-8 h-8 text-purple-600 dark:text-purple-400 animate-pulse" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white">L'IA prépare votre évaluation...</h3>
+                  <p className="text-xs text-purple-600 dark:text-purple-400 font-bold bg-purple-50 dark:bg-purple-950/40 py-2 px-4 rounded-xl border border-purple-200 dark:border-purple-900/50 inline-block animate-pulse">
+                    {aiQuizStepText || "Génération en cours..."}
+                  </p>
+                  <p className="text-[11px] text-zinc-400 max-w-xs mx-auto">
+                    Gemini formule les questions QCM, les choix de réponses et les justifications pédagogiques.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleGenerateAiQuiz} className="p-6 space-y-5">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Sujet ou Objectifs pédagogiques du Quiz *</label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={aiQuizTopic}
+                    onChange={(e) => setAiQuizTopic(e.target.value)}
+                    placeholder="Ex: Fondamentaux de la Blockchain, Consensus PoW/PoS, Smart Contracts et Décentralisation"
+                    className="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Rattacher à un Chapitre</label>
+                    <select
+                      value={aiQuizSectionId}
+                      onChange={(e) => setAiQuizSectionId(e.target.value)}
+                      className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-medium text-zinc-900 dark:text-white"
+                    >
+                      <option value="">Quiz Global du Cours (Fin de formation)</option>
+                      {sections.map((sec) => (
+                        <option key={sec.id} value={sec.id}>Chapitre : {sec.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Niveau de difficulté</label>
+                    <select
+                      value={aiQuizDifficulty}
+                      onChange={(e) => setAiQuizDifficulty(e.target.value)}
+                      className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-medium text-zinc-900 dark:text-white"
+                    >
+                      <option value="FACILE">Facile (Débutant)</option>
+                      <option value="MOYEN">Moyen (Intermédiaire)</option>
+                      <option value="DIFFICILE">Difficile (Avancé)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Nombre de questions QCM</label>
+                    <select
+                      value={aiQuizNumQuestions}
+                      onChange={(e) => setAiQuizNumQuestions(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-medium text-zinc-900 dark:text-white"
+                    >
+                      <option value={3}>3 Questions (Express)</option>
+                      <option value={5}>5 Questions (Recommandé)</option>
+                      <option value={7}>7 Questions (Standard)</option>
+                      <option value={10}>10 Questions (Examen complet)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Seuil de réussite (%)</label>
+                    <input
+                      type="number"
+                      min={50}
+                      max={100}
+                      value={70}
+                      readOnly
+                      className="w-full px-3 py-2 bg-zinc-100 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs text-zinc-500 font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900/40 rounded-xl flex items-center gap-2.5 text-xs text-purple-700 dark:text-purple-300">
+                  <Sparkles className="w-4 h-4 text-purple-500 shrink-0" />
+                  <span>Chaque question comportera 4 choix de réponses et l'explication complète de la bonne réponse.</span>
+                </div>
+
+                <div className="pt-4 border-t border-zinc-150 dark:border-zinc-800 flex items-center justify-end gap-3">
+                  <button type="button" onClick={() => setShowAiQuizModal(false)} className="px-4 py-2.5 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-white cursor-pointer">
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!aiQuizTopic.trim()}
+                    className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-purple-500/20 disabled:opacity-50 cursor-pointer flex items-center gap-2 transition-all"
+                  >
+                    <Sparkles className="w-4 h-4 text-yellow-300" />
+                    Lancer la Génération IA
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

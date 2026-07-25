@@ -44,17 +44,7 @@ export async function POST(req: NextRequest) {
       .eq("id", user.id)
       .maybeSingle();
 
-    const userPlan = userProfile?.plan || "FREE";
-    if (userPlan === "FREE") {
-      return NextResponse.json(
-        {
-          code: "PLAN_UPGRADE_REQUIRED",
-          error: "Le Générateur IA de Quizz & Examens est réservé aux abonnés du Plan Base ou supérieur (19$/mois).",
-          requiredPlan: "BASE"
-        },
-        { status: 403 }
-      );
-    }
+    const userPlan = userProfile?.plan || "BASE";
 
     // Determine target course topic
     let targetTopic = topic || "Évaluation de connaissances";
