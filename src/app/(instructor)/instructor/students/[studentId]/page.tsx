@@ -335,7 +335,7 @@ export default function StudentDetailPage() {
     </div>
   );
 
-  const totalPaid = student.courses.reduce((s, c) => s + (c.paymentStatus === "PAID" ? c.paymentAmount : 0), 0);
+  const totalPaid = student.courses.reduce((s, c) => s + (c.totalPaid ?? c.paymentAmount ?? 0), 0);
   const avgProgress = student.courses.length > 0
     ? Math.round(student.courses.reduce((s, c) => s + c.progressPercent, 0) / student.courses.length)
     : 0;
