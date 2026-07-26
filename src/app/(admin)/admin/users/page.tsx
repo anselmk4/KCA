@@ -192,86 +192,65 @@ export default function AdminUsersPage() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // 1. Get profiles
-      const { data: profiles, error: profError } = await supabase
-        .from('profiles')
-        .select('*');
+      const res = await fetch('/api/admin/users/list');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur de chargement des utilisateurs.");
 
-      if (profError) throw profError;
-
-      // 2. Get user roles
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role_id, roles(name)');
-
-      if (rolesError) throw rolesError;
-
-      // Create a map of userId -> roles
-      const roleMap = new Map<string, string[]>();
-      userRoles?.forEach((ur: any) => {
-        const name = ur.roles?.name;
-        if (name) {
-          const list = roleMap.get(ur.user_id) || [];
-          list.push(name);
-          roleMap.set(ur.user_id, list);
-        }
-      });
-
-      // Map profiles to items
-      const items: AdminUserItem[] = (profiles || []).map((p: any) => {
-        const roles = roleMap.get(p.id) || [];
-        let role: RoleName = 'STUDENT';
-        if (roles.includes('SUPER_ADMIN')) role = 'SUPER_ADMIN';
-        else if (roles.includes('ADMIN')) role = 'ADMIN';
-        else if (roles.includes('INSTRUCTOR')) role = 'INSTRUCTOR';
-
-        return {
-          id: p.id,
-          name: p.full_name || 'Utilisateur anonyme',
-          email: p.email || '',
-          role,
-          status: p.status === 'SUSPENDED' ? 'SUSPENDED' : (p.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE'),
-          plan: p.plan || 'FREE',
-          level: p.level || 'Débutant',
-          joinedAt: p.created_at || new Date().toISOString(),
-          phoneNumber: p.phone || '',
-          country: p.nationality || '',
-          gender: p.gender || '',
-          bio: p.bio || '',
-          nationality: p.nationality || '',
-          website: p.website || '',
-          twitter: p.twitter || '',
-          linkedin: p.linkedin || '',
-          youtube: p.youtube || '',
-          instagram: p.instagram || '',
-          specialty: p.specialty || '',
-          academyName: p.academy_name || '',
-          academyTagline: p.academy_tagline || '',
-          academicBackground: p.academic_background || '',
-          certifications: p.certifications || '',
-          referralCode: p.referral_code || '',
-          affiliatePoints: p.affiliate_points || 0,
-        };
-      });
-
-      items.sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime());
-      setUsers(items);
+      setUsers(data.users || []);
     } catch (err: any) {
-      console.error('[AdminUsers] Error loading from Supabase:', err);
-      // Fallback to local DB
-      const db = getDB();
-      const mapped = db.users.map(u => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role as RoleName,
-        status: u.status === 'Suspendu' ? 'SUSPENDED' as const : 'ACTIVE' as const,
-        plan: u.plan || 'FREE',
-        level: u.level || 'Débutant',
-        joinedAt: u.joinedAt,
-      }));
-      mapped.sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime());
-      setUsers(mapped);
+      console.error('[AdminUsers] Error loading users API, falling back to direct query:', err);
+      try {
+        const { data: profiles } = await supabase.from('profiles').select('*');
+        const { data: userRoles } = await supabase.from('user_roles').select('user_id, role_id, roles(name)');
+        const roleMap = new Map<string, string[]>();
+        userRoles?.forEach((ur: any) => {
+          const name = ur.roles?.name;
+          if (name) {
+            const list = roleMap.get(ur.user_id) || [];
+            list.push(name);
+            roleMap.set(ur.user_id, list);
+          }
+        });
+        const items: AdminUserItem[] = (profiles || []).map((p: any) => {
+          const roles = roleMap.get(p.id) || [];
+          let role: RoleName = 'STUDENT';
+          if (roles.includes('SUPER_ADMIN')) role = 'SUPER_ADMIN';
+          else if (roles.includes('ADMIN')) role = 'ADMIN';
+          else if (roles.includes('INSTRUCTOR')) role = 'INSTRUCTOR';
+
+          return {
+            id: p.id,
+            name: p.full_name || 'Utilisateur anonyme',
+            email: p.email || '',
+            role,
+            status: p.status === 'SUSPENDED' ? 'SUSPENDED' : (p.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE'),
+            plan: p.plan || 'FREE',
+            level: p.level || 'Débutant',
+            joinedAt: p.created_at || new Date().toISOString(),
+            phoneNumber: p.phone || '',
+            country: p.nationality || '',
+            gender: p.gender || '',
+            bio: p.bio || '',
+            nationality: p.nationality || '',
+            website: p.website || '',
+            twitter: p.twitter || '',
+            linkedin: p.linkedin || '',
+            youtube: p.youtube || '',
+            instagram: p.instagram || '',
+            specialty: p.specialty || '',
+            academyName: p.academy_name || '',
+            academyTagline: p.academy_tagline || '',
+            academicBackground: p.academic_background || '',
+            certifications: p.certifications || '',
+            referralCode: p.referral_code || '',
+            affiliatePoints: p.affiliate_points || 0,
+          };
+        });
+        items.sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime());
+        setUsers(items);
+      } catch (fbErr) {
+        console.error('[AdminUsers] Fallback failed:', fbErr);
+      }
     } finally {
       setLoading(false);
     }
@@ -284,13 +263,14 @@ export default function AdminUsersPage() {
   const handleToggleStatus = async (userId: string, currentStatus: string) => {
     const nextStatus = currentStatus === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ status: nextStatus })
-        .eq('id', userId);
-      
-      if (error) throw error;
-      
+      const res = await fetch('/api/admin/users/update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId: userId, newStatus: nextStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur de mise à jour du statut.");
+
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: nextStatus } : u));
       if (selectedUser?.id === userId) {
         setSelectedUser(prev => prev ? { ...prev, status: nextStatus as any } : null);
@@ -303,12 +283,13 @@ export default function AdminUsersPage() {
 
   const handleManualActivateUser = async (userId: string, userName: string) => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ status: 'ACTIVE' })
-        .eq('id', userId);
-
-      if (error) throw error;
+      const res = await fetch('/api/admin/users/update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId: userId, newStatus: 'ACTIVE' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur lors de l'activation.");
 
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: 'ACTIVE' } : u));
       if (selectedUser?.id === userId) {
