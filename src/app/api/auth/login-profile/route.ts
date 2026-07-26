@@ -20,7 +20,25 @@ export async function POST(req: NextRequest) {
       .eq('id', userId)
       .maybeSingle();
 
-    // 2. If profile is missing, auto-create it (repair)
+    // 2. Check Auth confirmation status
+    let isEmailConfirmed = false;
+    try {
+      const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+      isEmailConfirmed = !!authUser?.user?.email_confirmed_at;
+    } catch (authErr) {
+      console.warn('[login-profile] Could not fetch auth user:', authErr);
+    }
+
+    // 3. Auto-repair / Auto-activate: if email is confirmed in Auth but profile status is INACTIVE, activate it!
+    if (profile && isEmailConfirmed && profile.status === 'INACTIVE') {
+      await supabaseAdmin
+        .from('profiles')
+        .update({ status: 'ACTIVE' })
+        .eq('id', userId);
+      profile.status = 'ACTIVE';
+    }
+
+    // 4. If profile is missing, auto-create it (repair)
     if (!profile && email) {
       const fullName = email.split('@')[0] || 'Utilisateur';
       

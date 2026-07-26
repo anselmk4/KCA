@@ -227,13 +227,26 @@ export async function loginWithEmail(
     );
   }
 
+  // Auto-activate profile if status is INACTIVE upon successful password login
+  if (profile.status === 'INACTIVE') {
+    try {
+      await supabase
+        .from('profiles')
+        .update({ status: 'ACTIVE' })
+        .eq('id', sessionUser.id);
+      profile.status = 'ACTIVE';
+    } catch (err) {
+      console.warn('[loginWithEmail] Could not update profile status to ACTIVE:', err);
+    }
+  }
+
   // Set session for the app
   setSimulatedSession({
     userId: profile.id,
     name: profile.full_name,
     email: profile.email,
     role: profile.role,
-    status: profile.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
+    status: 'ACTIVE',
     plan: profile.plan,
   });
 

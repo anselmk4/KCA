@@ -46,17 +46,27 @@ function LoginForm() {
             profile = await fetchUserProfile(user.id);
           }
 
+          if (profile && profile.status === 'INACTIVE') {
+            try {
+              await supabase
+                .from('profiles')
+                .update({ status: 'ACTIVE' })
+                .eq('id', user.id);
+            } catch (updErr) {
+              console.warn('[login checkSession] Could not activate profile status:', updErr);
+            }
+          }
+
           const userRole = profile?.role || (user.user_metadata?.role as any) || 'STUDENT';
           const userName = profile?.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Utilisateur';
           const userPlan = profile?.plan || 'FREE';
-          const userStatus = profile?.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE';
 
           setSimulatedSession({
             userId: user.id,
             name: userName,
             email: user.email || '',
             role: userRole,
-            status: userStatus,
+            status: 'ACTIVE',
             plan: userPlan,
           });
 

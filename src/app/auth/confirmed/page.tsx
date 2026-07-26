@@ -146,8 +146,17 @@ function ConfirmedContent() {
           setStatusText("Chargement de votre profil...");
           const profile = await fetchUserProfile(user.id);
 
-          // Force intendedRole to take precedence over DB role to prevent regression
           let finalRole = intendedRole;
+          // Update profile status in database to ACTIVE
+          try {
+            await supabase
+              .from('profiles')
+              .update({ status: 'ACTIVE' })
+              .eq('id', user.id);
+          } catch (stErr) {
+            console.warn("[confirmed] Could not update profile status to ACTIVE:", stErr);
+          }
+
           if (profile) {
             finalRole = intendedRole !== "STUDENT" ? intendedRole : (profile.role || "STUDENT");
 
@@ -169,7 +178,7 @@ function ConfirmedContent() {
                 | "FINANCE_ADMIN"
                 | "ACADEMIC_ADMIN"
                 | "SUPPORT_AGENT",
-              status: profile.status === "ACTIVE" ? "ACTIVE" : "INACTIVE",
+              status: "ACTIVE",
               plan: profile.plan,
             });
             localStorage.setItem("kuettu_unconfirmed_email", "false");
