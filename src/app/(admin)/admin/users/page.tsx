@@ -566,29 +566,28 @@ export default function AdminUsersPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex justify-end gap-3 text-zinc-400">
-                          {/* Manual Activation or Suspend Toggle */}
-                          {user.status === 'INACTIVE' ? (
-                            <button
-                              onClick={() => handleManualActivateUser(user.id, user.name)}
-                              className="p-1.5 rounded-lg border border-green-300 bg-green-50 text-green-600 hover:bg-green-100 hover:scale-105 transition-all cursor-pointer"
-                              title="Activer manuellement le compte"
-                            >
-                              <CheckCircle className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleToggleStatus(user.id, user.status)}
-                              className={`p-1.5 rounded-lg border hover:scale-105 transition-all cursor-pointer ${
-                                user.status === 'SUSPENDED'
-                                  ? "bg-green-50 border-green-200 text-green-600 hover:bg-green-100"
-                                  : "bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100"
-                              }`}
-                              title={user.status === 'SUSPENDED' ? "Activer l'utilisateur" : "Suspendre l'utilisateur"}
-                            >
-                              {user.status === 'SUSPENDED' ? <UserCheck className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
-                            </button>
-                          )}
+                        <div className="flex justify-end gap-2 text-zinc-400">
+                          {/* Manual Account Activation Button */}
+                          <button
+                            onClick={() => handleManualActivateUser(user.id, user.name)}
+                            className="p-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:scale-105 transition-all cursor-pointer"
+                            title="Activer manuellement le compte utilisateur"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </button>
+
+                          {/* Suspend / Reactivate Toggle */}
+                          <button
+                            onClick={() => handleToggleStatus(user.id, user.status)}
+                            className={`p-1.5 rounded-lg border hover:scale-105 transition-all cursor-pointer ${
+                              user.status === 'SUSPENDED'
+                                ? "bg-green-50 border-green-200 text-green-600 hover:bg-green-100"
+                                : "bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100"
+                            }`}
+                            title={user.status === 'SUSPENDED' ? "Réactiver le compte" : "Suspendre l'utilisateur"}
+                          >
+                            {user.status === 'SUSPENDED' ? <UserCheck className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
+                          </button>
   
                           {/* Promote to Instructor / Demote */}
                           {user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN' && (
@@ -1107,16 +1106,16 @@ export default function AdminUsersPage() {
                   <h5 className="text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-550">Actions d'administration</h5>
                   <div className="grid grid-cols-2 gap-3">
                     
-                    {/* Bouton d'activation manuelle du compte */}
-                    {openUser.status === 'INACTIVE' && (
-                      <button
-                        onClick={() => handleManualActivateUser(openUser.id, openUser.name)}
-                        className="col-span-2 flex items-center justify-center gap-2 py-3 rounded-xl border border-green-300 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all cursor-pointer shadow-md"
-                      >
-                        <CheckCircle className="w-4 h-4 text-white" />
-                        Activer manuellement le compte utilisateur
-                      </button>
-                    )}
+                    {/* Bouton d'activation manuelle du compte (Toujours visible) */}
+                    <button
+                      onClick={() => handleManualActivateUser(openUser.id, openUser.name)}
+                      className="col-span-2 flex items-center justify-center gap-2 py-3 rounded-xl border border-emerald-300 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all cursor-pointer shadow-md"
+                    >
+                      <CheckCircle className="w-4 h-4 text-white" />
+                      {openUser.status === 'ACTIVE'
+                        ? "Compte Actif (Forcer validation / ré-activation)"
+                        : "Activer manuellement le compte utilisateur"}
+                    </button>
                     
                     {/* Ban/Activate */}
                     <button
