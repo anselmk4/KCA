@@ -39,10 +39,21 @@ export async function POST(req: NextRequest) {
       .eq("id", userId)
       .maybeSingle();
 
+    // Check if user email is already confirmed in auth
+    let initialStatus = "INACTIVE";
+    try {
+      const { data: authUserData } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (authUserData?.user?.email_confirmed_at) {
+        initialStatus = "ACTIVE";
+      }
+    } catch {
+      // Default to INACTIVE upon registration until email confirmed
+    }
+
     const profileData: any = {
       email,
       full_name: name || email.split("@")[0],
-      status: "ACTIVE",
+      status: initialStatus,
       plan: "FREE",
       // Set columns on public.profiles structure (nationality and phone)
       nationality: country,

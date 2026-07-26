@@ -132,24 +132,31 @@ async function bootstrapUserAndGetRole(user: any): Promise<string> {
 
   console.log(`[callback] bootstrapUserAndGetRole — targetRole=${targetRole}, userId=${user.id}`);
 
-  // 1. Ensure profile exists (using admin client to bypass RLS)
+  // 1. Ensure profile exists and is activated if email confirmed (using admin client to bypass RLS)
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('id')
+    .select('id, status')
     .eq('id', user.id)
     .maybeSingle();
+
+  const isConfirmed = !!user.email_confirmed_at;
 
   if (!profile) {
     const { error: insertError } = await supabaseAdmin.from('profiles').insert({
       id: user.id,
       email: user.email!,
       full_name: fullName,
-      status: 'ACTIVE',
+      status: isConfirmed ? 'ACTIVE' : 'INACTIVE',
       plan: 'FREE',
     });
     if (insertError) {
       console.error('[callback] profile insert error:', insertError.message);
     }
+  } else if (isConfirmed && profile.status === 'INACTIVE') {
+    await supabaseAdmin
+      .from('profiles')
+      .update({ status: 'ACTIVE' })
+      .eq('id', user.id);
   }
 
   // 2. Enforce the correct role — always clean up conflicting roles first

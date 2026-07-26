@@ -292,9 +292,32 @@ export default function AdminUsersPage() {
       if (error) throw error;
       
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: nextStatus } : u));
+      if (selectedUser?.id === userId) {
+        setSelectedUser(prev => prev ? { ...prev, status: nextStatus as any } : null);
+      }
     } catch (err: any) {
       console.error('Error updating status:', err.message);
       alert('Erreur lors du changement de statut : ' + err.message);
+    }
+  };
+
+  const handleManualActivateUser = async (userId: string, userName: string) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ status: 'ACTIVE' })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: 'ACTIVE' } : u));
+      if (selectedUser?.id === userId) {
+        setSelectedUser(prev => prev ? { ...prev, status: 'ACTIVE' } : null);
+      }
+      alert(`Le compte de "${userName}" a été activé manuellement avec succès !`);
+    } catch (err: any) {
+      console.error('Error manually activating user:', err.message);
+      alert("Erreur lors de l'activation du compte : " + err.message);
     }
   };
 
@@ -554,25 +577,37 @@ export default function AdminUsersPage() {
                         <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
                           user.status === 'ACTIVE'
                             ? "bg-green-100 dark:bg-green-950/20 text-green-700 dark:text-green-400"
-                            : "bg-amber-100 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400"
+                            : user.status === 'SUSPENDED'
+                            ? "bg-red-100 dark:bg-red-950/20 text-red-700 dark:text-red-400"
+                            : "bg-amber-100 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30"
                         }`}>
-                          {user.status === 'ACTIVE' ? 'Actif' : 'Suspendu'}
+                          {user.status === 'ACTIVE' ? 'Actif' : user.status === 'SUSPENDED' ? 'Suspendu' : 'Non activé'}
                         </span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex justify-end gap-3 text-zinc-400">
-                          {/* Toggle Status (Ban/Activate) */}
-                          <button
-                            onClick={() => handleToggleStatus(user.id, user.status)}
-                            className={`p-1.5 rounded-lg border hover:scale-105 transition-all cursor-pointer ${
-                              user.status === 'SUSPENDED'
-                                ? "bg-green-50 border-green-200 text-green-600 hover:bg-green-100"
-                                : "bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100"
-                            }`}
-                            title={user.status === 'SUSPENDED' ? "Activer l'utilisateur" : "Suspendre l'utilisateur"}
-                          >
-                            {user.status === 'SUSPENDED' ? <UserCheck className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
-                          </button>
+                          {/* Manual Activation or Suspend Toggle */}
+                          {user.status === 'INACTIVE' ? (
+                            <button
+                              onClick={() => handleManualActivateUser(user.id, user.name)}
+                              className="p-1.5 rounded-lg border border-green-300 bg-green-50 text-green-600 hover:bg-green-100 hover:scale-105 transition-all cursor-pointer"
+                              title="Activer manuellement le compte"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleToggleStatus(user.id, user.status)}
+                              className={`p-1.5 rounded-lg border hover:scale-105 transition-all cursor-pointer ${
+                                user.status === 'SUSPENDED'
+                                  ? "bg-green-50 border-green-200 text-green-600 hover:bg-green-100"
+                                  : "bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100"
+                              }`}
+                              title={user.status === 'SUSPENDED' ? "Activer l'utilisateur" : "Suspendre l'utilisateur"}
+                            >
+                              {user.status === 'SUSPENDED' ? <UserCheck className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
+                            </button>
+                          )}
   
                           {/* Promote to Instructor / Demote */}
                           {user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN' && (
@@ -936,9 +971,11 @@ export default function AdminUsersPage() {
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
                         openUser.status === 'ACTIVE'
                           ? "bg-green-100 text-green-700 dark:bg-green-950/20 dark:text-green-400"
-                          : "bg-amber-100 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400"
+                          : openUser.status === 'SUSPENDED'
+                          ? "bg-red-100 text-red-700 dark:bg-red-950/20 dark:text-red-400"
+                          : "bg-amber-100 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400 border border-amber-300 dark:border-amber-800"
                       }`}>
-                        {openUser.status === 'ACTIVE' ? 'Actif' : 'Suspendu'}
+                        {openUser.status === 'ACTIVE' ? 'Actif' : openUser.status === 'SUSPENDED' ? 'Suspendu' : 'Non activé'}
                       </span>
                       <span className="text-[9px] font-extrabold bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-350 px-2 py-0.5 rounded-full uppercase border border-zinc-300 dark:border-zinc-700">
                         Plan {openUser.plan}
@@ -1088,6 +1125,17 @@ export default function AdminUsersPage() {
                 <div className="space-y-3">
                   <h5 className="text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-550">Actions d'administration</h5>
                   <div className="grid grid-cols-2 gap-3">
+                    
+                    {/* Bouton d'activation manuelle du compte */}
+                    {openUser.status === 'INACTIVE' && (
+                      <button
+                        onClick={() => handleManualActivateUser(openUser.id, openUser.name)}
+                        className="col-span-2 flex items-center justify-center gap-2 py-3 rounded-xl border border-green-300 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition-all cursor-pointer shadow-md"
+                      >
+                        <CheckCircle className="w-4 h-4 text-white" />
+                        Activer manuellement le compte utilisateur
+                      </button>
+                    )}
                     
                     {/* Ban/Activate */}
                     <button
