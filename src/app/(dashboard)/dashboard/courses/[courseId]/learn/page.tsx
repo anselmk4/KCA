@@ -141,6 +141,7 @@ export default function CourseLearnPage() {
     setVideoPlaying(false);
   }, [activeLesson]);
   const [notAuthorized, setNotAuthorized] = useState(false);
+  const [isSuspended, setIsSuspended] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
   // ─── Chargement des données depuis Supabase ───────────────
@@ -156,33 +157,29 @@ export default function CourseLearnPage() {
     }
     setUserId(user.id);
 
-    // 2. Vérifier enrollment actif
-    const { data: enrollment } = await supabase
+    // 2. Vérifier enrollment
+    const { data: anyEnrollment } = await supabase
       .from("enrollments")
-      .select("id, progress_percent")
+      .select("id, progress_percent, status")
       .eq("student_id", user.id)
       .eq("course_id", courseId)
-      .eq("status", "ACTIVE")
       .maybeSingle();
 
-    // Aussi vérifier si COMPLETED
-    const { data: completedEnrollment } = !enrollment
-      ? await supabase
-          .from("enrollments")
-          .select("id, progress_percent")
-          .eq("student_id", user.id)
-          .eq("course_id", courseId)
-          .eq("status", "COMPLETED")
-          .maybeSingle()
-      : { data: null };
-
-    const activeEnrollment = enrollment || completedEnrollment;
-
-    if (!activeEnrollment) {
+    const currentStatus = (anyEnrollment?.status as string) || "";
+    if (currentStatus === "SUSPENDED" || currentStatus === "BLOCKED") {
+      setIsSuspended(true);
       setNotAuthorized(true);
       setLoading(false);
       return;
     }
+
+    if (!anyEnrollment || (anyEnrollment.status !== "ACTIVE" && anyEnrollment.status !== "COMPLETED")) {
+      setNotAuthorized(true);
+      setLoading(false);
+      return;
+    }
+
+    const activeEnrollment = anyEnrollment;
 
     // 3. Charger le cours
     const { data: courseData } = await supabase
@@ -575,8 +572,38 @@ export default function CourseLearnPage() {
   }
 
   if (notAuthorized) {
+    if (isSuspended) {
+      return (
+        <div className="max-w-md mx-auto text-center py-16 bg-white dark:bg-zinc-900 rounded-3xl border border-amber-300 dark:border-amber-900/50 p-8 space-y-6 shadow-xl my-12">
+          <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+            <Lock className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Accès Temporairement Suspendu 🔒</h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+              Votre accès à cette formation a été suspendu par le formateur en raison d&apos;une tranche de paiement requise.
+            </p>
+          </div>
+          <div className="pt-2 space-y-3">
+            <Link
+              href={`/dashboard/payment/${courseId}`}
+              className="block w-full py-3 bg-amber-600 hover:bg-amber-700 text-white text-xs font-extrabold rounded-xl transition-all shadow-md text-center"
+            >
+              Régler ma tranche suivante
+            </Link>
+            <Link
+              href="/dashboard/payments"
+              className="block w-full py-2.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-bold rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all text-center"
+            >
+              Consulter mes paiements &amp; factures
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="max-w-md mx-auto text-center py-16 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 p-8 space-y-6">
+      <div className="max-w-md mx-auto text-center py-16 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 p-8 space-y-6 my-12">
         <AlertTriangle className="w-16 h-16 text-amber-500 mx-auto animate-bounce" />
         <h2 className="text-xl font-bold">Accès Verrouillé</h2>
         <p className="text-zinc-500 dark:text-zinc-400">

@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   ArrowLeft, BookOpen, TrendingUp, DollarSign, Award, Clock,
   CheckCircle2, Circle, PlayCircle, AlertTriangle, Mail,
-  Calendar, BarChart3, ExternalLink, Loader2, User
+  Calendar, BarChart3, ExternalLink, Loader2, User, Lock, Unlock
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { getSimulatedSession } from "@/lib/rbac";
@@ -16,6 +16,12 @@ type CourseDetail = {
   courseTitle: string;
   courseSlug: string;
   coursePrice: number;
+  totalPaid?: number;
+  remainingAmount?: number;
+  isInstallmentCourse?: boolean;
+  totalInstallments?: number;
+  paidInstallmentsCount?: number;
+  remainingInstallmentsCount?: number;
   enrollmentStatus: string;
   enrolledAt: string;
   progressPercent: number;
@@ -83,6 +89,44 @@ export default function StudentDetailPage() {
   const [savingGrade, setSavingGrade] = useState<string | null>(null);
   const [unlockingCertCourseId, setUnlockingCertCourseId] = useState<string | null>(null);
   const [revokingCourseId, setRevokingCourseId] = useState<string | null>(null);
+  const [blockingCourseId, setBlockingCourseId] = useState<string | null>(null);
+
+  async function handleBlockAccess(courseId: string, currentStatus: string, courseTitle: string) {
+    if (!student) return;
+    const isBlocking = currentStatus !== "SUSPENDED";
+    const confirmMsg = isBlocking
+      ? `Souhaitez-vous bloquer l'accès de ${student.name} au cours "${courseTitle}" (pour tranche impayée) ?`
+      : `Souhaitez-vous réactiver l'accès au cours "${courseTitle}" pour ${student.name} ?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setBlockingCourseId(courseId);
+    try {
+      const res = await fetch("/api/instructor/students/block-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentId: student.id,
+          courseId,
+          action: isBlocking ? "BLOCK" : "UNBLOCK",
+          reason: isBlocking ? `Accès au cours "${courseTitle}" suspendu par le formateur en raison d'une tranche de paiement requise.` : undefined
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur lors de la mise à jour.");
+
+      alert(data.message || `L'accès a été ${isBlocking ? "suspendu" : "réactivé"} avec succès.`);
+      setStudent({
+        ...student,
+        courses: student.courses.map(c => c.courseId === courseId ? { ...c, enrollmentStatus: isBlocking ? "SUSPENDED" : "ACTIVE" } : c)
+      });
+    } catch (err: any) {
+      alert("Erreur : " + err.message);
+    } finally {
+      setBlockingCourseId(null);
+    }
+  }
 
   async function handleRevokeCourse(courseId: string, courseTitle: string) {
     if (!student) return;
@@ -403,8 +447,22 @@ export default function StudentDetailPage() {
                       </div>
                     </div>
 
-                    {/* CTA: go to student progress & Revoke course */}
+                    {/* CTA: Block/Unblock, Revoke & View progress */}
                     <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleBlockAccess(course.courseId, course.enrollmentStatus, course.courseTitle)}
+                        disabled={blockingCourseId === course.courseId}
+                        className={`inline-flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                          course.enrollmentStatus === "SUSPENDED"
+                            ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500"
+                            : "bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800"
+                        }`}
+                        title={course.enrollmentStatus === "SUSPENDED" ? "Réactiver l'accès au cours" : "Bloquer l'accès pour tranche d'échéance"}
+                      >
+                        {course.enrollmentStatus === "SUSPENDED" ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                        <span>{blockingCourseId === course.courseId ? "Traitement..." : course.enrollmentStatus === "SUSPENDED" ? "Débloquer l'accès" : "Bloquer l'accès"}</span>
+                      </button>
+
                       <button
                         onClick={() => handleRevokeCourse(course.courseId, course.courseTitle)}
                         disabled={revokingCourseId === course.courseId}
@@ -438,27 +496,35 @@ export default function StudentDetailPage() {
                       </p>
                     </div>
 
-                    {/* Payment */}
+                    {/* Payment & Installments Breakdown */}
                     <div className="space-y-3">
-                      <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Paiement</p>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${payInfo.cls}`}>
-                            {payInfo.label}
-                          </span>
-                          {course.paymentAmount > 0 && (
-                            <span className="text-sm font-bold text-zinc-900 dark:text-white">{course.paymentAmount.toLocaleString()} $</span>
-                          )}
+                      <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Paiement &amp; Tranches</p>
+                      <div className="space-y-2 text-xs">
+                        <div className="flex items-center justify-between font-medium">
+                          <span className="text-zinc-500">Prix total cours :</span>
+                          <span className="font-bold text-zinc-900 dark:text-white">${course.coursePrice} USD</span>
                         </div>
-                        {course.paymentDate && (
-                          <p className="text-xs text-zinc-400 flex items-center gap-1.5">
-                            <Clock className="w-3.5 h-3.5" />
-                            {new Date(course.paymentDate).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
-                          </p>
+                        <div className="flex items-center justify-between font-medium">
+                          <span className="text-zinc-500">Total versé :</span>
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400">${course.paymentAmount || course.totalPaid || 0} USD</span>
+                        </div>
+                        {(course.remainingAmount || 0) > 0 ? (
+                          <div className="p-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-xl space-y-1">
+                            <div className="flex items-center justify-between font-bold text-amber-700 dark:text-amber-400">
+                              <span>Solde restant :</span>
+                              <span>${course.remainingAmount} USD</span>
+                            </div>
+                            <p className="text-[10px] text-amber-600/80 dark:text-amber-400/80">Règlement en tranches en cours</p>
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400">
+                            <CheckCircle2 className="w-3 h-3" /> Réglé intégralement
+                          </span>
                         )}
-                        {course.coursePrice > 0 && course.paymentStatus !== "PAID" && (
-                          <p className="text-xs text-zinc-400">
-                            Prix du cours : <span className="font-semibold text-zinc-700 dark:text-zinc-300">{course.coursePrice} $</span>
+                        {course.paymentDate && (
+                          <p className="text-[11px] text-zinc-400 flex items-center gap-1.5 pt-1">
+                            <Clock className="w-3 h-3" />
+                            Dernier versement : {new Date(course.paymentDate).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
                           </p>
                         )}
                       </div>
