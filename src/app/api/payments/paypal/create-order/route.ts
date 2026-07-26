@@ -39,12 +39,17 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Cours introuvable." }, { status: 404 });
       }
 
-      let coursePrice = course.price;
-      if (payInstallment && course.allow_installments && course.installments_count) {
-        coursePrice = Math.round(course.price / course.installments_count);
+      const originalPrice = course.price;
+      let installmentCount = 1;
+      if (payInstallment === 2) {
+        installmentCount = 2;
+      } else if (payInstallment === 3 || payInstallment === true) {
+        installmentCount = course.installments_count || 3;
+      } else if (typeof payInstallment === 'number' && payInstallment > 1) {
+        installmentCount = payInstallment;
       }
 
-      // Apply coupon if any
+      let fullCourseDiscount = 0;
       if (couponId) {
         const { data: coupon } = await supabaseAdmin
           .from("coupons")
@@ -55,15 +60,15 @@ export async function POST(req: NextRequest) {
 
         if (coupon) {
           if (coupon.discount_type === "PERCENTAGE") {
-            coursePrice = Math.max(0, coursePrice - (coursePrice * (coupon.discount_value / 100)));
+            fullCourseDiscount = Math.round(originalPrice * (coupon.discount_value / 100));
           } else if (coupon.discount_type === "FIXED") {
-            coursePrice = Math.max(0, coursePrice - coupon.discount_value);
+            fullCourseDiscount = coupon.discount_value;
           }
-          coursePrice = Math.round(coursePrice);
         }
       }
 
-      amount = coursePrice;
+      const discountedTotalCoursePrice = Math.max(0, originalPrice - fullCourseDiscount);
+      amount = Math.max(0, Math.round(discountedTotalCoursePrice / installmentCount));
       customId = `COURSE:${itemId}:${user.id}`;
     } else if (type === "INSTRUCTOR_PLAN") {
       // 2. Resolve plan price

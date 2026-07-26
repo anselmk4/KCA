@@ -44,7 +44,7 @@ export default function PaymentPage() {
 
   const [course, setCourse] = useState<Course | null>(null);
   const [method, setMethod] = useState<PaymentMethod>("momo");
-  const [payInstallment, setPayInstallment] = useState(false);
+  const [payInstallment, setPayInstallment] = useState<number>(1);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showPendingState, setShowPendingState] = useState(false);
@@ -344,19 +344,22 @@ export default function PaymentPage() {
     });
   }, [courseId]);
 
-  const finalAmount = course && payInstallment && course.allowInstallments
-    ? Math.round(course.price / (course.installmentsCount || 1))
-    : course ? course.price : 0;
+  const fullPrice = course ? course.price : 0;
 
-  let discountedAmount = finalAmount;
-  if (appliedCoupon) {
+  let fullCourseDiscount = 0;
+  if (appliedCoupon && fullPrice > 0) {
     if (appliedCoupon.discount_type === "PERCENTAGE") {
-      discountedAmount = Math.max(0, finalAmount - (finalAmount * (appliedCoupon.discount_value / 100)));
+      fullCourseDiscount = Math.round(fullPrice * (appliedCoupon.discount_value / 100));
     } else if (appliedCoupon.discount_type === "FIXED") {
-      discountedAmount = Math.max(0, finalAmount - appliedCoupon.discount_value);
+      fullCourseDiscount = Math.min(fullPrice, appliedCoupon.discount_value);
     }
-    discountedAmount = Math.round(discountedAmount);
   }
+  const discountedTotalCoursePrice = Math.max(0, fullPrice - fullCourseDiscount);
+
+  const selectedInstallmentCount = typeof payInstallment === "number" && payInstallment > 1 ? payInstallment : 1;
+
+  const finalAmount = Math.round(fullPrice / selectedInstallmentCount);
+  const discountedAmount = Math.round(discountedTotalCoursePrice / selectedInstallmentCount);
 
   const checkPaymentStatus = async (isSilent = false) => {
     if (!paymentId) return;
@@ -1178,40 +1181,60 @@ export default function PaymentPage() {
                 </div>
               )}
 
-              {/* Billing Options Selector (Installments vs Full) */}
-              {course.allowInstallments && (
+              {/* Billing Options Selector (1 tranche, 2 tranches, 3 tranches) */}
+              {(course.allowInstallments || course.price > 0) && (
                 <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl border border-zinc-200 dark:border-zinc-800 space-y-3">
                   <label className="block text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider">
                     {t("student.payment.applyCoupon", "Option").toLowerCase().includes("appliqu") ? "Billing Option" : "Option de facturation"}
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Option 1: Paiement unique (1 tranche) */}
                     <button
                       type="button"
-                      onClick={() => setPayInstallment(false)}
+                      onClick={() => setPayInstallment(1)}
                       className={`p-3.5 border-2 rounded-xl text-xs font-extrabold flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${
-                        !payInstallment
-                          ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 shadow-md"
+                        payInstallment === 1
+                          ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 shadow-md ring-2 ring-blue-500/20"
                           : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:border-zinc-400"
                       }`}
                     >
                       <span>{t("student.payment.applyCoupon", "Paiement unique").toLowerCase().includes("appliqu") ? "One-time payment" : "Paiement unique"}</span>
-                      <span className="text-[11px] opacity-80 font-bold">${course.price} USD</span>
+                      <span className="text-[11px] opacity-90 font-bold">${discountedTotalCoursePrice} USD</span>
                     </button>
 
+                    {/* Option 2: Payer en 2 tranches */}
                     <button
                       type="button"
-                      onClick={() => setPayInstallment(true)}
+                      onClick={() => setPayInstallment(2)}
+                      className={`p-3.5 border-2 rounded-xl text-xs font-extrabold flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${
+                        payInstallment === 2
+                          ? "border-amber-500 bg-amber-500/10 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 shadow-md ring-2 ring-amber-500/20"
+                          : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:border-zinc-400"
+                      }`}
+                    >
+                      <span className="uppercase tracking-wider flex items-center gap-1">
+                        ⚡ {t("student.payment.applyCoupon", "2 tranches").toLowerCase().includes("appliqu") ? "Pay in 2 parts" : "Payer en 2 tranches"}
+                      </span>
+                      <span className="text-xs font-black">
+                        ${Math.round(discountedTotalCoursePrice / 2)} USD / {t("student.payment.applyCoupon", "mois").toLowerCase().includes("appliqu") ? "month" : "mois"}
+                      </span>
+                    </button>
+
+                    {/* Option 3: Payer en 3 tranches */}
+                    <button
+                      type="button"
+                      onClick={() => setPayInstallment(3)}
                       className={`p-3.5 border-2 rounded-xl text-xs font-black flex flex-col items-center justify-center gap-1 cursor-pointer transition-all shadow-lg ${
-                        payInstallment
+                        payInstallment === 3
                           ? "border-red-600 bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white ring-2 ring-red-500 scale-[1.02]"
                           : "border-red-500 bg-red-600 text-white hover:bg-red-500 shadow-red-600/30"
                       }`}
                     >
                       <span className="uppercase tracking-wider flex items-center gap-1">
-                        🔥 {t("student.payment.installment", `Payez en ${course.installmentsCount} fois`)}
+                        🔥 {t("student.payment.applyCoupon", "3 tranches").toLowerCase().includes("appliqu") ? "Pay in 3 parts" : "Payer en 3 tranches"}
                       </span>
                       <span className="text-xs font-black text-white">
-                        ${finalAmount} USD / {t("student.payment.applyCoupon", "mois").toLowerCase().includes("appliqu") ? "month" : "mois"}
+                        ${Math.round(discountedTotalCoursePrice / 3)} USD / {t("student.payment.applyCoupon", "mois").toLowerCase().includes("appliqu") ? "month" : "mois"}
                       </span>
                     </button>
                   </div>
@@ -1233,7 +1256,7 @@ export default function PaymentPage() {
                   ) : (
                     <>
                       <ShieldCheck className="w-5 h-5" />
-                      <span>{t("student.payment.payNow", "Valider le paiement")} (${discountedAmount})</span>
+                      <span>{t("student.payment.payNow", "Valider le paiement")} (${discountedAmount} USD)</span>
                     </>
                   )}
                 </button>
@@ -1261,15 +1284,15 @@ export default function PaymentPage() {
             <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-zinc-500">{t("student.payment.applyCoupon", "Sous-total").toLowerCase().includes("appliqu") ? "Subtotal" : "Sous-total"} :</span>
-                <span className="font-semibold text-zinc-900 dark:text-white">${course.price}</span>
+                <span className="font-semibold text-zinc-900 dark:text-white">${fullPrice} USD</span>
               </div>
               {appliedCoupon && (
                 <div className="flex justify-between text-emerald-500 font-semibold text-xs">
                   <span>{t("student.payment.discount", "Réduction")} ({appliedCoupon.code}) :</span>
                   <span>
                     -{appliedCoupon.discount_type === "PERCENTAGE" 
-                      ? `${appliedCoupon.discount_value}% (-$${Math.round(finalAmount * (appliedCoupon.discount_value / 100))})` 
-                      : `$${appliedCoupon.discount_value}`}
+                      ? `${appliedCoupon.discount_value}% (-$${fullCourseDiscount})` 
+                      : `$${fullCourseDiscount}`}
                   </span>
                 </div>
               )}
@@ -1277,15 +1300,15 @@ export default function PaymentPage() {
                 <span className="text-zinc-500">{t("student.payment.applyCoupon", "Frais").toLowerCase().includes("appliqu") ? "Enrollment fee" : "Frais d'inscription"} :</span>
                 <span className="font-semibold text-green-500">{t("student.discover.freeCourse", "Gratuit")}</span>
               </div>
-              {payInstallment && course.allowInstallments && (
+              {selectedInstallmentCount > 1 && (
                 <div className="flex justify-between text-xs text-zinc-500">
                   <span>{t("student.payment.applyCoupon", "Tranches").toLowerCase().includes("appliqu") ? "Remaining installments" : "Tranches restantes"} :</span>
-                  <span>{(course.installmentsCount || 1) - 1} x ${discountedAmount}</span>
+                  <span>{selectedInstallmentCount - 1} x ${discountedAmount} USD</span>
                 </div>
               )}
               <div className="flex justify-between border-t border-zinc-100 dark:border-zinc-800 pt-2 text-base font-bold">
                 <span className="text-zinc-950 dark:text-white">{t("student.payment.applyCoupon", "Aujourd'hui").toLowerCase().includes("appliqu") ? "Today" : "Aujourd'hui"} :</span>
-                <span className="text-blue-600 dark:text-blue-400">${discountedAmount}</span>
+                <span className="text-blue-600 dark:text-blue-400">${discountedAmount} USD</span>
               </div>
             </div>
 

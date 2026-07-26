@@ -77,14 +77,17 @@ export async function POST(req: NextRequest) {
 
       if (course) {
         const originalPrice = parseFloat(course.price as any) || 0;
-        let baseAmount = originalPrice;
 
-        if (payInstallment && course.allow_installments && course.installments_count) {
-          baseAmount = Math.round(originalPrice / course.installments_count);
+        let installmentCount = 1;
+        if (payInstallment === 2) {
+          installmentCount = 2;
+        } else if (payInstallment === 3 || payInstallment === true) {
+          installmentCount = course.installments_count || 3;
+        } else if (typeof payInstallment === 'number' && payInstallment > 1) {
+          installmentCount = payInstallment;
         }
 
-        subtotal = baseAmount;
-
+        let fullCourseDiscount = 0;
         if (couponId) {
           const { data: coupon } = await supabaseAdmin
             .from('coupons')
@@ -95,14 +98,18 @@ export async function POST(req: NextRequest) {
 
           if (coupon) {
             if (coupon.discount_type === 'PERCENTAGE') {
-              discountAmount = Math.round(baseAmount * (parseFloat(coupon.discount_value as any) / 100));
+              fullCourseDiscount = Math.round(originalPrice * (parseFloat(coupon.discount_value as any) / 100));
             } else if (coupon.discount_type === 'FIXED') {
-              discountAmount = parseFloat(coupon.discount_value as any) || 0;
+              fullCourseDiscount = parseFloat(coupon.discount_value as any) || 0;
             }
           }
         }
 
-        calculatedAmount = Math.max(0, baseAmount - discountAmount);
+        const discountedTotalCoursePrice = Math.max(0, originalPrice - fullCourseDiscount);
+
+        subtotal = Math.round(originalPrice / installmentCount);
+        discountAmount = Math.round(fullCourseDiscount / installmentCount);
+        calculatedAmount = Math.max(0, Math.round(discountedTotalCoursePrice / installmentCount));
       }
     }
 
