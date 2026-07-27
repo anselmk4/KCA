@@ -68,12 +68,12 @@ export async function GET(req: NextRequest) {
     const courseIds = [...new Set(orderItems.map((item) => item.course_id))];
 
     // 3. Fetch courses
-    const { data: coursesData } = await dbClient
-      .from("courses")
+    const { data: coursesData } = await (dbClient
+      .from("courses" as any) as any)
       .select("id, title, price, allow_installments, installments_count, instructor_id")
       .in("id", courseIds);
 
-    const courses = coursesData || [];
+    const courses: any[] = coursesData || [];
     const instructorIds = [...new Set(courses.map((c) => c.instructor_id).filter(Boolean))];
 
     // 4. Fetch instructor profiles
@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
     // 5. Build detailed display transactions
     const transactions = payments.map((p) => {
       const item = orderItems.find((oi) => oi.order_id === p.order_id);
-      const course = item ? courseMap.get(item.course_id) : null;
+      const course: any = item ? courseMap.get(item.course_id) : null;
       const instructorName = course ? instructorMap.get(course.instructor_id) || "Formateur Kuettu" : "—";
       const courseTitle = course ? course.title : "Formation Spécialisée";
 
@@ -121,8 +121,8 @@ export async function GET(req: NextRequest) {
       // Parse provider details
       const rawMethod = p.method || "";
       const methodParts = rawMethod.split("::");
-      const carrierCode = methodParts[0] ? methodParts[0].toUpperCase() : "";
-      const carrierName = CARRIER_NAMES[carrierCode] || carrierCode;
+      const carrierCode = (methodParts[0] ? methodParts[0].toUpperCase() : "") as keyof typeof CARRIER_NAMES;
+      const carrierName = (CARRIER_NAMES as any)[carrierCode] || carrierCode;
 
       let methodDetail = PROVIDER_MAP[p.provider] || p.provider || "Paiement en ligne";
       if (p.provider === "MOBILE_MONEY" && carrierName) {

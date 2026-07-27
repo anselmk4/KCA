@@ -37,10 +37,11 @@ export async function GET(req: NextRequest) {
       : supabase;
 
     // Get instructor's courses
-    const { data: courses, error: coursesError } = await dbClient
-      .from("courses")
+    const { data: coursesRaw, error: coursesError } = await (dbClient
+      .from("courses" as any) as any)
       .select("id, title, slug, price, allow_installments, installments_count")
       .eq("instructor_id", user.id);
+    const courses: any[] | null = coursesRaw;
 
     if (coursesError) {
       console.error("[students-api] error fetching instructor courses:", coursesError);

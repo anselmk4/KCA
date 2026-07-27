@@ -19,6 +19,7 @@ import { supabase } from "@/lib/supabase/client";
 import { getPawaPayConfigForCountry } from "@/lib/pawapay";
 import { OperatorLogo } from "@/components/icons/PaymentLogos";
 import { SOLANA_TREASURY_ADDRESS, getSolanaPayUri, getSolanaQrCodeUrl, getBackupQrCodeUrl, connectSolanaWallet } from "@/lib/crypto";
+import { SolanaQrCode } from "@/components/ui/SolanaQrCode";
 
 declare global {
   interface Window {
@@ -763,24 +764,12 @@ function PaymentContent() {
 
                   <div className="flex flex-col items-center p-6 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl shadow-sm space-y-4">
                     {/* Solana Pay QR Code */}
-                    <div className="relative p-4 bg-white rounded-2xl border border-zinc-200 flex flex-col items-center justify-center shadow-md group">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img 
-                        src={getSolanaQrCodeUrl(getSolanaPayUri({ amount: currentPlanDetails.price, label: "Ansella Academy", memo: `KCA-PLAN-${plan.toUpperCase()}` }), 220)}
-                        onError={(e) => {
-                          const target = e.currentTarget;
-                          const fallback = getBackupQrCodeUrl(getSolanaPayUri({ amount: currentPlanDetails.price, label: "Ansella Academy", memo: `KCA-PLAN-${plan.toUpperCase()}` }), 220);
-                          if (target.src !== fallback) {
-                            target.src = fallback;
-                          }
-                        }}
-                        alt="Solana Pay QR Code"
-                        width={220}
-                        height={220}
-                        className="w-48 h-48 object-contain rounded-lg"
-                      />
-                      <div className="mt-2 text-[10px] font-bold text-zinc-500">Scannez avec Phantom ou Solflare</div>
-                    </div>
+                    <SolanaQrCode 
+                      value={getSolanaPayUri({ amount: currentPlanDetails.price, label: "Ansella Academy", memo: `KCA-PLAN-${plan.toUpperCase()}` })}
+                      size={200}
+                      showAnsellaLogo={true}
+                    />
+                    <div className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">Scannez avec Phantom ou Solflare</div>
 
                     <div className="text-center space-y-1.5 max-w-sm">
                       <p className="text-[11px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest">Abonnement Plan {plan}</p>
