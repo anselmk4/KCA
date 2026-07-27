@@ -33,6 +33,7 @@ interface AdminCourseItem {
   categoryName: string;
   level: string;
   createdAt: string;
+  type?: 'academic' | 'self_paced';
 }
 
 export default function AdminCoursesPage() {
@@ -136,6 +137,7 @@ export default function AdminCoursesPage() {
           categoryName: categoryMap.get(c.category_id) || 'Général',
           level: levelLabel,
           createdAt: c.created_at || new Date().toISOString(),
+          type: c.type || 'academic',
         };
       });
 
@@ -260,9 +262,18 @@ export default function AdminCoursesPage() {
               <div className="p-6 space-y-4">
                 {/* Header */}
                 <div className="flex items-center justify-between">
-                  <span className="px-2 py-0.5 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 rounded-lg text-[10px] font-bold uppercase">
-                    {course.categoryName}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2 py-0.5 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 rounded-lg text-[10px] font-bold uppercase">
+                      {course.categoryName}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold border uppercase ${
+                      course.type === 'self_paced'
+                        ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20'
+                        : 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20'
+                    }`}>
+                      {course.type === 'self_paced' ? '⚡ Autonomie' : '🎓 Encadré'}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-2">
                     {/* Action buttons */}
                     <button

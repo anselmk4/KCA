@@ -142,11 +142,15 @@ export async function PUT(
 
     if (type === "course") {
       // Update course metadata
-      const allowed = ["title", "slug", "description", "price", "category_id", "level", "allow_installments", "installments_count", "prerequisites", "learning_outcomes"];
+      const allowed = ["title", "slug", "description", "price", "category_id", "level", "allow_installments", "installments_count", "prerequisites", "learning_outcomes", "type"];
       const updates: Record<string, any> = { updated_at: new Date().toISOString() };
 
       for (const k of allowed) {
         if (courseData[k] !== undefined) updates[k] = courseData[k];
+      }
+
+      if (updates.type === "self_paced") {
+        updates.allow_installments = false;
       }
 
       const { data: updated, error } = await supabaseAdmin

@@ -63,6 +63,7 @@ export function CourseInspectionModal({ courseId, onClose, onStatusChanged }: Co
     description: "",
     price: 0,
     level: "BEGINNER",
+    type: "academic" as "academic" | "self_paced",
   });
 
   // Lesson Edit Form
@@ -99,6 +100,7 @@ export function CourseInspectionModal({ courseId, onClose, onStatusChanged }: Co
         description: data.course.description || "",
         price: data.course.price || 0,
         level: data.course.level || "BEGINNER",
+        type: data.course.type || "academic",
       });
 
       // Expand all sections by default
@@ -482,7 +484,7 @@ export function CourseInspectionModal({ courseId, onClose, onStatusChanged }: Co
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
                         <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1 block">Prix ($)</label>
                         <input
@@ -505,6 +507,18 @@ export function CourseInspectionModal({ courseId, onClose, onStatusChanged }: Co
                           <option value="INTERMEDIATE">Intermédiaire</option>
                           <option value="ADVANCED">Avancé</option>
                           <option value="EXPERT">Expert</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1 block font-bold text-red-600 dark:text-red-400">Format & Modèle (Type)</label>
+                        <select
+                          value={metaForm.type}
+                          onChange={e => setMetaForm({ ...metaForm, type: e.target.value as "academic" | "self_paced" })}
+                          className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 dark:text-white font-bold"
+                        >
+                          <option value="academic">🎓 Cours Encadré (Academic)</option>
+                          <option value="self_paced">⚡ Cours en Autonomie (Self-Paced)</option>
                         </select>
                       </div>
                     </div>
