@@ -1,4 +1,32 @@
-import React from "react";
+import Image from "next/image";
+
+export function PawaPayLogo(props: { className?: string }) {
+  return (
+    <div className={`relative flex items-center justify-center p-1 ${props.className || "w-12 h-12"}`}>
+      <Image
+        src="/images/partners/pawapay.png"
+        alt="pawaPay"
+        width={140}
+        height={50}
+        className="object-contain max-h-full max-w-full"
+      />
+    </div>
+  );
+}
+
+export function SolanaLogo(props: { className?: string }) {
+  return (
+    <div className={`relative flex items-center justify-center overflow-hidden rounded-xl ${props.className || "w-12 h-12"}`}>
+      <Image
+        src="/images/partners/solana.jpg"
+        alt="Solana"
+        width={140}
+        height={60}
+        className="object-cover w-full h-full"
+      />
+    </div>
+  );
+}
 
 export function BinanceLogo(props: React.SVGProps<SVGSVGElement>) {
   return (

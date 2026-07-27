@@ -4,7 +4,7 @@ import React from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { 
-  MokoLogo, BinanceLogo, OKXLogo, McBuleliLogo, 
+  PawaPayLogo, SolanaLogo, BinanceLogo, OKXLogo, McBuleliLogo, 
   PECBLogo, KivutechLogo, AnadecLogo 
 } from "@/components/icons/PartnerLogos";
 import { Handshake, ArrowRight, ShieldCheck, Cpu, Target } from "lucide-react";
@@ -12,12 +12,20 @@ import Link from "next/link";
 
 const partnersList = [
   {
-    name: "Moko afrika (Freshpay)",
-    role: "Partenaire d'intégration de Paiement",
-    desc: "Freshpay fournit l'infrastructure technique essentielle permettant aux formateurs de la plateforme Ansella d'encaisser les ventes de cours via Mobile Money (M-Pesa, Airtel Money, Orange Money) et de retirer leurs commissions instantanément.",
-    logo: <MokoLogo className="w-12 h-12" />,
-    color: "from-teal-500/10 to-indigo-500/5",
-    border: "hover:border-teal-500/40"
+    name: "pawaPay",
+    role: "Infrastructure de Paiement Mobile Money",
+    desc: "pawaPay fournit l'infrastructure technique globale d'intégration des paiements mobiles (Orange Money, Airtel Money, Vodacom M-Pesa, MTN MoMo, Wave) permettant l'encaissement sécurisé des formations et le versement automatisé des commissions formateurs.",
+    logo: <PawaPayLogo className="w-14 h-14" />,
+    color: "from-purple-500/10 to-indigo-500/5",
+    border: "hover:border-purple-500/40"
+  },
+  {
+    name: "Solana",
+    role: "Infrastructure Blockchain & Écosystème Web3",
+    desc: "La blockchain hautes performances Solana alimente nos infrastructures d'ancrage décentralisé des certificats et permet des règlements instantanés en crypto-actifs (SOL et tokens SPL) avec des frais de transaction minimes.",
+    logo: <SolanaLogo className="w-14 h-14" />,
+    color: "from-emerald-500/10 to-cyan-500/5",
+    border: "hover:border-emerald-500/40"
   },
   {
     name: "Binance",
