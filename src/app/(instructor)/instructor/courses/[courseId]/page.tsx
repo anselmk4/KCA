@@ -57,6 +57,7 @@ interface CourseData {
   instructor_id: string;
   allow_installments: boolean;
   installments_count: number;
+  type?: "academic" | "self_paced";
 }
 
 interface SectionData {
@@ -1227,6 +1228,13 @@ export default function CourseDetailPage() {
             <div className="flex items-center gap-2.5 flex-wrap">
               <span className="text-[11px] uppercase tracking-wider font-extrabold px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
                 {course.category || "Général"}
+              </span>
+              <span className={`text-[11px] uppercase tracking-wider font-extrabold px-3 py-1 rounded-full border ${
+                course.type === "self_paced"
+                  ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
+                  : "bg-teal-500/20 text-teal-300 border-teal-500/30"
+              }`}>
+                {course.type === "self_paced" ? "⚡ Autonomie" : "🎓 Encadré"}
               </span>
               <span className={`text-[11px] uppercase tracking-wider font-extrabold px-3 py-1 rounded-full border ${
                 course.status === "PUBLISHED"

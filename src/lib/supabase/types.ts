@@ -1,3 +1,5 @@
+export type CourseType = 'academic' | 'self_paced';
+
 export type Json =
   | string
   | number

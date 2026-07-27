@@ -21,6 +21,11 @@ enum Role {
   STUDENT
 }
 
+enum CourseType {
+  academic
+  self_paced
+}
+
 enum CourseStatus {
   DRAFT
   REVIEW
@@ -107,6 +112,7 @@ model Course {
   description String
   benefits    String?
   price       Float
+  type        CourseType   @default(academic)
   status      CourseStatus @default(DRAFT)
   instructorId String
   createdAt   DateTime     @default(now())

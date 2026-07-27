@@ -18,6 +18,8 @@ import {
   UploadCloud,
   FileImage,
   Loader2,
+  GraduationCap,
+  Info,
 } from "lucide-react";
 
 interface CourseCreationWizardModalProps {
@@ -35,6 +37,7 @@ interface CourseCreationWizardModalProps {
     level: string;
     thumbnailUrl: string;
     prerequisites: string;
+    type: "academic" | "self_paced";
   }) => Promise<void>;
   creating: boolean;
 }
@@ -91,8 +94,9 @@ export function CourseCreationWizardModal({
 }: CourseCreationWizardModalProps) {
   const [step, setStep] = useState<number>(1);
 
-  // Step 1: Identity & Description
+  // Step 1: Identity & Description & Format
   const [title, setTitle] = useState("");
+  const [type, setType] = useState<"academic" | "self_paced">("academic");
   const [category, setCategory] = useState("Intelligence Artificielle & Data");
   const [shortDescription, setShortDescription] = useState("");
   const [description, setDescription] = useState("");
@@ -182,11 +186,12 @@ export function CourseCreationWizardModal({
       category,
       price: currentPriceNumber,
       isPaid,
-      installmentsEnabled: isPaid && installmentsEnabled,
+      installmentsEnabled: type === "academic" && isPaid && installmentsEnabled,
       installmentCount,
       level,
       thumbnailUrl: activeImage,
       prerequisites,
+      type,
     });
   };
 
@@ -297,6 +302,63 @@ export function CourseCreationWizardModal({
                   placeholder="Ex: Masterclass IA & Automation : De Zéro à Pro"
                   className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-medium transition-all"
                 />
+              </div>
+
+              {/* Type / Format Selector */}
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
+                  Format & Modèle Pédagogique <span className="text-teal-600">*</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setType("academic")}
+                    className={`p-4 rounded-2xl border-2 transition-all text-left flex flex-col justify-between cursor-pointer ${
+                      type === "academic"
+                        ? "border-teal-500 bg-teal-50/50 dark:bg-teal-950/20 shadow-md ring-1 ring-teal-500"
+                        : "border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 hover:border-zinc-300"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+                        <span className="font-extrabold text-sm text-zinc-900 dark:text-white">Cours Encadré</span>
+                      </div>
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${type === "academic" ? "bg-teal-600 text-white" : "border border-zinc-300"}`}>
+                        {type === "academic" && <Check className="w-3 h-3" />}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                      Format académique complet : suivi actif des apprenants, devoirs, révocations d'accès, paiements par tranches et certificats.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setType("self_paced");
+                      setInstallmentsEnabled(false);
+                    }}
+                    className={`p-4 rounded-2xl border-2 transition-all text-left flex flex-col justify-between cursor-pointer ${
+                      type === "self_paced"
+                        ? "border-teal-500 bg-teal-50/50 dark:bg-teal-950/20 shadow-md ring-1 ring-teal-500"
+                        : "border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 hover:border-zinc-300"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Zap className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                        <span className="font-extrabold text-sm text-zinc-900 dark:text-white">Cours en Autonomie</span>
+                      </div>
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${type === "self_paced" ? "bg-teal-600 text-white" : "border border-zinc-300"}`}>
+                        {type === "self_paced" && <Check className="w-3 h-3" />}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                      Format style Udemy : accès immédiat et illimité après un paiement unique. Sans devoirs, révocations ni tranches.
+                    </p>
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -439,25 +501,34 @@ export function CourseCreationWizardModal({
                   </div>
 
                   <div className="pt-4 border-t border-zinc-200 dark:border-zinc-700/60 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
-                          Autoriser le Paiement par Tranches (Installments)
-                        </h4>
-                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                          Permet aux apprenants de régler en 2x, 3x ou 4x mensualités.
-                        </p>
+                    {type === "self_paced" ? (
+                      <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-2.5 text-xs text-amber-700 dark:text-amber-400 font-semibold">
+                        <Info className="w-4 h-4 shrink-0 text-amber-500" />
+                        <span>Le paiement par tranches est réservé aux <strong>Cours Encadrés</strong>. Pour ce cours en autonomie, le règlement s'effectue en une seule fois.</span>
                       </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={installmentsEnabled}
-                          onChange={(e) => setInstallmentsEnabled(e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-zinc-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
-                      </label>
-                    </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
+                              Autoriser le Paiement par Tranches (Installments)
+                            </h4>
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                              Permet aux apprenants de régler en 2x, 3x ou 4x mensualités.
+                            </p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={installmentsEnabled}
+                              onChange={(e) => setInstallmentsEnabled(e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-zinc-300 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                          </label>
+                        </div>
+                      </>
+                    )}
 
                     {installmentsEnabled && (
                       <div className="p-4 bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200/80 dark:border-teal-900/40 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 items-center animate-in fade-in">

@@ -70,12 +70,19 @@ export async function POST(req: NextRequest) {
     // 2. Vérifier que le cours existe et est publié
     const { data: course, error: courseError } = await activeClient
       .from('courses')
-      .select('id, title, status')
+      .select('id, title, status, type')
       .eq('id', courseId)
       .maybeSingle();
 
     if (courseError || !course) {
       return NextResponse.json({ error: 'Cours introuvable', eligible: false }, { status: 404 });
+    }
+
+    if ((course as any).type === 'self_paced') {
+      return NextResponse.json(
+        { error: 'Les certificats académiques d\'excellence sont réservés aux cours encadrés (Academic).', eligible: false },
+        { status: 400 }
+      );
     }
 
     // 3. Calculer total des leçons du cours

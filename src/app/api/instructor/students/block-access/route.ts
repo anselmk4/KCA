@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     // Verify course belongs to this instructor (unless admin)
     const { data: course, error: courseErr } = await dbClient
       .from("courses")
-      .select("id, title, instructor_id")
+      .select("id, title, instructor_id, type")
       .eq("id", courseId)
       .maybeSingle();
 
@@ -51,6 +51,10 @@ export async function POST(req: NextRequest) {
 
     if (!isAdmin && course.instructor_id !== user.id) {
       return NextResponse.json({ error: "Vous n'êtes pas le formateur de ce cours." }, { status: 403 });
+    }
+
+    if (action === "BLOCK" && course.type === "self_paced") {
+      return NextResponse.json({ error: "Le blocage manuel d'accès est réservé aux cours encadrés (Academic). Les cours en autonomie ne permettent pas la suspension d'accès." }, { status: 400 });
     }
 
     const nextStatus = action === "BLOCK" ? "SUSPENDED" : "ACTIVE";

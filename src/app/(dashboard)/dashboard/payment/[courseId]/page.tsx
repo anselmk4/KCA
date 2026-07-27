@@ -33,6 +33,7 @@ interface Course {
   level: string;
   allowInstallments: boolean;
   installmentsCount: number;
+  type?: 'academic' | 'self_paced';
 }
 
 type PaymentMethod = "momo" | "paypal" | "crypto" | "card";
@@ -254,8 +255,9 @@ export default function PaymentPage() {
         else if (currentCourse.level === 'ADVANCED') level = 'Avancé';
         else if (currentCourse.level === 'EXPERT') level = 'Expert';
 
-        let allowInstallments = currentCourse.allow_installments || false;
-        let installmentsCount = currentCourse.installments_count || 1;
+        const courseType = currentCourse.type || 'academic';
+        let allowInstallments = courseType === 'self_paced' ? false : (currentCourse.allow_installments || false);
+        let installmentsCount = courseType === 'self_paced' ? 1 : (currentCourse.installments_count || 1);
 
         setCourse({
           id: currentCourse.id,
@@ -271,7 +273,8 @@ export default function PaymentPage() {
           category: categoryName,
           level,
           allowInstallments,
-          installmentsCount
+          installmentsCount,
+          type: courseType,
         });
       } catch (err) {
         console.error('[payment] Unexpected error loading course from Supabase:', err);

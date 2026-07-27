@@ -253,6 +253,7 @@ export default function InstructorCoursesPage() {
     level: string;
     thumbnailUrl: string;
     prerequisites: string;
+    type: "academic" | "self_paced";
   }) => {
     setCreating(true);
     const slug = courseData.title
@@ -269,6 +270,9 @@ export default function InstructorCoursesPage() {
       return "BEGINNER";
     };
 
+    const courseType = courseData.type || "academic";
+    const allowInstallments = courseType === "academic" ? courseData.installmentsEnabled : false;
+
     const { error } = await supabase
       .from("courses")
       .insert({
@@ -279,8 +283,10 @@ export default function InstructorCoursesPage() {
         level: mapLevel(courseData.level),
         thumbnail_url: courseData.thumbnailUrl,
         instructor_id: instructorId,
-        status: "DRAFT"
-      });
+        status: "DRAFT",
+        type: courseType,
+        allow_installments: allowInstallments,
+      } as any);
 
     if (error) {
       console.warn("Supabase error during course creation, using local fallback DB:", error.message);
@@ -479,9 +485,18 @@ export default function InstructorCoursesPage() {
                       {cleanDesc && (
                         <p className="text-[11px] text-zinc-400 truncate mt-0.5">{cleanDesc}</p>
                       )}
-                      {course.level && (
-                        <span className="text-[9px] font-bold uppercase text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 px-1.5 py-0.5 rounded mt-1 inline-block">{course.level}</span>
-                      )}
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        {course.level && (
+                          <span className="text-[9px] font-bold uppercase text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 px-1.5 py-0.5 rounded">{course.level}</span>
+                        )}
+                        <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${
+                          course.type === "self_paced"
+                            ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20"
+                            : "bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20"
+                        }`}>
+                          {course.type === "self_paced" ? "Autonomie" : "Encadré"}
+                        </span>
+                      </div>
                     </div>
                   </div>
 

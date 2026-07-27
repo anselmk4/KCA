@@ -12,11 +12,14 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, title, slug, description, price, createdAt, category, level } = body;
+    const { id, title, slug, description, price, createdAt, category, level, type, installmentsEnabled } = body;
 
     if (!title || !slug) {
       return NextResponse.json({ error: 'title et slug sont requis' }, { status: 400 });
     }
+
+    const courseType = type === 'self_paced' ? 'self_paced' : 'academic';
+    const allowInstallments = courseType === 'self_paced' ? false : (installmentsEnabled ?? false);
 
     const categoryMap: Record<string, string> = {
       'Blockchain': 'fb9c0236-be6a-4dca-aeaf-b477c88e00cd',
@@ -44,13 +47,15 @@ export async function POST(req: NextRequest) {
       slug,
       description: description || '',
       price: price ?? 0,
+      type: courseType,
+      allow_installments: allowInstallments,
       status: 'DRAFT',
       instructor_id: user.id,
       category_id: categoryId,
       level: mappedLevel,
       created_at: createdAt || new Date().toISOString(),
       updated_at: createdAt || new Date().toISOString(),
-    }).select().single();
+    } as any).select().single();
 
     if (error) {
       console.error('[API /courses POST] Supabase error:', error.message, error.details, error.hint);
@@ -82,6 +87,12 @@ export async function PUT(req: NextRequest) {
 
     // Map camelCase updates to snake_case Supabase columns
     const sbUpdates: Record<string, any> = {};
+    if (updates.type !== undefined) {
+      sbUpdates.type = updates.type === 'self_paced' ? 'self_paced' : 'academic';
+      if (sbUpdates.type === 'self_paced') {
+        sbUpdates.allow_installments = false;
+      }
+    }
     if (updates.title !== undefined) sbUpdates.title = updates.title;
     if (updates.description !== undefined) sbUpdates.description = updates.description;
     if (updates.price !== undefined) sbUpdates.price = updates.price;
