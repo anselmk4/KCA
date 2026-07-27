@@ -17,11 +17,17 @@ export function getSolanaPayUri(params: {
   memo?: string;
 }): string {
   const recipient = params.recipient || SOLANA_TREASURY_ADDRESS;
-  const label = encodeURIComponent(params.label || "Ansella Academy");
-  const memo = encodeURIComponent(params.memo || "ANS-PAYMENT");
-  const amountStr = (Number(params.amount) || 0).toFixed(2);
+  const numAmount = Number(params.amount) || 0;
+  const amountStr = numAmount % 1 === 0 ? numAmount.toString() : numAmount.toFixed(2);
 
-  return `solana:${recipient}?amount=${amountStr}&spl-token=${USDC_SOLANA_MINT}&label=${label}&memo=${memo}`;
+  const searchParams = new URLSearchParams();
+  if (amountStr && amountStr !== "0") searchParams.set("amount", amountStr);
+  if (USDC_SOLANA_MINT) searchParams.set("spl-token", USDC_SOLANA_MINT);
+  if (params.label) searchParams.set("label", params.label || "Ansella Academy");
+  if (params.memo) searchParams.set("memo", params.memo || "ANS-PAYMENT");
+
+  const queryString = searchParams.toString();
+  return `solana:${recipient}${queryString ? `?${queryString}` : ""}`;
 }
 
 /**

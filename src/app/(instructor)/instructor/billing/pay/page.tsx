@@ -74,6 +74,7 @@ function PaymentContent() {
   const [cryptoSuccess, setCryptoSuccess] = useState<string | null>(null);
   const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const [cryptoQrType, setCryptoQrType] = useState<"solanapay" | "address">("solanapay");
 
   const handleVerifyCryptoPayment = async (overrideTxId?: string) => {
     const txToVerify = (overrideTxId || cryptoTxId).trim();
@@ -763,13 +764,47 @@ function PaymentContent() {
                   </div>
 
                   <div className="flex flex-col items-center p-6 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl shadow-sm space-y-4">
+                    {/* QR Code Type Selector Tabs */}
+                    <div className="flex items-center gap-1 bg-zinc-200/60 dark:bg-zinc-800/80 p-1 rounded-xl w-full max-w-xs text-xs font-extrabold">
+                      <button
+                        type="button"
+                        onClick={() => setCryptoQrType("solanapay")}
+                        className={`flex-1 py-1.5 px-2 rounded-lg transition-all text-center cursor-pointer ${
+                          cryptoQrType === "solanapay"
+                            ? "bg-white dark:bg-zinc-900 text-teal-600 dark:text-teal-400 shadow-sm"
+                            : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                        }`}
+                      >
+                        Solana Pay (Auto)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCryptoQrType("address")}
+                        className={`flex-1 py-1.5 px-2 rounded-lg transition-all text-center cursor-pointer ${
+                          cryptoQrType === "address"
+                            ? "bg-white dark:bg-zinc-900 text-teal-600 dark:text-teal-400 shadow-sm"
+                            : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                        }`}
+                      >
+                        Adresse Directe
+                      </button>
+                    </div>
+
                     {/* Solana Pay QR Code */}
                     <SolanaQrCode 
-                      value={getSolanaPayUri({ amount: currentPlanDetails.price, label: "Ansella Academy", memo: `KCA-PLAN-${plan.toUpperCase()}` })}
+                      value={
+                        cryptoQrType === "solanapay"
+                          ? getSolanaPayUri({ amount: currentPlanDetails.price, label: "Ansella Academy", memo: `KCA-PLAN-${plan.toUpperCase()}` })
+                          : SOLANA_TREASURY_ADDRESS
+                      }
                       size={200}
                       showAnsellaLogo={true}
                     />
-                    <div className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">Scannez avec Phantom ou Solflare</div>
+                    <div className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">
+                      {cryptoQrType === "solanapay"
+                        ? "Scannez avec Phantom ou Solflare (Montant pré-rempli)"
+                        : "Scannez pour obtenir l'adresse du portefeuille"}
+                    </div>
 
                     <div className="text-center space-y-1.5 max-w-sm">
                       <p className="text-[11px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest">Abonnement Plan {plan}</p>

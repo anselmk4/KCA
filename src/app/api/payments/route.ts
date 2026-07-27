@@ -124,7 +124,8 @@ export async function GET(req: NextRequest) {
       const carrierCode = (methodParts[0] ? methodParts[0].toUpperCase() : "") as keyof typeof CARRIER_NAMES;
       const carrierName = (CARRIER_NAMES as any)[carrierCode] || carrierCode;
 
-      let methodDetail = PROVIDER_MAP[p.provider] || p.provider || "Paiement en ligne";
+      const providerKey = (p.provider || "") as keyof typeof PROVIDER_MAP;
+      let methodDetail = PROVIDER_MAP[providerKey] || p.provider || "Paiement en ligne";
       if (p.provider === "MOBILE_MONEY" && carrierName) {
         methodDetail = `Mobile Money (${carrierName})`;
       } else if (p.provider === "PAYPAL") {

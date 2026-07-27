@@ -83,12 +83,12 @@ export function SolanaQrCode({
           {/* Central Ansella Logo Badge Overlay */}
           {showAnsellaLogo && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white border-2 border-teal-500/80 shadow-md p-1 flex items-center justify-center">
+              <div className="w-9 h-9 rounded-xl bg-white border border-teal-500/60 shadow-sm p-1 flex items-center justify-center">
                 <Image
                   src="/logo.png"
                   alt="Ansella"
-                  width={40}
-                  height={40}
+                  width={28}
+                  height={28}
                   className="w-full h-full object-contain"
                 />
               </div>
