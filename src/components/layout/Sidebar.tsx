@@ -17,7 +17,8 @@ import {
   Compass,
   Video,
   UserCircle,
-  MessageSquare
+  MessageSquare,
+  Calendar,
 } from "lucide-react";
 import { clearSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
@@ -44,6 +45,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     { icon: <LayoutDashboard className="w-5 h-5" />, label: language === "en" ? "Overview" : "Vue d'ensemble", href: "/dashboard" },
     { icon: <Compass className="w-5 h-5" />, label: language === "en" ? "Discover" : "Découvrir", href: "/dashboard/discover" },
     { icon: <BookOpen className="w-5 h-5" />, label: t("student.sidebar.myCourses"), href: "/dashboard/courses" },
+    { icon: <Calendar className="w-5 h-5" />, label: language === "en" ? "Calendar" : "Calendrier & Planning", href: "/dashboard/calendar" },
     { icon: <MessageSquare className="w-5 h-5" />, label: language === "en" ? "Direct Messages" : "Messagerie Directe", href: "/dashboard/messages" },
     { icon: <Video className="w-5 h-5" />, label: language === "en" ? "Live Sessions" : "Session Live", href: "/dashboard/live" },
     { icon: <CreditCard className="w-5 h-5" />, label: t("student.sidebar.billing"), href: "/dashboard/payments" },
