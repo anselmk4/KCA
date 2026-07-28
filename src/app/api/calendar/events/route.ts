@@ -74,8 +74,6 @@ export async function GET(req: NextRequest) {
           if (Array.isArray(s.allowed_user_ids) && s.allowed_user_ids.includes(user.id)) return true;
           // Linked to enrolled course
           if (s.course_id && enrolledCourseIds.includes(s.course_id)) return true;
-          // Created for this student
-          if (s.target_student_id === user.id) return true;
           return false;
         });
       }
@@ -96,23 +94,26 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const formattedEvents = events.map(e => ({
-      id: e.id,
-      title: e.title,
-      description: e.description || "",
-      scheduledAt: e.scheduled_at,
-      durationMinutes: e.duration_minutes || 60,
-      meetingProvider: e.meeting_provider || "ANSELLA_LIVE",
-      meetingUrl: e.meeting_url || "",
-      isPublic: e.is_public ?? true,
-      instructorId: e.instructor_id,
-      instructorName: hostMap[e.instructor_id] || "Formateur",
-      allowedUserIds: e.allowed_user_ids || [],
-      sessionType: e.session_type || (e.allowed_user_ids?.length === 1 ? "COACHING_1ON1" : "LIVE_SESSION"),
-      courseId: e.course_id,
-      courseTitle: e.courses?.title || null,
-      targetStudentId: e.target_student_id || null,
-    }));
+    const formattedEvents = events.map(e => {
+      const isCoaching = (!e.is_public && Array.isArray(e.allowed_user_ids) && e.allowed_user_ids.length > 0) || e.description?.includes("[COACHING]");
+      
+      return {
+        id: e.id,
+        title: e.title,
+        description: (e.description || "").replace("[COACHING]", "").trim(),
+        scheduledAt: e.scheduled_at,
+        durationMinutes: e.duration_minutes || 60,
+        meetingProvider: e.meeting_provider || "ANSELLA_LIVE",
+        meetingUrl: e.meeting_url || "",
+        isPublic: e.is_public ?? true,
+        instructorId: e.instructor_id,
+        instructorName: hostMap[e.instructor_id] || "Formateur",
+        allowedUserIds: e.allowed_user_ids || [],
+        sessionType: isCoaching ? "COACHING_1ON1" : "LIVE_SESSION",
+        courseId: e.course_id,
+        courseTitle: e.courses?.title || null,
+      };
+    });
 
     return NextResponse.json({ events: formattedEvents }, { status: 200 });
 
@@ -143,7 +144,6 @@ export async function POST(req: NextRequest) {
       durationMinutes,
       sessionType, // "LIVE_SESSION" | "COACHING_1ON1"
       courseId,
-      targetStudentId,
       allowedUserIds,
       meetingProvider,
       meetingUrl,
@@ -155,26 +155,33 @@ export async function POST(req: NextRequest) {
     }
 
     const dbClient = process.env.SUPABASE_SERVICE_ROLE_KEY ? supabaseAdmin : supabase;
+    const sessionId = crypto.randomUUID();
 
-    // Resolve target allowed user IDs
-    let finalAllowedUserIds: string[] = Array.isArray(allowedUserIds) ? allowedUserIds : [];
-    if (targetStudentId && !finalAllowedUserIds.includes(targetStudentId)) {
-      finalAllowedUserIds.push(targetStudentId);
+    // Determine meeting link
+    let finalMeetingUrl = meetingUrl?.trim() || "";
+    if (meetingProvider === "ANSELLA_LIVE" || !finalMeetingUrl) {
+      finalMeetingUrl = `https://meet.jit.si/ansella-live-${sessionId}`;
     }
 
+    const isPublicSession = sessionType === "COACHING_1ON1" ? false : Boolean(isPublic);
+    const finalAllowedUsers = Array.isArray(allowedUserIds) ? allowedUserIds : [];
+    
+    const formattedDesc = sessionType === "COACHING_1ON1" 
+      ? `[COACHING] ${description || ""}`.trim()
+      : (description || "").trim();
+
     const newSession = {
+      id: sessionId,
       title: title.trim(),
-      description: description?.trim() || null,
+      description: formattedDesc || null,
       scheduled_at: new Date(scheduledAt).toISOString(),
       duration_minutes: Number(durationMinutes) || 60,
       meeting_provider: meetingProvider || "ANSELLA_LIVE",
-      meeting_url: meetingUrl?.trim() || `https://meet.jit.si/Ansella-Live-${Math.random().toString(36).substring(2, 8)}`,
-      is_public: isPublic ?? (sessionType === "COACHING_1ON1" ? false : true),
+      meeting_url: finalMeetingUrl,
+      is_public: isPublicSession,
       instructor_id: user.id,
-      allowed_user_ids: finalAllowedUserIds,
-      session_type: sessionType || "LIVE_SESSION",
+      allowed_user_ids: isPublicSession ? [] : finalAllowedUsers,
       course_id: courseId || null,
-      target_student_id: targetStudentId || null,
     };
 
     const { data, error } = await dbClient
@@ -189,11 +196,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Send notifications to selected student(s)
-    if (finalAllowedUserIds.length > 0) {
-      for (const studentId of finalAllowedUserIds) {
+    if (finalAllowedUsers.length > 0) {
+      for (const studentId of finalAllowedUsers) {
         await createNotification({
           userId: studentId,
-          title: sessionType === "COACHING_1ON1" ? "🤝 Séance de Coaching 1-sur-1 programmée" : "📡 Nouvelle Session Live programmée",
+          title: sessionType === "COACHING_1ON1" ? "🤝 Séance de Coaching 1-sur-1 programmée" : "📡 Session Live Privée programmée",
           message: `Votre séance "${title}" a été programmée pour le ${new Date(scheduledAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}.`,
           type: "INFO",
           link: "/dashboard/calendar"

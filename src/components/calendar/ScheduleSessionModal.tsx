@@ -14,6 +14,8 @@ import {
   BookOpen,
   Link2,
   Users,
+  Globe,
+  Lock,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
@@ -27,7 +29,7 @@ interface StudentOption {
   id: string;
   full_name: string;
   email: string;
-  courseTitle?: string;
+  type?: "student" | "instructor";
 }
 
 interface CourseOption {
@@ -50,11 +52,11 @@ export function ScheduleSessionModal({
   const [meetingUrl, setMeetingUrl] = useState("");
   const [isPublic, setIsPublic] = useState(true);
 
-  // Options
+  // Options & Selections
   const [courses, setCourses] = useState<CourseOption[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState("");
   const [students, setStudents] = useState<StudentOption[]>([]);
-  const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [studentSearch, setStudentSearch] = useState("");
 
   const [loadingOptions, setLoadingOptions] = useState(false);
@@ -83,12 +85,14 @@ export function ScheduleSessionModal({
 
         setCourses(courseData || []);
 
-        // Fetch enrolled students across instructor's courses
+        // Build list of students & fellow instructors for invitation
+        const inviteList: StudentOption[] = [];
         const courseIds = (courseData || []).map((c) => c.id);
+
         if (courseIds.length > 0) {
           const { data: enrollData } = await supabase
             .from("enrollments")
-            .select("student_id, courses(title)")
+            .select("student_id")
             .in("course_id", courseIds);
 
           const studentIds = Array.from(new Set(enrollData?.map((e: any) => e.student_id).filter(Boolean)));
@@ -99,15 +103,35 @@ export function ScheduleSessionModal({
               .select("id, full_name, email")
               .in("id", studentIds);
 
-            setStudents(
-              (profileData || []).map((p) => ({
+            (profileData || []).forEach((p) => {
+              inviteList.push({
                 id: p.id,
                 full_name: p.full_name || "Apprenant",
                 email: p.email || "",
-              }))
-            );
+                type: "student",
+              });
+            });
           }
         }
+
+        // Also fetch all student profiles as fallback
+        const { data: allProfiles } = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .limit(50);
+
+        (allProfiles || []).forEach((p) => {
+          if (!inviteList.some((x) => x.id === p.id) && p.id !== user.id) {
+            inviteList.push({
+              id: p.id,
+              full_name: p.full_name || "Utilisateur",
+              email: p.email || "",
+              type: "student",
+            });
+          }
+        });
+
+        setStudents(inviteList);
       } catch (err) {
         console.error("Error loading options:", err);
       } finally {
@@ -126,6 +150,20 @@ export function ScheduleSessionModal({
       s.email.toLowerCase().includes(studentSearch.toLowerCase())
   );
 
+  const toggleUserSelection = (userId: string) => {
+    if (sessionType === "COACHING_1ON1") {
+      // Coaching 1-on-1: single student selection
+      setSelectedUserIds([userId]);
+    } else {
+      // Private Live Masterclass: multi-selection
+      if (selectedUserIds.includes(userId)) {
+        setSelectedUserIds(selectedUserIds.filter((id) => id !== userId));
+      } else {
+        setSelectedUserIds([...selectedUserIds, userId]);
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
@@ -139,17 +177,26 @@ export function ScheduleSessionModal({
       return;
     }
 
-    if (sessionType === "COACHING_1ON1" && !selectedStudentId) {
-      setErrorMsg("Veuillez sélectionner l'apprenant pour ce coaching 1-sur-1.");
+    // Validation for external meeting URLs
+    if (meetingProvider !== "ANSELLA_LIVE" && !meetingUrl.trim()) {
+      setErrorMsg(`Veuillez saisir le lien de réunion pour ${meetingProvider}.`);
+      return;
+    }
+
+    // Validation for private / coaching target users
+    const requiresUserSelection = sessionType === "COACHING_1ON1" || !isPublic;
+    if (requiresUserSelection && selectedUserIds.length === 0) {
+      setErrorMsg(
+        sessionType === "COACHING_1ON1"
+          ? "Veuillez sélectionner l'apprenant pour ce coaching 1-sur-1."
+          : "Veuillez sélectionner au moins un participant pour cette séance privée."
+      );
       return;
     }
 
     setSubmitting(true);
     try {
-      const scheduledAt = new Date(`${date}T${time}:00`).toISOString();
-      const generatedMeetingUrl =
-        meetingUrl.trim() ||
-        `https://meet.jit.si/Ansella-Live-${Math.random().toString(36).substring(2, 8)}`;
+      const scheduledAt = `${date}T${time}:00`;
 
       const res = await fetch("/api/calendar/events", {
         method: "POST",
@@ -161,11 +208,10 @@ export function ScheduleSessionModal({
           durationMinutes: Number(duration) || 60,
           sessionType,
           courseId: selectedCourseId || null,
-          targetStudentId: sessionType === "COACHING_1ON1" ? selectedStudentId : null,
-          allowedUserIds: sessionType === "COACHING_1ON1" ? [selectedStudentId] : [],
+          allowedUserIds: sessionType === "COACHING_1ON1" || !isPublic ? selectedUserIds : [],
           meetingProvider,
-          meetingUrl: generatedMeetingUrl,
-          isPublic: sessionType === "LIVE_SESSION" ? isPublic : false,
+          meetingUrl: meetingUrl.trim(),
+          isPublic: sessionType === "COACHING_1ON1" ? false : isPublic,
         }),
       });
 
@@ -220,7 +266,10 @@ export function ScheduleSessionModal({
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => setSessionType("LIVE_SESSION")}
+                onClick={() => {
+                  setSessionType("LIVE_SESSION");
+                  setIsPublic(true);
+                }}
                 className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
                   sessionType === "LIVE_SESSION"
                     ? "border-teal-500 bg-teal-50/50 dark:bg-teal-950/20 shadow-md ring-1 ring-teal-500"
@@ -239,7 +288,10 @@ export function ScheduleSessionModal({
 
               <button
                 type="button"
-                onClick={() => setSessionType("COACHING_1ON1")}
+                onClick={() => {
+                  setSessionType("COACHING_1ON1");
+                  setIsPublic(false);
+                }}
                 className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
                   sessionType === "COACHING_1ON1"
                     ? "border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20 shadow-md ring-1 ring-indigo-500"
@@ -257,6 +309,41 @@ export function ScheduleSessionModal({
               </button>
             </div>
           </div>
+
+          {/* Visibility Option for Live Session */}
+          {sessionType === "LIVE_SESSION" && (
+            <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-700/60 rounded-2xl space-y-3">
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+                Visibilité de la Masterclass
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsPublic(true)}
+                  className={`p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                    isPublic
+                      ? "border-teal-500 bg-teal-500/10 text-teal-600 dark:text-teal-400 shadow-sm"
+                      : "border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:border-zinc-400"
+                  }`}
+                >
+                  <Globe className="w-4 h-4" />
+                  <span>Publique (Tous les inscrits)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPublic(false)}
+                  className={`p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                    !isPublic
+                      ? "border-indigo-500 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                      : "border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:border-zinc-400"
+                  }`}
+                >
+                  <Lock className="w-4 h-4" />
+                  <span>Privée / Restreinte</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Title */}
           <div>
@@ -292,12 +379,17 @@ export function ScheduleSessionModal({
             </select>
           </div>
 
-          {/* Target Student Selection for 1-on-1 */}
-          {sessionType === "COACHING_1ON1" && (
+          {/* Target Student / User Selection (for Coaching or Private Live) */}
+          {(sessionType === "COACHING_1ON1" || !isPublic) && (
             <div className="p-4 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-900/30 rounded-2xl space-y-3">
-              <label className="block text-xs font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-200">
-                Sélectionnez l'Apprenant <span className="text-indigo-600">*</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-200">
+                  {sessionType === "COACHING_1ON1" ? "Sélectionnez l'Apprenant (1-sur-1)" : "Sélectionnez les Participants Autorisés"} <span className="text-indigo-600">*</span>
+                </label>
+                <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-md">
+                  {selectedUserIds.length} sélectionné(s)
+                </span>
+              </div>
 
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
@@ -306,32 +398,39 @@ export function ScheduleSessionModal({
                   placeholder="Rechercher par nom ou email..."
                   value={studentSearch}
                   onChange={(e) => setStudentSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs"
+                  className="w-full pl-9 pr-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500/30"
                 />
               </div>
 
-              <div className="max-h-36 overflow-y-auto space-y-1">
+              <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
                 {filteredStudents.length === 0 ? (
-                  <p className="text-xs text-zinc-400 italic py-2">Aucun étudiant trouvé.</p>
+                  <p className="text-xs text-zinc-400 italic py-2">Aucun utilisateur trouvé.</p>
                 ) : (
-                  filteredStudents.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setSelectedStudentId(s.id)}
-                      className={`w-full p-2.5 rounded-xl text-left text-xs flex items-center justify-between transition-all cursor-pointer ${
-                        selectedStudentId === s.id
-                          ? "bg-indigo-600 text-white font-bold shadow-md"
-                          : "bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200"
-                      }`}
-                    >
-                      <div>
-                        <p className="font-extrabold">{s.full_name}</p>
-                        <p className="text-[10px] opacity-80">{s.email}</p>
-                      </div>
-                      {selectedStudentId === s.id && <Check className="w-4 h-4" />}
-                    </button>
-                  ))
+                  filteredStudents.map((s) => {
+                    const isSelected = selectedUserIds.includes(s.id);
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => toggleUserSelection(s.id)}
+                        className={`w-full p-2.5 rounded-xl text-left text-xs flex items-center justify-between transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-indigo-600 text-white font-bold shadow-md"
+                            : "bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200/60 dark:border-zinc-800"
+                        }`}
+                      >
+                        <div>
+                          <p className="font-extrabold">{s.full_name}</p>
+                          <p className="text-[10px] opacity-80">{s.email}</p>
+                        </div>
+                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center text-xs ${
+                          isSelected ? "bg-white text-indigo-600 border-white font-black" : "border-zinc-300 dark:border-zinc-700"
+                        }`}>
+                          {isSelected && <Check className="w-3.5 h-3.5" />}
+                        </div>
+                      </button>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -386,33 +485,58 @@ export function ScheduleSessionModal({
           {/* Description */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-              Description & Programme de la Séance
+              Description & Ordre du Jour
             </label>
             <textarea
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Précisez l'ordre du jour, les sujets abordés et les prérequis..."
+              placeholder="Précisez le programme, les sujets abordés et les prérequis..."
               className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs font-medium focus:outline-none"
             />
           </div>
 
-          {/* Meeting URL */}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
-              Lien de Visioconférence (Optionnel)
+          {/* Meeting Provider & Automatic Link Logic */}
+          <div className="space-y-3">
+            <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              Plateforme de Visioconférence
             </label>
-            <div className="relative">
-              <Link2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-              <input
-                type="url"
-                value={meetingUrl}
-                onChange={(e) => setMeetingUrl(e.target.value)}
-                placeholder="https://meet.jit.si/... ou https://zoom.us/j/..."
-                className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-medium focus:outline-none"
-              />
-            </div>
-            <p className="text-[10px] text-zinc-400 mt-1">Laissez vide pour générer automatiquement un salon vidéo sécurisé Ansella Live.</p>
+
+            <select
+              value={meetingProvider}
+              onChange={(e) => setMeetingProvider(e.target.value)}
+              className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs font-medium focus:outline-none"
+            >
+              <option value="ANSELLA_LIVE">🟣 Ansella Visio Live (Généré automatiquement)</option>
+              <option value="ZOOM">🔷 Zoom Meetings</option>
+              <option value="GOOGLE_MEET">🟢 Google Meet</option>
+              <option value="TEAMS">🟪 Microsoft Teams</option>
+              <option value="OTHER">🌐 Autre service externe</option>
+            </select>
+
+            {meetingProvider === "ANSELLA_LIVE" ? (
+              <div className="p-3 bg-teal-500/10 border border-teal-500/20 rounded-xl text-xs text-teal-700 dark:text-teal-300 font-medium flex items-center gap-2">
+                <Sparkles className="w-4 h-4 shrink-0 text-teal-500" />
+                <span>Le salon vidéo interactif sécurisé Ansella Live sera automatiquement généré dès la création de la séance.</span>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
+                  Lien de la Réunion ({meetingProvider}) <span className="text-teal-600">*</span>
+                </label>
+                <div className="relative">
+                  <Link2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                  <input
+                    type="url"
+                    required
+                    value={meetingUrl}
+                    onChange={(e) => setMeetingUrl(e.target.value)}
+                    placeholder={`Saisissez le lien de réunion ${meetingProvider}...`}
+                    className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-medium focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Submit Action */}
