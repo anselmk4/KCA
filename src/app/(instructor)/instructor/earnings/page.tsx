@@ -206,7 +206,9 @@ export default function EarningsPage() {
       }
 
       setInstructorPlan(data.plan || "FREE");
-      setTransactions(data.transactions || []);
+      // Keep strictly PAID (validé) and FAILED (échoué) transactions
+      const cleanTx = (data.transactions || []).filter((t: any) => t.status === "PAID" || t.status === "FAILED");
+      setTransactions(cleanTx);
       setPayouts(data.payouts || []);
       setHasServiceRole(data.hasServiceRole !== false);
     } catch (err) {
@@ -226,7 +228,7 @@ export default function EarningsPage() {
 
   // Filtered transactions for calculation
   const paidTransactions = useMemo(() => {
-    return transactions.filter(t => normalizeStatus(t.status) === "PAID");
+    return transactions.filter(t => t.status === "PAID");
   }, [transactions]);
 
   // Total gross revenue
@@ -237,12 +239,8 @@ export default function EarningsPage() {
   const platformFee = totalRevenue * commissionRate;
   const netRevenue = totalRevenue * instructorShare;
 
-  // Calculate pending revenue from orders that are still pending
-  const pendingRevenue = useMemo(() => {
-    return transactions
-      .filter((t) => normalizeStatus(t.status) === "PENDING")
-      .reduce((acc, t) => acc + t.amount, 0) * instructorShare;
-  }, [transactions, instructorShare]);
+  // Pending revenue metric clean (set to 0 as pending transactions are cleaned)
+  const pendingRevenue = 0;
 
   // Unique students count
   const uniqueStudentsCount = useMemo(() => {
@@ -880,14 +878,12 @@ export default function EarningsPage() {
                       <td className="px-6 py-4 text-right">${tx.amount.toFixed(2)}</td>
                       <td className="px-6 py-4 text-right text-emerald-600 dark:text-emerald-450 font-bold">+${net.toFixed(2)}</td>
                       <td className="px-6 py-4 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                          normalizeStatus(tx.status) === "PAID"
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                            : normalizeStatus(tx.status) === "PENDING"
-                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${
+                          tx.status === "PAID"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800"
+                            : "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400 border-red-300 dark:border-red-800"
                         }`}>
-                          {tx.status === "PAID" ? "Payé" : tx.status === "PENDING" ? "En attente" : "Échoué"}
+                          {tx.status === "PAID" ? "Validé" : "Échoué"}
                         </span>
                       </td>
                     </tr>

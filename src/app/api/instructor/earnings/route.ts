@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
       .select("order_id, course_id, final_price, unit_price")
       .in("course_id", courseIds);
 
-    let transactions: any[] = [];
+    let rawTransactions: any[] = [];
 
     if (orderItems && orderItems.length > 0) {
       const orderIds = orderItems.map((oi) => oi.order_id);
@@ -99,20 +99,28 @@ export async function GET(req: NextRequest) {
 
         const profileMap = new Map(studentProfiles?.map((p) => [p.id, p.full_name]) || []);
 
-        transactions = payments.map((p) => {
+        rawTransactions = payments.map((p) => {
           const courseId = orderItemMap.get(p.order_id) || "";
           const course = courseMap.get(courseId);
           const studentName = profileMap.get(p.user_id) || "Étudiant";
           const st = (p.status || "").toUpperCase();
+
+          let normalizedStatus = "PENDING";
+          if (st === "PAID" || st === "COMPLETED" || st === "SUCCESS") {
+            normalizedStatus = "PAID";
+          } else if (st === "FAILED" || st === "CANCELLED" || st === "REFUNDED" || st === "REJECTED") {
+            normalizedStatus = "FAILED";
+          }
 
           return {
             id: p.id,
             orderId: p.order_id,
             courseId,
             courseTitle: course?.title || "Formation",
+            userId: p.user_id,
             studentName,
             amount: Number(p.amount) || 0,
-            status: (st === "PAID" || st === "COMPLETED" || st === "SUCCESS") ? "PAID" : "PENDING",
+            status: normalizedStatus,
             date: p.paid_at || new Date().toISOString(),
             method: p.provider || "CARTE"
           };
@@ -120,9 +128,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Fallback: If no payment records found, construct transactions from active enrollments
-    if (transactions.length === 0 && enrollmentsList.length > 0) {
-      transactions = enrollmentsList.map((enr: any) => {
+    // Fallback: If no payment records found, construct transactions from active enrollments (marked as PAID)
+    if (rawTransactions.length === 0 && enrollmentsList.length > 0) {
+      rawTransactions = enrollmentsList.map((enr: any) => {
         const course = courseMap.get(enr.course_id);
         const coursePrice = Number(course?.price) || 0;
         const studentName = enr.profiles?.full_name || "Étudiant inscrit";
@@ -132,6 +140,7 @@ export async function GET(req: NextRequest) {
           orderId: `ENR-${enr.id?.substring(0, 8) || "ACC"}`,
           courseId: enr.course_id,
           courseTitle: course?.title || "Formation",
+          userId: enr.student_id,
           studentName,
           amount: coursePrice,
           status: "PAID",
@@ -141,21 +150,27 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const paidTx = transactions.filter((t) => t.status === "PAID");
+    // Clean transactions: Keep ONLY transactions that are either "PAID" (validée) or "FAILED" (échouée)
+    // Filter out all "PENDING" or in-progress transactions!
+    const cleanTransactions = rawTransactions.filter(
+      (t) => t.status === "PAID" || t.status === "FAILED"
+    );
+
+    const paidTx = cleanTransactions.filter((t) => t.status === "PAID");
     const totalRevenue = paidTx.reduce((sum, t) => sum + (t.amount || 0), 0);
     const uniqueStudentsCount = new Set(enrollmentsList.map((e) => e.student_id)).size;
 
     return NextResponse.json({
       plan: profile.plan || 'FREE',
-      transactions,
+      transactions: cleanTransactions,
       payouts: payoutsList,
       totalRevenue,
       pendingRevenue: 0,
       uniqueStudentsCount
     });
 
-  } catch (error: any) {
-    console.error('[GET /api/instructor/earnings] Exception:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  } catch (err: any) {
+    console.error("[GET /api/instructor/earnings] Error:", err);
+    return NextResponse.json({ error: err.message || "Erreur serveur" }, { status: 500 });
   }
 }
