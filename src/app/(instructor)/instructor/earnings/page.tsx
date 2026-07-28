@@ -206,8 +206,8 @@ export default function EarningsPage() {
       }
 
       setInstructorPlan(data.plan || "FREE");
-      // Keep strictly PAID (validé) and FAILED (échoué) transactions
-      const cleanTx = (data.transactions || []).filter((t: any) => t.status === "PAID" || t.status === "FAILED");
+      // Keep strictly PAID (validé/complété) transactions, filtering out FAILED and PENDING
+      const cleanTx = (data.transactions || []).filter((t: any) => t.status === "PAID");
       setTransactions(cleanTx);
       setPayouts(data.payouts || []);
       setHasServiceRole(data.hasServiceRole !== false);

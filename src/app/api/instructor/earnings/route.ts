@@ -150,14 +150,11 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Clean transactions: Keep ONLY transactions that are either "PAID" (validée) or "FAILED" (échouée)
-    // Filter out all "PENDING" or in-progress transactions!
-    const cleanTransactions = rawTransactions.filter(
-      (t) => t.status === "PAID" || t.status === "FAILED"
-    );
+    // Clean transactions: Keep ONLY transactions that are "PAID" (validées/payées)
+    // Filter out all "FAILED" and "PENDING" transactions completely!
+    const cleanTransactions = rawTransactions.filter((t) => t.status === "PAID");
 
-    const paidTx = cleanTransactions.filter((t) => t.status === "PAID");
-    const totalRevenue = paidTx.reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalRevenue = cleanTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
     const uniqueStudentsCount = new Set(enrollmentsList.map((e) => e.student_id)).size;
 
     return NextResponse.json({

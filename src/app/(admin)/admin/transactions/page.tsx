@@ -258,26 +258,10 @@ export default function AdminTransactionsPage() {
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          {/* Status filter tabs */}
-          <div className="bg-zinc-100 dark:bg-zinc-800/80 p-0.5 rounded-xl flex">
-            {[
-              { id: "PAID", label: "Complétés" },
-              { id: "PENDING", label: "En attente" },
-              { id: "FAILED", label: "Échoués" },
-              { id: "ALL", label: "Tous" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setStatusFilter(tab.id)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                  statusFilter === tab.id
-                    ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-850 dark:hover:text-zinc-200"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+          {/* Status badge indicator */}
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Paiements Validés Uniquement</span>
           </div>
 
           <div className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800 hidden md:block" />
