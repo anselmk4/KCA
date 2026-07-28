@@ -256,63 +256,63 @@ export default function InstructorCoursesPage() {
     type: "academic" | "self_paced";
   }) => {
     setCreating(true);
-    const slug = courseData.title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "") + "-" + Math.floor(Math.random() * 1000);
+    try {
+      // 1. Call API /api/courses endpoint
+      const res = await fetch("/api/courses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(courseData),
+      });
 
-    const instructorId = session?.userId || "u3";
+      const resData = await res.json();
 
-    const mapLevel = (lvl: string): "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "EXPERT" => {
-      if (lvl.includes("Débutant")) return "BEGINNER";
-      if (lvl.includes("Intermédiaire")) return "INTERMEDIATE";
-      if (lvl.includes("Avancé") || lvl.includes("Expert")) return "ADVANCED";
-      return "BEGINNER";
-    };
+      if (!res.ok) {
+        // Direct client-side insert fallback using authenticated Supabase user
+        const { data: { user } } = await supabase.auth.getUser();
+        const activeUserId = user?.id || session?.userId;
 
-    const courseType = courseData.type || "academic";
-    const allowInstallments = courseType === "academic" ? courseData.installmentsEnabled : false;
+        if (!activeUserId) {
+          throw new Error(resData.error || "Impossible d'identifier l'utilisateur. Veuillez vous reconnecter.");
+        }
 
-    const { error } = await supabase
-      .from("courses")
-      .insert({
-        title: courseData.title,
-        slug,
-        description: courseData.description,
-        price: courseData.price,
-        level: mapLevel(courseData.level),
-        thumbnail_url: courseData.thumbnailUrl,
-        instructor_id: instructorId,
-        status: "DRAFT",
-        type: courseType,
-        allow_installments: allowInstallments,
-      } as any);
+        const slug = courseData.title
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/(^-|-$)/g, "") + "-" + Math.floor(Math.random() * 1000);
 
-    if (error) {
-      console.warn("Supabase error during course creation, using local fallback DB:", error.message);
-      try {
-        const { getDB, saveDB } = require("@/lib/db");
-        const db = getDB();
-        db.courses.push({
-          id: `c_${Date.now()}`,
-          title: courseData.title,
-          slug,
-          description: courseData.description,
-          price: courseData.price,
-          level: courseData.level,
-          thumbnailUrl: courseData.thumbnailUrl,
-          instructorId,
-          status: "DRAFT"
-        });
-        saveDB(db);
-      } catch (dbErr) {
-        console.error("Local DB fallback error:", dbErr);
+        const courseType = courseData.type || "academic";
+        const allowInstallments = courseType === "academic" ? courseData.installmentsEnabled : false;
+
+        const { error: directErr } = await (supabase as any)
+          .from("courses")
+          .insert({
+            title: courseData.title,
+            slug,
+            description: courseData.description,
+            price: courseData.price,
+            level: courseData.level.includes("Intermédiaire") ? "INTERMEDIATE" : courseData.level.includes("Avancé") ? "ADVANCED" : "BEGINNER",
+            thumbnail_url: courseData.thumbnailUrl,
+            instructor_id: activeUserId,
+            status: "DRAFT",
+            type: courseType,
+            allow_installments: allowInstallments,
+          });
+
+        if (directErr) {
+          throw new Error(directErr.message);
+        }
       }
-    }
 
-    await loadDashboardData();
-    setShowCreateModal(false);
-    setCreating(false);
+      await loadDashboardData();
+      setShowCreateModal(false);
+    } catch (err: any) {
+      console.error("Course creation error:", err);
+      alert("Erreur lors de la création du cours: " + (err.message || "Erreur inconnue"));
+    } finally {
+      setCreating(false);
+    }
   };
 
   if (loading || !session) {
