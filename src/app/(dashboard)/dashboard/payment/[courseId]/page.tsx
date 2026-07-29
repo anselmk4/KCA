@@ -366,6 +366,11 @@ export default function PaymentPage() {
   const finalAmount = Math.round(fullPrice / selectedInstallmentCount);
   const discountedAmount = Math.round(discountedTotalCoursePrice / selectedInstallmentCount);
 
+  // Dynamic Fee Surcharge: +2.5% for Mobile Money (pawaPay), +3% for PayPal / Card, 0% for Crypto
+  const feeRate = method === "momo" ? 0.025 : (method === "paypal" || method === "card") ? 0.03 : 0;
+  const feeSurchargeAmount = Number((discountedAmount * feeRate).toFixed(2));
+  const finalAmountWithFee = Number((discountedAmount * (1 + feeRate)).toFixed(2));
+
   const checkPaymentStatus = async (isSilent = false) => {
     if (!paymentId) return;
     if (!isSilent) setVerifying(true);
@@ -595,7 +600,7 @@ export default function PaymentPage() {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              amount: discountedAmount,
+              amount: finalAmountWithFee,
               phoneNumber: momoPhone,
               carrier: momoProvider,
               type: 'STUDENT_COURSE',
@@ -631,7 +636,7 @@ export default function PaymentPage() {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              amount: discountedAmount,
+              amount: finalAmountWithFee,
               type: 'STUDENT_COURSE',
               itemId: course.id,
               couponId: appliedCoupon?.id || null,
@@ -1283,7 +1288,7 @@ export default function PaymentPage() {
                   ) : (
                     <>
                       <ShieldCheck className="w-5 h-5" />
-                      <span>{t("student.payment.payNow", "Valider le paiement")} (${discountedAmount} USD)</span>
+                      <span>{t("student.payment.payNow", "Valider le paiement")} (${finalAmountWithFee.toFixed(2)} USD)</span>
                     </>
                   )}
                 </button>
@@ -1323,10 +1328,12 @@ export default function PaymentPage() {
                   </span>
                 </div>
               )}
-              <div className="flex justify-between">
-                <span className="text-zinc-500">{t("student.payment.applyCoupon", "Frais").toLowerCase().includes("appliqu") ? "Enrollment fee" : "Frais d'inscription"} :</span>
-                <span className="font-semibold text-green-500">{t("student.discover.freeCourse", "Gratuit")}</span>
-              </div>
+              {feeSurchargeAmount > 0 && (
+                <div className="flex justify-between text-xs text-amber-600 dark:text-amber-400 font-semibold">
+                  <span>Frais ({method === "momo" ? "+2.5% Mobile Money" : "+3% PayPal/Carte"}) :</span>
+                  <span>+${feeSurchargeAmount.toFixed(2)} USD</span>
+                </div>
+              )}
               {selectedInstallmentCount > 1 && (
                 <div className="flex justify-between text-xs text-zinc-500">
                   <span>{t("student.payment.applyCoupon", "Tranches").toLowerCase().includes("appliqu") ? "Remaining installments" : "Tranches restantes"} :</span>
@@ -1334,8 +1341,8 @@ export default function PaymentPage() {
                 </div>
               )}
               <div className="flex justify-between border-t border-zinc-100 dark:border-zinc-800 pt-2 text-base font-bold">
-                <span className="text-zinc-950 dark:text-white">{t("student.payment.applyCoupon", "Aujourd'hui").toLowerCase().includes("appliqu") ? "Today" : "Aujourd'hui"} :</span>
-                <span className="text-blue-600 dark:text-blue-400">${discountedAmount} USD</span>
+                <span className="text-zinc-950 dark:text-white">Montant Total :</span>
+                <span className="text-blue-600 dark:text-blue-400">${finalAmountWithFee.toFixed(2)} USD</span>
               </div>
             </div>
 

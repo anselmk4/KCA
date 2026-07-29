@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Paramètres 'type' et 'itemId' requis." }, { status: 400 });
     }
 
-    let amount = 0;
+    let baseAmount = 0;
     let customId = ""; // Used to pass metadata to capture phase: "type:itemId:userId"
 
     if (type === "COURSE") {
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       }
 
       const discountedTotalCoursePrice = Math.max(0, originalPrice - fullCourseDiscount);
-      amount = Math.max(0, Math.round(discountedTotalCoursePrice / installmentCount));
+      baseAmount = Math.max(0, Math.round(discountedTotalCoursePrice / installmentCount));
       customId = `COURSE:${itemId}:${user.id}`;
     } else if (type === "INSTRUCTOR_PLAN") {
       // 2. Resolve plan price
@@ -85,16 +85,19 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Plan d'abonnement invalide." }, { status: 400 });
       }
 
-      amount = price;
+      baseAmount = price;
       customId = `INSTRUCTOR_PLAN:${selectedPlan}:${user.id}`;
     } else {
       return NextResponse.json({ error: "Type de paiement non supporté." }, { status: 400 });
     }
 
-    // Call PayPal API to create checkout order
-    const order = await createPayPalOrder(amount, customId);
+    // Add +3% PayPal fee surcharge (amount + 3%)
+    const paypalTotalAmount = Number((baseAmount * 1.03).toFixed(2));
 
-    return NextResponse.json({ orderId: order.id });
+    // Call PayPal API to create checkout order with +3% fee surcharge included
+    const order = await createPayPalOrder(paypalTotalAmount, customId);
+
+    return NextResponse.json({ orderId: order.id, amount: paypalTotalAmount });
   } catch (err: any) {
     console.error("[paypal-create-order] Error:", err);
     return NextResponse.json({ error: err.message || "Erreur lors de la création de la commande PayPal." }, { status: 500 });

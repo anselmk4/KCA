@@ -224,6 +224,11 @@ function PaymentContent() {
       : (plan === "MAX" ? "Cours et apprenants illimités, 0% commission." : "Jusqu'à 10 cours actifs et 200 apprenants. Commission 2%.")
   };
 
+  // Dynamic Fee Surcharge: +2.5% for Mobile Money (pawaPay), +3% for PayPal / Card, 0% for Crypto
+  const feeRate = method === "mobile_money" ? 0.025 : (method === "paypal" || method === "mastercard" || method === "stripe") ? 0.03 : 0;
+  const feeSurchargeAmount = Number((currentPlanDetails.price * feeRate).toFixed(2));
+  const finalAmountWithFee = Number((currentPlanDetails.price * (1 + feeRate)).toFixed(2));
+
   /**
    * Called after any successful payment to show success state and redirect.
    * The plan update in Supabase is handled server-side by the capture handler
@@ -449,7 +454,7 @@ function PaymentContent() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            amount: currentPlanDetails.price,
+            amount: finalAmountWithFee,
             phoneNumber: phone,
             carrier: carrier,
             type: "INSTRUCTOR_PLAN",
@@ -482,7 +487,7 @@ function PaymentContent() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            amount: currentPlanDetails.price,
+            amount: finalAmountWithFee,
             type: "INSTRUCTOR_PLAN",
             itemId: plan,
           }),
@@ -1014,7 +1019,7 @@ function PaymentContent() {
                         Traitement...
                       </>
                     ) : (
-                      "Confirmer et Payer"
+                      `Payer (${finalAmountWithFee.toFixed(2)} $USD)`
                     )}
                   </button>
                 )}
