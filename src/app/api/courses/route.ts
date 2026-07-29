@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     };
     const mappedLevel = (levelMap[level] || 'BEGINNER') as 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'EXPERT';
 
-    const newCourse = {
+    const newCoursePayload: any = {
       id: id || undefined,
       title: title.trim(),
       slug: generatedSlug,
@@ -125,11 +125,25 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    const { data, error } = await dbClient
+    let { data, error } = await dbClient
       .from('courses')
-      .insert(newCourse as any)
+      .insert(newCoursePayload)
       .select()
       .single();
+
+    // Fallback: If PostgREST schema cache fails on missing 'type' column
+    if (error && (error.message?.toLowerCase().includes("type") || error.message?.toLowerCase().includes("schema cache"))) {
+      console.warn('[API /courses POST] Schema cache error on type column, retrying without type column...', error.message);
+      const { type: _ignored, ...fallbackPayload } = newCoursePayload;
+      const retryRes = await dbClient
+        .from('courses')
+        .insert(fallbackPayload)
+        .select()
+        .single();
+
+      data = retryRes.data;
+      error = retryRes.error;
+    }
 
     if (error) {
       console.error('[API /courses POST] Supabase error:', error.message, error.details, error.hint);
@@ -205,11 +219,24 @@ export async function PUT(req: NextRequest) {
     }
     sbUpdates.updated_at = new Date().toISOString();
 
-    const { data, error } = await dbClient
+    let { data, error } = await dbClient
       .from('courses')
       .update(sbUpdates as any)
       .eq('id', id)
       .select().single();
+
+    // Fallback if 'type' column missing in schema cache
+    if (error && (error.message?.toLowerCase().includes("type") || error.message?.toLowerCase().includes("schema cache"))) {
+      delete sbUpdates.type;
+      const retryRes = await dbClient
+        .from('courses')
+        .update(sbUpdates as any)
+        .eq('id', id)
+        .select().single();
+
+      data = retryRes.data;
+      error = retryRes.error;
+    }
 
     if (error) {
       console.error('[API /courses PUT] Supabase error:', error.message);

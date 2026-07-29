@@ -285,7 +285,7 @@ export default function InstructorCoursesPage() {
         const courseType = courseData.type || "academic";
         const allowInstallments = courseType === "academic" ? courseData.installmentsEnabled : false;
 
-        const { error: directErr } = await (supabase as any)
+        let { error: directErr } = await (supabase as any)
           .from("courses")
           .insert({
             title: courseData.title,
@@ -299,6 +299,23 @@ export default function InstructorCoursesPage() {
             type: courseType,
             allow_installments: allowInstallments,
           });
+
+        if (directErr && (directErr.message?.toLowerCase().includes("type") || directErr.message?.toLowerCase().includes("schema cache"))) {
+          const { error: retryErr } = await (supabase as any)
+            .from("courses")
+            .insert({
+              title: courseData.title,
+              slug,
+              description: courseData.description,
+              price: courseData.price,
+              level: courseData.level.includes("Intermédiaire") ? "INTERMEDIATE" : courseData.level.includes("Avancé") ? "ADVANCED" : "BEGINNER",
+              thumbnail_url: courseData.thumbnailUrl,
+              instructor_id: activeUserId,
+              status: "DRAFT",
+              allow_installments: allowInstallments,
+            });
+          directErr = retryErr;
+        }
 
         if (directErr) {
           throw new Error(directErr.message);
