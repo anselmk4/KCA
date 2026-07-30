@@ -1,6 +1,7 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Hero } from "@/components/sections/Hero";
+import { LiveCourseAnnouncement } from "@/components/sections/LiveCourseAnnouncement";
 import { ValueProposition } from "@/components/sections/ValueProposition";
 import { WhyChooseUs } from "@/components/sections/WhyChooseUs";
 import { FeaturesGrid } from "@/components/sections/FeaturesGrid";
@@ -18,6 +19,7 @@ export default function Home() {
       <Navbar />
       <main className="flex-1">
         <Hero />
+        <LiveCourseAnnouncement />
         <LogoBanner />
         <PartnersMarquee />
         <ValueProposition />
