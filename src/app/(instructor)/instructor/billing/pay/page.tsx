@@ -27,7 +27,7 @@ declare global {
   }
 }
 
-type PaymentMethod = "mastercard" | "stripe" | "paypal" | "crypto" | "mobile_money";
+type PaymentMethod = "mastercard" | "paypal" | "crypto" | "mobile_money";
 
 function PaymentContent() {
   const router = useRouter();
@@ -225,7 +225,7 @@ function PaymentContent() {
   };
 
   // Dynamic Fee Surcharge: +2.5% for Mobile Money (pawaPay), +3% for PayPal / Card, 0% for Crypto
-  const feeRate = method === "mobile_money" ? 0.025 : (method === "paypal" || method === "mastercard" || method === "stripe") ? 0.03 : 0;
+  const feeRate = method === "mobile_money" ? 0.025 : (method === "paypal" || method === "mastercard") ? 0.03 : 0;
   const feeSurchargeAmount = Number((currentPlanDetails.price * feeRate).toFixed(2));
   const finalAmountWithFee = Number((currentPlanDetails.price * (1 + feeRate)).toFixed(2));
 
@@ -511,7 +511,7 @@ function PaymentContent() {
       return;
     }
 
-    // Simulate other payment methods (stripe, crypto) — update Supabase directly
+    // Simulate other payment methods (crypto) — update Supabase directly
     setTimeout(async () => {
       try {
         // Update plan in Supabase
@@ -677,7 +677,6 @@ function PaymentContent() {
               
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                  { id: "stripe", label: "Stripe", icon: <ShieldCheck className="w-5 h-5 text-indigo-500" /> },
                   { id: "paypal", label: "PayPal", icon: <DollarSign className="w-5 h-5 text-blue-500" /> },
                   { id: "crypto", label: "Crypto", icon: <Coins className="w-5 h-5 text-amber-500" /> },
                   { id: "mobile_money", label: "Mobile Money", icon: <Phone className="w-5 h-5 text-green-500" /> }
@@ -716,16 +715,7 @@ function PaymentContent() {
                 </div>
               )}
 
-              {/* 2. Stripe direct mock */}
-              {method === "stripe" && (
-                <div className="space-y-4 animate-in fade-in duration-200 py-4 text-center">
-                  <h4 className="font-bold text-sm text-zinc-900 dark:text-white">Paiement instantané Stripe</h4>
-                  <p className="text-xs text-zinc-500 max-w-sm mx-auto">Vous allez être redirigé vers l'interface de paiement sécurisée Stripe Checkout pour terminer la transaction en toute sécurité.</p>
-                  <div className="inline-flex items-center gap-2 bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 border border-indigo-150 px-4 py-2 rounded-full text-xs font-bold">
-                    <ShieldCheck className="w-4 h-4" /> Transactions 100% sécurisées par Stripe
-                  </div>
-                </div>
-              )}
+
 
               {/* 3. PayPal direct Integration */}
               {method === "paypal" && (
