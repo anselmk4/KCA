@@ -211,6 +211,8 @@ export default function CourseDetailPage() {
   const [inviteFound, setInviteFound] = useState<{ id: string; full_name: string; email: string } | null>(null);
   const [inviteError, setInviteError] = useState("");
   const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [invitePaymentOption, setInvitePaymentOption] = useState<"FREE" | "CASH_FULL" | "CASH_INSTALLMENT">("FREE");
+  const [invitePaidAmount, setInvitePaidAmount] = useState<string>("");
 
   // ─── Price tab states ─────────────────────────────────────
   const [coursePrice, setCoursePrice] = useState("0");
@@ -1121,6 +1123,8 @@ export default function CourseDetailPage() {
         body: JSON.stringify({
           studentId: inviteFound.id,
           courseId: courseId,
+          paymentOption: invitePaymentOption,
+          paidAmount: Number(invitePaidAmount) || 0
         }),
       });
 
@@ -2900,14 +2904,83 @@ export default function CourseDetailPage() {
                   </div>
                 )}
                 {inviteFound && (
-                  <div className="p-4 bg-zinc-50 dark:bg-zinc-850 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-3 animate-in fade-in">
+                  <div className="p-4 bg-zinc-50 dark:bg-zinc-850 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-4 animate-in fade-in">
                     <p className="text-[10px] uppercase font-extrabold text-teal-600 tracking-wider">Compte Trouvé</p>
                     <div className="space-y-1">
                       <p className="text-xs font-bold text-zinc-900 dark:text-white">{inviteFound.full_name}</p>
                       <p className="text-[11px] text-zinc-500">{inviteFound.email}</p>
                     </div>
+
+                    {/* Mode de règlement manuel */}
+                    <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700 space-y-2">
+                      <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                        Statut du paiement pour cet enrôlement manuel :
+                      </label>
+                      <div className="space-y-1.5 text-xs">
+                        <label className="flex items-center gap-2 cursor-pointer p-2 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                          <input
+                            type="radio"
+                            name="invitePaymentOption"
+                            value="FREE"
+                            checked={invitePaymentOption === "FREE"}
+                            onChange={() => setInvitePaymentOption("FREE")}
+                            className="text-teal-600 focus:ring-teal-500"
+                          />
+                          <div>
+                            <span className="font-bold text-zinc-800 dark:text-zinc-200">Accès Offert / Bourse (0$)</span>
+                            <span className="block text-[10px] text-zinc-400">Gratuit, n&apos;impacte pas les chiffres en ligne.</span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-2 cursor-pointer p-2 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                          <input
+                            type="radio"
+                            name="invitePaymentOption"
+                            value="CASH_FULL"
+                            checked={invitePaymentOption === "CASH_FULL"}
+                            onChange={() => setInvitePaymentOption("CASH_FULL")}
+                            className="text-teal-600 focus:ring-teal-500"
+                          />
+                          <div>
+                            <span className="font-bold text-zinc-800 dark:text-zinc-200">Payé en cash au formateur (Totalité - ${coursePrice}$)</span>
+                            <span className="block text-[10px] text-zinc-400">Marqué comme réglé en main propre.</span>
+                          </div>
+                        </label>
+
+                        <label className="flex items-center gap-2 cursor-pointer p-2 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                          <input
+                            type="radio"
+                            name="invitePaymentOption"
+                            value="CASH_INSTALLMENT"
+                            checked={invitePaymentOption === "CASH_INSTALLMENT"}
+                            onChange={() => setInvitePaymentOption("CASH_INSTALLMENT")}
+                            className="text-teal-600 focus:ring-teal-500"
+                          />
+                          <div>
+                            <span className="font-bold text-zinc-800 dark:text-zinc-200">Payé en cash au formateur (Par tranche)</span>
+                            <span className="block text-[10px] text-zinc-400">Acompte perçu en liquide par le formateur.</span>
+                          </div>
+                        </label>
+                      </div>
+
+                      {invitePaymentOption === "CASH_INSTALLMENT" && (
+                        <div className="pt-1">
+                          <label className="block text-[10px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">Montant perçu pour cette tranche ($ USD) *</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={invitePaidAmount}
+                            onChange={(e) => setInvitePaidAmount(e.target.value)}
+                            placeholder="Ex: 100"
+                            className="w-full px-3 py-1.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-bold outline-none focus:ring-1 focus:ring-teal-500 text-zinc-900 dark:text-white"
+                          />
+                        </div>
+                      )}
+                    </div>
+
                     <button onClick={handleInviteStudent} disabled={saving} className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50">
-                      Inscrire cet étudiant (Statut Actif)
+                      Confirmer l&apos;enrôlement manuel
                     </button>
                   </div>
                 )}

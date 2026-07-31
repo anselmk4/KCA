@@ -69,9 +69,9 @@ export async function GET(req: NextRequest) {
 
       const { data: enrollments } = await dbClient
         .from("enrollments")
-        .select("id, course_id, progress_percent, status, enrolled_at")
+        .select("id, course_id, progress_percent, status, enrolled_at, enrollment_type, manual_payment_status, manual_amount_paid")
         .eq("student_id", studentId)
-        .in("course_id", courseIds);
+        .in("course_id", enrolledCourseIds);
 
       if (!enrollments || enrollments.length === 0) {
         return NextResponse.json({
@@ -170,20 +170,42 @@ export async function GET(req: NextRequest) {
         const certDate = certMap.get(e.course_id) || null;
 
         const rawPrice = parseFloat((course?.price as any) || 0);
-        const totalPaid = payInfo?.totalAmount || (e.status === "ACTIVE" ? rawPrice : 0);
+        const hasOnlinePayment = !!payInfo && payInfo.totalAmount > 0;
+        const isManual = (e as any).enrollment_type === 'MANUAL_INSTRUCTOR' || !hasOnlinePayment;
+        const manualStatus = (e as any).manual_payment_status || (isManual ? 'FREE_SCHOLARSHIP' : 'NOT_APPLICABLE');
+        const manualAmount = parseFloat((e as any).manual_amount_paid || 0);
+
+        let totalPaid = 0;
+        let paymentOrigin: "ONLINE" | "MANUAL" = "ONLINE";
+
+        if (hasOnlinePayment) {
+          totalPaid = payInfo.totalAmount;
+          paymentOrigin = "ONLINE";
+        } else if (isManual) {
+          paymentOrigin = "MANUAL";
+          if (manualStatus === "CASH_FULL") {
+            totalPaid = rawPrice;
+          } else if (manualStatus === "CASH_INSTALLMENT") {
+            totalPaid = manualAmount;
+          } else {
+            totalPaid = 0;
+          }
+        }
+
         const remainingAmount = Math.max(0, Math.round(rawPrice - totalPaid));
         const isInstallmentCourse = course?.allow_installments || false;
         const totalInstallments = isInstallmentCourse ? (course?.installments_count || 3) : 1;
-        const paidInstallmentsCount = payInfo?.count || (totalPaid >= rawPrice && rawPrice > 0 ? 1 : 0);
+        const paidInstallmentsCount = hasOnlinePayment ? payInfo.count : (manualStatus === "CASH_FULL" ? 1 : (totalPaid > 0 ? 1 : 0));
         const remainingInstallmentsCount = remainingAmount <= 0 ? 0 : Math.max(0, totalInstallments - paidInstallmentsCount);
 
         let pStatus = "none";
-        if (totalPaid >= rawPrice && rawPrice > 0) {
-          pStatus = "PAID";
-        } else if (totalPaid > 0 && remainingAmount > 0) {
-          pStatus = "PARTIAL";
-        } else if (e.status === "ACTIVE") {
-          pStatus = "PAID";
+        if (hasOnlinePayment) {
+          if (totalPaid >= rawPrice && rawPrice > 0) pStatus = "PAID";
+          else if (totalPaid > 0) pStatus = "PARTIAL";
+        } else if (isManual) {
+          if (manualStatus === "CASH_FULL") pStatus = "MANUAL_CASH_FULL";
+          else if (manualStatus === "CASH_INSTALLMENT") pStatus = "MANUAL_CASH_PARTIAL";
+          else pStatus = "FREE_SCHOLARSHIP";
         }
 
         return {
@@ -204,6 +226,9 @@ export async function GET(req: NextRequest) {
           completedLessons: completedByCourse.get(e.course_id) || 0,
           paymentStatus: pStatus,
           paymentAmount: totalPaid,
+          paymentOrigin,
+          manualPaymentStatus: manualStatus,
+          manualAmountPaid: manualAmount,
           paymentDate: payInfo?.lastDate || null,
           hasCertificate: certDate !== null,
           certificateDate: certDate,
@@ -223,7 +248,7 @@ export async function GET(req: NextRequest) {
     // --- BEHAVIOR 2: All Students List ---
     const { data: enrData, error: enrError } = await dbClient
       .from("enrollments")
-      .select("id, student_id, course_id, progress_percent, status, enrolled_at")
+      .select("id, student_id, course_id, progress_percent, status, enrolled_at, enrollment_type, manual_payment_status, manual_amount_paid")
       .in("course_id", courseIds);
 
     if (enrError) {
@@ -286,20 +311,42 @@ export async function GET(req: NextRequest) {
       const payInfo = paymentMap.get(`${e.student_id}_${e.course_id}`);
 
       const rawPrice = parseFloat((course?.price as any) || 0);
-      const totalPaid = payInfo?.totalPaid || (e.status === "ACTIVE" ? rawPrice : 0);
+      const hasOnlinePayment = !!payInfo && payInfo.totalPaid > 0;
+      const isManual = (e as any).enrollment_type === 'MANUAL_INSTRUCTOR' || !hasOnlinePayment;
+      const manualStatus = (e as any).manual_payment_status || (isManual ? 'FREE_SCHOLARSHIP' : 'NOT_APPLICABLE');
+      const manualAmount = parseFloat((e as any).manual_amount_paid || 0);
+
+      let totalPaid = 0;
+      let paymentOrigin: "ONLINE" | "MANUAL" = "ONLINE";
+
+      if (hasOnlinePayment) {
+        totalPaid = payInfo.totalPaid;
+        paymentOrigin = "ONLINE";
+      } else if (isManual) {
+        paymentOrigin = "MANUAL";
+        if (manualStatus === "CASH_FULL") {
+          totalPaid = rawPrice;
+        } else if (manualStatus === "CASH_INSTALLMENT") {
+          totalPaid = manualAmount;
+        } else {
+          totalPaid = 0;
+        }
+      }
+
       const remainingAmount = Math.max(0, Math.round(rawPrice - totalPaid));
       const isInstallmentCourse = course?.allow_installments || false;
       const totalInstallments = isInstallmentCourse ? (course?.installments_count || 3) : 1;
-      const paidInstallmentsCount = payInfo?.count || (totalPaid >= rawPrice && rawPrice > 0 ? 1 : 0);
+      const paidInstallmentsCount = hasOnlinePayment ? payInfo.count : (manualStatus === "CASH_FULL" ? 1 : (totalPaid > 0 ? 1 : 0));
       const remainingInstallmentsCount = remainingAmount <= 0 ? 0 : Math.max(0, totalInstallments - paidInstallmentsCount);
 
       let pStatus = "none";
-      if (totalPaid >= rawPrice && rawPrice > 0) {
-        pStatus = "PAID";
-      } else if (totalPaid > 0 && remainingAmount > 0) {
-        pStatus = "PARTIAL";
-      } else if (e.status === "ACTIVE") {
-        pStatus = "PAID";
+      if (hasOnlinePayment) {
+        if (totalPaid >= rawPrice && rawPrice > 0) pStatus = "PAID";
+        else if (totalPaid > 0) pStatus = "PARTIAL";
+      } else if (isManual) {
+        if (manualStatus === "CASH_FULL") pStatus = "MANUAL_CASH_FULL";
+        else if (manualStatus === "CASH_INSTALLMENT") pStatus = "MANUAL_CASH_PARTIAL";
+        else pStatus = "FREE_SCHOLARSHIP";
       }
 
       return {
@@ -320,6 +367,9 @@ export async function GET(req: NextRequest) {
         enrolledAt: e.enrolled_at,
         paymentStatus: pStatus,
         paymentAmount: totalPaid,
+        paymentOrigin,
+        manualPaymentStatus: manualStatus,
+        manualAmountPaid: manualAmount,
         hasCertificate: certSet.has(`${e.student_id}_${e.course_id}`),
       };
     });
@@ -351,17 +401,18 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { studentId, courseId } = body;
+    const { studentId, courseId, paymentOption, paidAmount } = body;
 
     if (!studentId || !courseId) {
       return NextResponse.json({ error: "Données manquantes (studentId ou courseId)." }, { status: 400 });
     }
 
     const isAdmin = roles.some(r => ["SUPER_ADMIN", "ADMIN"].includes(r));
+    let targetCoursePrice = 0;
     if (!isAdmin) {
       const { data: course, error: courseErr } = await supabaseAdmin
         .from("courses")
-        .select("instructor_id")
+        .select("instructor_id, price")
         .eq("id", courseId)
         .maybeSingle();
 
@@ -372,6 +423,10 @@ export async function POST(req: NextRequest) {
       if (course.instructor_id !== user.id) {
         return NextResponse.json({ error: "Vous n'êtes pas le formateur de ce cours." }, { status: 403 });
       }
+      targetCoursePrice = Number(course.price) || 0;
+    } else {
+      const { data: course } = await supabaseAdmin.from("courses").select("price").eq("id", courseId).maybeSingle();
+      targetCoursePrice = Number(course?.price) || 0;
     }
 
     const { data: existing } = await supabaseAdmin
@@ -385,6 +440,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Cet étudiant est déjà inscrit à ce cours." }, { status: 400 });
     }
 
+    const manualStatus = paymentOption === "CASH_FULL" ? "CASH_FULL" : paymentOption === "CASH_INSTALLMENT" ? "CASH_INSTALLMENT" : "FREE_SCHOLARSHIP";
+    const manualAmount = paymentOption === "FREE" ? 0 : (Number(paidAmount) || (paymentOption === "CASH_FULL" ? targetCoursePrice : 0));
+
     const { error: insertErr } = await supabaseAdmin
       .from("enrollments")
       .insert({
@@ -392,7 +450,10 @@ export async function POST(req: NextRequest) {
         course_id: courseId,
         status: "ACTIVE",
         progress_percent: 0,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        enrollment_type: "MANUAL_INSTRUCTOR",
+        manual_payment_status: manualStatus,
+        manual_amount_paid: manualAmount
       });
 
     if (insertErr) {

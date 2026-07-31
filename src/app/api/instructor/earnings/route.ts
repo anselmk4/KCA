@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
     // 3. Fetch enrollments for these courses
     const { data: enrollmentsData } = await dbClient
       .from("enrollments")
-      .select("id, student_id, course_id, enrolled_at, profiles(full_name)")
+      .select("id, student_id, course_id, enrolled_at, enrollment_type, manual_payment_status, manual_amount_paid, profiles(full_name)")
       .in("course_id", courseIds);
 
     const enrollmentsList = enrollmentsData || [];
@@ -128,12 +128,14 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Fallback: If no payment records found, construct transactions from active enrollments (marked as PAID)
+    // Fallback: If no online payment records found, construct transactions only from manual cash enrollments
     if (rawTransactions.length === 0 && enrollmentsList.length > 0) {
       rawTransactions = enrollmentsList.map((enr: any) => {
         const course = courseMap.get(enr.course_id);
         const coursePrice = Number(course?.price) || 0;
         const studentName = enr.profiles?.full_name || "Étudiant inscrit";
+        const manualStatus = enr.manual_payment_status || "FREE_SCHOLARSHIP";
+        const manualAmount = Number(enr.manual_amount_paid) || (manualStatus === "CASH_FULL" ? coursePrice : 0);
 
         return {
           id: enr.id || crypto.randomUUID(),
@@ -142,10 +144,10 @@ export async function GET(req: NextRequest) {
           courseTitle: course?.title || "Formation",
           userId: enr.student_id,
           studentName,
-          amount: coursePrice,
-          status: "PAID",
+          amount: manualAmount,
+          status: manualAmount > 0 ? "PAID" : "FREE",
           date: enr.enrolled_at || new Date().toISOString(),
-          method: "INSCRIPTION"
+          method: manualAmount > 0 ? "CASH_FORMATEUR" : "BOURSE_GRATUIT"
         };
       });
     }

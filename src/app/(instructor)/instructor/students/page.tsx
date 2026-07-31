@@ -28,8 +28,11 @@ type StudentEnrollment = {
   progressPercent: number;
   enrollmentStatus: string;
   enrolledAt: string;
-  paymentStatus: "PAID" | "PARTIAL" | "PENDING" | "FAILED" | "none";
+  paymentStatus: "PAID" | "PARTIAL" | "PENDING" | "FAILED" | "MANUAL_CASH_FULL" | "MANUAL_CASH_PARTIAL" | "FREE_SCHOLARSHIP" | "none";
   paymentAmount: number;
+  paymentOrigin?: "ONLINE" | "MANUAL";
+  manualPaymentStatus?: string;
+  manualAmountPaid?: number;
   hasCertificate: boolean;
 };
 
@@ -292,23 +295,45 @@ export default function StudentsPage() {
 
                   {/* Courses & Installments breakdown */}
                   <div className="md:col-span-4 space-y-1.5">
-                    {student.enrollments.map((e) => (
-                      <div key={e.courseId} className="flex items-center justify-between text-xs bg-zinc-50 dark:bg-zinc-800/40 p-2 rounded-xl border border-zinc-100 dark:border-zinc-800">
-                        <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate max-w-[160px]" title={e.courseTitle}>
-                          {e.courseTitle}
-                        </span>
-                        
-                        {e.remainingAmount > 0 ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400">
-                            Payé : ${e.totalPaid || e.paymentAmount} / ${e.coursePrice} (Reste ${e.remainingAmount}$)
+                    {student.enrollments.map((e) => {
+                      const isOnline = e.paymentOrigin === "ONLINE";
+                      const manualStatus = e.manualPaymentStatus || "FREE_SCHOLARSHIP";
+                      
+                      let badgeLabel = "";
+                      let badgeStyle = "";
+
+                      if (isOnline) {
+                        if (e.remainingAmount > 0 && e.totalPaid > 0) {
+                          badgeLabel = `Payé en ligne : $${e.totalPaid} / $${e.coursePrice} (Reste $${e.remainingAmount}$)`;
+                          badgeStyle = "bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40";
+                        } else {
+                          badgeLabel = `Réglé en ligne ($${e.coursePrice}$)`;
+                          badgeStyle = "bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40";
+                        }
+                      } else {
+                        if (manualStatus === "CASH_FULL") {
+                          badgeLabel = `Manuel - Cash ($${e.coursePrice}$)`;
+                          badgeStyle = "bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40";
+                        } else if (manualStatus === "CASH_INSTALLMENT") {
+                          badgeLabel = `Manuel - Cash ($${e.totalPaid} / $${e.coursePrice}$)`;
+                          badgeStyle = "bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/40";
+                        } else {
+                          badgeLabel = `Accès Offert / Bourse ($0$)`;
+                          badgeStyle = "bg-teal-100 dark:bg-teal-950/30 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-900/40";
+                        }
+                      }
+
+                      return (
+                        <div key={e.courseId} className="flex items-center justify-between text-xs bg-zinc-50 dark:bg-zinc-800/40 p-2 rounded-xl border border-zinc-100 dark:border-zinc-800 gap-2">
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate max-w-[150px]" title={e.courseTitle}>
+                            {e.courseTitle}
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400">
-                            Réglé intégralement (${e.coursePrice}$)
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${badgeStyle}`}>
+                            {badgeLabel}
                           </span>
-                        )}
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* Status & Actions */}
