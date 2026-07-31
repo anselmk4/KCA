@@ -126,12 +126,46 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
 export function normalizePawaPayCorrespondent(correspondent: string): string {
   if (!correspondent) return correspondent;
   const legacyMap: Record<string, string> = {
+    // MTN
     MTN_RWA: "MTN_MOMO_RWA",
+    MTN_RW: "MTN_MOMO_RWA",
     MTN_UGA: "MTN_MOMO_UGA",
+    MTN_UG: "MTN_MOMO_UGA",
     MTN_CMR: "MTN_MOMO_CMR",
+    MTN_CM: "MTN_MOMO_CMR",
     MTN_CIV: "MTN_MOMO_CIV",
+    MTN_CI: "MTN_MOMO_CIV",
     MTN_ZMB: "MTN_MOMO_ZMB",
+    MTN_ZM: "MTN_MOMO_ZMB",
     MTN_BEN: "MTN_MOMO_BEN",
+    MTN_BJ: "MTN_MOMO_BEN",
+    // Moov
+    MOOV_CI: "MOOV_CIV",
+    MOOV_BJ: "MOOV_BEN",
+    // Wave
+    WAVE_SN: "WAVE_SEN",
+    WAVE_CI: "WAVE_CIV",
+    // Zamtel
+    ZAMTEL_ZM: "ZAMTEL_ZMB",
+    // Free
+    FREE_SN: "FREE_SEN",
+    // Celtiis
+    CELTIIS_BJ: "CELTIIS_BEN",
+    // Orange
+    ORANGE_CD: "ORANGE_COD",
+    ORANGE_CM: "ORANGE_CMR",
+    ORANGE_CI: "ORANGE_CIV",
+    ORANGE_SN: "ORANGE_SEN",
+    // Airtel
+    AIRTEL_CD: "AIRTEL_COD",
+    AIRTEL_RW: "AIRTEL_RWA",
+    AIRTEL_UG: "AIRTEL_UGA",
+    AIRTEL_ZM: "AIRTEL_ZMB",
+    // Vodacom / M-Pesa
+    MPESA_COD: "VODACOM_MPESA_COD",
+    VODACOM_COD: "VODACOM_MPESA_COD",
+    MPESA_CD: "VODACOM_MPESA_COD",
+    VODACOM_CD: "VODACOM_MPESA_COD",
   };
   return legacyMap[correspondent] || correspondent;
 }
