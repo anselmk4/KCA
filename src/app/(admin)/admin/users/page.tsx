@@ -24,7 +24,8 @@ import {
   CreditCard,
   Activity,
   Lock,
-  Trash2
+  Trash2,
+  AlertCircle
 } from "lucide-react";
 
 type RoleName = 'STUDENT' | 'INSTRUCTOR' | 'ADMIN' | 'SUPER_ADMIN';
@@ -129,9 +130,9 @@ export default function AdminUsersPage() {
 
           const { data: payments } = await supabase
             .from("payments")
-            .select("id, amount, status, provider, paid_at, created_at")
+            .select("id, amount, status, provider, method, paid_at, created_at, failure_reason")
             .eq("user_id", selectedUser.id)
-            .order("paid_at", { ascending: false });
+            .order("created_at", { ascending: false });
           setDrawerPayments(payments || []);
         }
       } catch (err) {
@@ -1260,32 +1261,52 @@ export default function AdminUsersPage() {
                           </div>
 
                           {/* Student Payments */}
-                          <div className="space-y-3">
+                          <div className="space-y-3 font-sans">
                             <h5 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Historique des transactions ({drawerPayments.length})</h5>
                             {drawerPayments.length === 0 ? (
                               <p className="text-xs text-zinc-400 text-center py-4 bg-zinc-50 dark:bg-zinc-900/30 rounded-xl">Aucune transaction enregistrée.</p>
                             ) : (
-                              <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
-                                {drawerPayments.map((p) => (
-                                  <div key={p.id} className="p-3 bg-zinc-50 dark:bg-zinc-900/30 rounded-xl border border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs">
-                                    <div>
-                                      <p className="font-extrabold text-zinc-950 dark:text-white">{p.amount || 0}$</p>
-                                      <p className="text-[10px] text-zinc-400 mt-0.5 flex items-center gap-1.5">
-                                        <CreditCard className="w-3 h-3 text-zinc-400" />
-                                        {p.provider} • {new Date(p.paid_at || p.created_at).toLocaleDateString()}
-                                      </p>
+                              <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                                {drawerPayments.map((p) => {
+                                  const rawMethod = (p.method || '').split('::')[0] || p.provider || 'Paiement';
+                                  const formattedDate = new Date(p.created_at || p.paid_at).toLocaleDateString();
+
+                                  return (
+                                    <div key={p.id} className="p-3.5 bg-zinc-50 dark:bg-zinc-900/40 rounded-xl border border-zinc-200/80 dark:border-zinc-800 space-y-2 text-xs">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <p className="font-extrabold text-zinc-950 dark:text-white">{p.amount || 0}$</p>
+                                          <p className="text-[10px] text-zinc-400 mt-0.5 flex items-center gap-1.5 font-medium">
+                                            <CreditCard className="w-3 h-3 text-zinc-400 shrink-0" />
+                                            <span>{rawMethod}</span>
+                                            <span>•</span>
+                                            <span>{formattedDate}</span>
+                                          </p>
+                                        </div>
+                                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                                          p.status === 'PAID' || p.status === 'COMPLETED'
+                                            ? "bg-green-100 text-green-700 dark:bg-green-950/20 dark:text-green-400"
+                                            : p.status === 'PENDING'
+                                            ? "bg-amber-100 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400"
+                                            : "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400 border border-red-200 dark:border-red-900/40"
+                                        }`}>
+                                          {p.status}
+                                        </span>
+                                      </div>
+
+                                      {/* Failure reason / Error message */}
+                                      {(p.status === 'FAILED' || p.status === 'CANCELLED' || p.failure_reason) && (
+                                        <div className="p-2.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 rounded-lg text-[11px] text-red-700 dark:text-red-300 flex items-start gap-2">
+                                          <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                                          <div className="leading-relaxed">
+                                            <span className="font-bold text-red-800 dark:text-red-300">Raison de l&apos;échec : </span>
+                                            <span className="font-mono text-[10.5px] font-medium">{p.failure_reason || "La transaction a été rejetée par l'opérateur ou le client."}</span>
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
-                                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                                      p.status === 'PAID'
-                                        ? "bg-green-100 text-green-700 dark:bg-green-950/20 dark:text-green-400"
-                                        : p.status === 'PENDING'
-                                        ? "bg-amber-100 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400"
-                                        : "bg-red-50 text-red-650 dark:bg-red-950/20 dark:text-red-400"
-                                    }`}>
-                                      {p.status}
-                                    </span>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
