@@ -216,7 +216,7 @@ export async function POST(req: NextRequest) {
     const depositResult = await initiatePawaPayDeposit({
       amount: targetAmount,
       currency: targetCurrency,
-      correspondent: carrier,
+      correspondent: effectiveCarrier,
       phoneNumber: formattedPhone,
       depositId: paymentId,
       statementDescription

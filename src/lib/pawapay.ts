@@ -189,10 +189,21 @@ export function getPawaPayConfigForCountry(countryNameOrCode: string): PawaPayCo
  * Format phone number to clean international format (no +, no leading 0) matching target prefix
  */
 export function formatPawaPayPhoneNumber(phoneNumber: string, prefix: string): string {
+  if (!phoneNumber) return "";
   let clean = phoneNumber.replace(/\D/g, '');
   
+  // Remove leading international zeros (e.g., 00250 -> 250)
+  while (clean.startsWith('00')) {
+    clean = clean.substring(2);
+  }
+  
+  // If user entered prefix followed by redundant 0 (e.g., 2500788123456 -> 250788123456)
+  if (prefix && clean.startsWith(prefix + '0')) {
+    clean = prefix + clean.substring(prefix.length + 1);
+  }
+  
   // If it already starts with prefix, return it
-  if (clean.startsWith(prefix)) {
+  if (prefix && clean.startsWith(prefix)) {
     return clean;
   }
   
@@ -201,7 +212,7 @@ export function formatPawaPayPhoneNumber(phoneNumber: string, prefix: string): s
     clean = clean.substring(1);
   }
   
-  return prefix + clean;
+  return prefix ? prefix + clean : clean;
 }
 
 export interface InitiateDepositResponse {
@@ -212,7 +223,7 @@ export interface InitiateDepositResponse {
 }
 
 /**
- * Request deposit via PawaPay Sandbox API
+ * Request deposit via PawaPay API (V2 with V1 fallback)
  */
 export async function initiatePawaPayDeposit(params: {
   amount: number;
@@ -225,13 +236,31 @@ export async function initiatePawaPayDeposit(params: {
   const depositId = params.depositId || crypto.randomUUID();
   const apiKey = process.env.PAWAPAY_API_TOKEN || "pawapay_sandbox_placeholder_token_abc123";
   const isProduction = process.env.PAWAPAY_ENVIRONMENT === "production";
-  const url = `${isProduction ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io"}/deposits`;
+  const baseUrl = isProduction ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io";
+  const correspondent = normalizePawaPayCorrespondent(params.correspondent);
+  const cleanDesc = (params.statementDescription || "Ansella Academy").replace(/[^a-zA-Z0-9 ]/g, '').trim().substring(0, 22) || "Ansella Academy";
 
-  const payload = {
+  // V2 API payload
+  const payloadV2 = {
     depositId: depositId,
     amount: Math.round(params.amount).toString(),
     currency: params.currency,
-    correspondent: normalizePawaPayCorrespondent(params.correspondent),
+    payer: {
+      type: "MMO",
+      accountDetails: {
+        phoneNumber: params.phoneNumber,
+        provider: correspondent
+      }
+    },
+    customerMessage: cleanDesc
+  };
+
+  // V1 API payload (Fallback)
+  const payloadV1 = {
+    depositId: depositId,
+    amount: Math.round(params.amount).toString(),
+    currency: params.currency,
+    correspondent: correspondent,
     payer: {
       type: "MSISDN",
       address: {
@@ -239,23 +268,39 @@ export async function initiatePawaPayDeposit(params: {
       }
     },
     customerTimestamp: new Date().toISOString(),
-    statementDescription: params.statementDescription || "Ansella Academy"
+    statementDescription: cleanDesc
   };
 
-  console.log("[PawaPayService] Initiating deposit:", url, JSON.stringify(payload, null, 2));
+  console.log(`[PawaPayService] Initiating deposit (${depositId}) for ${correspondent}, phone: ${params.phoneNumber}, amount: ${params.amount} ${params.currency}`);
 
   try {
-    const response = await fetch(url, {
+    // Try V2 endpoint first
+    let response = await fetch(`${baseUrl}/v2/deposits`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payloadV2)
     });
 
-    const responseText = await response.text();
-    console.log("[PawaPayService] PawaPay API response status:", response.status, "body:", responseText);
+    let responseText = await response.text();
+    console.log("[PawaPayService] V2 API response status:", response.status, "body:", responseText);
+
+    // Fallback to V1 if V2 endpoint returns 404
+    if (response.status === 404) {
+      console.log("[PawaPayService] V2 endpoint returned 404, attempting V1 /deposits endpoint...");
+      response = await fetch(`${baseUrl}/deposits`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(payloadV1)
+      });
+      responseText = await response.text();
+      console.log("[PawaPayService] V1 API response status:", response.status, "body:", responseText);
+    }
 
     let data: any = {};
     try {
@@ -268,7 +313,7 @@ export async function initiatePawaPayDeposit(params: {
       return {
         success: false,
         depositId,
-        error: data.message || data.error || `HTTP ${response.status}: ${responseText}`
+        error: data.message || data.error || data.rejectionReason?.rejectionMessage || `HTTP ${response.status}: ${responseText}`
       };
     }
 
@@ -276,12 +321,10 @@ export async function initiatePawaPayDeposit(params: {
       return {
         success: false,
         depositId,
-        error: data.rejectionReason?.rejectionMessage || "La transaction a été rejetée par PawaPay."
+        error: data.rejectionReason?.rejectionMessage || data.failureReason || "La transaction a été rejetée par PawaPay."
       };
     }
 
-    // PawaPay standard success response indicates the request is accepted
-    // and returns status (often PENDING, waiting for customer PIN)
     return {
       success: true,
       depositId,
@@ -289,7 +332,7 @@ export async function initiatePawaPayDeposit(params: {
     };
 
   } catch (err: any) {
-    console.error("[PawaPayService] Network error during request:", err);
+    console.error("[PawaPayService] Network error during deposit request:", err);
     return {
       success: false,
       depositId,
@@ -308,20 +351,29 @@ export interface PawaPayDepositStatusResponse {
 }
 
 /**
- * Fetch deposit status directly from PawaPay API (production or sandbox)
+ * Fetch deposit status directly from PawaPay API (V2 / V1 fallback)
  */
 export async function getPawaPayDepositStatus(depositId: string): Promise<PawaPayDepositStatusResponse> {
   const apiKey = process.env.PAWAPAY_API_TOKEN || "pawapay_sandbox_placeholder_token_abc123";
   const isProduction = process.env.PAWAPAY_ENVIRONMENT === "production";
-  const url = `${isProduction ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io"}/deposits/${depositId}`;
+  const baseUrl = isProduction ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io";
 
   try {
-    const response = await fetch(url, {
+    let response = await fetch(`${baseUrl}/v2/deposits/${depositId}`, {
       method: "GET",
       headers: {
         "Authorization": `Bearer ${apiKey}`
       }
     });
+
+    if (response.status === 404) {
+      response = await fetch(`${baseUrl}/deposits/${depositId}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`
+        }
+      });
+    }
 
     const responseText = await response.text();
     console.log("[PawaPayService] PawaPay deposit status response:", response.status, "body:", responseText);
@@ -341,7 +393,6 @@ export async function getPawaPayDepositStatus(depositId: string): Promise<PawaPa
       data = {};
     }
 
-    // PawaPay deposit status API can return an array of objects or a single object
     const depositObj = Array.isArray(data) ? data[0] : data;
 
     if (!depositObj) {
@@ -354,12 +405,12 @@ export async function getPawaPayDepositStatus(depositId: string): Promise<PawaPa
 
     const status = depositObj.status;
     const failureCode = depositObj.failureCode?.failureCode || (typeof depositObj.failureCode === 'string' ? depositObj.failureCode : undefined) || depositObj.rejectionReason?.rejectionCode;
-    const failureMessage = depositObj.failureCode?.failureMessage || depositObj.rejectionReason?.rejectionMessage;
+    const failureMessage = depositObj.failureCode?.failureMessage || depositObj.rejectionReason?.rejectionMessage || depositObj.failureReason;
 
     return {
       success: true,
       depositId,
-      status: status || "PENDING",
+      status,
       failureCode,
       failureMessage
     };
