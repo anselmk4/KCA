@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
         .from("enrollments")
         .select("id, course_id, progress_percent, status, enrolled_at, enrollment_type, manual_payment_status, manual_amount_paid")
         .eq("student_id", studentId)
-        .in("course_id", enrolledCourseIds);
+        .in("course_id", courseIds);
 
       if (!enrollments || enrollments.length === 0) {
         return NextResponse.json({
