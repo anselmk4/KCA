@@ -37,7 +37,7 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
     phonePrefix: "250",
     exchangeRate: 1300,
     operators: [
-      { id: "MTN_RWA", name: "MTN Mobile Money" },
+      { id: "MTN_MOMO_RWA", name: "MTN Mobile Money" },
       { id: "AIRTEL_RWA", name: "Airtel Money" }
     ]
   },
@@ -49,7 +49,7 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
     phonePrefix: "256",
     exchangeRate: 3700,
     operators: [
-      { id: "MTN_UGA", name: "MTN Mobile Money" },
+      { id: "MTN_MOMO_UGA", name: "MTN Mobile Money" },
       { id: "AIRTEL_UGA", name: "Airtel Money" }
     ]
   },
@@ -61,7 +61,7 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
     phonePrefix: "237",
     exchangeRate: 600,
     operators: [
-      { id: "MTN_CMR", name: "MTN Mobile Money" },
+      { id: "MTN_MOMO_CMR", name: "MTN Mobile Money" },
       { id: "ORANGE_CMR", name: "Orange Money" }
     ]
   },
@@ -86,7 +86,7 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
     phonePrefix: "225",
     exchangeRate: 600,
     operators: [
-      { id: "MTN_CIV", name: "MTN Mobile Money" },
+      { id: "MTN_MOMO_CIV", name: "MTN Mobile Money" },
       { id: "ORANGE_CIV", name: "Orange Money" },
       { id: "MOOV_CIV", name: "Moov Money" },
       { id: "WAVE_CIV", name: "Wave" }
@@ -100,7 +100,7 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
     phonePrefix: "260",
     exchangeRate: 27,
     operators: [
-      { id: "MTN_ZMB", name: "MTN Mobile Money" },
+      { id: "MTN_MOMO_ZMB", name: "MTN Mobile Money" },
       { id: "AIRTEL_ZMB", name: "Airtel Money" },
       { id: "ZAMTEL_ZMB", name: "Zamtel Kwacha" }
     ]
@@ -113,12 +113,28 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
     phonePrefix: "229",
     exchangeRate: 600,
     operators: [
-      { id: "MTN_BEN", name: "MTN Mobile Money" },
+      { id: "MTN_MOMO_BEN", name: "MTN Mobile Money" },
       { id: "MOOV_BEN", name: "Moov Money" },
       { id: "CELTIIS_BEN", name: "Celtiis Cash" }
     ]
   }
 ];
+
+/**
+ * Normalizes legacy or shorthand pawaPay operator/correspondent codes to valid official codes.
+ */
+export function normalizePawaPayCorrespondent(correspondent: string): string {
+  if (!correspondent) return correspondent;
+  const legacyMap: Record<string, string> = {
+    MTN_RWA: "MTN_MOMO_RWA",
+    MTN_UGA: "MTN_MOMO_UGA",
+    MTN_CMR: "MTN_MOMO_CMR",
+    MTN_CIV: "MTN_MOMO_CIV",
+    MTN_ZMB: "MTN_MOMO_ZMB",
+    MTN_BEN: "MTN_MOMO_BEN",
+  };
+  return legacyMap[correspondent] || correspondent;
+}
 
 /**
  * Find PawaPay configuration for a country based on country name, ISO2, or ISO3 code.
@@ -181,7 +197,7 @@ export async function initiatePawaPayDeposit(params: {
     depositId: depositId,
     amount: Math.round(params.amount).toString(),
     currency: params.currency,
-    correspondent: params.correspondent,
+    correspondent: normalizePawaPayCorrespondent(params.correspondent),
     payer: {
       type: "MSISDN",
       address: {
@@ -352,7 +368,7 @@ export async function initiatePawaPayPayout(params: {
     payoutId: payoutId,
     amount: Math.round(params.amount).toString(),
     currency: params.currency,
-    correspondent: params.correspondent,
+    correspondent: normalizePawaPayCorrespondent(params.correspondent),
     recipient: {
       type: "MSISDN",
       address: {

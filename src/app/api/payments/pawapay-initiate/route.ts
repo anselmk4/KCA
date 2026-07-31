@@ -4,7 +4,8 @@ import { createClient as createDirectClient } from '@supabase/supabase-js';
 import { 
   initiatePawaPayDeposit, 
   getPawaPayConfigForCountry, 
-  formatPawaPayPhoneNumber 
+  formatPawaPayPhoneNumber,
+  normalizePawaPayCorrespondent
 } from '@/lib/pawapay';
 
 const supabaseAdmin = createDirectClient(
@@ -47,8 +48,11 @@ export async function POST(req: NextRequest) {
     // Format phone number according to country configuration prefix
     const formattedPhone = formatPawaPayPhoneNumber(phoneNumber, countryConfig.phonePrefix);
 
+    // Normalize carrier code (e.g., MTN_RWA -> MTN_MOMO_RWA)
+    const effectiveCarrier = normalizePawaPayCorrespondent(carrier);
+
     // Validate carrier belongs to countryConfig operators
-    const operatorExists = countryConfig.operators.some(op => op.id === carrier);
+    const operatorExists = countryConfig.operators.some(op => op.id === effectiveCarrier || op.id === carrier);
     if (!operatorExists) {
       return NextResponse.json({ error: `Opérateur ${carrier} invalide pour le pays ${userCountry}` }, { status: 400 });
     }
