@@ -400,7 +400,9 @@ export default function CoursePreviewPage() {
                   : "bg-yellow-400 hover:bg-yellow-505 text-zinc-900 shadow-yellow-500/20"
               }`}
             >
-              {isEnrolled ? (t("student.dashboard.welcome", "ACCÉDER").includes("Ravi") ? "✓ ACCÉDER À LA FORMATION" : "✓ ACCESS COURSE") : (t("student.dashboard.welcome", "REJOINDRE").includes("Ravi") ? `REJOINDRE POUR $${course.price}` : `JOIN FOR $${course.price}`)}
+              {isEnrolled
+                ? (t("student.dashboard.welcome", "ACCÉDER").includes("Ravi") ? "✓ ACCÉDER À LA FORMATION" : "✓ ACCESS COURSE")
+                : (course.price > 0 ? `Procéder au paiement de $${course.price}` : "Procéder à l'inscription gratuite")}
             </button>
 
             {/* Additional details */}

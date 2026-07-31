@@ -262,7 +262,11 @@ export default function DiscoverCoursesPage() {
             const enrolledCount = enrollmentCounts[course.id] || 0;
 
             return (
-              <div key={course.id} className="group bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
+              <Link
+                key={course.id}
+                href={`/dashboard/discover/${course.id}`}
+                className="group bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col cursor-pointer"
+              >
                 {/* Cover Image */}
                 <div className="relative h-48 overflow-hidden">
                   <Image
@@ -306,16 +310,13 @@ export default function DiscoverCoursesPage() {
                         {enrolledCount} {enrolledCount > 1 ? t("instructor.courses.students", "étudiants") : t("instructor.courses.students", "étudiant")}
                       </div>
                     </div>
-                    <Link
-                      href={`/dashboard/discover/${course.id}`}
-                      className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors group/link"
-                    >
-                      {t("student.courses.review", "Aperçu")}
-                      <ArrowRight className="h-4 w-4 transition-transform group-hover/link:translate-x-0.5" />
-                    </Link>
+                    <span className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                      S&apos;enrôler au cours
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                    </span>
                   </div>
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

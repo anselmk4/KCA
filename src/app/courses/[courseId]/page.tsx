@@ -39,6 +39,7 @@ interface CourseDetail {
   instructor_id: string;
   instructorName: string;
   categoryName: string;
+  thumbnail_url?: string | null;
 }
 
 interface Section {
@@ -88,14 +89,14 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
       // Try by slug first, then by id
       let { data: courseData } = await supabase
         .from("courses")
-        .select("id, title, slug, description, price, status, level, rating_avg, estimated_duration_hours, enrollment_count, instructor_id, category_id")
+        .select("id, title, slug, description, price, status, level, rating_avg, estimated_duration_hours, enrollment_count, instructor_id, category_id, thumbnail_url")
         .eq("slug", courseId)
         .maybeSingle();
 
       if (!courseData) {
         const res = await supabase
           .from("courses")
-          .select("id, title, slug, description, price, status, level, rating_avg, estimated_duration_hours, enrollment_count, instructor_id, category_id")
+          .select("id, title, slug, description, price, status, level, rating_avg, estimated_duration_hours, enrollment_count, instructor_id, category_id, thumbnail_url")
           .eq("id", courseId)
           .maybeSingle();
         courseData = res.data;
@@ -135,6 +136,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
         instructor_id: courseData.instructor_id,
         instructorName: profile?.full_name || "Formateur",
         categoryName,
+        thumbnail_url: (courseData as any).thumbnail_url || null,
       });
 
       // Sections + lessons
@@ -295,9 +297,15 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
 
             {/* Right: CTA card */}
             <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 text-center space-y-4 sticky top-24">
-              <div className="flex justify-center">
-                <CourseHeroIcon category={course.categoryName || course.title} />
-              </div>
+              {course.thumbnail_url ? (
+                <div className="w-full h-48 rounded-xl overflow-hidden border border-white/15 shadow-lg mb-2">
+                  <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="flex justify-center">
+                  <CourseHeroIcon category={course.categoryName || course.title} />
+                </div>
+              )}
               <p className="text-zinc-400 text-xs uppercase tracking-widest font-bold">Prix de la formation</p>
               <p className="text-4xl font-black">
                 {course.price === 0 ? "Gratuit" : `$${course.price}`}
@@ -324,14 +332,14 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                   href={`/dashboard/payment?courseId=${course.id}`}
                   className="block w-full py-3.5 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-teal-500/20 text-sm"
                 >
-                  S&apos;inscrire maintenant
+                  {course.price > 0 ? `Procéder au paiement de $${course.price}` : "S'inscrire gratuitement"}
                 </Link>
               ) : (
                 <Link
                   href={`/register?next=/dashboard/payment?courseId=${course.id}`}
                   className="block w-full py-3.5 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-teal-500/20 text-sm"
                 >
-                  Commencer maintenant
+                  {course.price > 0 ? `Procéder au paiement de $${course.price}` : "Commencer gratuitement"}
                 </Link>
               )}
 
