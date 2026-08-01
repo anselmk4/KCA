@@ -147,6 +147,7 @@ export default function PaymentPage() {
   const [paypalEmail, setPaypalEmail] = useState("");
   const [paypalLoaded, setPaypalLoaded] = useState(false);
   const [paypalError, setPaypalError] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   // Crypto state
@@ -388,8 +389,10 @@ export default function PaymentPage() {
         return true;
       } else if (data.status === 'FAILED') {
         setShowPendingState(false);
+        const reasonText = data.failureReason || "Transaction refusée par l'opérateur Mobile Money.";
+        setPaymentError(reasonText);
         if (!isSilent) {
-          alert(`Le paiement a échoué : ${data.failureReason || "Transaction refusée par l'opérateur."}`);
+          alert(`Le paiement a échoué : ${reasonText}`);
         }
         return false;
       } else {
@@ -583,6 +586,7 @@ export default function PaymentPage() {
     if (method === "paypal") return;
 
     setSubmitting(true);
+    setPaymentError(null);
 
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -884,6 +888,16 @@ export default function PaymentPage() {
         {/* Payment options & form (Left) */}
         <div className="md:col-span-2 space-y-6">
           
+          {paymentError && (
+            <div className="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-2xl text-red-700 dark:text-red-300 text-xs font-semibold space-y-1.5 animate-in fade-in">
+              <div className="font-extrabold text-sm flex items-center gap-2 text-red-800 dark:text-red-200">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>Paiement non validé</span>
+              </div>
+              <p className="leading-relaxed">{paymentError}</p>
+            </div>
+          )}
+
           {/* Main card */}
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-md overflow-hidden">
             <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/10">
