@@ -593,6 +593,44 @@ export default function PaymentPage() {
       }
 
       if (method === 'momo') {
+        if (momoSubMode === "manual") {
+          try {
+            if (!momoTxRef.trim()) {
+              alert("Veuillez entrer le numéro de référence ou l'ID de votre virement Mobile Money.");
+              setSubmitting(false);
+              return;
+            }
+
+            const response = await fetch('/api/payments/manual-momo-submit', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                amount: finalAmountWithFee,
+                phoneNumber: momoPhone,
+                carrier: momoProvider,
+                type: 'STUDENT_COURSE',
+                itemId: course.id,
+                transactionRef: momoTxRef.trim(),
+                couponId: appliedCoupon?.id || null,
+                payInstallment
+              }),
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || "Erreur de validation");
+
+            setSuccess(true);
+            setTimeout(() => {
+              router.push("/dashboard/courses");
+            }, 2500);
+          } catch (manualErr: any) {
+            alert("Erreur de virement : " + (manualErr.message || manualErr));
+          } finally {
+            setSubmitting(false);
+          }
+          return;
+        }
+
         try {
           const response = await fetch('/api/payments/pawapay-initiate', {
             method: 'POST',
@@ -622,44 +660,6 @@ export default function PaymentPage() {
           setShowPendingState(true);
         } catch (momoErr: any) {
           alert(momoErr.message || "Une erreur est survenue avec le service Mobile Money.");
-        } finally {
-          setSubmitting(false);
-        }
-        return;
-      }
-
-      if (method === "momo_manual") {
-        try {
-          if (!momoTxRef.trim()) {
-            alert("Veuillez entrer le numéro de référence ou l'ID de votre virement Mobile Money.");
-            setSubmitting(false);
-            return;
-          }
-
-          const response = await fetch('/api/payments/manual-momo-submit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              amount: finalAmountWithFee,
-              phoneNumber: momoPhone,
-              carrier: momoProvider,
-              type: 'STUDENT_COURSE',
-              itemId: course.id,
-              transactionRef: momoTxRef.trim(),
-              couponId: appliedCoupon?.id || null,
-              payInstallment
-            }),
-          });
-
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.error || "Erreur de validation");
-
-          setSuccess(true);
-          setTimeout(() => {
-            router.push("/dashboard/courses");
-          }, 2500);
-        } catch (manualErr: any) {
-          alert("Erreur de virement : " + (manualErr.message || manualErr));
         } finally {
           setSubmitting(false);
         }
