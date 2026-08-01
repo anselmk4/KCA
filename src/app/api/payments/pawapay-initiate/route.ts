@@ -48,14 +48,23 @@ export async function POST(req: NextRequest) {
     // Format phone number according to country configuration prefix
     const formattedPhone = formatPawaPayPhoneNumber(phoneNumber, countryConfig.phonePrefix);
 
-    // Normalize carrier code (e.g., MTN_RWA -> MTN_MOMO_RWA)
-    const effectiveCarrier = normalizePawaPayCorrespondent(carrier);
+    // Normalize carrier code (e.g., MTN_RWA -> MTN_MOMO_RWA, or generic MTN -> country operator)
+    let effectiveCarrier = normalizePawaPayCorrespondent(carrier);
 
-    // Validate carrier belongs to countryConfig operators
-    const operatorExists = countryConfig.operators.some(op => op.id === effectiveCarrier || op.id === carrier);
-    if (!operatorExists) {
+    // Validate and resolve carrier belonging to countryConfig operators
+    const matchedOperator = countryConfig.operators.find(op => 
+      op.id === effectiveCarrier || 
+      op.id === carrier ||
+      op.id.startsWith(carrier.toUpperCase()) ||
+      carrier.toUpperCase().includes(op.id.split('_')[0]) ||
+      op.name.toLowerCase().includes(carrier.toLowerCase())
+    );
+
+    if (!matchedOperator) {
       return NextResponse.json({ error: `Opérateur ${carrier} invalide pour le pays ${userCountry}` }, { status: 400 });
     }
+
+    effectiveCarrier = matchedOperator.id;
 
     // 4. Generate references
     const orderId = crypto.randomUUID();

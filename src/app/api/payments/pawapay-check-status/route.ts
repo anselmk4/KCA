@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createDirectClient } from '@supabase/supabase-js';
-import { getPawaPayDepositStatus } from '@/lib/pawapay';
+import { getPawaPayDepositStatus, formatPawaPayFailureReason } from '@/lib/pawapay';
 import { createNotification } from '@/lib/supabase/notifications-helper';
 import { incrementCouponUses } from '@/lib/supabase/orders-helper';
 import crypto from 'crypto';
@@ -294,7 +294,7 @@ export async function GET(req: NextRequest) {
 
     // 6. Process FAILED or REJECTED status
     if (['FAILED', 'REJECTED', 'CANCELLED', 'EXPIRED'].includes(pawaStatus)) {
-      const failureReason = pawaPayResult.failureMessage || 'Transaction rejetée ou annulée par l\'opérateur.';
+      const failureReason = formatPawaPayFailureReason(pawaPayResult.failureCode, pawaPayResult.failureMessage);
 
       await supabaseAdmin
         .from('payments')

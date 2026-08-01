@@ -125,20 +125,27 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
  */
 export function normalizePawaPayCorrespondent(correspondent: string): string {
   if (!correspondent) return correspondent;
+  const upper = correspondent.trim().toUpperCase();
   const legacyMap: Record<string, string> = {
     // MTN
     MTN_RWA: "MTN_MOMO_RWA",
     MTN_RW: "MTN_MOMO_RWA",
+    MTN_MOMO_RW: "MTN_MOMO_RWA",
     MTN_UGA: "MTN_MOMO_UGA",
     MTN_UG: "MTN_MOMO_UGA",
+    MTN_MOMO_UG: "MTN_MOMO_UGA",
     MTN_CMR: "MTN_MOMO_CMR",
     MTN_CM: "MTN_MOMO_CMR",
+    MTN_MOMO_CM: "MTN_MOMO_CMR",
     MTN_CIV: "MTN_MOMO_CIV",
     MTN_CI: "MTN_MOMO_CIV",
+    MTN_MOMO_CI: "MTN_MOMO_CIV",
     MTN_ZMB: "MTN_MOMO_ZMB",
     MTN_ZM: "MTN_MOMO_ZMB",
+    MTN_MOMO_ZM: "MTN_MOMO_ZMB",
     MTN_BEN: "MTN_MOMO_BEN",
     MTN_BJ: "MTN_MOMO_BEN",
+    MTN_MOMO_BJ: "MTN_MOMO_BEN",
     // Moov
     MOOV_CI: "MOOV_CIV",
     MOOV_BJ: "MOOV_BEN",
@@ -167,7 +174,36 @@ export function normalizePawaPayCorrespondent(correspondent: string): string {
     MPESA_CD: "VODACOM_MPESA_COD",
     VODACOM_CD: "VODACOM_MPESA_COD",
   };
-  return legacyMap[correspondent] || correspondent;
+  return legacyMap[upper] || upper;
+}
+
+/**
+ * Format human-readable error reasons from PawaPay response codes
+ */
+export function formatPawaPayFailureReason(code?: string, rawMessage?: string): string {
+  const codeUpper = (code || '').toUpperCase();
+  const msgUpper = (rawMessage || '').toUpperCase();
+
+  if (codeUpper.includes('CANCEL') || msgUpper.includes('CANCEL') || codeUpper.includes('REJECT') || msgUpper.includes('REJECT') || msgUpper.includes('USER_CANCELLED')) {
+    return "Transaction annulée ou rejetée sur le téléphone de l'utilisateur.";
+  }
+  if (codeUpper.includes('INSUFFICIENT') || msgUpper.includes('INSUFFICIENT')) {
+    return "Solde Mobile Money insuffisant sur le compte du client.";
+  }
+  if (codeUpper.includes('TIMEOUT') || msgUpper.includes('EXPIRE')) {
+    return "La demande de paiement a expiré sans saisie du code PIN secret.";
+  }
+  if (codeUpper.includes('PIN') || msgUpper.includes('PIN')) {
+    return "Code PIN secret incorrect ou erroné.";
+  }
+  if (codeUpper.includes('LIMIT') || msgUpper.includes('LIMIT')) {
+    return "Plafond de transaction Mobile Money atteint pour cette journée.";
+  }
+  if (codeUpper.includes('NOT_FOUND') || codeUpper.includes('INVALID_RECIPIENT') || msgUpper.includes('NOT_FOUND') || msgUpper.includes('SUBSCRIBER')) {
+    return "Numéro de téléphone introuvable ou non enregistré auprès de l'opérateur Mobile Money.";
+  }
+
+  return rawMessage || code || "Paiement rejeté par l'opérateur Mobile Money.";
 }
 
 /**
@@ -186,7 +222,7 @@ export function getPawaPayConfigForCountry(countryNameOrCode: string): PawaPayCo
 }
 
 /**
- * Format phone number to clean international format (no +, no leading 0) matching target prefix
+ * Format phone number to clean international format (no +, no leading 0 except CI 10-digit numbers) matching target prefix
  */
 export function formatPawaPayPhoneNumber(phoneNumber: string, prefix: string): string {
   if (!phoneNumber) return "";
@@ -197,17 +233,21 @@ export function formatPawaPayPhoneNumber(phoneNumber: string, prefix: string): s
     clean = clean.substring(2);
   }
   
-  // If user entered prefix followed by redundant 0 (e.g., 2500788123456 -> 250788123456)
-  if (prefix && clean.startsWith(prefix + '0')) {
-    clean = prefix + clean.substring(prefix.length + 1);
-  }
-  
-  // If it already starts with prefix, return it
+  // If already starts with prefix
   if (prefix && clean.startsWith(prefix)) {
+    // Special check for prefix + redundant zero (e.g., 2370677123456 -> 237677123456, EXCEPT for CI 225 where 22505/22507/22501 is valid 13-digit)
+    if (prefix !== '225' && clean.startsWith(prefix + '0')) {
+      clean = prefix + clean.substring(prefix.length + 1);
+    }
     return clean;
   }
   
-  // If it starts with 0, strip the 0 and add prefix
+  // For Côte d'Ivoire (225): 10-digit national numbers start with 0 (05, 07, 01) and MUST keep the 0 (e.g. 0504123456 -> 2250504123456)
+  if (prefix === '225' && clean.length === 10 && clean.startsWith('0')) {
+    return prefix + clean;
+  }
+
+  // For other countries (or non-10-digit CI), if starts with 0, strip the leading 0
   if (clean.startsWith('0')) {
     clean = clean.substring(1);
   }
@@ -240,23 +280,8 @@ export async function initiatePawaPayDeposit(params: {
   const correspondent = normalizePawaPayCorrespondent(params.correspondent);
   const cleanDesc = (params.statementDescription || "Ansella Academy").replace(/[^a-zA-Z0-9 ]/g, '').trim().substring(0, 22) || "Ansella Academy";
 
-  // V2 API payload
-  const payloadV2 = {
-    depositId: depositId,
-    amount: Math.round(params.amount).toString(),
-    currency: params.currency,
-    payer: {
-      type: "MMO",
-      accountDetails: {
-        phoneNumber: params.phoneNumber,
-        provider: correspondent
-      }
-    },
-    customerMessage: cleanDesc
-  };
-
-  // V1 API payload (Fallback)
-  const payloadV1 = {
+  // Official PawaPay Deposit Payload (compatible with V2 and V1 endpoints)
+  const payload = {
     depositId: depositId,
     amount: Math.round(params.amount).toString(),
     currency: params.currency,
@@ -281,22 +306,22 @@ export async function initiatePawaPayDeposit(params: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`
       },
-      body: JSON.stringify(payloadV2)
+      body: JSON.stringify(payload)
     });
 
     let responseText = await response.text();
     console.log("[PawaPayService] V2 API response status:", response.status, "body:", responseText);
 
-    // Fallback to V1 if V2 endpoint returns 404
-    if (response.status === 404) {
-      console.log("[PawaPayService] V2 endpoint returned 404, attempting V1 /deposits endpoint...");
+    // Fallback to V1 if V2 endpoint returns 404 or 405
+    if (response.status === 404 || response.status === 405) {
+      console.log("[PawaPayService] V2 endpoint unavailable, attempting V1 /deposits endpoint...");
       response = await fetch(`${baseUrl}/deposits`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`
         },
-        body: JSON.stringify(payloadV1)
+        body: JSON.stringify(payload)
       });
       responseText = await response.text();
       console.log("[PawaPayService] V1 API response status:", response.status, "body:", responseText);
@@ -310,18 +335,20 @@ export async function initiatePawaPayDeposit(params: {
     }
 
     if (!response.ok) {
+      const errorMsg = data.message || data.error || data.rejectionReason?.rejectionMessage || data.failureReason || `HTTP ${response.status}: ${responseText}`;
       return {
         success: false,
         depositId,
-        error: data.message || data.error || data.rejectionReason?.rejectionMessage || `HTTP ${response.status}: ${responseText}`
+        error: formatPawaPayFailureReason(data.rejectionReason?.rejectionCode || data.failureCode, errorMsg)
       };
     }
 
-    if (data.status === "REJECTED") {
+    if (data.status === "REJECTED" || data.status === "FAILED") {
+      const rawReason = data.rejectionReason?.rejectionMessage || data.failureReason || "La transaction a été rejetée par l'opérateur.";
       return {
         success: false,
         depositId,
-        error: data.rejectionReason?.rejectionMessage || data.failureReason || "La transaction a été rejetée par PawaPay."
+        error: formatPawaPayFailureReason(data.rejectionReason?.rejectionCode || data.failureCode, rawReason)
       };
     }
 

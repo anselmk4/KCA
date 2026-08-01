@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { formatPawaPayFailureReason } from '@/lib/pawapay';
 import { createNotification } from '@/lib/supabase/notifications-helper';
 import { incrementCouponUses } from '@/lib/supabase/orders-helper';
 import crypto from 'crypto';
@@ -329,15 +330,19 @@ export async function POST(req: NextRequest) {
         } else {
           console.warn(`[webhook-pawapay] Unknown payment type in method field: "${payment.method}". No activation performed.`);
         }
-      } else if (status === 'FAILED') {
-        console.log(`[webhook-pawapay] Deposit ${depositId} has FAILED. Marking payment as FAILED.`);
+      } else if (['FAILED', 'REJECTED', 'CANCELLED', 'EXPIRED'].includes(status)) {
+        console.log(`[webhook-pawapay] Deposit ${depositId} status is ${status}. Marking payment as FAILED.`);
+
+        const codeVal = typeof event.failureCode === 'string' ? event.failureCode : (event.failureCode?.failureCode || event.rejectionReason?.rejectionCode);
+        const msgVal = typeof event.failureCode === 'object' ? event.failureCode?.failureMessage : (event.rejectionReason?.rejectionMessage || event.failureReason);
+        const reasonText = formatPawaPayFailureReason(codeVal, msgVal);
 
         // Update payment to FAILED
         await supabaseAdmin
           .from('payments')
           .update({
             status: 'FAILED',
-            failure_reason: failureCode || 'Rejeté par PawaPay / Annulé par l\'utilisateur',
+            failure_reason: reasonText,
             updated_at: new Date().toISOString()
           } as any)
           .eq('id', paymentId);
