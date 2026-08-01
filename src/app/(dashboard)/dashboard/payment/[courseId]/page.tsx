@@ -60,6 +60,8 @@ export default function PaymentPage() {
   const [momoProvider, setMomoProvider] = useState("VODACOM_MPESA_COD");
   const [momoPhone, setMomoPhone] = useState("");
   const [momoCurrency, setMomoCurrency] = useState<"USD" | "CDF">("USD");
+  const [momoSubMode, setMomoSubMode] = useState<"push" | "manual">("push");
+  const [momoTxRef, setMomoTxRef] = useState("");
 
   const countryConfig = getPawaPayConfigForCountry(userCountry) || getPawaPayConfigForCountry("CD")!;
 
@@ -626,6 +628,44 @@ export default function PaymentPage() {
         return;
       }
 
+      if (method === "momo_manual") {
+        try {
+          if (!momoTxRef.trim()) {
+            alert("Veuillez entrer le numéro de référence ou l'ID de votre virement Mobile Money.");
+            setSubmitting(false);
+            return;
+          }
+
+          const response = await fetch('/api/payments/manual-momo-submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              amount: finalAmountWithFee,
+              phoneNumber: momoPhone,
+              carrier: momoProvider,
+              type: 'STUDENT_COURSE',
+              itemId: course.id,
+              transactionRef: momoTxRef.trim(),
+              couponId: appliedCoupon?.id || null,
+              payInstallment
+            }),
+          });
+
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "Erreur de validation");
+
+          setSuccess(true);
+          setTimeout(() => {
+            router.push("/dashboard/courses");
+          }, 2500);
+        } catch (manualErr: any) {
+          alert("Erreur de virement : " + (manualErr.message || manualErr));
+        } finally {
+          setSubmitting(false);
+        }
+        return;
+      }
+
       if (method === 'card') {
         try {
           const response = await fetch('/api/payments/moko-initiate-card', {
@@ -883,12 +923,25 @@ export default function PaymentPage() {
         <div className="md:col-span-2 space-y-6">
           
           {paymentError && (
-            <div className="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-2xl text-red-700 dark:text-red-300 text-xs font-semibold space-y-1.5 animate-in fade-in">
+            <div className="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-2xl text-red-700 dark:text-red-300 text-xs font-semibold space-y-2 animate-in fade-in">
               <div className="font-extrabold text-sm flex items-center gap-2 text-red-800 dark:text-red-200">
                 <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                <span>Paiement non validé</span>
+                <span>Paiement non validé par l'opérateur</span>
               </div>
               <p className="leading-relaxed">{paymentError}</p>
+              <div className="pt-2 border-t border-red-200 dark:border-red-900/50 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMethod("momo");
+                    setMomoSubMode("manual");
+                    setPaymentError(null);
+                  }}
+                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+                >
+                  <span>📲 Utiliser le virement direct MoMo / Code USSD</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -945,6 +998,32 @@ export default function PaymentPage() {
               {/* MOMO Form */}
               {method === "momo" && (
                 <div className="space-y-4">
+                  {/* Mode selector tab */}
+                  <div className="grid grid-cols-2 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setMomoSubMode("push")}
+                      className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        momoSubMode === "push"
+                          ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-sm"
+                          : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                      }`}
+                    >
+                      📲 Détection Automatique (Push USSD)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMomoSubMode("manual")}
+                      className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        momoSubMode === "manual"
+                          ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-sm"
+                          : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                      }`}
+                    >
+                      💳 Virement Direct / Code USSD
+                    </button>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">{t("student.payment.applyCoupon", "Pays").toLowerCase().includes("appliqu") ? "Payment Country" : "Pays de paiement"}</label>
                     <select
@@ -962,6 +1041,75 @@ export default function PaymentPage() {
                       <option value="UG">🇺🇬 Ouganda</option>
                     </select>
                   </div>
+
+                  {momoSubMode === "manual" && (
+                    <div className="p-4 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-2xl space-y-3 animate-in fade-in">
+                      <div className="font-extrabold text-xs uppercase tracking-wider text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                        <span>Instructions de Virement Direct Mobile Money</span>
+                      </div>
+                      <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                        Effectuez votre virement de <strong className="text-blue-600 dark:text-blue-400">{userCountry === "CD" && momoCurrency === "USD" ? `$${finalAmountWithFee.toFixed(2)} USD` : `${Math.round(finalAmountWithFee * countryConfig.exchangeRate).toLocaleString()} ${countryConfig.currency}`}</strong> vers votre compte marchand MoMo habituel, puis entrez le numéro de référence reçu par SMS ci-dessous :
+                      </p>
+
+                      <div className="space-y-1.5 pt-1">
+                        <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                          ID de transaction / Référence du virement MoMo *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: 250788123456 ou TXN-98765432"
+                          value={momoTxRef}
+                          onChange={(e) => setMomoTxRef(e.target.value)}
+                          className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-white font-mono tracking-wide outline-none focus:ring-2 focus:ring-blue-500/40"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={submitting || !momoTxRef.trim()}
+                        onClick={async () => {
+                          setSubmitting(true);
+                          try {
+                            const response = await fetch('/api/payments/manual-momo-submit', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                amount: finalAmountWithFee,
+                                phoneNumber: momoPhone || 'N/A',
+                                carrier: momoProvider,
+                                type: 'STUDENT_COURSE',
+                                itemId: course.id,
+                                transactionRef: momoTxRef.trim(),
+                                couponId: appliedCoupon?.id || null,
+                                payInstallment
+                              }),
+                            });
+                            const data = await response.json();
+                            if (!response.ok) throw new Error(data.error || "Erreur de validation");
+                            setSuccess(true);
+                            setTimeout(() => {
+                              router.push("/dashboard/courses");
+                            }, 2500);
+                          } catch (err: any) {
+                            alert("Erreur de virement : " + (err.message || err));
+                          } finally {
+                            setSubmitting(false);
+                          }
+                        }}
+                        className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-xl transition-all cursor-pointer shadow-md text-xs flex items-center justify-center gap-2"
+                      >
+                        {submitting ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            <span>Validation du virement...</span>
+                          </>
+                        ) : (
+                          <span>✓ Valider mon virement et débloquer le cours</span>
+                        )}
+                      </button>
+                    </div>
+                  )}
 
                   {/* Currency Selector for DRC */}
                   {userCountry === "CD" && (
