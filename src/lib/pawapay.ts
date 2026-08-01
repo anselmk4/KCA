@@ -313,8 +313,8 @@ export async function initiatePawaPayDeposit(params: {
   console.log(`[PawaPayService] Initiating deposit (${depositId}) for ${correspondent}, phone: ${params.phoneNumber}, amount: ${params.amount} ${params.currency}`);
 
   try {
-    // Try V2 endpoint first
-    let response = await fetch(`${baseUrl}/v2/deposits`, {
+    // Try primary PawaPay /deposits endpoint (V1 standard collection endpoint)
+    let response = await fetch(`${baseUrl}/deposits`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -324,12 +324,12 @@ export async function initiatePawaPayDeposit(params: {
     });
 
     let responseText = await response.text();
-    console.log("[PawaPayService] V2 API response status:", response.status, "body:", responseText);
+    console.log("[PawaPayService] /deposits API response status:", response.status, "body:", responseText);
 
-    // Fallback to V1 if V2 endpoint returns 404 or 405
-    if (response.status === 404 || response.status === 405) {
-      console.log("[PawaPayService] V2 endpoint unavailable, attempting V1 /deposits endpoint...");
-      response = await fetch(`${baseUrl}/deposits`, {
+    // Fallback to V2 if /deposits endpoint returns 404 or 405 or 400 with invalid parameter error
+    if (!response.ok && (response.status === 404 || response.status === 405 || (response.status === 400 && responseText.includes("type")))) {
+      console.log("[PawaPayService] /deposits endpoint returned " + response.status + ", attempting /v2/deposits...");
+      response = await fetch(`${baseUrl}/v2/deposits`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -338,7 +338,7 @@ export async function initiatePawaPayDeposit(params: {
         body: JSON.stringify(payload)
       });
       responseText = await response.text();
-      console.log("[PawaPayService] V1 API response status:", response.status, "body:", responseText);
+      console.log("[PawaPayService] /v2/deposits API response status:", response.status, "body:", responseText);
     }
 
     let data: any = {};
