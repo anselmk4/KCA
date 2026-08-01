@@ -571,7 +571,7 @@ function PaymentContent() {
           <div>
             <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Validation Mobile Money...</h2>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
-              Une notification de validation PIN a été envoyée sur votre téléphone. Veuillez saisir votre code secret pour confirmer le paiement de <span className="font-bold text-teal-600">{currentPlanDetails.price}$</span> pour le plan <span className="font-bold">{plan}</span>.
+              Une notification de validation PIN a été envoyée sur votre téléphone. Veuillez saisir votre code secret pour confirmer le paiement de <span className="font-bold text-teal-600">{(userCountry === "CD" && momoCurrency === "USD") ? `$${finalAmountWithFee.toFixed(2)} USD` : `${Math.round(finalAmountWithFee * countryConfig.exchangeRate).toLocaleString()} ${countryConfig.currency}`}</span> <span className="text-xs text-zinc-400">(${finalAmountWithFee.toFixed(2)}$ USD)</span> pour le plan <span className="font-bold">{plan}</span>.
             </p>
           </div>
           

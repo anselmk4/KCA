@@ -824,7 +824,7 @@ export default function PaymentPage() {
           <div className="space-y-2">
             <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Validation du paiement en cours...</h2>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
-              Une demande d'approbation a été envoyée sur votre téléphone. Veuillez saisir votre code PIN secret pour confirmer le paiement de <span className="font-extrabold text-blue-600 dark:text-blue-450">${discountedAmount} USD</span>.
+              Une demande d'approbation a été envoyée sur votre téléphone. Veuillez saisir votre code PIN secret pour confirmer le paiement de <span className="font-extrabold text-blue-600 dark:text-blue-450">{(userCountry === "CD" && momoCurrency === "USD") ? `$${finalAmountWithFee.toFixed(2)} USD` : `${Math.round(finalAmountWithFee * countryConfig.exchangeRate).toLocaleString()} ${countryConfig.currency}`}</span> <span className="text-xs text-zinc-400">(${finalAmountWithFee.toFixed(2)}$ USD)</span>.
             </p>
           </div>
 
