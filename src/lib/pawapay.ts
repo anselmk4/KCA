@@ -123,9 +123,17 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
 /**
  * Normalizes legacy or shorthand pawaPay operator/correspondent codes to valid official codes.
  */
-export function normalizePawaPayCorrespondent(correspondent: string): string {
-  if (!correspondent) return correspondent;
-  const upper = correspondent.trim().toUpperCase();
+export function normalizePawaPayCorrespondent(correspondent: any): string {
+  if (!correspondent) return "";
+  let str = "";
+  if (typeof correspondent === 'string') {
+    str = correspondent;
+  } else if (typeof correspondent === 'object' && correspondent !== null) {
+    str = correspondent.id || correspondent.name || correspondent.correspondent || String(correspondent);
+  } else {
+    str = String(correspondent);
+  }
+  const upper = str.trim().toUpperCase();
   const legacyMap: Record<string, string> = {
     // MTN
     MTN_RWA: "MTN_MOMO_RWA",
@@ -180,9 +188,12 @@ export function normalizePawaPayCorrespondent(correspondent: string): string {
 /**
  * Format human-readable error reasons from PawaPay response codes
  */
-export function formatPawaPayFailureReason(code?: string, rawMessage?: string): string {
-  const codeUpper = (code || '').toUpperCase();
-  const msgUpper = (rawMessage || '').toUpperCase();
+export function formatPawaPayFailureReason(code?: any, rawMessage?: any): string {
+  const codeStr = typeof code === 'string' ? code : (code?.failureCode || code?.rejectionCode || (typeof code === 'object' ? JSON.stringify(code) : String(code || '')));
+  const msgStr = typeof rawMessage === 'string' ? rawMessage : (rawMessage?.failureMessage || rawMessage?.rejectionMessage || (typeof rawMessage === 'object' ? JSON.stringify(rawMessage) : String(rawMessage || '')));
+
+  const codeUpper = codeStr.toUpperCase();
+  const msgUpper = msgStr.toUpperCase();
 
   if (codeUpper.includes('CANCEL') || msgUpper.includes('CANCEL') || codeUpper.includes('REJECT') || msgUpper.includes('REJECT') || msgUpper.includes('USER_CANCELLED')) {
     return "Transaction annulée ou rejetée sur le téléphone de l'utilisateur.";
@@ -203,16 +214,17 @@ export function formatPawaPayFailureReason(code?: string, rawMessage?: string): 
     return "Numéro de téléphone introuvable ou non enregistré auprès de l'opérateur Mobile Money.";
   }
 
-  return rawMessage || code || "Paiement rejeté par l'opérateur Mobile Money.";
+  return msgStr || codeStr || "Paiement rejeté par l'opérateur Mobile Money.";
 }
 
 /**
  * Find PawaPay configuration for a country based on country name, ISO2, or ISO3 code.
  */
-export function getPawaPayConfigForCountry(countryNameOrCode: string): PawaPayCountryConfig | undefined {
+export function getPawaPayConfigForCountry(countryNameOrCode: any): PawaPayCountryConfig | undefined {
   if (!countryNameOrCode) return undefined;
   
-  const searchStr = countryNameOrCode.trim().toLowerCase();
+  const str = typeof countryNameOrCode === 'string' ? countryNameOrCode : (countryNameOrCode.countryCode || String(countryNameOrCode));
+  const searchStr = str.trim().toLowerCase();
   
   return PAWAPAY_COUNTRY_MAPPING.find(cfg => 
     cfg.countryCode.toLowerCase() === searchStr ||
@@ -224,9 +236,11 @@ export function getPawaPayConfigForCountry(countryNameOrCode: string): PawaPayCo
 /**
  * Format phone number to clean international format (no +, no leading 0 except CI 10-digit numbers) matching target prefix
  */
-export function formatPawaPayPhoneNumber(phoneNumber: string, prefix: string): string {
-  if (!phoneNumber) return "";
-  let clean = phoneNumber.replace(/\D/g, '');
+export function formatPawaPayPhoneNumber(phoneNumber: any, prefix: any): string {
+  const phoneStr = typeof phoneNumber === 'string' ? phoneNumber : String(phoneNumber || '');
+  const prefixStr = typeof prefix === 'string' ? prefix : String(prefix || '');
+  if (!phoneStr) return "";
+  let clean = phoneStr.replace(/\D/g, '');
   
   // Remove leading international zeros (e.g., 00250 -> 250)
   while (clean.startsWith('00')) {
@@ -234,17 +248,17 @@ export function formatPawaPayPhoneNumber(phoneNumber: string, prefix: string): s
   }
   
   // If already starts with prefix
-  if (prefix && clean.startsWith(prefix)) {
+  if (prefixStr && clean.startsWith(prefixStr)) {
     // Special check for prefix + redundant zero (e.g., 2370677123456 -> 237677123456, EXCEPT for CI 225 where 22505/22507/22501 is valid 13-digit)
-    if (prefix !== '225' && clean.startsWith(prefix + '0')) {
-      clean = prefix + clean.substring(prefix.length + 1);
+    if (prefixStr !== '225' && clean.startsWith(prefixStr + '0')) {
+      clean = prefixStr + clean.substring(prefixStr.length + 1);
     }
     return clean;
   }
   
   // For Côte d'Ivoire (225): 10-digit national numbers start with 0 (05, 07, 01) and MUST keep the 0 (e.g. 0504123456 -> 2250504123456)
-  if (prefix === '225' && clean.length === 10 && clean.startsWith('0')) {
-    return prefix + clean;
+  if (prefixStr === '225' && clean.length === 10 && clean.startsWith('0')) {
+    return prefixStr + clean;
   }
 
   // For other countries (or non-10-digit CI), if starts with 0, strip the leading 0
@@ -252,7 +266,7 @@ export function formatPawaPayPhoneNumber(phoneNumber: string, prefix: string): s
     clean = clean.substring(1);
   }
   
-  return prefix ? prefix + clean : clean;
+  return prefixStr ? prefixStr + clean : clean;
 }
 
 export interface InitiateDepositResponse {

@@ -48,20 +48,29 @@ export async function POST(req: NextRequest) {
     // Format phone number according to country configuration prefix
     const formattedPhone = formatPawaPayPhoneNumber(phoneNumber, countryConfig.phonePrefix);
 
-    // Normalize carrier code (e.g., MTN_RWA -> MTN_MOMO_RWA, or generic MTN -> country operator)
-    let effectiveCarrier = normalizePawaPayCorrespondent(carrier);
+    // Extract string representation of carrier safely
+    const carrierStr = typeof carrier === 'string' 
+      ? carrier 
+      : (typeof carrier === 'object' && carrier !== null ? (carrier.id || carrier.name || '') : String(carrier || ''));
+
+    let effectiveCarrier = normalizePawaPayCorrespondent(carrierStr);
+    const carrierUpper = carrierStr.toUpperCase();
 
     // Validate and resolve carrier belonging to countryConfig operators
-    const matchedOperator = countryConfig.operators.find(op => 
-      op.id === effectiveCarrier || 
-      op.id === carrier ||
-      op.id.startsWith(carrier.toUpperCase()) ||
-      carrier.toUpperCase().includes(op.id.split('_')[0]) ||
-      op.name.toLowerCase().includes(carrier.toLowerCase())
-    );
+    const matchedOperator = countryConfig.operators.find(op => {
+      const opIdUpper = (op.id || '').toUpperCase();
+      const opNameLower = (op.name || '').toLowerCase();
+      return (
+        op.id === effectiveCarrier || 
+        op.id === carrierStr ||
+        (carrierUpper.length > 0 && opIdUpper.startsWith(carrierUpper)) ||
+        (carrierUpper.length > 0 && carrierUpper.includes(opIdUpper.split('_')[0])) ||
+        (carrierStr.length > 0 && opNameLower.includes(carrierStr.toLowerCase()))
+      );
+    }) || countryConfig.operators[0];
 
     if (!matchedOperator) {
-      return NextResponse.json({ error: `Opérateur ${carrier} invalide pour le pays ${userCountry}` }, { status: 400 });
+      return NextResponse.json({ error: `Opérateur ${carrierStr} invalide pour le pays ${userCountry}` }, { status: 400 });
     }
 
     effectiveCarrier = matchedOperator.id;
