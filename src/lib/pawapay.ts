@@ -213,6 +213,18 @@ export function formatPawaPayFailureReason(code?: any, rawMessage?: any): string
   if (codeUpper.includes('NOT_FOUND') || codeUpper.includes('INVALID_RECIPIENT') || msgUpper.includes('NOT_FOUND') || msgUpper.includes('SUBSCRIBER')) {
     return "Numéro de téléphone introuvable ou non enregistré auprès de l'opérateur Mobile Money.";
   }
+  if (msgUpper.includes('UNKNOWN') || msgUpper.includes('UNKNOWN REASON')) {
+    const isSandbox = process.env.PAWAPAY_ENVIRONMENT !== 'production';
+    if (isSandbox) {
+      return "Échec PawaPay (Mode Sandbox) : L'opérateur a rejeté le test. En mode Sandbox, seuls les numéros de test PawaPay sont validés. En Production, vérifiez le solde du compte MTN et la confirmation PIN.";
+    }
+    return "Le paiement a été rejeté par l'opérateur Mobile Money (Raison indéfinie). Veuillez vérifier le solde de votre compte MTN et vous assurer de valider la demande PIN sur votre téléphone.";
+  }
+
+  const isSandbox = process.env.PAWAPAY_ENVIRONMENT !== 'production';
+  if (isSandbox && msgStr) {
+    return `Paiement rejeté par l'opérateur (${msgStr}). Remarque : En mode PawaPay Sandbox, utilisez des numéros de test PawaPay.`;
+  }
 
   return msgStr || codeStr || "Paiement rejeté par l'opérateur Mobile Money.";
 }
