@@ -362,7 +362,7 @@ export async function initiatePawaPayDeposit(params: {
         value: params.phoneNumber
       }
     },
-    customerTimestamp: new Date().toISOString(),
+    customerTimestamp: new Date().toISOString().split('.')[0] + 'Z',
     statementDescription: cleanDesc
   };
 
@@ -405,6 +405,20 @@ export async function initiatePawaPayDeposit(params: {
     }
 
     if (!response.ok) {
+      if (response.status === 401) {
+        return {
+          success: false,
+          depositId,
+          error: "Erreur d'authentification PawaPay (HTTP 401) : Clé API PawaPay (PAWAPAY_API_TOKEN) non valide ou expirée dans vos variables d'environnement Vercel."
+        };
+      }
+      if (response.status === 403) {
+        return {
+          success: false,
+          depositId,
+          error: `Accès refusé PawaPay (HTTP 403) : Votre compte marchand PawaPay n'est pas autorisé pour l'opérateur ${correspondent}.`
+        };
+      }
       const errorMsg = data.message || data.error || data.rejectionReason?.rejectionMessage || data.failureReason || `HTTP ${response.status}: ${responseText}`;
       return {
         success: false,
