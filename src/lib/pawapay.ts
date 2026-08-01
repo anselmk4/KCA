@@ -246,6 +246,50 @@ export function getPawaPayConfigForCountry(countryNameOrCode: any): PawaPayCount
 }
 
 /**
+ * Auto-detect PawaPay country configuration from phone number prefix, operator code, or fallback user country
+ */
+export function detectPawaPayCountry(phoneNumber?: any, carrier?: any, userCountry?: any): PawaPayCountryConfig {
+  const phoneStr = typeof phoneNumber === 'string' ? phoneNumber : String(phoneNumber || '');
+  const cleanPhone = phoneStr.replace(/\D/g, '');
+  
+  const carrierStr = typeof carrier === 'string' ? carrier : (typeof carrier === 'object' && carrier !== null ? (carrier.id || carrier.name || '') : String(carrier || ''));
+  const carrierUpper = normalizePawaPayCorrespondent(carrierStr).toUpperCase();
+
+  // 1. Try to detect from carrier suffix (e.g. MTN_MOMO_RWA -> RWA, MTN_MOMO_CMR -> CMR, etc.)
+  if (carrierUpper) {
+    for (const cfg of PAWAPAY_COUNTRY_MAPPING) {
+      if (
+        carrierUpper.endsWith(`_${cfg.countryCode3}`) ||
+        carrierUpper.endsWith(`_${cfg.countryCode}`) ||
+        cfg.operators.some(op => op.id.toUpperCase() === carrierUpper)
+      ) {
+        return cfg;
+      }
+    }
+  }
+
+  // 2. Try to detect from phone number international prefix (e.g. 250... -> Rwanda, 237... -> Cameroon, etc.)
+  if (cleanPhone) {
+    // Sort mapping by prefix length descending to match 243 before 24...
+    const sorted = [...PAWAPAY_COUNTRY_MAPPING].sort((a, b) => b.phonePrefix.length - a.phonePrefix.length);
+    for (const cfg of sorted) {
+      if (cleanPhone.startsWith(cfg.phonePrefix)) {
+        return cfg;
+      }
+    }
+  }
+
+  // 3. Fallback to user country parameter or profile country
+  if (userCountry) {
+    const config = getPawaPayConfigForCountry(userCountry);
+    if (config) return config;
+  }
+
+  // Default fallback: DRC (CD)
+  return PAWAPAY_COUNTRY_MAPPING[0];
+}
+
+/**
  * Format phone number to clean international format (no +, no leading 0 except CI 10-digit numbers) matching target prefix
  */
 export function formatPawaPayPhoneNumber(phoneNumber: any, prefix: any): string {

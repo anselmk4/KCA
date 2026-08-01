@@ -4,6 +4,7 @@ import { createClient as createDirectClient } from '@supabase/supabase-js';
 import { 
   initiatePawaPayDeposit, 
   getPawaPayConfigForCountry, 
+  detectPawaPayCountry,
   formatPawaPayPhoneNumber,
   normalizePawaPayCorrespondent
 } from '@/lib/pawapay';
@@ -38,11 +39,11 @@ export async function POST(req: NextRequest) {
       .eq('id', user.id)
       .maybeSingle();
 
-    const userCountry = country || profile?.nationality || profile?.country || 'CD';
-    const countryConfig = getPawaPayConfigForCountry(userCountry);
+    // Auto-detect country configuration (phone number prefix, operator suffix, or fallback country)
+    const countryConfig = detectPawaPayCountry(phoneNumber, carrier, country || profile?.nationality || profile?.country);
 
     if (!countryConfig) {
-      return NextResponse.json({ error: `PawaPay n'est pas disponible pour votre pays : ${userCountry}` }, { status: 400 });
+      return NextResponse.json({ error: `PawaPay n'est pas disponible pour votre pays.` }, { status: 400 });
     }
 
     // Format phone number according to country configuration prefix
