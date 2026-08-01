@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
 
     // Auto-detect country configuration (phone number prefix, operator suffix, or fallback country)
     const countryConfig = detectPawaPayCountry(phoneNumber, carrier, country || profile?.nationality || profile?.country);
+    const userCountry = countryConfig.countryCode;
 
     if (!countryConfig) {
       return NextResponse.json({ error: `PawaPay n'est pas disponible pour votre pays.` }, { status: 400 });
