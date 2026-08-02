@@ -18,11 +18,13 @@ import {
   Loader2,
   GraduationCap,
   ArrowRight,
+  UserCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 import { stripHtml } from "@/lib/utils";
+import { RequestCoachingModal } from "@/components/coaching/RequestCoachingModal";
 
 interface Profile {
   id: string;
@@ -78,6 +80,7 @@ export default function DashboardPage() {
   const [certificates, setCertificates] = useState<CertificateData[]>([]);
   const [availableCourses, setAvailableCourses] = useState<CourseData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isCoachingModalOpen, setIsCoachingModalOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -251,6 +254,40 @@ export default function DashboardPage() {
             </p>
           </div>
           <h4 className="text-2xl font-bold text-zinc-900 dark:text-white">{avgProgress}%</h4>
+        </div>
+      </div>
+
+      {/* 1-on-1 Coaching CTA Banner */}
+      <div className="bg-gradient-to-r from-zinc-900 via-zinc-900 to-teal-950 p-6 rounded-2xl border border-teal-500/30 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
+        <div className="flex items-center gap-4 relative z-10">
+          <div className="w-12 h-12 rounded-xl bg-teal-500/20 border border-teal-400/30 text-teal-300 flex items-center justify-center shrink-0">
+            <UserCheck className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-base font-extrabold flex items-center gap-2">
+              Besoin d&apos;un accompagnement individuel ?
+              <Sparkles className="w-4 h-4 text-amber-400" />
+            </h3>
+            <p className="text-xs text-zinc-300 mt-0.5 max-w-xl">
+              Réservez une séance de Coaching 1-sur-1 en visioconférence avec vos formateurs pour débloquer un sujet précis.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 relative z-10 self-start md:self-auto shrink-0">
+          <Link
+            href="/dashboard/coaching"
+            className="px-4 py-2.5 rounded-xl border border-zinc-700 hover:bg-zinc-800 text-white text-xs font-bold transition-all"
+          >
+            Voir mes demandes
+          </Link>
+
+          <button
+            onClick={() => setIsCoachingModalOpen(true)}
+            className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-extrabold shadow-lg shadow-teal-500/20 transition-all flex items-center gap-2 cursor-pointer hover:scale-105"
+          >
+            <UserCheck className="w-4 h-4" /> Demander un Coaching 1-on-1
+          </button>
         </div>
       </div>
 
@@ -440,6 +477,11 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      <RequestCoachingModal
+        isOpen={isCoachingModalOpen}
+        onClose={() => setIsCoachingModalOpen(false)}
+      />
     </div>
   );
 }

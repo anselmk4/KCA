@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   MessageSquare,
   Send,
@@ -25,6 +25,28 @@ export function CoachRequestsTab() {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadRequests() {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/coaching/requests");
+        const data = await res.json();
+        if (data?.requests && Array.isArray(data.requests)) {
+          setRequests(data.requests);
+          if (data.requests.length > 0) {
+            setSelectedRequestId(data.requests[0].id);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading coach requests:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadRequests();
+  }, []);
 
   const selectedRequest = requests.find((r) => r.id === selectedRequestId);
 

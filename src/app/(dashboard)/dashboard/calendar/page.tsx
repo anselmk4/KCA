@@ -2,13 +2,15 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { CalendarView, CalendarEvent } from "@/components/calendar/CalendarView";
-import { Calendar as CalendarIcon, RefreshCw, Loader2, Sparkles, Video, UserCheck } from "lucide-react";
+import { Calendar as CalendarIcon, RefreshCw, Loader2, Sparkles, Video, UserCheck, Plus } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import { RequestCoachingModal } from "@/components/coaching/RequestCoachingModal";
 
 export default function StudentCalendarPage() {
   const { t } = useLanguage();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isCoachingModalOpen, setIsCoachingModalOpen] = useState(false);
 
   const fetchEvents = useCallback(async () => {
     setLoading(true);
@@ -51,6 +53,13 @@ export default function StudentCalendarPage() {
 
         <div className="relative z-10 flex items-center gap-3 shrink-0">
           <button
+            onClick={() => setIsCoachingModalOpen(true)}
+            className="px-4 py-2.5 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-extrabold shadow-lg shadow-teal-500/20 transition-all flex items-center gap-2 cursor-pointer"
+          >
+            <UserCheck className="w-4 h-4" /> Demander un Coaching
+          </button>
+
+          <button
             onClick={fetchEvents}
             className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl transition-all cursor-pointer border border-white/10"
             title="Rafraîchir les événements"
@@ -73,6 +82,12 @@ export default function StudentCalendarPage() {
           onRefresh={fetchEvents}
         />
       )}
+
+      <RequestCoachingModal
+        isOpen={isCoachingModalOpen}
+        onClose={() => setIsCoachingModalOpen(false)}
+        onRequestSubmitted={fetchEvents}
+      />
     </div>
   );
 }

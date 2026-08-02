@@ -48,6 +48,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     { icon: <Calendar className="w-5 h-5" />, label: language === "en" ? "Calendar" : "Calendrier & Planning", href: "/dashboard/calendar" },
     { icon: <MessageSquare className="w-5 h-5" />, label: language === "en" ? "Direct Messages" : "Messagerie Directe", href: "/dashboard/messages" },
     { icon: <Video className="w-5 h-5" />, label: language === "en" ? "Live Sessions" : "Session Live", href: "/dashboard/live" },
+    { icon: <UserCircle className="w-5 h-5 text-teal-500" />, label: language === "en" ? "1-on-1 Coaching" : "Coaching 1-sur-1", href: "/dashboard/coaching" },
     { icon: <CreditCard className="w-5 h-5" />, label: t("student.sidebar.billing"), href: "/dashboard/payments" },
     { icon: <Award className="w-5 h-5" />, label: t("student.sidebar.certificates"), href: "/dashboard/certificates" },
     { icon: <Users className="w-5 h-5" />, label: language === "en" ? "Community" : "Communauté", href: "/dashboard/community" },
