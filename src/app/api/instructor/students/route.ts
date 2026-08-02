@@ -461,6 +461,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: insertErr.message }, { status: 400 });
     }
 
+    // If there is a manual paid amount, generate order & payment record for receipt/invoice generation
+    if (manualAmount > 0) {
+      try {
+        const orderId = crypto.randomUUID();
+        await supabaseAdmin.from("orders").insert({
+          id: orderId,
+          user_id: studentId,
+          total_amount: manualAmount,
+          status: "COMPLETED",
+          created_at: new Date().toISOString(),
+        });
+
+        await supabaseAdmin.from("order_items").insert({
+          id: crypto.randomUUID(),
+          order_id: orderId,
+          course_id: courseId,
+          unit_price: targetCoursePrice || manualAmount,
+          final_price: manualAmount,
+        });
+
+        await supabaseAdmin.from("payments").insert({
+          id: crypto.randomUUID(),
+          order_id: orderId,
+          user_id: studentId,
+          amount: manualAmount,
+          currency: "USD",
+          status: "PAID",
+          provider: "MANUAL",
+          method: manualStatus === "CASH_FULL" ? "MANUAL::CASH_FULL" : "MANUAL::CASH_INSTALLMENT",
+          paid_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        });
+      } catch (payErr) {
+        console.warn("[students-api POST] Could not create manual order/payment record:", payErr);
+      }
+    }
+
     try {
       const { data: courseData } = await supabaseAdmin
         .from("courses")
