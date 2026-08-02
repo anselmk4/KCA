@@ -903,8 +903,8 @@ function PaymentContent() {
               {method === "crypto_btc" && (
                 <div className="space-y-6 animate-in fade-in duration-300">
                   <BitcoinQrCode
-                    usdAmount={totalAmountWithFee}
-                    btcAmount={convertUsdToBtc(totalAmountWithFee, btcPriceUsd)}
+                    usdAmount={currentPlanDetails.price}
+                    btcAmount={convertUsdToBtc(currentPlanDetails.price, btcPriceUsd)}
                     label={`Abonnement Formateur Plan ${plan}`}
                   />
 
