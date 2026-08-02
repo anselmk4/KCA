@@ -11,17 +11,17 @@ const supabaseAdmin = createSupabaseAdmin(
 // Structure: courseId -> Map<userId, timestamp>
 const activeCoursePresenceMap = new Map<string, Map<string, number>>();
 
-// Clean up stale sessions older than 2 minutes (120,000 ms)
-function getActiveOnlineCount(courseId: string): number {
+// Clean up stale sessions older than 3 minutes (180,000 ms)
+function getActiveOnlineCount(courseIdKey: string): number {
   const now = Date.now();
-  const twoMinutesAgo = now - 2 * 60 * 1000;
+  const threeMinutesAgo = now - 3 * 60 * 1000;
   
-  const courseMap = activeCoursePresenceMap.get(courseId);
+  const courseMap = activeCoursePresenceMap.get(courseIdKey);
   if (!courseMap) return 0;
 
   let activeCount = 0;
   for (const [userId, lastHeartbeat] of courseMap.entries()) {
-    if (lastHeartbeat >= twoMinutesAgo) {
+    if (lastHeartbeat >= threeMinutesAgo) {
       activeCount++;
     } else {
       courseMap.delete(userId); // Purge stale session
@@ -31,11 +31,25 @@ function getActiveOnlineCount(courseId: string): number {
   return activeCount;
 }
 
-function registerUserPresence(courseId: string, userId: string) {
-  if (!activeCoursePresenceMap.has(courseId)) {
-    activeCoursePresenceMap.set(courseId, new Map());
+function registerUserPresence(courseIdKey: string, userId: string) {
+  if (!activeCoursePresenceMap.has(courseIdKey)) {
+    activeCoursePresenceMap.set(courseIdKey, new Map());
   }
-  activeCoursePresenceMap.get(courseId)!.set(userId, Date.now());
+  activeCoursePresenceMap.get(courseIdKey)!.set(userId, Date.now());
+}
+
+/**
+ * Resolves the real course record (id, slug, instructor_id) whether passed an ID or a Slug
+ */
+async function resolveCourseInfo(idOrSlug: string) {
+  const clean = idOrSlug.trim();
+  const { data } = await supabaseAdmin
+    .from("courses")
+    .select("id, slug, instructor_id")
+    .or(`id.eq.${clean},slug.eq.${clean}`)
+    .maybeSingle();
+
+  return data || null;
 }
 
 /**
@@ -48,17 +62,20 @@ export async function GET(
 ) {
   try {
     const resolvedParams = await params;
-    const courseId = resolvedParams.courseId;
+    const rawCourseId = resolvedParams.courseId;
 
-    if (!courseId) {
+    if (!rawCourseId) {
       return NextResponse.json({ error: "courseId est requis." }, { status: 400 });
     }
+
+    const courseInfo = await resolveCourseInfo(rawCourseId);
+    const targetCourseId = courseInfo?.id || rawCourseId;
 
     // 1. Exact count of active/completed enrollments from database
     const { count: enrolledCountData, error: enrollError } = await supabaseAdmin
       .from("enrollments")
       .select("id", { count: "exact", head: true })
-      .eq("course_id", courseId)
+      .eq("course_id", targetCourseId)
       .in("status", ["ACTIVE", "COMPLETED"]);
 
     if (enrollError) {
@@ -68,22 +85,20 @@ export async function GET(
     const enrolledCount = enrolledCountData || 0;
 
     // 2. Exact online connected learners at instant T for this course
-    const onlineCount = getActiveOnlineCount(courseId);
+    let onlineCount = getActiveOnlineCount(targetCourseId);
+    if (courseInfo?.slug) {
+      onlineCount = Math.max(onlineCount, getActiveOnlineCount(courseInfo.slug));
+    }
 
     // 3. Exact count of course instructors / admins
     let adminCount = 1;
-    const { data: courseData } = await supabaseAdmin
-      .from("courses")
-      .select("instructor_id")
-      .eq("id", courseId)
-      .maybeSingle();
-
-    if (courseData?.instructor_id) {
-      adminCount = 1; // Primary instructor
+    if (courseInfo?.instructor_id) {
+      adminCount = 1;
     }
 
     return NextResponse.json({
-      courseId,
+      courseId: targetCourseId,
+      slug: courseInfo?.slug || null,
       enrolledCount,
       onlineCount,
       adminCount,
@@ -107,17 +122,23 @@ export async function POST(
 ) {
   try {
     const resolvedParams = await params;
-    const courseId = resolvedParams.courseId;
+    const rawCourseId = resolvedParams.courseId;
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     const userId = user?.id || req.headers.get("x-user-id") || `anonymous-${req.headers.get("x-forwarded-for") || "client"}`;
 
-    if (courseId && userId) {
-      registerUserPresence(courseId, userId);
+    if (rawCourseId && userId) {
+      const courseInfo = await resolveCourseInfo(rawCourseId);
+      const targetCourseId = courseInfo?.id || rawCourseId;
 
-      // Optionally update updated_at on user profile for DB audit trace
+      registerUserPresence(targetCourseId, userId);
+      if (courseInfo?.slug) {
+        registerUserPresence(courseInfo.slug, userId);
+      }
+
+      // Update updated_at on user profile for DB audit trace
       if (user?.id) {
         await supabaseAdmin
           .from("profiles")
@@ -126,11 +147,8 @@ export async function POST(
       }
     }
 
-    const onlineCount = getActiveOnlineCount(courseId);
-
     return NextResponse.json({
       success: true,
-      onlineCount,
     });
   } catch (err: any) {
     console.error("[POST /api/courses/[courseId]/presence] Error:", err);

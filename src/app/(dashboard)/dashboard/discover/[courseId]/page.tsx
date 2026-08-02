@@ -62,11 +62,11 @@ export default function CoursePreviewPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Charger le cours
+      // 1. Charger le cours par ID ou par Slug
       const { data: rawCourseData, error: courseError } = await supabase
         .from("courses")
         .select("*")
-        .eq("id", courseId)
+        .or(`id.eq.${courseId},slug.eq.${courseId}`)
         .maybeSingle();
 
       if (courseError || !rawCourseData) {
@@ -76,6 +76,7 @@ export default function CoursePreviewPage() {
       }
 
       const courseData = rawCourseData as any;
+      const realCourseId = courseData.id;
 
       // 2. Charger le nom du formateur
       const { data: instructorProfile } = await supabase
@@ -99,7 +100,7 @@ export default function CoursePreviewPage() {
       const { data: sectionsData } = await supabase
         .from("course_sections")
         .select("id")
-        .eq("course_id", courseId);
+        .eq("course_id", realCourseId);
 
       const sCount = sectionsData ? sectionsData.length : 0;
       setSectionsCount(sCount);
@@ -116,7 +117,7 @@ export default function CoursePreviewPage() {
       }
       setLessonsCount(lCount);
 
-      // 6. Vérifier la session & inscription
+      // 6. Vérifier la session & inscription avec l'UUID réel
       const { data: { user } } = await supabase.auth.getUser();
       
       let enrolled = false;
@@ -125,7 +126,7 @@ export default function CoursePreviewPage() {
           .from("enrollments")
           .select("id")
           .eq("student_id", user.id)
-          .eq("course_id", courseId)
+          .eq("course_id", realCourseId)
           .eq("status", "ACTIVE")
           .maybeSingle();
 
@@ -134,7 +135,7 @@ export default function CoursePreviewPage() {
               .from("enrollments")
               .select("id")
               .eq("student_id", user.id)
-              .eq("course_id", courseId)
+              .eq("course_id", realCourseId)
               .eq("status", "COMPLETED")
               .maybeSingle()
           : { data: null };
@@ -143,11 +144,11 @@ export default function CoursePreviewPage() {
         setIsEnrolled(enrolled);
       }
 
-      // 7. Compte des inscrits exacts depuis la base de données
+      // 7. Compte des inscrits exacts depuis la base de données avec l'UUID réel
       const { count: enrolledCountData } = await supabase
         .from("enrollments")
         .select("id", { count: "exact", head: true })
-        .eq("course_id", courseId)
+        .eq("course_id", realCourseId)
         .in("status", ["ACTIVE", "COMPLETED"]);
 
       setEnrolledCount(enrolledCountData || 0);
