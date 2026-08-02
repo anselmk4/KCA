@@ -38,7 +38,26 @@ export default function CoursePreviewPage() {
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [enrolledCount, setEnrolledCount] = useState(0);
   const [onlineCount, setOnlineCount] = useState(0);
+  const [adminCount, setAdminCount] = useState(1);
   const [loading, setLoading] = useState(true);
+
+  const fetchLivePresence = useCallback(async () => {
+    try {
+      // 1. Send presence heartbeat to register user on this course at instant T
+      await fetch(`/api/courses/${courseId}/presence`, { method: "POST" });
+
+      // 2. Fetch exact DB metrics
+      const res = await fetch(`/api/courses/${courseId}/presence`);
+      if (res.ok) {
+        const stats = await res.json();
+        if (typeof stats.enrolledCount === "number") setEnrolledCount(stats.enrolledCount);
+        if (typeof stats.onlineCount === "number") setOnlineCount(stats.onlineCount);
+        if (typeof stats.adminCount === "number") setAdminCount(stats.adminCount);
+      }
+    } catch (err) {
+      console.warn("[presence] Error fetching live metrics:", err);
+    }
+  }, [courseId]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -124,38 +143,14 @@ export default function CoursePreviewPage() {
         setIsEnrolled(enrolled);
       }
 
-      // 7. Compte des inscrits (seulement les inscriptions actives ou complétées)
+      // 7. Compte des inscrits exacts depuis la base de données
       const { count: enrolledCountData } = await supabase
         .from("enrollments")
         .select("id", { count: "exact", head: true })
         .eq("course_id", courseId)
         .in("status", ["ACTIVE", "COMPLETED"]);
 
-      const currentEnrolledCount = enrolledCountData || 0;
-      setEnrolledCount(currentEnrolledCount);
-
-      // 8. Calcul des membres en ligne à partir de la base
-      let activeOnline = 0;
-      if (currentEnrolledCount > 0) {
-        const { data: courseEnrollments } = await supabase
-          .from("enrollments")
-          .select("student_id")
-          .eq("course_id", courseId)
-          .in("status", ["ACTIVE", "COMPLETED"]);
-
-        const studentIds = (courseEnrollments || []).map(e => e.student_id);
-        if (studentIds.length > 0) {
-          const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-          const { count: onlineProfilesCount } = await supabase
-            .from("profiles")
-            .select("id", { count: "exact", head: true })
-            .in("id", studentIds)
-            .gt("updated_at", fifteenMinutesAgo);
-          
-          activeOnline = onlineProfilesCount || Math.max(1, Math.floor(currentEnrolledCount * 0.12));
-        }
-      }
-      setOnlineCount(activeOnline);
+      setEnrolledCount(enrolledCountData || 0);
 
       // Mapper le niveau
       let levelLabel = t("student.dashboard.welcome", "Débutant").includes("Ravi") ? "Débutant" : "Beginner";
@@ -185,11 +180,19 @@ export default function CoursePreviewPage() {
     } finally {
       setLoading(false);
     }
-  }, [courseId]);
+  }, [courseId, t]);
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    fetchLivePresence();
+
+    // Pulse heartbeat every 25 seconds for real-time presence at instant T
+    const presenceInterval = setInterval(() => {
+      fetchLivePresence();
+    }, 25000);
+
+    return () => clearInterval(presenceInterval);
+  }, [loadData, fetchLivePresence]);
 
   if (loading) {
     return (
@@ -356,19 +359,26 @@ export default function CoursePreviewPage() {
               </p>
             </div>
 
-            {/* statistics row */}
+            {/* Statistics row */}
             <div className="grid grid-cols-3 border-y border-zinc-100 dark:border-zinc-800 py-4 text-center">
               <div>
                 <p className="text-xl font-extrabold text-zinc-900 dark:text-white">{enrolledCount}</p>
-                <p className="text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5">{t("student.dashboard.welcome", "Membres").includes("Ravi") ? "Membres" : "Members"}</p>
+                <p className="text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5 font-bold">
+                  {t("student.dashboard.welcome", "Membres").includes("Ravi") ? "Membres" : "Members"}
+                </p>
               </div>
               <div>
-                <p className="text-xl font-extrabold text-teal-600">{onlineCount}</p>
-                <p className="text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5">{t("student.dashboard.welcome", "En Ligne").includes("Ravi") ? "En Ligne" : "Online"}</p>
+                <p className="text-xl font-extrabold text-teal-600 flex items-center justify-center gap-1">
+                  {onlineCount > 0 && <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>}
+                  {onlineCount}
+                </p>
+                <p className="text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5 font-bold">
+                  {t("student.dashboard.welcome", "En Ligne").includes("Ravi") ? "En Ligne" : "Online"}
+                </p>
               </div>
               <div>
-                <p className="text-xl font-extrabold text-blue-500">1</p>
-                <p className="text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5">Admin</p>
+                <p className="text-xl font-extrabold text-blue-500">{adminCount}</p>
+                <p className="text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5 font-bold">Admin</p>
               </div>
             </div>
 

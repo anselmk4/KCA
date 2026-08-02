@@ -133,6 +133,18 @@ export default function CourseLearnPage() {
   const [togglingLesson, setTogglingLesson] = useState<string | null>(null);
   const [checkingCert, setCheckingCert] = useState(false);
 
+  useEffect(() => {
+    if (!courseId) return;
+
+    const sendPresenceHeartbeat = () => {
+      fetch(`/api/courses/${courseId}/presence`, { method: "POST" }).catch(() => {});
+    };
+
+    sendPresenceHeartbeat();
+    const presenceInterval = setInterval(sendPresenceHeartbeat, 20000);
+    return () => clearInterval(presenceInterval);
+  }, [courseId]);
+
   const [progressPercent, setProgressPercent] = useState(0);
   const [loading, setLoading] = useState(true);
   const [videoPlaying, setVideoPlaying] = useState(false);

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, Clock, ArrowRight, Compass, Loader2 } from "lucide-react";
+import { Search, Clock, ArrowRight, Compass, Loader2, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -70,7 +70,32 @@ export default function DiscoverCoursesPage() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [courses, setCourses] = useState<DiscoverCourse[]>([]);
   const [enrollmentCounts, setEnrollmentCounts] = useState<Record<string, number>>({});
+  const [onlineCounts, setOnlineCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchPresenceGlobal() {
+      try {
+        const res = await fetch("/api/courses/presence");
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.stats) {
+            const onMap: Record<string, number> = {};
+            Object.keys(data.stats).forEach(cId => {
+              onMap[cId] = data.stats[cId].onlineCount || 0;
+            });
+            setOnlineCounts(onMap);
+          }
+        }
+      } catch (err) {
+        console.warn("[discover] Global presence fetch error:", err);
+      }
+    }
+
+    fetchPresenceGlobal();
+    const interval = setInterval(fetchPresenceGlobal, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     async function fetchCourses() {
@@ -260,6 +285,7 @@ export default function DiscoverCoursesPage() {
             }
 
             const enrolledCount = enrollmentCounts[course.id] || 0;
+            const onlineCount = onlineCounts[course.id] || 0;
 
             return (
               <Link
@@ -305,9 +331,17 @@ export default function DiscoverCoursesPage() {
                         <Clock className="h-3.5 w-3.5" />
                         <span>{course.level || t("student.discover.level", "Tous niveaux")}</span>
                       </div>
-                      <div className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold flex items-center gap-1">
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                        {enrolledCount} {enrolledCount > 1 ? t("instructor.courses.students", "étudiants") : t("instructor.courses.students", "étudiant")}
+                      <div className="text-xs text-zinc-600 dark:text-zinc-300 font-bold flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          <Users className="w-3.5 h-3.5 text-zinc-400" />
+                          <span>{enrolledCount} {enrolledCount > 1 ? "inscrits" : "inscrit"}</span>
+                        </div>
+                        {onlineCount > 0 && (
+                          <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-md">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span>{onlineCount} en ligne</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <span className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
