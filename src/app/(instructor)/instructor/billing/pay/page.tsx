@@ -11,7 +11,8 @@ import {
   Phone, 
   DollarSign, 
   Loader2,
-  Sparkles
+  Sparkles,
+  Bitcoin
 } from "lucide-react";
 import Link from "next/link";
 import Script from "next/script";
@@ -20,6 +21,8 @@ import { getPawaPayConfigForCountry } from "@/lib/pawapay";
 import { OperatorLogo } from "@/components/icons/PaymentLogos";
 import { SOLANA_TREASURY_ADDRESS, getSolanaPayUri, getSolanaQrCodeUrl, getBackupQrCodeUrl, connectSolanaWallet } from "@/lib/crypto";
 import { SolanaQrCode } from "@/components/ui/SolanaQrCode";
+import { fetchBtcPriceInUsd, convertUsdToBtc } from "@/lib/bitcoin";
+import { BitcoinQrCode } from "@/components/ui/BitcoinQrCode";
 
 declare global {
   interface Window {
@@ -27,7 +30,7 @@ declare global {
   }
 }
 
-type PaymentMethod = "mastercard" | "paypal" | "crypto" | "mobile_money";
+type PaymentMethod = "mastercard" | "paypal" | "crypto" | "crypto_btc" | "mobile_money";
 
 function PaymentContent() {
   const router = useRouter();
@@ -37,6 +40,17 @@ function PaymentContent() {
   const [method, setMethod] = useState<PaymentMethod>("mobile_money");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  // BTC State
+  const [btcTxHash, setBtcTxHash] = useState("");
+  const [btcPriceUsd, setBtcPriceUsd] = useState(65000);
+  const [verifyingBtc, setVerifyingBtc] = useState(false);
+
+  useEffect(() => {
+    fetchBtcPriceInUsd().then(price => {
+      if (price && price > 0) setBtcPriceUsd(price);
+    });
+  }, []);
   const [showPendingState, setShowPendingState] = useState(false);
   const [paymentId, setPaymentId] = useState("");
   const [verifying, setVerifying] = useState(false);
@@ -672,7 +686,8 @@ function PaymentContent() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
                   { id: "paypal", label: "PayPal", icon: <DollarSign className="w-5 h-5 text-blue-500" /> },
-                  { id: "crypto", label: "Crypto", icon: <Coins className="w-5 h-5 text-amber-500" /> },
+                  { id: "crypto", label: "Solana Pay", icon: <Coins className="w-5 h-5 text-purple-500" /> },
+                  { id: "crypto_btc", label: "Bitcoin (BTC)", icon: <Bitcoin className="w-5 h-5 text-amber-500" /> },
                   { id: "mobile_money", label: "Mobile Money", icon: <Phone className="w-5 h-5 text-green-500" /> }
                 ].map((item) => (
                   <div
@@ -880,6 +895,79 @@ function PaymentContent() {
                         {cryptoSuccess}
                       </p>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* 4. Bitcoin (BTC) Form */}
+              {method === "crypto_btc" && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  <BitcoinQrCode
+                    usdAmount={totalAmountWithFee}
+                    btcAmount={convertUsdToBtc(totalAmountWithFee, btcPriceUsd)}
+                    label={`Abonnement Formateur Plan ${plan}`}
+                  />
+
+                  <div className="p-4 bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200 dark:border-zinc-800 space-y-3">
+                    <label className="block text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      Signature de Transaction Bitcoin (TxID / Hash) <span className="text-amber-500">*</span>
+                    </label>
+
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input 
+                        type="text"
+                        value={btcTxHash}
+                        onChange={(e) => setBtcTxHash(e.target.value)}
+                        placeholder="Collez votre Hash Bitcoin (ex: 4a5e1e4baab89f3a32518...)"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono font-semibold text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!btcTxHash.trim()) return;
+                          setVerifyingBtc(true);
+                          try {
+                            const res = await fetch("/api/payments/btc-verify", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                txHash: btcTxHash.trim(),
+                                planId: plan,
+                              }),
+                            });
+
+                            const data = await res.json();
+                            if (!res.ok) {
+                              throw new Error(data.error || "Échec de vérification Bitcoin.");
+                            }
+
+                            setSuccess(true);
+                            setTimeout(() => {
+                              router.push("/instructor/billing");
+                            }, 2500);
+                          } catch (err: any) {
+                            alert("Erreur Bitcoin : " + (err.message || err));
+                          } finally {
+                            setVerifyingBtc(false);
+                          }
+                        }}
+                        disabled={verifyingBtc || !btcTxHash.trim()}
+                        className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 text-xs font-extrabold transition-all shrink-0 flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-amber-500/20"
+                      >
+                        {verifyingBtc ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Vérification On-Chain...
+                          </>
+                        ) : (
+                          <>
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            Vérifier & Valider
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

@@ -4,13 +4,15 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Script from "next/script";
-import { ChevronLeft, CreditCard, Smartphone, ShieldCheck, QrCode, Loader2, CheckCircle, AlertCircle, Sparkles } from "lucide-react";
+import { ChevronLeft, CreditCard, Smartphone, ShieldCheck, QrCode, Loader2, CheckCircle, AlertCircle, Sparkles, Bitcoin } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 import { getPawaPayConfigForCountry } from "@/lib/pawapay";
 import { OperatorLogo } from "@/components/icons/PaymentLogos";
 import { SOLANA_TREASURY_ADDRESS, getSolanaPayUri, getSolanaQrCodeUrl, getBackupQrCodeUrl, connectSolanaWallet } from "@/lib/crypto";
 import { SolanaQrCode } from "@/components/ui/SolanaQrCode";
+import { fetchBtcPriceInUsd, convertUsdToBtc } from "@/lib/bitcoin";
+import { BitcoinQrCode } from "@/components/ui/BitcoinQrCode";
 
 declare global {
   interface Window {
@@ -36,7 +38,7 @@ interface Course {
   type?: 'academic' | 'self_paced';
 }
 
-type PaymentMethod = "momo" | "paypal" | "crypto" | "card";
+type PaymentMethod = "momo" | "paypal" | "crypto" | "crypto_btc" | "card";
 
 export default function PaymentPage() {
   const { t } = useLanguage();
@@ -54,6 +56,17 @@ export default function PaymentPage() {
   const [verifying, setVerifying] = useState(false);
   const [simulating, setSimulating] = useState(false);
   const [isSandboxMode, setIsSandboxMode] = useState(false);
+
+  // BTC State
+  const [btcTxHash, setBtcTxHash] = useState("");
+  const [btcPriceUsd, setBtcPriceUsd] = useState(65000);
+  const [verifyingBtc, setVerifyingBtc] = useState(false);
+
+  useEffect(() => {
+    fetchBtcPriceInUsd().then(price => {
+      if (price && price > 0) setBtcPriceUsd(price);
+    });
+  }, []);
 
   // MOMO state
   const [userCountry, setUserCountry] = useState("CD");
@@ -988,7 +1001,19 @@ export default function PaymentPage() {
                 }`}
               >
                 <QrCode className="w-5 h-5" />
-                <span className="text-xs">Crypto (USDT)</span>
+                <span className="text-xs">Solana Pay</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMethod("crypto_btc")}
+                className={`flex flex-col items-center gap-2 py-3 rounded-xl transition-all cursor-pointer ${
+                  method === "crypto_btc"
+                    ? "bg-zinc-100 dark:bg-zinc-800 text-amber-500 font-bold"
+                    : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-700"
+                }`}
+              >
+                <Bitcoin className="w-5 h-5 text-amber-500" />
+                <span className="text-xs">Bitcoin (BTC)</span>
               </button>
             </div>
 
@@ -1365,6 +1390,79 @@ export default function PaymentPage() {
                         {cryptoSuccess}
                       </p>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Bitcoin (BTC) Form */}
+              {method === "crypto_btc" && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  <BitcoinQrCode
+                    usdAmount={finalAmountWithFee}
+                    btcAmount={convertUsdToBtc(finalAmountWithFee, btcPriceUsd)}
+                    label={`Formation ${course.title}`}
+                  />
+
+                  <div className="p-4 bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200 dark:border-zinc-800 space-y-3">
+                    <label className="block text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      Signature de Transaction Bitcoin (TxID / Hash) <span className="text-amber-500">*</span>
+                    </label>
+
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input 
+                        type="text"
+                        value={btcTxHash}
+                        onChange={(e) => setBtcTxHash(e.target.value)}
+                        placeholder="Collez votre Hash Bitcoin (ex: 4a5e1e4baab89f3a32518...)"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono font-semibold text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!btcTxHash.trim()) return;
+                          setVerifyingBtc(true);
+                          try {
+                            const res = await fetch("/api/payments/btc-verify", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                txHash: btcTxHash.trim(),
+                                courseId: course.id,
+                              }),
+                            });
+
+                            const data = await res.json();
+                            if (!res.ok) {
+                              throw new Error(data.error || "Échec de vérification Bitcoin.");
+                            }
+
+                            setSuccess(true);
+                            setTimeout(() => {
+                              router.push("/dashboard/courses");
+                            }, 2500);
+                          } catch (err: any) {
+                            alert("Erreur Bitcoin : " + (err.message || err));
+                          } finally {
+                            setVerifyingBtc(false);
+                          }
+                        }}
+                        disabled={verifyingBtc || !btcTxHash.trim()}
+                        className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 text-xs font-extrabold transition-all shrink-0 flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-amber-500/20"
+                      >
+                        {verifyingBtc ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Vérification On-Chain...
+                          </>
+                        ) : (
+                          <>
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            Vérifier & Valider
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

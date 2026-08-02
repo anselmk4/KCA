@@ -12,6 +12,7 @@ const PROVIDER_MAP: Record<string, string> = {
   PAYPAL: "PayPal Account",
   MOBILE_MONEY: "Mobile Money",
   CRYPTO: "Cryptomonnaie (Solana)",
+  CRYPTO_BTC: "Bitcoin (BTC - On-Chain)",
   MANUAL: "Validation manuelle",
 };
 

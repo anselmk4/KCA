@@ -11,7 +11,8 @@ const PROVIDER_LABELS: Record<string, string> = {
   PAYPAL: "PayPal",
   MOBILE_MONEY: "Mobile Money",
   STRIPE: "Stripe / Carte",
-  CRYPTO: "Cryptomonnaie",
+  CRYPTO: "Cryptomonnaie (Solana)",
+  CRYPTO_BTC: "Bitcoin (BTC - On-Chain)",
   MANUAL: "Validation manuelle",
   MOKO_CARD: "Carte bancaire (Moko)",
 };
