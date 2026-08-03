@@ -12,8 +12,15 @@ import {
   Calendar, 
   User, 
   TrendingUp, 
-  AlertCircle 
+  AlertCircle,
+  Send,
+  Smartphone,
+  Globe,
+  Phone,
+  UserCheck,
+  CheckCircle2
 } from "lucide-react";
+import { PAWAPAY_COUNTRY_MAPPING } from "@/lib/pawapay";
 
 interface AdminPayoutItem {
   id: string;
@@ -50,6 +57,78 @@ export default function AdminPayoutsPage() {
   const [activeTab, setActiveTab] = useState<"ALL" | "PENDING" | "PAID" | "FAILED">("PENDING");
   const [processingId, setProcessingId] = useState<string | null>(null);
 
+  // Direct PawaPay Withdrawal Form State
+  const [instructorsList, setInstructorsList] = useState<{ id: string; name: string }[]>([]);
+  const [directCountry, setDirectCountry] = useState<string>("CD");
+  const [directCarrier, setDirectCarrier] = useState<string>("VODACOM_MPESA_COD");
+  const [directPhone, setDirectPhone] = useState<string>("");
+  const [directAmount, setDirectAmount] = useState<string>("");
+  const [directDescription, setDirectDescription] = useState<string>("");
+  const [directInstructorId, setDirectInstructorId] = useState<string>("");
+  const [submittingDirect, setSubmittingDirect] = useState<boolean>(false);
+  const [directMessage, setDirectMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const selectedCountryConfig = PAWAPAY_COUNTRY_MAPPING.find(c => c.countryCode === directCountry) || PAWAPAY_COUNTRY_MAPPING[0];
+
+  const handleCountryChange = (countryCode: string) => {
+    setDirectCountry(countryCode);
+    const cfg = PAWAPAY_COUNTRY_MAPPING.find(c => c.countryCode === countryCode);
+    if (cfg && cfg.operators.length > 0) {
+      setDirectCarrier(cfg.operators[0].id);
+    }
+  };
+
+  const handleDirectPayoutSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDirectMessage(null);
+
+    const amountNum = parseFloat(directAmount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      setDirectMessage({ type: "error", text: "Veuillez entrer un montant valide supérieur à 0 $." });
+      return;
+    }
+
+    const cleanDigits = directPhone.replace(/\D/g, "").replace(/^0+/, "");
+    if (!cleanDigits || cleanDigits.length < 6) {
+      setDirectMessage({ type: "error", text: "Veuillez entrer un numéro de téléphone Mobile Money valide." });
+      return;
+    }
+
+    setSubmittingDirect(true);
+    try {
+      const response = await fetch("/api/admin/payouts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "direct_payout",
+          country: directCountry,
+          carrier: directCarrier,
+          phoneNumber: directPhone,
+          amount: amountNum,
+          statementDescription: directDescription || "Retrait Direct Admin PawaPay",
+          instructorId: directInstructorId || undefined
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Échec de l'envoi du versement PawaPay.");
+      }
+
+      setDirectMessage({ type: "success", text: data.message || "Versement PawaPay envoyé avec succès !" });
+      setDirectPhone("");
+      setDirectAmount("");
+      setDirectDescription("");
+      
+      // Refresh payouts list & dashboard stats
+      loadData();
+    } catch (err: any) {
+      setDirectMessage({ type: "error", text: err.message || "Une erreur est survenue lors de l'envoi." });
+    } finally {
+      setSubmittingDirect(false);
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -63,15 +142,20 @@ export default function AdminPayoutsPage() {
       // 2. Fetch profiles for names and plans
       const { data: sbProfiles } = await supabase
         .from('profiles')
-        .select('id, full_name, plan');
+        .select('id, full_name, plan, email');
 
       const profileMap = new Map<string, string>();
       const planMap = new Map<string, string>();
+      const instList: { id: string; name: string }[] = [];
       
       sbProfiles?.forEach(p => {
-        profileMap.set(p.id, p.full_name || 'Instructeur');
+        const name = p.full_name || p.email || 'Instructeur';
+        profileMap.set(p.id, name);
         planMap.set(p.id, p.plan || 'FREE');
+        instList.push({ id: p.id, name });
       });
+
+      setInstructorsList(instList);
 
       // 3. Fetch all completed payments
       const { data: paymentsData } = await supabase
@@ -431,10 +515,202 @@ export default function AdminPayoutsPage() {
         </div>
       </div>
 
-      {/* Payout Requests Title */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
+      {/* Payout Requests Title & Option Retrait Direct PawaPay */}
+      <div className="space-y-6">
+        <div>
           <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Demandes de Reversement</h3>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+            Gérez les demandes de retrait soumises par les formateurs ou effectuez un virement direct vers n&apos;importe quel réseau Mobile Money.
+          </p>
+        </div>
+
+        {/* Formulaire de Retrait Direct PawaPay */}
+        <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-950 text-white rounded-3xl p-6 border border-zinc-800 shadow-xl space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800/80 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-teal-500/20 border border-teal-500/30 rounded-2xl text-teal-400">
+                <Send className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-base font-extrabold text-white">Retrait Direct PawaPay (Mobile Money)</h4>
+                  <span className="bg-teal-500/20 text-teal-400 border border-teal-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    API Instantanée
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Effectuez un transfert Mobile Money immédiat vers un numéro de téléphone selon le pays et l&apos;opérateur choisi.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-zinc-400 bg-zinc-800/60 px-3 py-1.5 rounded-xl border border-zinc-700/50">
+              <Globe className="w-4 h-4 text-teal-400" />
+              <span>{PAWAPAY_COUNTRY_MAPPING.length} Pays supportés</span>
+            </div>
+          </div>
+
+          <form onSubmit={handleDirectPayoutSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              
+              {/* 1. Country */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5 text-teal-400" /> Pays de destination
+                </label>
+                <select
+                  value={directCountry}
+                  onChange={(e) => handleCountryChange(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-zinc-800/90 border border-zinc-700 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-teal-500 transition-colors"
+                >
+                  {PAWAPAY_COUNTRY_MAPPING.map((cfg) => {
+                    const flag = cfg.countryCode === "CD" ? "🇨🇩" : cfg.countryCode === "CM" ? "🇨🇲" : cfg.countryCode === "CI" ? "🇨🇮" : cfg.countryCode === "SN" ? "🇸🇳" : cfg.countryCode === "RW" ? "🇷🇼" : cfg.countryCode === "UG" ? "🇺🇬" : cfg.countryCode === "ZM" ? "🇿🇲" : "🇧🇯";
+                    return (
+                      <option key={cfg.countryCode} value={cfg.countryCode}>
+                        {flag} {cfg.names[0].toUpperCase()} (+{cfg.phonePrefix})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* 2. Operator */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                  <Smartphone className="w-3.5 h-3.5 text-teal-400" /> Réseau / Opérateur
+                </label>
+                <select
+                  value={directCarrier}
+                  onChange={(e) => setDirectCarrier(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-zinc-800/90 border border-zinc-700 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-teal-500 transition-colors"
+                >
+                  {selectedCountryConfig.operators.map((op) => (
+                    <option key={op.id} value={op.id}>
+                      {op.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 3. Phone Number */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 text-teal-400" /> Numéro de téléphone
+                </label>
+                <div className="flex items-center">
+                  <span className="px-3 py-2.5 bg-zinc-800 border border-r-0 border-zinc-700 rounded-l-xl text-xs font-extrabold text-teal-400 select-none">
+                    +{selectedCountryConfig.phonePrefix}
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="812345678"
+                    value={directPhone}
+                    onChange={(e) => setDirectPhone(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-zinc-800/90 border border-zinc-700 rounded-r-xl text-xs font-semibold text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* 4. Amount */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-teal-400" /> Montant (USD $)
+                  </label>
+                  {(parseFloat(directAmount) || 0) > 0 && (
+                    <span className="text-[10px] font-extrabold text-teal-400">
+                      ≈ {Math.round((parseFloat(directAmount) || 0) * selectedCountryConfig.exchangeRate).toLocaleString('fr-FR')} {selectedCountryConfig.currency}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.5"
+                  placeholder="Ex: 50"
+                  value={directAmount}
+                  onChange={(e) => setDirectAmount(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-zinc-800/90 border border-zinc-700 rounded-xl text-xs font-bold text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              {/* 5. Optional Instructor */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5 text-teal-400" /> Formateur Destinataire (Optionnel)
+                </label>
+                <select
+                  value={directInstructorId}
+                  onChange={(e) => setDirectInstructorId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-zinc-800/90 border border-zinc-700 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-teal-500 transition-colors"
+                >
+                  <option value="">-- Retrait Direct Admin (Sans formateur lié) --</option>
+                  {instructorsList.map((inst) => (
+                    <option key={inst.id} value={inst.id}>
+                      {inst.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 6. Reason / Description */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                  <Coins className="w-3.5 h-3.5 text-teal-400" /> Motif / Description du versement
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Avance commission ou versement d'urgence"
+                  value={directDescription}
+                  onChange={(e) => setDirectDescription(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-zinc-800/90 border border-zinc-700 rounded-xl text-xs font-medium text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Feedback alert */}
+            {directMessage && (
+              <div className={`p-4 rounded-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in ${
+                directMessage.type === 'success'
+                  ? 'bg-emerald-950/80 border border-emerald-500/50 text-emerald-300'
+                  : 'bg-red-950/80 border border-red-500/50 text-red-300'
+              }`}>
+                {directMessage.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                )}
+                <span>{directMessage.text}</span>
+              </div>
+            )}
+
+            {/* Submit Action */}
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                disabled={submittingDirect}
+                className="px-6 py-3 bg-teal-500 hover:bg-teal-400 disabled:bg-zinc-800 text-zinc-950 disabled:text-zinc-500 font-extrabold text-xs rounded-xl transition-all shadow-lg flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+              >
+                {submittingDirect ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-zinc-950 border-t-transparent" />
+                    Envoi PawaPay API en cours...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Envoyer le retrait direct PawaPay
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* Tab Filters for Table */}
+        <div className="flex justify-between items-center pt-2">
+          <h4 className="text-sm font-bold text-zinc-900 dark:text-white">Historique des demandes & versements</h4>
           <div className="flex gap-2">
             {(["PENDING", "PAID", "FAILED", "ALL"] as const).map((tab) => (
               <button

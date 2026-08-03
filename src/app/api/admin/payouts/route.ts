@@ -35,9 +35,134 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
-    const { payoutId, action, reason } = await req.json();
-    if (!payoutId || !action) {
+    const body = await req.json();
+    const { payoutId, action, reason } = body;
+
+    if (!action) {
       return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
+    }
+
+    // --- Direct Admin Payout via PawaPay API ---
+    if (action === "direct_payout") {
+      const { 
+        phoneNumber, 
+        carrier, 
+        country, 
+        amount, 
+        statementDescription, 
+        instructorId 
+      } = body;
+
+      const numAmount = parseFloat(amount);
+      if (!phoneNumber || !carrier || isNaN(numAmount) || numAmount <= 0) {
+        return NextResponse.json({ error: "Numéro de téléphone, réseau/opérateur et montant valide requises." }, { status: 400 });
+      }
+
+      // Format and resolve PawaPay params
+      const resolveResult = resolvePawaPayCorrespondent(carrier, phoneNumber);
+      if (resolveResult.error) {
+        return NextResponse.json({ error: resolveResult.error }, { status: 400 });
+      }
+
+      const amountLocal = numAmount * resolveResult.exchangeRate;
+      const targetPhone = resolveResult.formattedPhone;
+      const freshPayoutTxId = crypto.randomUUID();
+      const desc = statementDescription || "Retrait Direct Admin PawaPay";
+
+      // Initiate payout via PawaPay API
+      const payoutResponse = await initiatePawaPayPayout({
+        payoutId: freshPayoutTxId,
+        amount: amountLocal,
+        currency: resolveResult.currency,
+        correspondent: resolveResult.correspondent,
+        phoneNumber: targetPhone,
+        statementDescription: desc.substring(0, 22)
+      });
+
+      const isSuccess = payoutResponse.success;
+      const pStatus = isSuccess ? "PAID" : "FAILED";
+      const pNote = isSuccess 
+        ? `[Retrait Direct PawaPay API] Transfert réussi de ${Math.round(amountLocal)} ${resolveResult.currency} (${numAmount}$ USD) via ${resolveResult.correspondent} vers +${targetPhone}. Réf: ${freshPayoutTxId}. Note: ${desc}`
+        : `[Échec Retrait Direct PawaPay API] ${payoutResponse.error}. (Opérateur: ${resolveResult.correspondent}, Téléphone: +${targetPhone}). Réf: ${freshPayoutTxId}`;
+
+      const targetInstructorId = instructorId || user.id;
+
+      // Insert payout record in Supabase
+      const { data: newPayout, error: insertErr } = await supabaseAdmin
+        .from("payouts")
+        .insert({
+          id: crypto.randomUUID(),
+          instructor_id: targetInstructorId,
+          amount: numAmount,
+          currency: "USD",
+          status: pStatus,
+          payment_method: "MOBILE_MONEY",
+          payment_reference: `${carrier}: +${targetPhone}`,
+          notes: pNote,
+          processed_by: user.id,
+          processed_at: isSuccess ? new Date().toISOString() : null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (insertErr) {
+        console.error("[admin-payouts] Insert direct payout record error:", insertErr.message);
+      }
+
+      // Send notification & email if a target instructor was selected
+      if (isSuccess && instructorId && instructorId !== user.id) {
+        try {
+          const { createNotification } = await import("@/lib/supabase/notifications-helper");
+          const { sendInstructorPayoutCompletedEmail } = await import("@/lib/email");
+
+          await createNotification({
+            userId: instructorId,
+            title: "Versement reçu !",
+            message: `Un versement direct de $${numAmount.toFixed(2)} USD a été envoyé sur votre Mobile Money (+${targetPhone}).`,
+            type: "SUCCESS",
+            link: "/instructor/earnings"
+          });
+
+          const { data: instProfile } = await supabaseAdmin
+            .from("profiles")
+            .select("email, full_name")
+            .eq("id", instructorId)
+            .maybeSingle();
+
+          if (instProfile?.email) {
+            await sendInstructorPayoutCompletedEmail(
+              instProfile.email,
+              instProfile.full_name || "Formateur",
+              numAmount,
+              "Mobile Money",
+              `${carrier}: +${targetPhone}`
+            );
+          }
+        } catch (notifErr) {
+          console.error("[admin-payouts] Error sending direct payout notifications:", notifErr);
+        }
+      }
+
+      if (!isSuccess) {
+        return NextResponse.json({
+          error: `Échec du versement PawaPay : ${payoutResponse.error}. Le versement a été consigné avec le statut ÉCHOUÉ.`,
+          status: "FAILED",
+          notes: pNote
+        }, { status: 400 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        status: "PAID",
+        payoutId: freshPayoutTxId,
+        message: `Versement direct PawaPay de ${Math.round(amountLocal)} ${resolveResult.currency} (${numAmount}$ USD) envoyé avec succès au +${targetPhone} !`
+      });
+    }
+
+    if (!payoutId) {
+      return NextResponse.json({ error: "Identifiant de retrait manquant" }, { status: 400 });
     }
 
     // Fetch the payout request
