@@ -23,6 +23,7 @@ interface AdminPayoutItem {
   status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED';
   paymentReference?: string;
   createdAt: string;
+  notes?: string;
 }
 
 interface FundSourceItem {
@@ -46,7 +47,7 @@ export default function AdminPayoutsPage() {
   const [planSales, setPlanSales] = useState(0);
   const [fundSources, setFundSources] = useState<FundSourceItem[]>([]);
   const [commissionRate, setCommissionRate] = useState(20); // Fallback commission rate
-  const [activeTab, setActiveTab] = useState<"ALL" | "PENDING" | "PAID">("PENDING");
+  const [activeTab, setActiveTab] = useState<"ALL" | "PENDING" | "PAID" | "FAILED">("PENDING");
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   const loadData = async () => {
@@ -184,6 +185,7 @@ export default function AdminPayoutsPage() {
         status: p.status || 'PENDING',
         paymentReference: p.payment_reference || '',
         createdAt: p.created_at || new Date().toISOString(),
+        notes: p.notes || '',
       }));
 
       setPayouts(items);
@@ -254,12 +256,19 @@ export default function AdminPayoutsPage() {
       });
 
       const data = await response.json();
+
+      // Update state with returned status and notes (e.g. FAILED with PawaPay error message)
+      setPayouts(prev => prev.map(p => p.id === payoutId ? { 
+        ...p, 
+        status: data.status || (response.ok ? nextStatus : 'FAILED'),
+        notes: data.notes || p.notes
+      } : p));
+
       if (!response.ok) {
         throw new Error(data.error || 'Une erreur est survenue lors du traitement du reversement.');
       }
 
-      setPayouts(prev => prev.map(p => p.id === payoutId ? { ...p, status: data.status || nextStatus } : p));
-      alert(`Demande de reversement traitée avec succès : ${data.status === 'PAID' ? 'Validée (Payée)' : 'Rejetée (Notification & e-mail transmis au formateur)'}`);
+      alert(`Demande de reversement traitée avec succès : ${data.status === 'PAID' ? 'Validée (Payée)' : 'Mise à jour'}`);
     } catch (err: any) {
       console.error('Error updating payout status:', err.message);
       alert('Échec de l\'opération : ' + err.message);
@@ -427,7 +436,7 @@ export default function AdminPayoutsPage() {
         <div className="flex justify-between items-center">
           <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Demandes de Reversement</h3>
           <div className="flex gap-2">
-            {(["PENDING", "PAID", "ALL"] as const).map((tab) => (
+            {(["PENDING", "PAID", "FAILED", "ALL"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -437,7 +446,7 @@ export default function AdminPayoutsPage() {
                     : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800"
                 }`}
               >
-                {tab === "PENDING" ? "En attente ⏳" : tab === "PAID" ? "Payés" : "Tous"}
+                {tab === "PENDING" ? "En attente ⏳" : tab === "PAID" ? "Payés ✅" : tab === "FAILED" ? "Échoués ❌" : "Tous"}
               </button>
             ))}
           </div>
@@ -460,7 +469,7 @@ export default function AdminPayoutsPage() {
                 <thead className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider">
                   <tr>
                     <th className="px-6 py-4 font-semibold">Formateur</th>
-                    <th className="px-6 py-4 font-semibold">Coordonnées Mobile Money</th>
+                    <th className="px-6 py-4 font-semibold">Coordonnées & PawaPay</th>
                     <th className="px-6 py-4 font-semibold">Date de Demande</th>
                     <th className="px-6 py-4 font-semibold">Montant à reverser</th>
                     <th className="px-6 py-4 font-semibold">Statut</th>
@@ -480,9 +489,15 @@ export default function AdminPayoutsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="font-extrabold text-teal-600 dark:text-teal-400 text-xs bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-900/40 px-2.5 py-1 rounded-lg">
+                        <span className="font-extrabold text-teal-600 dark:text-teal-400 text-xs bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-900/40 px-2.5 py-1 rounded-lg inline-block">
                           {p.paymentReference || "—"}
                         </span>
+                        {p.notes && (
+                          <div className="mt-1.5 text-[11px] leading-tight text-zinc-600 dark:text-zinc-400 max-w-xs bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 p-2 rounded-lg">
+                            <span className="font-bold text-red-600 dark:text-red-400 block mb-0.5">Raison / Notes PawaPay :</span>
+                            {p.notes}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-zinc-500 text-xs">
                         {new Date(p.createdAt).toLocaleDateString("fr-FR")} à {new Date(p.createdAt).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit' })}
@@ -496,13 +511,15 @@ export default function AdminPayoutsPage() {
                             ? "bg-green-100 dark:bg-green-950/20 text-green-700 dark:text-green-400"
                             : p.status === 'PENDING'
                             ? "bg-amber-100 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400"
-                            : "bg-red-100 dark:bg-red-950/20 text-red-700 dark:text-red-400"
+                            : p.status === 'FAILED'
+                            ? "bg-red-100 dark:bg-red-950/20 text-red-700 dark:text-red-400"
+                            : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-400"
                         }`}>
-                          {p.status === 'PAID' ? 'Validé' : p.status === 'PENDING' ? 'En attente' : 'Annulé/Réfusé'}
+                          {p.status === 'PAID' ? 'Validé' : p.status === 'PENDING' ? 'En attente' : p.status === 'FAILED' ? 'Échoué PawaPay' : 'Annulé/Refusé'}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        {p.status === 'PENDING' ? (
+                        {p.status === 'PENDING' || p.status === 'FAILED' ? (
                           <div className="flex justify-end gap-1.5 flex-wrap">
                             <button
                               disabled={processingId !== null}
@@ -514,7 +531,7 @@ export default function AdminPayoutsPage() {
                                   ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
                                   : "bg-teal-600 hover:bg-teal-700 text-white cursor-pointer shadow-sm"
                               }`}
-                              title="Tenter le virement automatique via l'API PawaPay"
+                              title="Tenter le virement via l'API PawaPay"
                             >
                               {processingId === p.id ? (
                                 <>
@@ -539,18 +556,20 @@ export default function AdminPayoutsPage() {
                             >
                               <Check className="w-3 h-3" /> Manuel
                             </button>
-                            <button
-                              disabled={processingId !== null}
-                              onClick={() => handleUpdatePayoutStatus(p.id, 'CANCELLED', 'reject')}
-                              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
-                                processingId !== null
-                                  ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
-                                  : "bg-red-600 hover:bg-red-700 text-white cursor-pointer"
-                              }`}
-                              title="Rejeter la demande"
-                            >
-                              <X className="w-3 h-3" /> Refuser
-                            </button>
+                            {p.status === 'PENDING' && (
+                              <button
+                                disabled={processingId !== null}
+                                onClick={() => handleUpdatePayoutStatus(p.id, 'CANCELLED', 'reject')}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                                  processingId !== null
+                                    ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
+                                    : "bg-red-600 hover:bg-red-700 text-white cursor-pointer"
+                                }`}
+                                title="Rejeter la demande"
+                              >
+                                <X className="w-3 h-3" /> Refuser
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <span className="text-xs text-zinc-400 font-medium">Aucune action requise</span>

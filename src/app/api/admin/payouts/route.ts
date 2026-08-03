@@ -133,17 +133,22 @@ export async function POST(req: NextRequest) {
         });
 
         if (!payoutResponse.success) {
-          // Record the failure in payout notes but DO NOT mark as PAID
+          const failureNote = `[Échec PawaPay API] ${payoutResponse.error}. (Opérateur: ${resolveResult.correspondent}, Devise: ${resolveResult.currency}). Réf: ${freshPayoutTxId}`;
+          
+          // Mark status as FAILED in database so it is no longer considered PAID or PENDING without explanation
           await supabaseAdmin
             .from("payouts")
             .update({
-              notes: `[Échec PawaPay API] ${payoutResponse.error}. Résolu pour ${resolveResult.correspondent} (${resolveResult.currency}).`,
+              status: "FAILED",
+              notes: failureNote,
               updated_at: new Date().toISOString()
             })
             .eq("id", payoutId);
 
           return NextResponse.json({ 
-            error: `Échec du virement PawaPay : ${payoutResponse.error}. Vous pouvez aussi utiliser l'option de validation manuelle après envoi direct.` 
+            error: `Échec du virement PawaPay : ${payoutResponse.error}. La demande a été marquée comme ÉCHOUÉE (FAILED). Vous pouvez réessayer ou valider manuellement.`,
+            status: "FAILED",
+            notes: failureNote
           }, { status: 400 });
         }
 

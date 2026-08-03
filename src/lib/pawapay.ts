@@ -198,8 +198,8 @@ export function formatPawaPayFailureReason(code?: any, rawMessage?: any): string
   if (codeUpper.includes('CANCEL') || msgUpper.includes('CANCEL') || codeUpper.includes('REJECT') || msgUpper.includes('REJECT') || msgUpper.includes('USER_CANCELLED')) {
     return "Transaction annulée ou rejetée sur le téléphone de l'utilisateur.";
   }
-  if (codeUpper.includes('INSUFFICIENT') || msgUpper.includes('INSUFFICIENT')) {
-    return "Solde Mobile Money insuffisant sur le compte du client.";
+  if (codeUpper.includes('INSUFFICIENT') || msgUpper.includes('INSUFFICIENT') || msgUpper.includes('BALANCE') || codeUpper.includes('BALANCE') || msgUpper.includes('SOLDE')) {
+    return "Solde PawaPay marchand ou Mobile Money insuffisant pour effectuer la transaction (balance insuffisante).";
   }
   if (codeUpper.includes('TIMEOUT') || msgUpper.includes('EXPIRE')) {
     return "La demande de paiement a expiré sans saisie du code PIN secret.";
@@ -216,17 +216,17 @@ export function formatPawaPayFailureReason(code?: any, rawMessage?: any): string
   if (msgUpper.includes('UNKNOWN') || msgUpper.includes('UNKNOWN REASON')) {
     const isSandbox = process.env.PAWAPAY_ENVIRONMENT !== 'production';
     if (isSandbox) {
-      return "Échec PawaPay (Mode Sandbox) : L'opérateur a rejeté le test. En mode Sandbox, seuls les numéros de test PawaPay sont validés. En Production, vérifiez le solde du compte MTN et la confirmation PIN.";
+      return "Échec PawaPay (Mode Sandbox) : L'opérateur a rejeté le test. En mode Sandbox, seuls les numéros de test PawaPay sont validés. En Production, vérifiez le solde du compte et la confirmation PIN.";
     }
-    return "Le paiement a été rejeté par l'opérateur Mobile Money (Raison indéfinie). Veuillez vérifier le solde de votre compte MTN et vous assurer de valider la demande PIN sur votre téléphone.";
+    return "La transaction a été rejetée par l'opérateur Mobile Money (Raison indéfinie). Veuillez vérifier le solde du compte et vous assurer de valider la demande PIN sur votre téléphone.";
   }
 
   const isSandbox = process.env.PAWAPAY_ENVIRONMENT !== 'production';
   if (isSandbox && msgStr) {
-    return `Paiement rejeté par l'opérateur (${msgStr}). Remarque : En mode PawaPay Sandbox, utilisez des numéros de test PawaPay.`;
+    return `Transaction rejetée par l'opérateur (${msgStr}). Remarque : En mode PawaPay Sandbox, utilisez des numéros de test PawaPay.`;
   }
 
-  return msgStr || codeStr || "Paiement rejeté par l'opérateur Mobile Money.";
+  return msgStr || codeStr || "Transaction rejetée par l'opérateur Mobile Money.";
 }
 
 /**
@@ -598,19 +598,24 @@ export async function initiatePawaPayPayout(params: {
     }
 
     if (!response.ok) {
+      const codeVal = data.failureCode || data.rejectionReason?.rejectionCode || data.code || `HTTP_${response.status}`;
+      const rawMsg = data.message || data.error || data.rejectionReason?.rejectionMessage || responseText;
+      const formatted = formatPawaPayFailureReason(codeVal, rawMsg);
       return {
         success: false,
         payoutId,
-        error: data.message || data.error || `HTTP ${response.status}: ${responseText}`
+        error: formatted
       };
     }
 
     if (data.status === "REJECTED" || data.status === "FAILED") {
-      const rejMsg = data.rejectionReason?.rejectionMessage || data.rejectionReason?.rejectionCode || data.status;
+      const codeVal = data.rejectionReason?.rejectionCode || data.failureCode || data.status;
+      const rejMsg = data.rejectionReason?.rejectionMessage || data.failureReason || data.status;
+      const formatted = formatPawaPayFailureReason(codeVal, rejMsg);
       return {
         success: false,
         payoutId,
-        error: `PawaPay API (${data.status}) : ${rejMsg}`
+        error: formatted
       };
     }
 
@@ -626,6 +631,89 @@ export async function initiatePawaPayPayout(params: {
       success: false,
       payoutId,
       error: err.message || "Erreur réseau avec PawaPay"
+    };
+  }
+}
+
+export interface PawaPayPayoutStatusResponse {
+  success: boolean;
+  payoutId: string;
+  status?: string;
+  failureCode?: string;
+  failureMessage?: string;
+  error?: string;
+}
+
+/**
+ * Fetch payout status directly from PawaPay API (V2 / V1 fallback)
+ */
+export async function getPawaPayPayoutStatus(payoutId: string): Promise<PawaPayPayoutStatusResponse> {
+  const apiKey = process.env.PAWAPAY_API_TOKEN || "pawapay_sandbox_placeholder_token_abc123";
+  const isProduction = process.env.PAWAPAY_ENVIRONMENT === "production";
+  const baseUrl = isProduction ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io";
+
+  try {
+    let response = await fetch(`${baseUrl}/payouts/${payoutId}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`
+      }
+    });
+
+    if (response.status === 404) {
+      response = await fetch(`${baseUrl}/v2/payouts/${payoutId}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`
+        }
+      });
+    }
+
+    const responseText = await response.text();
+    console.log("[PawaPayService] PawaPay payout status response:", response.status, "body:", responseText);
+
+    if (!response.ok) {
+      return {
+        success: false,
+        payoutId,
+        error: `HTTP ${response.status}: ${responseText}`
+      };
+    }
+
+    let data: any = {};
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      data = {};
+    }
+
+    const payoutObj = Array.isArray(data) ? data[0] : data;
+    if (!payoutObj) {
+      return {
+        success: false,
+        payoutId,
+        error: "Aucune donnée de versement retournée par PawaPay."
+      };
+    }
+
+    const status = payoutObj.status;
+    const failureCode = payoutObj.failureCode?.failureCode || (typeof payoutObj.failureCode === 'string' ? payoutObj.failureCode : undefined) || payoutObj.rejectionReason?.rejectionCode;
+    const failureMessage = payoutObj.failureCode?.failureMessage || payoutObj.rejectionReason?.rejectionMessage || payoutObj.failureReason;
+
+    return {
+      success: true,
+      payoutId,
+      status,
+      failureCode,
+      failureMessage
+    };
+
+  } catch (err: any) {
+    console.error("[PawaPayService] Network error during payout status check:", err);
+    return {
+      success: false,
+      payoutId,
+      error: err.message || "Erreur réseau lors de la vérification du versement PawaPay"
     };
   }
 }

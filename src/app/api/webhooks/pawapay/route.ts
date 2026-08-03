@@ -30,27 +30,40 @@ export async function POST(req: NextRequest) {
       // Handle PawaPay B2C Payout callback
       if (payoutId) {
         console.log(`[webhook-pawapay] Processing payoutId: ${payoutId}, Status: ${status}`);
-        const { data: payout, error: payoutFetchErr } = await supabaseAdmin
+        
+        let { data: payout, error: payoutFetchErr } = await supabaseAdmin
           .from('payouts')
-          .select('id, status, notes')
+          .select('id, status, notes, instructor_id, amount, payment_method')
           .eq('id', payoutId)
           .maybeSingle() as any;
 
+        if (!payout) {
+          const { data: searchPayouts } = await supabaseAdmin
+            .from('payouts')
+            .select('id, status, notes, instructor_id, amount, payment_method')
+            .ilike('notes', `%${payoutId}%`)
+            .limit(1) as any;
+
+          if (searchPayouts && searchPayouts.length > 0) {
+            payout = searchPayouts[0];
+          }
+        }
+
         if (payoutFetchErr || !payout) {
-          console.error(`[webhook-pawapay] Payout record not found for id ${payoutId}:`, payoutFetchErr?.message);
+          console.error(`[webhook-pawapay] Payout record not found for id/ref ${payoutId}:`, payoutFetchErr?.message);
           continue;
         }
 
         if (status === 'COMPLETED') {
-          console.log(`[webhook-pawapay] Payout ${payoutId} is COMPLETED. Updating database...`);
+          console.log(`[webhook-pawapay] Payout ${payout.id} (ref ${payoutId}) is COMPLETED. Updating database...`);
           await supabaseAdmin
             .from('payouts')
             .update({
               status: 'PAID',
-              notes: (payout.notes || '') + `\n[Callback] Statut finalisé: COMPLETED le ${new Date().toLocaleString()}.`,
+              notes: (payout.notes || '') + `\n[Callback PawaPay API] Statut finalisé: COMPLETED le ${new Date().toLocaleString('fr-FR')}.`,
               updated_at: new Date().toISOString()
             })
-            .eq('id', payoutId);
+            .eq('id', payout.id);
 
           try {
             const { sendInstructorPayoutCompletedEmail } = await import('@/lib/email');
@@ -65,23 +78,40 @@ export async function POST(req: NextRequest) {
                 instProfile.email,
                 instProfile.full_name || 'Formateur',
                 payout.amount,
-                payout.payout_method || 'Mobile Money',
+                payout.payment_method || 'Mobile Money',
                 payoutId
               );
             }
           } catch (payoutEmailErr) {
             console.error('[webhook-pawapay] Error sending payout email:', payoutEmailErr);
           }
-        } else if (status === 'FAILED') {
-          console.log(`[webhook-pawapay] Payout ${payoutId} has FAILED. Updating database...`);
+        } else if (['FAILED', 'REJECTED', 'CANCELLED'].includes(status)) {
+          console.log(`[webhook-pawapay] Payout ${payout.id} (ref ${payoutId}) has ${status}. Updating database...`);
+          const codeVal = typeof failureCode === 'string' ? failureCode : (event.failureCode?.failureCode || event.rejectionReason?.rejectionCode);
+          const msgVal = typeof failureCode === 'object' ? event.failureCode?.failureMessage : (event.rejectionReason?.rejectionMessage || event.failureReason);
+          const failureReason = formatPawaPayFailureReason(codeVal, msgVal);
+
           await supabaseAdmin
             .from('payouts')
             .update({
               status: 'FAILED',
-              notes: (payout.notes || '') + `\n[Callback] Échec de la transaction: FAILED. Code: ${failureCode || 'Inconnu'} le ${new Date().toLocaleString()}.`,
+              notes: (payout.notes || '') + `\n[Callback PawaPay API] Échec: ${failureReason} (Statut: ${status}) le ${new Date().toLocaleString('fr-FR')}.`,
               updated_at: new Date().toISOString()
             })
-            .eq('id', payoutId);
+            .eq('id', payout.id);
+
+          try {
+            const { createNotification } = await import('@/lib/supabase/notifications-helper');
+            await createNotification({
+              userId: payout.instructor_id,
+              title: "Échec du virement PawaPay",
+              message: `Votre demande de retrait de $${payout.amount.toFixed(2)} USD n'a pas pu être exécutée. Raison : ${failureReason}`,
+              type: "WARNING",
+              link: "/instructor/earnings"
+            });
+          } catch (notifErr) {
+            console.error('[webhook-pawapay] Error sending payout failure notification:', notifErr);
+          }
         }
         continue;
       }
