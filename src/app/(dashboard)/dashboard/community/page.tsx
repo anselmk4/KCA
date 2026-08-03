@@ -7,17 +7,11 @@ import {
   Sparkles,
   Search,
   Trophy,
-  Flame,
-  TrendingUp,
   BookOpen,
-  UserCheck,
   Megaphone,
   Lightbulb,
   BarChart2,
   RefreshCw,
-  Award,
-  Crown,
-  X,
 } from "lucide-react";
 import { PostComposer, PostCategory as ComposerCategory } from "@/components/community/PostComposer";
 import { PostCard, PostItem, CommentItem } from "@/components/community/PostCard";
@@ -52,7 +46,6 @@ export default function CommunityPage() {
   const [selectedCategory, setSelectedCategory] = useState<PostCategoryFilter>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [leaderboardTab, setLeaderboardTab] = useState<"INSTRUCTORS" | "AFFILIATES">("AFFILIATES");
-  const [showFullLeaderboardModal, setShowFullLeaderboardModal] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
@@ -77,88 +70,14 @@ export default function CommunityPage() {
       // Fetch leaderboard
       loadLeaderboardData();
 
-      // Fetch posts from API or database
-      let fetchedPosts: PostItem[] = [];
-      try {
-        const res = await fetch("/api/community/posts");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.posts && data.posts.length > 0) {
-            fetchedPosts = data.posts;
-          }
-        }
-      } catch (err) {
-        console.warn("[Community] API fetch fallback to Supabase query:", err);
-      }
-
-      if (fetchedPosts.length === 0) {
-        const { data: dbPosts } = await (supabase as any)
-          .from("community_posts")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(100);
-
-        if (dbPosts && dbPosts.length > 0) {
-          fetchedPosts = dbPosts;
+      // Fetch posts from API
+      const res = await fetch("/api/community/posts");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.posts && Array.isArray(data.posts)) {
+          setPosts(data.posts);
         }
       }
-
-      // Fallback sample posts if database empty
-      if (fetchedPosts.length === 0) {
-        fetchedPosts = [
-          {
-            id: "sample-1",
-            user_id: "sample-inst-1",
-            category: "ANALYSIS",
-            title: "📈 Analyse Bitcoin Q3 2026 & Impact de l'IA sur le Trading Algorithmique",
-            content: "Bonjour à tous les membres ! Voici mon analyse complète sur la structure actuelle du marché Crypto. Avec l'intégration des modèles LLM dans les bots d'arbitrage, nous observons une compression importante de la volatilité sur l'Ether et le Bitcoin. Quels sont vos niveaux clés pour ce mois-ci ?",
-            resource_url: "https://kuettu.com/analysis/btc-2026",
-            media_urls: [
-              "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?auto=format&fit=crop&w=1000&q=80",
-              "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1000&q=80",
-            ],
-            likes_count: 24,
-            reactions_count: { LIKE: 14, BRAVO: 5, INTERESTING: 3, GENIUS: 2, LOVE: 0 },
-            user_reaction: "LIKE",
-            created_at: new Date(Date.now() - 3600000 * 4).toISOString(),
-            author_name: "Prof. Alexandre Vane",
-            author_avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
-            author_role: "INSTRUCTOR",
-            comments: [
-              {
-                id: "c1",
-                post_id: "sample-1",
-                user_id: "sample-user-2",
-                content: "Excellente analyse ! Merci pour ces précisions sur la compression de volatilité.",
-                created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-                author_name: "Jean-Marc M.",
-                author_role: "STUDENT",
-              },
-            ],
-          },
-          {
-            id: "sample-2",
-            user_id: "sample-inst-2",
-            category: "RESOURCES",
-            title: "🛠️ Guide Ultime : Déployer un Smart Contract Solidity sécurisé avec Hardhat",
-            content: "J'ai préparé une checklist complète sur la sécurité des Smart Contracts (Reentrancy, Overflow, Oracles attacks). N'hésitez pas à la télécharger et à poser vos questions dans les commentaires !",
-            resource_url: "https://github.com/kuettu/smart-contract-security-guide",
-            media_urls: [
-              "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1000&q=80",
-            ],
-            likes_count: 18,
-            reactions_count: { LIKE: 10, BRAVO: 6, INTERESTING: 2, GENIUS: 0, LOVE: 0 },
-            user_reaction: null,
-            created_at: new Date(Date.now() - 3600000 * 12).toISOString(),
-            author_name: "Sarah Lin",
-            author_avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=200&q=80",
-            author_role: "INSTRUCTOR",
-            comments: [],
-          },
-        ];
-      }
-
-      setPosts(fetchedPosts);
     } catch (err) {
       console.error("Error loading community data:", err);
     } finally {
@@ -216,28 +135,6 @@ export default function CommunityPage() {
         affiliatesCount: 6,
         rank: 3,
       },
-      {
-        id: "lb-4",
-        name: "David K.",
-        avatar: null,
-        role: "STUDENT",
-        plan: "FREE",
-        points: 520,
-        coursesCount: 0,
-        affiliatesCount: 4,
-        rank: 4,
-      },
-      {
-        id: "lb-5",
-        name: "Elena Rostova",
-        avatar: null,
-        role: "STUDENT",
-        plan: "FREE",
-        points: 340,
-        coursesCount: 0,
-        affiliatesCount: 2,
-        rank: 5,
-      },
     ]);
   };
 
@@ -245,7 +142,7 @@ export default function CommunityPage() {
     loadCommunityData();
   }, [loadCommunityData]);
 
-  // ─── Post Creation ─────────────────────────────────────────
+  // ─── Post Creation with Full DB Persistence ─────────────────
   const handleCreatePost = async (postData: {
     title: string;
     content: string;
@@ -253,63 +150,49 @@ export default function CommunityPage() {
     resourceUrl?: string;
     mediaUrls?: string[];
   }) => {
-    const newPostItem: PostItem = {
-      id: crypto.randomUUID(),
-      user_id: currentUser?.id || "anon",
-      category: postData.category,
-      title: postData.title || null,
-      content: postData.content,
-      resource_url: postData.resourceUrl || null,
-      media_urls: postData.mediaUrls || null,
-      likes_count: 0,
-      reactions_count: { LIKE: 0, BRAVO: 0, INTERESTING: 0, GENIUS: 0, LOVE: 0 },
-      user_reaction: null,
-      created_at: new Date().toISOString(),
-      author_name: currentUserProfile?.full_name || currentUser?.email?.split("@")[0] || "Membre Ansella",
-      author_avatar: currentUserProfile?.avatar_url || null,
-      author_role: currentUserProfile?.role || "STUDENT",
-      comments: [],
-    };
-
-    // Optimistic UI update
-    setPosts((prev) => [newPostItem, ...prev]);
-
-    // Persist via API
     try {
-      await fetch("/api/community/posts", {
+      const res = await fetch("/api/community/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(postData),
       });
-    } catch (err) {
-      console.warn("Post created in memory state:", err);
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur de création de publication.");
+
+      if (data.post) {
+        setPosts((prev) => [data.post, ...prev]);
+      } else {
+        loadCommunityData();
+      }
+    } catch (err: any) {
+      alert("Erreur lors de la publication : " + err.message);
     }
   };
 
-  // ─── Reactions (Optimistic Update) ─────────────────────────
-  const handleReact = (postId: string, reactionType: ReactionType) => {
+  // ─── Reactions with DB Persistence ─────────────────────────
+  const handleReact = async (postId: string, reactionType: ReactionType) => {
+    // Optimistic UI update
     setPosts((prev) =>
       prev.map((p) => {
         if (p.id !== postId) return p;
 
         const currentReaction = p.user_reaction;
-        const currentCounts = { ...(p.reactions_count || { LIKE: p.likes_count, BRAVO: 0, INTERESTING: 0, GENIUS: 0, LOVE: 0 }) };
+        const currentCounts = { ...(p.reactions_count || { LIKE: p.likes_count || 0, BRAVO: 0, INTERESTING: 0, GENIUS: 0, LOVE: 0 }) };
 
         let nextUserReaction: ReactionType | null = reactionType;
 
         if (currentReaction === reactionType) {
-          // Toggle off
           nextUserReaction = null;
           currentCounts[reactionType] = Math.max((currentCounts[reactionType] || 1) - 1, 0);
         } else {
-          // Change reaction
           if (currentReaction) {
             currentCounts[currentReaction] = Math.max((currentCounts[currentReaction] || 1) - 1, 0);
           }
           currentCounts[reactionType] = (currentCounts[reactionType] || 0) + 1;
         }
 
-        const totalLikes = Object.values(currentCounts).reduce((a, b) => a + b, 0);
+        const totalLikes = Object.values(currentCounts).reduce((a, b) => Number(a) + Number(b), 0);
 
         return {
           ...p,
@@ -319,54 +202,66 @@ export default function CommunityPage() {
         };
       })
     );
+
+    // Persist reaction to PostgreSQL DB
+    try {
+      await fetch("/api/community/posts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId, reactionType }),
+      });
+    } catch (err) {
+      console.error("Error saving reaction to DB:", err);
+    }
   };
 
-  // ─── Add Comment / Reply ───────────────────────────────────
+  // ─── Add Comment / Reply with DB Persistence ───────────────
   const handleAddComment = async (postId: string, content: string, parentId?: string) => {
-    const newComment: CommentItem = {
-      id: crypto.randomUUID(),
-      post_id: postId,
-      user_id: currentUser?.id || "anon",
-      content,
-      parent_id: parentId || null,
-      created_at: new Date().toISOString(),
-      author_name: currentUserProfile?.full_name || currentUser?.email?.split("@")[0] || "Membre",
-      author_avatar: currentUserProfile?.avatar_url || null,
-      author_role: currentUserProfile?.role || "STUDENT",
-    };
-
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p.id !== postId) return p;
-
-        const existingComments = p.comments || [];
-        if (parentId) {
-          // Attach to parent comment
-          const updatedComments = existingComments.map((c) => {
-            if (c.id === parentId) {
-              return {
-                ...c,
-                replies: [...(c.replies || []), newComment],
-              };
-            }
-            return c;
-          });
-          return { ...p, comments: updatedComments };
-        } else {
-          return { ...p, comments: [...existingComments, newComment] };
-        }
-      })
-    );
-
-    // Persist to API
     try {
-      await fetch("/api/community/comments", {
+      const res = await fetch("/api/community/comments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ postId, content, parentId }),
       });
-    } catch (err) {
-      console.warn("Comment saved in memory:", err);
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur d'ajout de commentaire.");
+
+      const newComment: CommentItem = data.comment || {
+        id: crypto.randomUUID(),
+        post_id: postId,
+        user_id: currentUser?.id || "anon",
+        content,
+        parent_id: parentId || null,
+        created_at: new Date().toISOString(),
+        author_name: currentUserProfile?.full_name || currentUser?.email?.split("@")[0] || "Membre",
+        author_avatar: currentUserProfile?.avatar_url || null,
+        author_role: currentUserProfile?.role || "STUDENT",
+      };
+
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.id !== postId) return p;
+
+          const existingComments = p.comments || [];
+          if (parentId) {
+            const updatedComments = existingComments.map((c) => {
+              if (c.id === parentId) {
+                return {
+                  ...c,
+                  replies: [...(c.replies || []), newComment],
+                };
+              }
+              return c;
+            });
+            return { ...p, comments: updatedComments };
+          } else {
+            return { ...p, comments: [...existingComments, newComment] };
+          }
+        })
+      );
+    } catch (err: any) {
+      alert("Erreur lors de l'ajout du commentaire : " + err.message);
     }
   };
 
@@ -379,7 +274,7 @@ export default function CommunityPage() {
     try {
       await fetch(`/api/community/posts?id=${postId}`, { method: "DELETE" });
     } catch (err) {
-      console.warn("Post deleted in memory:", err);
+      console.error("Error deleting post from DB:", err);
     }
   };
 
@@ -395,7 +290,7 @@ export default function CommunityPage() {
     try {
       await fetch(`/api/community/comments?id=${commentId}`, { method: "DELETE" });
     } catch (err) {
-      console.warn("Comment deleted in memory:", err);
+      console.error("Error deleting comment from DB:", err);
     }
   };
 
@@ -503,10 +398,10 @@ export default function CommunityPage() {
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-12 text-center space-y-3">
               <Sparkles className="w-10 h-10 text-zinc-300 dark:text-zinc-600 mx-auto" />
               <h3 className="font-extrabold text-sm text-zinc-700 dark:text-zinc-300">
-                Aucune publication trouvée
+                Aucune publication dans cette catégorie
               </h3>
               <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                Soyez le premier à lancer la discussion dans cette catégorie !
+                Soyez le premier à publier un message ci-dessus !
               </p>
             </div>
           ) : (
