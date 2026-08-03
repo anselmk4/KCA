@@ -98,11 +98,19 @@ export function CalendarView({
     return sorted[0] || null;
   }, [events]);
 
+  // Helper to format local date string (YYYY-MM-DD) without UTC timezone shift
+  const toLocalDateString = (d: Date): string => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
   // Events on selected date
   const eventsOnSelectedDate = useMemo(() => {
-    const selDateStr = selectedDate.toISOString().split("T")[0];
+    const selDateStr = toLocalDateString(selectedDate);
     return filteredEvents.filter((e) => {
-      const eventDateStr = new Date(e.scheduledAt).toISOString().split("T")[0];
+      const eventDateStr = toLocalDateString(new Date(e.scheduledAt));
       return eventDateStr === selDateStr;
     });
   }, [filteredEvents, selectedDate]);
@@ -116,13 +124,16 @@ export function CalendarView({
       cells.push({ isPadding: true, day: null, dateStr: null });
     }
 
+    const todayStr = toLocalDateString(new Date());
+    const selDateStr = toLocalDateString(selectedDate);
+
     // Days of month
     for (let day = 1; day <= daysInMonth; day++) {
       const dateObj = new Date(year, month, day);
-      const dateStr = dateObj.toISOString().split("T")[0];
+      const dateStr = toLocalDateString(dateObj);
       
       const dayEvents = filteredEvents.filter((e) => {
-        const eDateStr = new Date(e.scheduledAt).toISOString().split("T")[0];
+        const eDateStr = toLocalDateString(new Date(e.scheduledAt));
         return eDateStr === dateStr;
       });
 
@@ -132,8 +143,8 @@ export function CalendarView({
         dateObj,
         dateStr,
         dayEvents,
-        isToday: new Date().toISOString().split("T")[0] === dateStr,
-        isSelected: selectedDate.toISOString().split("T")[0] === dateStr,
+        isToday: todayStr === dateStr,
+        isSelected: selDateStr === dateStr,
       });
     }
 
