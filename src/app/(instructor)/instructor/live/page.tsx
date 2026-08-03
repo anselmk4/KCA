@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { getSimulatedSession } from "@/lib/rbac";
 import Link from "next/link";
+import { LiveCountdownTimer } from "@/components/live/LiveCountdownTimer";
 
 interface LiveSession {
   id: string;
@@ -448,6 +449,15 @@ export default function LivePage() {
           Planifier une session
         </button>
       </div>
+
+      {/* Dynamic Live Countdown Timer Widget */}
+      {upcoming.length > 0 && (
+        <LiveCountdownTimer
+          targetDate={upcoming[0].scheduled_at}
+          title={upcoming[0].title}
+          meetingUrl={upcoming[0].meeting_url}
+        />
+      )}
 
       {/* Upcoming Sessions */}
       <div className="space-y-4">

@@ -10,7 +10,7 @@ const supabaseAdmin = createSupabaseAdmin(
 
 /**
  * GET /api/calendar/events
- * Returns scheduled Live Sessions and 1-on-1 Coaching events for current user.
+ * Returns scheduled Live Sessions AND Coaching 1-on-1 events for current user.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -32,24 +32,31 @@ export async function GET(req: NextRequest) {
     const roles = userRoles?.map((ur: any) => ur.roles?.name) || [];
     const isInstructorOrAdmin = roles.some(r => ["SUPER_ADMIN", "ADMIN", "INSTRUCTOR", "TEACHING_ASSISTANT"].includes(r));
 
-    let events: any[] = [];
+    let liveSessionsList: any[] = [];
+    let coachingRequestsList: any[] = [];
 
     if (isInstructorOrAdmin) {
-      // Instructor/Admin: Fetch all events authored by this user
-      const { data: authoredEvents, error } = await dbClient
+      // 1. Fetch live sessions authored by or assigned to instructor
+      const { data: authoredEvents } = await dbClient
         .from("live_sessions")
-        .select(`
-          *,
-          courses (id, title)
-        `)
+        .select(`*, courses (id, title)`)
         .eq("instructor_id", user.id)
         .order("scheduled_at", { ascending: true });
 
-      if (!error && authoredEvents) {
-        events = authoredEvents;
-      }
+      if (authoredEvents) liveSessionsList = authoredEvents;
+
+      // 2. Fetch scheduled coaching requests
+      const { data: coachReqs } = await dbClient
+        .from("coaching_requests")
+        .select("*")
+        .or(`instructor_id.eq.${user.id},instructor_id.is.null`)
+        .not("scheduled_at", "is", null)
+        .order("scheduled_at", { ascending: true });
+
+      if (coachReqs) coachingRequestsList = coachReqs;
+
     } else {
-      // Student: Fetch 1. Public events, 2. Events where allowed_user_ids contains user.id, 3. Events linked to enrolled courses
+      // Student: Fetch 1. Public events, 2. Events where allowed_user_ids contains user.id, 3. Enrolled courses
       const { data: enrollments } = await dbClient
         .from("enrollments")
         .select("course_id")
@@ -58,45 +65,52 @@ export async function GET(req: NextRequest) {
 
       const enrolledCourseIds = enrollments?.map(e => e.course_id) || [];
 
-      const { data: allSessions, error } = await dbClient
+      const { data: allSessions } = await dbClient
         .from("live_sessions")
-        .select(`
-          *,
-          courses (id, title)
-        `)
+        .select(`*, courses (id, title)`)
         .order("scheduled_at", { ascending: true });
 
-      if (!error && allSessions) {
-        events = allSessions.filter((s: any) => {
-          // Public session
+      if (allSessions) {
+        liveSessionsList = allSessions.filter((s: any) => {
           if (s.is_public) return true;
-          // Target student in allowed_user_ids
           if (Array.isArray(s.allowed_user_ids) && s.allowed_user_ids.includes(user.id)) return true;
-          // Linked to enrolled course
           if (s.course_id && enrolledCourseIds.includes(s.course_id)) return true;
           return false;
         });
       }
+
+      // Fetch scheduled coaching requests for student
+      const { data: coachReqs } = await dbClient
+        .from("coaching_requests")
+        .select("*")
+        .eq("student_id", user.id)
+        .not("scheduled_at", "is", null)
+        .order("scheduled_at", { ascending: true });
+
+      if (coachReqs) coachingRequestsList = coachReqs;
     }
 
-    // Fetch instructor names for display
-    const instructorIds = Array.from(new Set(events.map(e => e.instructor_id).filter(Boolean)));
-    let hostMap: Record<string, string> = {};
+    // Resolve instructor names
+    const allInstructorIds = Array.from(new Set([
+      ...liveSessionsList.map(e => e.instructor_id),
+      ...coachingRequestsList.map(c => c.instructor_id)
+    ].filter(Boolean)));
 
-    if (instructorIds.length > 0) {
+    let hostMap: Record<string, string> = {};
+    if (allInstructorIds.length > 0) {
       const { data: profiles } = await dbClient
         .from("profiles")
         .select("id, full_name")
-        .in("id", instructorIds);
+        .in("id", allInstructorIds);
 
       profiles?.forEach(p => {
         hostMap[p.id] = p.full_name || "Formateur";
       });
     }
 
-    const formattedEvents = events.map(e => {
+    // Format live_sessions events
+    const formattedLive = liveSessionsList.map(e => {
       const isCoaching = (!e.is_public && Array.isArray(e.allowed_user_ids) && e.allowed_user_ids.length > 0) || e.description?.includes("[COACHING]");
-      
       return {
         id: e.id,
         title: e.title,
@@ -115,7 +129,32 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json({ events: formattedEvents }, { status: 200 });
+    // Format coaching_requests events (avoiding duplicate IDs if already converted to live_sessions)
+    const existingLiveIds = new Set(liveSessionsList.map(l => l.id));
+    const formattedCoaching = coachingRequestsList
+      .filter(c => !existingLiveIds.has(c.id))
+      .map(c => ({
+        id: c.id,
+        title: `Coaching 1-on-1 : ${c.subject}`,
+        description: c.message,
+        scheduledAt: c.scheduled_at,
+        durationMinutes: 45,
+        meetingProvider: "ANSELLA_LIVE",
+        meetingUrl: `https://meet.jit.si/ansella-live-coaching-${c.id.slice(0, 8)}`,
+        isPublic: false,
+        instructorId: c.instructor_id,
+        instructorName: hostMap[c.instructor_id] || "Formateur",
+        allowedUserIds: [c.student_id],
+        sessionType: "COACHING_1ON1",
+        courseId: c.course_id,
+        courseTitle: c.course_title,
+      }));
+
+    const events = [...formattedLive, ...formattedCoaching].sort(
+      (a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
+    );
+
+    return NextResponse.json({ events }, { status: 200 });
 
   } catch (err: any) {
     console.error("[GET /api/calendar/events] Unexpected error:", err);
@@ -142,7 +181,7 @@ export async function POST(req: NextRequest) {
       description,
       scheduledAt,
       durationMinutes,
-      sessionType, // "LIVE_SESSION" | "COACHING_1ON1"
+      sessionType,
       courseId,
       allowedUserIds,
       meetingProvider,
@@ -157,7 +196,6 @@ export async function POST(req: NextRequest) {
     const dbClient = process.env.SUPABASE_SERVICE_ROLE_KEY ? supabaseAdmin : supabase;
     const sessionId = crypto.randomUUID();
 
-    // Determine meeting link
     let finalMeetingUrl = meetingUrl?.trim() || "";
     if (meetingProvider === "ANSELLA_LIVE" || !finalMeetingUrl) {
       finalMeetingUrl = `https://meet.jit.si/ansella-live-${sessionId}`;
@@ -195,7 +233,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    // Send notifications to selected student(s)
+    // Send notifications to target student(s)
     if (finalAllowedUsers.length > 0) {
       for (const studentId of finalAllowedUsers) {
         await createNotification({

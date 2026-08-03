@@ -13,11 +13,10 @@ import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
-  ArrowRight,
+  CornerUpLeft,
+  Send,
   ShieldCheck,
 } from "lucide-react";
-import Link from "next/link";
-import { supabase } from "@/lib/supabase/client";
 import { RequestCoachingModal } from "@/components/coaching/RequestCoachingModal";
 
 interface CoachingRequest {
@@ -26,18 +25,20 @@ interface CoachingRequest {
   subject: string;
   message: string;
   preferredTime: string;
-  status: "PENDING" | "CONFIRMED" | "REPLIED";
+  scheduledAt?: string;
+  status: "PENDING" | "REPLIED" | "SCHEDULED" | "COMPLETED";
   createdAt: string;
+  reply?: string;
 }
 
 interface VisioSession {
   id: string;
   title: string;
   description: string | null;
-  scheduled_at: string;
-  duration_minutes: number;
-  meeting_url: string;
-  meeting_provider: string;
+  scheduledAt: string;
+  durationMinutes: number;
+  meetingUrl: string;
+  meetingProvider: string;
 }
 
 export default function StudentCoachingPage() {
@@ -46,6 +47,11 @@ export default function StudentCoachingPage() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Student Reply State for existing request
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [submittingReply, setSubmittingReply] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -53,14 +59,14 @@ export default function StudentCoachingPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch user coaching requests
+      // 1. Fetch user coaching requests from DB
       const reqRes = await fetch("/api/coaching/requests");
       const reqData = await reqRes.json();
       if (reqData?.requests && Array.isArray(reqData.requests)) {
         setRequests(reqData.requests);
       }
 
-      // 2. Fetch 1-on-1 live sessions for student from /api/calendar/events
+      // 2. Fetch 1-on-1 visio sessions for student from /api/calendar/events
       const calRes = await fetch("/api/calendar/events");
       const calData = await calRes.json();
 
@@ -74,6 +80,33 @@ export default function StudentCoachingPage() {
       console.error("Error fetching student coaching data:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStudentSendReply = async (requestId: string) => {
+    if (!replyText.trim()) return;
+    setSubmittingReply(true);
+    try {
+      const res = await fetch("/api/coaching/requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestId,
+          message: replyText
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur d'envoi");
+
+      alert("Votre message a été transmis à votre formateur avec notification !");
+      setReplyText("");
+      setReplyingToId(null);
+      fetchData();
+    } catch (err: any) {
+      alert("Erreur : " + err.message);
+    } finally {
+      setSubmittingReply(false);
     }
   };
 
@@ -205,7 +238,7 @@ export default function StudentCoachingPage() {
                   <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3.5 h-3.5 text-teal-600" />
-                      {new Date(sess.scheduled_at).toLocaleDateString("fr-FR", {
+                      {new Date(sess.scheduledAt).toLocaleDateString("fr-FR", {
                         weekday: "short",
                         day: "numeric",
                         month: "short",
@@ -215,14 +248,14 @@ export default function StudentCoachingPage() {
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5 text-teal-600" />
-                      {sess.duration_minutes || 45} min
+                      {sess.durationMinutes || 45} min
                     </span>
                   </div>
 
-                  {sess.meeting_url && (
+                  {sess.meetingUrl && (
                     <div className="pt-2">
                       <a
-                        href={sess.meeting_url}
+                        href={sess.meetingUrl}
                         target="_blank"
                         rel="noreferrer"
                         className="w-full py-2.5 px-4 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-extrabold shadow-md shadow-teal-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
@@ -238,7 +271,7 @@ export default function StudentCoachingPage() {
           )}
         </div>
 
-        {/* Right Column: Submitted Requests */}
+        {/* Right Column: Submitted Requests & Responses */}
         <div className="lg:col-span-6 space-y-4">
           <h2 className="text-sm font-extrabold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-teal-600" />
@@ -261,11 +294,11 @@ export default function StudentCoachingPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {requests.map((req) => (
                 <div
                   key={req.id}
-                  className="p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm space-y-2"
+                  className="p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm space-y-3"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-bold text-teal-600 dark:text-teal-400">
@@ -275,10 +308,16 @@ export default function StudentCoachingPage() {
                       className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase ${
                         req.status === "PENDING"
                           ? "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400"
+                          : req.status === "SCHEDULED"
+                          ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-400"
                           : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"
                       }`}
                     >
-                      {req.status === "PENDING" ? "En attente du Formateur" : "Créneau Proposé"}
+                      {req.status === "PENDING"
+                        ? "En attente du Formateur"
+                        : req.status === "SCHEDULED"
+                        ? "Séance Programmée"
+                        : "Formateur a répondu"}
                     </span>
                   </div>
 
@@ -286,14 +325,65 @@ export default function StudentCoachingPage() {
                     {req.subject}
                   </h3>
 
-                  <p className="text-xs text-zinc-600 dark:text-zinc-300 line-clamp-2 leading-relaxed">
+                  <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed font-medium">
                     {req.message}
                   </p>
 
-                  <div className="pt-2 flex items-center justify-between text-[11px] text-zinc-400 font-medium border-t border-zinc-100 dark:border-zinc-800">
-                    <span>Créneau souhaité : {req.preferredTime}</span>
-                    <span>{new Date(req.createdAt).toLocaleDateString("fr-FR")}</span>
-                  </div>
+                  {/* Instructor Reply Box */}
+                  {req.reply && (
+                    <div className="p-3.5 rounded-xl bg-teal-50/60 dark:bg-teal-950/20 border border-teal-500/30 text-xs text-zinc-800 dark:text-zinc-200 space-y-1">
+                      <span className="font-extrabold text-teal-600 dark:text-teal-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Réponse de votre Formateur :
+                      </span>
+                      <p className="leading-relaxed font-medium whitespace-pre-wrap">{req.reply}</p>
+                    </div>
+                  )}
+
+                  {/* Scheduled Time preview */}
+                  {req.scheduledAt && (
+                    <div className="p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-500/30 text-xs text-indigo-700 dark:text-indigo-300 font-bold flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-indigo-600" />
+                      Séance visio programmée le : {new Date(req.scheduledAt).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                  )}
+
+                  {/* Student Reply Action */}
+                  {replyingToId === req.id ? (
+                    <div className="space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                      <textarea
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder="Rédigez votre réponse ou précision pour le formateur..."
+                        rows={2}
+                        className="w-full p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => setReplyingToId(null)}
+                          className="px-3 py-1.5 text-xs text-zinc-500 font-bold"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          onClick={() => handleStudentSendReply(req.id)}
+                          disabled={submittingReply || !replyText.trim()}
+                          className="px-4 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5"
+                        >
+                          <Send className="w-3.5 h-3.5" /> Envoyer
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="pt-2 flex items-center justify-between text-[11px] text-zinc-400 font-medium border-t border-zinc-100 dark:border-zinc-800">
+                      <span>Créneau souhaité : {req.preferredTime}</span>
+                      <button
+                        onClick={() => setReplyingToId(req.id)}
+                        className="text-teal-600 dark:text-teal-400 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <CornerUpLeft className="w-3 h-3" /> Répondre
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

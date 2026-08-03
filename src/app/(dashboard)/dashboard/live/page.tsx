@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { RequestCoachingModal } from "@/components/coaching/RequestCoachingModal";
+import { LiveCountdownTimer } from "@/components/live/LiveCountdownTimer";
 
 interface LiveSession {
   id: string;
@@ -35,8 +36,7 @@ export default function LiveSessionsPage() {
   const fetchSessions = async () => {
     setLoading(true);
     try {
-      // 1. Fetch live sessions from Supabase.
-      // RLS policy automatically filters only public lives or private lives where the student is invited.
+      // 1. Fetch live sessions from Supabase
       const { data: sbSessions, error } = await supabase
         .from("live_sessions")
         .select("*")
@@ -78,7 +78,7 @@ export default function LiveSessionsPage() {
   };
 
   const getPlatformLabel = (platform: string | null) => {
-    if (!platform) return "Inconnu";
+    if (!platform) return "Ansella Live";
     switch (platform) {
       case "ANSELLA_LIVE": return "Ansella Live";
       case "ZOOM": return "Zoom";
@@ -89,7 +89,7 @@ export default function LiveSessionsPage() {
   };
 
   const getPlatformColor = (platform: string | null) => {
-    if (!platform) return "text-zinc-500 bg-zinc-500/10 border-zinc-500/20";
+    if (!platform) return "text-teal-500 bg-teal-500/10 border-teal-500/20";
     switch (platform) {
       case "ANSELLA_LIVE": return "text-teal-500 bg-teal-500/10 border-teal-500/20";
       case "ZOOM": return "text-blue-500 bg-blue-500/10 border-blue-500/20";
@@ -116,25 +116,26 @@ export default function LiveSessionsPage() {
 
   // Filter sessions
   const activeSession = sessions.find(s => isSessionActive(s));
-  const upcomingSessions = sessions.filter(s => !isSessionActive(s) && !isSessionPast(s));
+  const upcomingSessions = sessions.filter(s => !isSessionPast(s));
+  const nextScheduledSession = upcomingSessions[0];
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
         <p className="text-sm text-zinc-500 dark:text-zinc-400">Recherche de lives programmés...</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
+          <div className="flex items-center gap-2 text-teal-600 dark:text-teal-400 mb-1">
             <Video className="w-5 h-5 animate-pulse" />
-            <span className="text-xs font-bold tracking-[0.2em] uppercase font-mono">En direct</span>
+            <span className="text-xs font-bold tracking-[0.2em] uppercase font-mono">En direct & Visio</span>
           </div>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-1">Sessions Live & Q/R</h1>
           <p className="text-zinc-500 dark:text-zinc-400 text-xs sm:text-sm">Rejoignez les cours en direct et posez vos questions en temps réel à vos instructeurs.</p>
@@ -148,10 +149,15 @@ export default function LiveSessionsPage() {
         </button>
       </div>
 
-      {/* Main Status Block (Online or Offline) */}
-      {activeSession ? (
+      {/* Dynamic Countdown Timer Widget for Next Scheduled Session */}
+      {nextScheduledSession ? (
+        <LiveCountdownTimer
+          targetDate={nextScheduledSession.scheduled_at}
+          title={nextScheduledSession.title}
+          meetingUrl={nextScheduledSession.meeting_url}
+        />
+      ) : activeSession ? (
         <div className="bg-gradient-to-r from-teal-900 to-zinc-900 text-white rounded-3xl p-8 border border-teal-500/20 shadow-2xl relative overflow-hidden">
-          <div className="absolute right-0 top-0 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-3 max-w-lg">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-teal-500/20 text-teal-400 border border-teal-500/30 animate-pulse">
@@ -162,11 +168,6 @@ export default function LiveSessionsPage() {
               {activeSession.description && (
                 <p className="text-zinc-300 text-sm">{activeSession.description}</p>
               )}
-              <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-400 pt-1">
-                <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" /> {instructorMap[activeSession.instructor_id] || "Instructeur"}</span>
-                <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Durée : {activeSession.duration_minutes} min</span>
-                <span className="font-semibold text-teal-400">{getPlatformLabel(activeSession.meeting_provider)}</span>
-              </div>
             </div>
             {activeSession.meeting_url && (
               <div className="shrink-0">
@@ -174,7 +175,7 @@ export default function LiveSessionsPage() {
                   href={activeSession.meeting_url} 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className="inline-flex items-center justify-center gap-2 px-6 py-4 bg-teal-500 hover:bg-teal-400 text-zinc-900 font-bold rounded-2xl transition-all shadow-xl hover:shadow-teal-500/20 text-sm hover:scale-[1.02] transform active:scale-[0.98]"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-4 bg-teal-500 hover:bg-teal-400 text-zinc-900 font-bold rounded-2xl transition-all shadow-xl text-sm"
                 >
                   Rejoindre le Live
                   <ExternalLink className="w-4 h-4" />
@@ -185,7 +186,6 @@ export default function LiveSessionsPage() {
         </div>
       ) : (
         <div className="bg-zinc-900 text-white rounded-3xl p-8 border border-zinc-800 shadow-xl relative overflow-hidden">
-          <div className="absolute right-0 top-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-3 max-w-lg">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-zinc-800 text-zinc-300 border border-zinc-700">
@@ -194,23 +194,18 @@ export default function LiveSessionsPage() {
               </span>
               <h2 className="text-2xl font-extrabold tracking-tight">Aucun live en cours pour le moment</h2>
               <p className="text-zinc-400 text-sm">
-                Les sessions en direct sont programmées à l'avance. Quand un live commencera, un bouton de connexion apparaîtra ici pour rejoindre la salle virtuelle (Ansella Live, Zoom, Meet, etc.).
+                Les sessions en direct sont programmées à l'avance. Quand un live commencera, un bouton de connexion apparaîtra ici pour rejoindre la salle virtuelle Ansella Live.
               </p>
-            </div>
-            <div className="shrink-0">
-              <button className="px-6 py-3.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 disabled:opacity-50 border border-zinc-700 rounded-2xl font-bold transition-all text-sm cursor-not-allowed">
-                Rejoindre la salle
-              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Scheduled Sessions */}
+      {/* Scheduled Sessions List */}
       <div className="space-y-4">
         <h3 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-blue-600" />
-          Sessions programmées
+          <Calendar className="w-5 h-5 text-teal-600" />
+          Toutes les Sessions programmées ({upcomingSessions.length})
         </h3>
         
         {upcomingSessions.length === 0 ? (
@@ -251,6 +246,19 @@ export default function LiveSessionsPage() {
                     </span>
                   </div>
                 </div>
+
+                {session.meeting_url && (
+                  <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                    <a
+                      href={session.meeting_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full py-2 px-3 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Video className="w-3.5 h-3.5" /> Rejoindre la salle Ansella Live <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
               </div>
             ))}
           </div>

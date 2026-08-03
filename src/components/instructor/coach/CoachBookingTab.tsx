@@ -9,6 +9,8 @@ import {
   User,
   ExternalLink,
   Loader2,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
@@ -29,59 +31,98 @@ export function CoachBookingTab() {
   const [sessions, setSessions] = useState<BookingSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddSlotModal, setShowAddSlotModal] = useState(false);
+  const [savingSlot, setSavingSlot] = useState(false);
+  const [students, setStudents] = useState<{ id: string; name: string }[]>([]);
 
   // Slot Form
-  const [slotDay, setSlotDay] = useState("Lundi");
-  const [slotStartTime, setSlotStartTime] = useState("14:00");
+  const [slotTitle, setSlotTitle] = useState("Session de Suivi 1-on-1");
+  const [slotDate, setSlotDate] = useState("");
   const [slotDuration, setSlotDuration] = useState("45");
+  const [selectedStudentId, setSelectedStudentId] = useState("");
   const [videoPlatform, setVideoPlatform] = useState<"ANSELLA_LIVE" | "GOOGLE_MEET" | "ZOOM" | "CUSTOM">("ANSELLA_LIVE");
   const [customUrl, setCustomUrl] = useState("");
 
   useEffect(() => {
-    async function loadSessions() {
-      setLoading(true);
-      try {
-        const res = await fetch("/api/instructor/coach/sessions");
-        const data = await res.json();
-        if (data?.sessions && Array.isArray(data.sessions)) {
-          setSessions(data.sessions);
-        } else {
-          setSessions([]);
-        }
-      } catch (err) {
-        console.error("Error fetching coach sessions:", err);
-        setSessions([]);
-      } finally {
-        setLoading(false);
-      }
-    }
     loadSessions();
+    loadStudents();
   }, []);
 
-  const handleAddSlot = (e: React.FormEvent) => {
+  async function loadSessions() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/instructor/coach/sessions");
+      const data = await res.json();
+      if (data?.sessions && Array.isArray(data.sessions)) {
+        setSessions(data.sessions);
+      } else {
+        setSessions([]);
+      }
+    } catch (err) {
+      console.error("Error fetching coach sessions:", err);
+      setSessions([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadStudents() {
+    try {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, email");
+
+      if (profiles) {
+        setStudents(profiles.map(p => ({
+          id: p.id,
+          name: p.full_name || p.email || "Apprenant"
+        })));
+      }
+    } catch (err) {
+      console.error("Error loading students:", err);
+    }
+  }
+
+  const handleAddSlot = async (e: React.FormEvent) => {
     e.preventDefault();
-    const uniqueRoom = `ansella-live-${Date.now().toString(36)}`;
-    const finalUrl =
-      videoPlatform === "ANSELLA_LIVE"
-        ? `https://meet.jit.si/${uniqueRoom}`
-        : customUrl.trim() || "https://meet.google.com/ansella-live";
+    if (!slotDate) {
+      alert("Veuillez sélectionner une date et une heure pour la session.");
+      return;
+    }
 
-    const newSess: BookingSession = {
-      id: `b_${Date.now()}`,
-      studentName: "Élève de la Formation",
-      studentEmail: "apprenant@ansella.app",
-      courseTitle: "Session de Suivi Individuel",
-      date: `${slotDay}, Créneau ouvert`,
-      time: `${slotStartTime} (${slotDuration} min)`,
-      durationMin: parseInt(slotDuration),
-      videoPlatform,
-      meetingUrl: finalUrl,
-      status: "CONFIRMED",
-    };
+    setSavingSlot(true);
+    try {
+      const uniqueRoom = `ansella-live-${Date.now().toString(36)}`;
+      const finalUrl =
+        videoPlatform === "ANSELLA_LIVE"
+          ? `https://meet.jit.si/${uniqueRoom}`
+          : customUrl.trim() || "https://meet.google.com/ansella-live";
 
-    setSessions([newSess, ...sessions]);
-    setShowAddSlotModal(false);
-    alert(`Plage horaire créée ! Lien visio : ${finalUrl}`);
+      const res = await fetch("/api/instructor/coach/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: slotTitle,
+          scheduledAt: slotDate,
+          durationMin: parseInt(slotDuration),
+          videoPlatform,
+          meetingUrl: finalUrl,
+          studentId: selectedStudentId || undefined
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur de création du créneau");
+
+      alert("Créneau enregistré avec succès dans la base de données et dans le calendrier !");
+      setShowAddSlotModal(false);
+      setSlotDate("");
+      setSelectedStudentId("");
+      loadSessions();
+    } catch (err: any) {
+      alert("Erreur : " + err.message);
+    } finally {
+      setSavingSlot(false);
+    }
   };
 
   return (
@@ -95,7 +136,7 @@ export function CoachBookingTab() {
             Sessions de Coaching 1-on-1 & Ansella Live
           </h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-            Gérez vos créneaux de mentorat individuel. Ansella Live (Jitsi Meet) est configuré par défaut.
+            Gérez vos créneaux de mentorat individuel synchronisés avec la base de données.
           </p>
         </div>
 
@@ -114,7 +155,7 @@ export function CoachBookingTab() {
         <div className="lg:col-span-8 space-y-4">
           <h3 className="text-sm font-extrabold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
             <Video className="w-4 h-4 text-teal-600" />
-            Prochaines Séances Confirmées ({sessions.length})
+            Séances Confirmées & Programmées ({sessions.length})
           </h3>
 
           {loading ? (
@@ -161,16 +202,18 @@ export function CoachBookingTab() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0 self-start md:self-auto">
-                    <a
-                      href={session.meetingUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-4 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white rounded-xl text-xs font-extrabold shadow-md shadow-teal-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Video className="w-4 h-4" /> Rejoindre la Visio <ExternalLink className="w-3 h-3 opacity-70" />
-                    </a>
-                  </div>
+                  {session.meetingUrl && (
+                    <div className="flex items-center gap-2 shrink-0 self-start md:self-auto">
+                      <a
+                        href={session.meetingUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-4 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white rounded-xl text-xs font-extrabold shadow-md shadow-teal-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Video className="w-4 h-4" /> Rejoindre la Visio <ExternalLink className="w-3 h-3 opacity-70" />
+                      </a>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -219,32 +262,47 @@ export function CoachBookingTab() {
             <form onSubmit={handleAddSlot} className="space-y-4 text-xs">
               <div>
                 <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
-                  Jour de la semaine
+                  Titre du créneau *
                 </label>
-                <select
-                  value={slotDay}
-                  onChange={(e) => setSlotDay(e.target.value)}
+                <input
+                  type="text"
+                  required
+                  value={slotTitle}
+                  onChange={(e) => setSlotTitle(e.target.value)}
+                  placeholder="Ex: Session de Suivi Individuel"
                   className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium"
-                >
-                  <option value="Lundi">Lundi</option>
-                  <option value="Mardi">Mardi</option>
-                  <option value="Mercredi">Mercredi</option>
-                  <option value="Jeudi">Jeudi</option>
-                  <option value="Vendredi">Vendredi</option>
-                  <option value="Samedi">Samedi</option>
-                </select>
+                />
               </div>
 
               <div>
                 <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
-                  Heure de début
+                  Date et Heure *
                 </label>
                 <input
-                  type="time"
-                  value={slotStartTime}
-                  onChange={(e) => setSlotStartTime(e.target.value)}
+                  type="datetime-local"
+                  required
+                  value={slotDate}
+                  onChange={(e) => setSlotDate(e.target.value)}
                   className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium"
                 />
+              </div>
+
+              <div>
+                <label className="block font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                  Apprenant Destinataire (Optionnel)
+                </label>
+                <select
+                  value={selectedStudentId}
+                  onChange={(e) => setSelectedStudentId(e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium"
+                >
+                  <option value="">-- Créneau ouvert à tous mes apprenants --</option>
+                  {students.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -288,9 +346,10 @@ export function CoachBookingTab() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-extrabold rounded-xl shadow-md shadow-teal-500/20"
+                  disabled={savingSlot}
+                  className="px-5 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-extrabold rounded-xl shadow-md shadow-teal-500/20 disabled:opacity-50"
                 >
-                  Ajouter le créneau
+                  {savingSlot ? "Enregistrement..." : "Créer le créneau dans la DB"}
                 </button>
               </div>
             </form>
