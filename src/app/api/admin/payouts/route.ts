@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
         phoneNumber, 
         carrier, 
         country, 
+        currency: requestCurrency,
         amount, 
         statementDescription, 
         instructorId 
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Format and resolve PawaPay params
-      const resolveResult = resolvePawaPayCorrespondent(carrier, phoneNumber);
+      const resolveResult = resolvePawaPayCorrespondent(carrier, phoneNumber, country, requestCurrency);
       if (resolveResult.error) {
         return NextResponse.json({ error: resolveResult.error }, { status: 400 });
       }
@@ -81,9 +82,13 @@ export async function POST(req: NextRequest) {
 
       const isSuccess = payoutResponse.success;
       const pStatus = isSuccess ? "PAID" : "FAILED";
+      const formattedAmountText = resolveResult.currency === "USD" 
+        ? `${numAmount}$ USD` 
+        : `${Math.round(amountLocal)} CDF (${numAmount}$ USD)`;
+
       const pNote = isSuccess 
-        ? `[Retrait Direct PawaPay API] Transfert réussi de ${Math.round(amountLocal)} ${resolveResult.currency} (${numAmount}$ USD) via ${resolveResult.correspondent} vers +${targetPhone}. Réf: ${freshPayoutTxId}. Note: ${desc}`
-        : `[Échec Retrait Direct PawaPay API] ${payoutResponse.error}. (Opérateur: ${resolveResult.correspondent}, Téléphone: +${targetPhone}). Réf: ${freshPayoutTxId}`;
+        ? `[Retrait Direct PawaPay API] Transfert réussi de ${formattedAmountText} via ${resolveResult.correspondent} vers +${targetPhone}. Réf: ${freshPayoutTxId}. Note: ${desc}`
+        : `[Échec Retrait Direct PawaPay API] ${payoutResponse.error}. (Opérateur: ${resolveResult.correspondent}, Devise: ${resolveResult.currency}, Téléphone: +${targetPhone}). Réf: ${freshPayoutTxId}`;
 
       const targetInstructorId = instructorId || user.id;
 
@@ -91,7 +96,7 @@ export async function POST(req: NextRequest) {
       const { data: newPayout, error: insertErr } = await supabaseAdmin
         .from("payouts")
         .insert({
-          id: crypto.randomUUID(),
+          id: freshPayoutTxId,
           instructor_id: targetInstructorId,
           amount: numAmount,
           currency: "USD",
@@ -120,7 +125,7 @@ export async function POST(req: NextRequest) {
           await createNotification({
             userId: instructorId,
             title: "Versement reçu !",
-            message: `Un versement direct de $${numAmount.toFixed(2)} USD a été envoyé sur votre Mobile Money (+${targetPhone}).`,
+            message: `Un versement direct de ${formattedAmountText} a été envoyé sur votre Mobile Money (+${targetPhone}).`,
             type: "SUCCESS",
             link: "/instructor/earnings"
           });
@@ -157,7 +162,7 @@ export async function POST(req: NextRequest) {
         success: true,
         status: "PAID",
         payoutId: freshPayoutTxId,
-        message: `Versement direct PawaPay de ${Math.round(amountLocal)} ${resolveResult.currency} (${numAmount}$ USD) envoyé avec succès au +${targetPhone} !`
+        message: `Versement direct PawaPay de ${formattedAmountText} envoyé avec succès au +${targetPhone} !`
       });
     }
 

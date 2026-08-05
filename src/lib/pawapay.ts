@@ -729,23 +729,38 @@ export interface ResolvePayoutCarrierResult {
 /**
  * Automatically resolve operator, currency, conversion rate, and clean phone number for PawaPay
  */
-export function resolvePawaPayCorrespondent(carrier: string, phoneNumber: string): ResolvePayoutCarrierResult {
-  const cleanPhone = phoneNumber.replace(/\D/g, "");
+export function resolvePawaPayCorrespondent(
+  carrier: string, 
+  phoneNumber: string,
+  countryCode?: string,
+  currencyOverride?: string
+): ResolvePayoutCarrierResult {
+  const phoneStr = typeof phoneNumber === 'string' ? phoneNumber : String(phoneNumber || '');
+  const cleanPhone = phoneStr.replace(/\D/g, "");
   
-  // Find matching country by phone prefix
-  const countryConfig = PAWAPAY_COUNTRY_MAPPING.find(cfg => cleanPhone.startsWith(cfg.phonePrefix));
-  if (!countryConfig) {
-    return {
-      correspondent: "",
-      currency: "",
-      exchangeRate: 1,
-      formattedPhone: cleanPhone,
-      error: `Le préfixe du numéro de téléphone (+${cleanPhone.substring(0, 3)}...) n'est pas géré par PawaPay.`
-    };
+  // Find matching country by countryCode or phone prefix
+  let countryConfig: PawaPayCountryConfig | undefined;
+
+  if (countryCode) {
+    countryConfig = getPawaPayConfigForCountry(countryCode);
   }
 
-  // Parse USD / CDF choice from carrier string (e.g., "AIRTEL (USD)", "MPESA (CDF)", "AIRTEL")
-  const isUSD = carrier.toUpperCase().includes("USD");
+  if (!countryConfig && cleanPhone) {
+    const sorted = [...PAWAPAY_COUNTRY_MAPPING].sort((a, b) => b.phonePrefix.length - a.phonePrefix.length);
+    countryConfig = sorted.find(cfg => cleanPhone.startsWith(cfg.phonePrefix));
+  }
+
+  if (!countryConfig) {
+    countryConfig = PAWAPAY_COUNTRY_MAPPING[0];
+  }
+
+  // Format phone number with country prefix
+  const formattedPhone = formatPawaPayPhoneNumber(cleanPhone, countryConfig.phonePrefix);
+
+  // Parse USD / CDF choice from currencyOverride or carrier string
+  const isUSD = (currencyOverride && currencyOverride.toUpperCase() === 'USD') || carrier.toUpperCase().includes("USD");
+  const isCDF = (currencyOverride && currencyOverride.toUpperCase() === 'CDF') || carrier.toUpperCase().includes("CDF");
+
   const cleanCarrierName = carrier.replace(/\(.*\)/g, "").replace(/USD|CDF/gi, "").trim().toLowerCase();
 
   // Find operator matching the carrier name
@@ -767,12 +782,13 @@ export function resolvePawaPayCorrespondent(carrier: string, phoneNumber: string
   let exchangeRate = countryConfig.exchangeRate;
 
   if (countryConfig.countryCode === "CD" || countryConfig.phonePrefix === "243") {
-    if (isUSD) {
-      currency = "USD";
-      exchangeRate = 1;
-    } else {
+    if (isCDF) {
       currency = "CDF";
       exchangeRate = countryConfig.exchangeRate || 2800;
+    } else {
+      // Default to USD for DRC when USD is selected or not explicitly CDF
+      currency = "USD";
+      exchangeRate = 1;
     }
   }
 
@@ -780,6 +796,6 @@ export function resolvePawaPayCorrespondent(carrier: string, phoneNumber: string
     correspondent: operator.id,
     currency,
     exchangeRate,
-    formattedPhone: cleanPhone
+    formattedPhone
   };
 }

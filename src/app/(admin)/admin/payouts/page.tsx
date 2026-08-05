@@ -61,12 +61,17 @@ export default function AdminPayoutsPage() {
   const [instructorsList, setInstructorsList] = useState<{ id: string; name: string }[]>([]);
   const [directCountry, setDirectCountry] = useState<string>("CD");
   const [directCarrier, setDirectCarrier] = useState<string>("VODACOM_MPESA_COD");
+  const [directCurrency, setDirectCurrency] = useState<"USD" | "CDF">("USD");
   const [directPhone, setDirectPhone] = useState<string>("");
   const [directAmount, setDirectAmount] = useState<string>("");
   const [directDescription, setDirectDescription] = useState<string>("");
   const [directInstructorId, setDirectInstructorId] = useState<string>("");
   const [submittingDirect, setSubmittingDirect] = useState<boolean>(false);
   const [directMessage, setDirectMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Accounting States
+  const [totalPaidPayouts, setTotalPaidPayouts] = useState<number>(0);
+  const [remainingInstructorBalance, setRemainingInstructorBalance] = useState<number>(0);
 
   const selectedCountryConfig = PAWAPAY_COUNTRY_MAPPING.find(c => c.countryCode === directCountry) || PAWAPAY_COUNTRY_MAPPING[0];
 
@@ -75,6 +80,9 @@ export default function AdminPayoutsPage() {
     const cfg = PAWAPAY_COUNTRY_MAPPING.find(c => c.countryCode === countryCode);
     if (cfg && cfg.operators.length > 0) {
       setDirectCarrier(cfg.operators[0].id);
+    }
+    if (countryCode === "CD") {
+      setDirectCurrency("USD");
     }
   };
 
@@ -103,6 +111,7 @@ export default function AdminPayoutsPage() {
           action: "direct_payout",
           country: directCountry,
           carrier: directCarrier,
+          currency: directCountry === "CD" ? directCurrency : undefined,
           phoneNumber: directPhone,
           amount: amountNum,
           statementDescription: directDescription || "Retrait Direct Admin PawaPay",
@@ -273,6 +282,11 @@ export default function AdminPayoutsPage() {
       }));
 
       setPayouts(items);
+
+      // Compute total paid payouts and remaining instructor balance
+      const totalPaid = items.filter(p => p.status === 'PAID').reduce((sum, p) => sum + p.amount, 0);
+      setTotalPaidPayouts(Math.round(totalPaid));
+      setRemainingInstructorBalance(Math.max(0, Math.round(computedInstructorShare - totalPaid)));
     } catch (err: any) {
       console.error('[AdminPayouts] Error loading from Supabase:', err);
       // Fallback local db
@@ -376,16 +390,16 @@ export default function AdminPayoutsPage() {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Total Platform Revenue */}
         <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center gap-4">
           <div className="p-4 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl text-emerald-600">
-            <DollarSign className="w-8 h-8" />
+            <DollarSign className="w-7 h-7" />
           </div>
           <div>
-            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Ventes globales (LMS)</p>
+            <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Ventes globales (LMS)</p>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">{totalSales}$</h3>
-            <p className="text-xxs text-zinc-450 dark:text-zinc-550 font-bold mt-1">
+            <p className="text-[10px] text-zinc-500 font-medium mt-1">
               {totalSales - planSales}$ cours + {planSales}$ plans
             </p>
           </div>
@@ -394,18 +408,18 @@ export default function AdminPayoutsPage() {
         {/* Platform Share */}
         <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center gap-4">
           <div className="p-4 bg-red-100 dark:bg-red-900/30 rounded-xl text-red-600">
-            <Percent className="w-8 h-8" />
+            <Percent className="w-7 h-7" />
           </div>
           <div className="flex-1">
             <div className="flex justify-between items-center">
-              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Fonds totaux du site</p>
-              <span className="text-xs bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-lg font-bold">
+              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Fonds net du site</p>
+              <span className="text-[10px] bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 px-2 py-0.5 rounded font-bold">
                 Site Share
               </span>
             </div>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">{platformCommissions}$</h3>
-            <p className="text-xxs text-zinc-450 dark:text-zinc-550 font-bold mt-1">
-              {courseCommissions}$ com. cours + {planSales}$ plans
+            <p className="text-[10px] text-zinc-500 font-medium mt-1">
+              {courseCommissions}$ com. + {planSales}$ plans
             </p>
           </div>
         </div>
@@ -413,13 +427,32 @@ export default function AdminPayoutsPage() {
         {/* Instructors Share */}
         <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center gap-4">
           <div className="p-4 bg-blue-100 dark:bg-blue-900/30 rounded-xl text-blue-600">
-            <TrendingUp className="w-8 h-8" />
+            <TrendingUp className="w-7 h-7" />
           </div>
           <div>
-            <p className="text-sm font-medium text-zinc-550 dark:text-zinc-400">Part théorique des Formateurs</p>
+            <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Gains Formateurs</p>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">{instructorShare}$</h3>
-            <p className="text-xxs text-zinc-450 dark:text-zinc-550 font-bold mt-1">
-              Uniquement sur les cours vendus
+            <p className="text-[10px] text-zinc-500 font-medium mt-1">
+              Part totale générée
+            </p>
+          </div>
+        </div>
+
+        {/* Payouts & Balance */}
+        <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center gap-4">
+          <div className="p-4 bg-teal-100 dark:bg-teal-900/30 rounded-xl text-teal-600">
+            <Coins className="w-7 h-7" />
+          </div>
+          <div className="flex-1">
+            <div className="flex justify-between items-center">
+              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Total Versements</p>
+              <span className="text-[10px] bg-teal-50 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded font-bold">
+                Payés
+              </span>
+            </div>
+            <h3 className="text-2xl font-bold text-teal-600 dark:text-teal-400">{totalPaidPayouts}$</h3>
+            <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold mt-1">
+              {remainingInstructorBalance}$ restant à reverser
             </p>
           </div>
         </div>
@@ -550,7 +583,7 @@ export default function AdminPayoutsPage() {
           </div>
 
           <form onSubmit={handleDirectPayoutSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               
               {/* 1. Country */}
               <div className="space-y-1.5">
@@ -573,7 +606,28 @@ export default function AdminPayoutsPage() {
                 </select>
               </div>
 
-              {/* 2. Operator */}
+              {/* 2. Currency Choice */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                  <Coins className="w-3.5 h-3.5 text-teal-400" /> Devise de versement
+                </label>
+                {directCountry === "CD" ? (
+                  <select
+                    value={directCurrency}
+                    onChange={(e) => setDirectCurrency(e.target.value as "USD" | "CDF")}
+                    className="w-full px-3.5 py-2.5 bg-zinc-800/90 border border-zinc-700 rounded-xl text-xs font-bold text-teal-400 focus:outline-none focus:border-teal-500 transition-colors"
+                  >
+                    <option value="USD">USD ($) - Dollar Américain</option>
+                    <option value="CDF">CDF (FC) - Franc Congolais</option>
+                  </select>
+                ) : (
+                  <div className="w-full px-3.5 py-2.5 bg-zinc-800/60 border border-zinc-700/60 rounded-xl text-xs font-bold text-teal-400 select-none">
+                    {selectedCountryConfig.currency} ({selectedCountryConfig.countryCode})
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Operator */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
                   <Smartphone className="w-3.5 h-3.5 text-teal-400" /> Réseau / Opérateur
@@ -591,10 +645,10 @@ export default function AdminPayoutsPage() {
                 </select>
               </div>
 
-              {/* 3. Phone Number */}
+              {/* 4. Phone Number */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5 text-teal-400" /> Numéro de téléphone
+                  <Phone className="w-3.5 h-3.5 text-teal-400" /> Numéro Mobile Money
                 </label>
                 <div className="flex items-center">
                   <span className="px-3 py-2.5 bg-zinc-800 border border-r-0 border-zinc-700 rounded-l-xl text-xs font-extrabold text-teal-400 select-none">
@@ -602,7 +656,7 @@ export default function AdminPayoutsPage() {
                   </span>
                   <input
                     type="text"
-                    placeholder="812345678"
+                    placeholder="992036994 ou 812345678"
                     value={directPhone}
                     onChange={(e) => setDirectPhone(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-zinc-800/90 border border-zinc-700 rounded-r-xl text-xs font-semibold text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500 transition-colors"
@@ -610,15 +664,17 @@ export default function AdminPayoutsPage() {
                 </div>
               </div>
 
-              {/* 4. Amount */}
+              {/* 5. Amount */}
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
-                    <DollarSign className="w-3.5 h-3.5 text-teal-400" /> Montant (USD $)
+                    <DollarSign className="w-3.5 h-3.5 text-teal-400" /> Montant ($ USD)
                   </label>
                   {(parseFloat(directAmount) || 0) > 0 && (
                     <span className="text-[10px] font-extrabold text-teal-400">
-                      ≈ {Math.round((parseFloat(directAmount) || 0) * selectedCountryConfig.exchangeRate).toLocaleString('fr-FR')} {selectedCountryConfig.currency}
+                      {directCountry === "CD" && directCurrency === "USD"
+                        ? `= ${(parseFloat(directAmount) || 0).toFixed(2)}$ USD`
+                        : `≈ ${Math.round((parseFloat(directAmount) || 0) * selectedCountryConfig.exchangeRate).toLocaleString('fr-FR')} ${selectedCountryConfig.currency}`}
                     </span>
                   )}
                 </div>
