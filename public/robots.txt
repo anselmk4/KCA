@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /api/
+Disallow: /_next/
+
+Sitemap: https://ansella.app/sitemap.xml

@@ -1,0 +1,487 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import {
+  PlayCircle,
+  Clock,
+  BookOpen,
+  ChevronRight,
+  TrendingUp,
+  BrainCircuit,
+  Bitcoin,
+  Code2,
+  Sparkles,
+  Award,
+  Compass,
+  CreditCard,
+  CheckCircle2,
+  Loader2,
+  GraduationCap,
+  ArrowRight,
+  UserCheck,
+} from "lucide-react";
+import Link from "next/link";
+import { supabase } from "@/lib/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
+import { stripHtml } from "@/lib/utils";
+import { RequestCoachingModal } from "@/components/coaching/RequestCoachingModal";
+
+interface Profile {
+  id: string;
+  full_name: string;
+  email: string;
+  plan?: string;
+}
+
+interface CourseData {
+  id: string;
+  title: string;
+  category: string;
+  level: string;
+  price: number;
+  status: string;
+  description: string;
+  thumbnail_url?: string | null;
+}
+
+interface EnrollmentData {
+  id: string;
+  student_id: string;
+  course_id: string;
+  status: string;
+  progress_percent: number;
+  created_at: string;
+  courses?: CourseData;
+}
+
+interface CertificateData {
+  id: string;
+  student_id: string;
+  course_id: string;
+  issued_at: string;
+}
+
+function getCourseStyles(category: string) {
+  const c = (category || "").toLowerCase();
+  if (c.includes("blockchain") || c.includes("web3") || c.includes("nft"))
+    return { color: "text-blue-600", bgColor: "bg-blue-100 dark:bg-blue-900/30", barColor: "bg-blue-500", borderHover: "hover:border-blue-400", icon: <Bitcoin className="w-8 h-8 text-blue-600" /> };
+  if (c.includes("trading") || c.includes("defi") || c.includes("finance"))
+    return { color: "text-emerald-600", bgColor: "bg-emerald-100 dark:bg-emerald-900/30", barColor: "bg-emerald-500", borderHover: "hover:border-emerald-400", icon: <TrendingUp className="w-8 h-8 text-emerald-600" /> };
+  if (c.includes("intelligence") || c.includes("ia") || c.includes("ai"))
+    return { color: "text-purple-600", bgColor: "bg-purple-100 dark:bg-purple-900/30", barColor: "bg-purple-500", borderHover: "hover:border-purple-400", icon: <BrainCircuit className="w-8 h-8 text-purple-600" /> };
+  return { color: "text-teal-600", bgColor: "bg-teal-100 dark:bg-teal-900/30", barColor: "bg-teal-500", borderHover: "hover:border-teal-400", icon: <Code2 className="w-8 h-8 text-teal-600" /> };
+}
+
+export default function DashboardPage() {
+  const { t, language } = useLanguage();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [activeEnrollments, setActiveEnrollments] = useState<EnrollmentData[]>([]);
+  const [completedEnrollments, setCompletedEnrollments] = useState<EnrollmentData[]>([]);
+  const [certificates, setCertificates] = useState<CertificateData[]>([]);
+  const [availableCourses, setAvailableCourses] = useState<CourseData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isCoachingModalOpen, setIsCoachingModalOpen] = useState(false);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setLoading(false); return; }
+
+      // Profile
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, plan")
+        .eq("id", user.id)
+        .maybeSingle();
+      setProfile(profileData as unknown as Profile);
+
+      // Enrollments with course data
+      const { data: enrollData } = await (supabase as any)
+        .from("enrollments")
+        .select("id, student_id, course_id, status, progress_percent, created_at, courses(id, title, category_id, level, price, status, description, thumbnail_url, categories(name))")
+        .eq("student_id", user.id);
+
+      const all = (enrollData || []).map((e: any) => ({
+        ...e,
+        courses: e.courses ? {
+          ...e.courses,
+          category: e.courses.categories?.name || "Général",
+          thumbnail_url: e.courses.thumbnail_url
+        } : undefined
+      })) as unknown as EnrollmentData[];
+
+      const active = all.filter((e) => e.status === "ACTIVE" && e.progress_percent < 100);
+      const completed = all.filter((e) => e.progress_percent >= 100 || e.status === "COMPLETED");
+      setActiveEnrollments(active);
+      setCompletedEnrollments(completed);
+
+      // Certificates
+      const { data: certData } = await supabase
+        .from("certificates")
+        .select("*")
+        .eq("student_id", user.id);
+      setCertificates((certData || []) as CertificateData[]);
+
+      // Available published courses not yet enrolled
+      const enrolledIds = new Set(all.map((e) => e.course_id));
+      const { data: coursesData } = await (supabase as any)
+        .from("courses")
+        .select("id, title, category_id, level, price, status, description, thumbnail_url, categories(name)")
+        .eq("status", "PUBLISHED");
+
+      const available = ((coursesData || []).map((c: any) => ({
+        ...c,
+        category: c.categories?.name || "Général",
+        thumbnail_url: c.thumbnail_url
+      })) as unknown as CourseData[]).filter((c) => !enrolledIds.has(c.id)).slice(0, 3);
+      setAvailableCourses(available);
+    } catch (err) {
+      console.error("[DashboardPage] loadData error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // Most advanced active course (best for "Reprendre")
+  const currentCourse = activeEnrollments.length > 0
+    ? activeEnrollments.reduce((best, e) => {
+        if (e.progress_percent > best.progress_percent) return e;
+        return best;
+      }, activeEnrollments[0])
+    : null;
+
+  // Overall stats
+  const totalHours = activeEnrollments.reduce((sum, e) => sum + (e.courses ? 0 : 0), 0); // Will update once lessons loaded
+  const avgProgress = activeEnrollments.length > 0
+    ? Math.round(activeEnrollments.reduce((s, e) => s + e.progress_percent, 0) / activeEnrollments.length)
+    : 0;
+
+  const firstName = (profile?.full_name || "Apprenant").split(" ")[0];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-10 h-10 text-teal-600 animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
+
+      {/* Welcome Hero */}
+      <div className="bg-white dark:bg-zinc-900 rounded-3xl p-7 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row justify-between items-center gap-5">
+        <div>
+          <p className="text-xs font-bold text-teal-600 uppercase tracking-widest mb-1">
+            {language === "en" ? "Dashboard" : "Tableau de bord"}
+          </p>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
+            {language === "en" ? `Welcome back, ${firstName}! 👋` : `Bon retour, ${firstName} ! 👋`}
+          </h1>
+          <p className="text-zinc-500 dark:text-zinc-400 text-sm">
+            {language === "en"
+              ? (activeEnrollments.length > 0 
+                 ? `You are taking ${activeEnrollments.length} course${activeEnrollments.length > 1 ? "s" : ""}. Keep going!` 
+                 : "Explore our catalog and start learning now.")
+              : (activeEnrollments.length > 0
+                 ? `Vous suivez ${activeEnrollments.length} formation${activeEnrollments.length > 1 ? "s" : ""}. Continuez sur votre lancée !`
+                 : "Explorez notre catalogue et commencez votre apprentissage dès maintenant.")
+            }
+          </p>
+        </div>
+        {currentCourse ? (
+          <Link
+            href={`/dashboard/courses/${currentCourse.course_id}/learn`}
+            className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition-all shadow-md shadow-teal-500/20 whitespace-nowrap"
+          >
+            <PlayCircle className="w-5 h-5" /> {language === "en" ? "Resume learning" : "Reprendre le cours"}
+          </Link>
+        ) : (
+          <Link
+            href="/dashboard/discover"
+            className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition-all shadow-md shadow-teal-500/20"
+          >
+            <Compass className="w-5 h-5" /> {language === "en" ? "Explore the catalog" : "Découvrir le catalogue"}
+          </Link>
+        )}
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="w-8 h-8 bg-teal-100 dark:bg-teal-900/30 rounded-lg flex items-center justify-center">
+              <BookOpen className="w-4 h-4 text-teal-600" />
+            </div>
+            <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">
+              {language === "en" ? "Active Courses" : "Cours actifs"}
+            </p>
+          </div>
+          <h4 className="text-2xl font-bold text-zinc-900 dark:text-white">{activeEnrollments.length}</h4>
+        </div>
+        <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
+              <Award className="w-4 h-4 text-emerald-600" />
+            </div>
+            <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">
+              {language === "en" ? "Certificates" : "Certificats"}
+            </p>
+          </div>
+          <h4 className="text-2xl font-bold text-zinc-900 dark:text-white">{certificates.length}</h4>
+        </div>
+        <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+              <CheckCircle2 className="w-4 h-4 text-blue-600" />
+            </div>
+            <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">
+              {language === "en" ? "Completed" : "Terminées"}
+            </p>
+          </div>
+          <h4 className="text-2xl font-bold text-zinc-900 dark:text-white">{completedEnrollments.length}</h4>
+        </div>
+        <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 text-purple-600" />
+            </div>
+            <p className="text-zinc-500 dark:text-zinc-400 text-xs font-medium">
+              {language === "en" ? "Avg. Progress" : "Progression moy."}
+            </p>
+          </div>
+          <h4 className="text-2xl font-bold text-zinc-900 dark:text-white">{avgProgress}%</h4>
+        </div>
+      </div>
+
+      {/* 1-on-1 Coaching CTA Banner */}
+      <div className="bg-gradient-to-r from-zinc-900 via-zinc-900 to-teal-950 p-6 rounded-2xl border border-teal-500/30 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
+        <div className="flex items-center gap-4 relative z-10">
+          <div className="w-12 h-12 rounded-xl bg-teal-500/20 border border-teal-400/30 text-teal-300 flex items-center justify-center shrink-0">
+            <UserCheck className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-base font-extrabold flex items-center gap-2">
+              Besoin d&apos;un accompagnement individuel ?
+              <Sparkles className="w-4 h-4 text-amber-400" />
+            </h3>
+            <p className="text-xs text-zinc-300 mt-0.5 max-w-xl">
+              Réservez une séance de Coaching 1-sur-1 en visioconférence avec vos formateurs pour débloquer un sujet précis.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 relative z-10 self-start md:self-auto shrink-0">
+          <Link
+            href="/dashboard/coaching"
+            className="px-4 py-2.5 rounded-xl border border-zinc-700 hover:bg-zinc-800 text-white text-xs font-bold transition-all"
+          >
+            Voir mes demandes
+          </Link>
+
+          <button
+            onClick={() => setIsCoachingModalOpen(true)}
+            className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-extrabold shadow-lg shadow-teal-500/20 transition-all flex items-center gap-2 cursor-pointer hover:scale-105"
+          >
+            <UserCheck className="w-4 h-4" /> Demander un Coaching 1-on-1
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        {/* Left: Active courses + Completed */}
+        <div className="lg:col-span-2 space-y-8">
+
+          {/* Active courses with progress */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Formations en cours</h2>
+              <Link href="/dashboard/courses" className="text-xs font-semibold text-teal-600 hover:text-teal-700 flex items-center gap-1">
+                Tout voir <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            {activeEnrollments.length === 0 ? (
+              <div className="bg-white dark:bg-zinc-900 rounded-2xl p-8 border border-zinc-200 dark:border-zinc-800 shadow-sm text-center space-y-4">
+                <BookOpen className="w-14 h-14 text-zinc-300 mx-auto" />
+                <h3 className="text-base font-bold text-zinc-900 dark:text-white">Aucune formation en cours</h3>
+                <p className="text-zinc-500 dark:text-zinc-400 text-sm max-w-sm mx-auto">Inscrivez-vous à une formation pour commencer votre apprentissage.</p>
+                <Link href="/dashboard/discover" className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition-colors">
+                  <Compass className="w-4 h-4" /> Découvrir le catalogue
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {activeEnrollments.slice(0, 3).map((enr) => {
+                  const course = enr.courses;
+                  if (!course) return null;
+                  const styles = getCourseStyles(course.category);
+                  const isCurrent = currentCourse?.id === enr.id;
+                  return (
+                    <div
+                      key={enr.id}
+                      className={`bg-white dark:bg-zinc-900 rounded-2xl p-5 border shadow-sm hover:shadow-md transition-all ${
+                        isCurrent ? "border-teal-400 dark:border-teal-700 ring-1 ring-teal-500/20" : "border-zinc-200 dark:border-zinc-800"
+                      }`}
+                    >
+                      <div className="flex items-start gap-4">
+                        {course.thumbnail_url ? (
+                          <div className="w-16 h-10 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 shrink-0 relative bg-zinc-150">
+                            <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className={`w-12 h-12 ${styles.bgColor} rounded-xl flex items-center justify-center shrink-0`}>
+                            {styles.icon}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <h3 className="font-bold text-sm text-zinc-900 dark:text-white line-clamp-1">{course.title}</h3>
+                            {isCurrent && (
+                              <span className="shrink-0 text-[10px] bg-teal-50 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400 font-bold px-2 py-0.5 rounded-full border border-teal-200 dark:border-teal-900/40">
+                                Actif
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-zinc-400 mb-3">{course.category} · {course.level}</p>
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 bg-zinc-100 dark:bg-zinc-800 rounded-full h-2 overflow-hidden">
+                              <div className={`h-2 rounded-full ${styles.barColor} transition-all duration-700`} style={{ width: `${enr.progress_percent}%` }} />
+                            </div>
+                            <span className={`text-xs font-bold ${styles.color} shrink-0 w-10 text-right`}>{enr.progress_percent}%</span>
+                          </div>
+                        </div>
+                        <Link
+                          href={`/dashboard/courses/${course.id}/learn`}
+                          className="shrink-0 flex items-center justify-center w-10 h-10 bg-teal-600 hover:bg-teal-700 text-white rounded-xl transition-colors"
+                        >
+                          <PlayCircle className="w-5 h-5" />
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+                {activeEnrollments.length > 3 && (
+                  <Link href="/dashboard/courses" className="block w-full py-3 border border-dashed border-zinc-200 dark:border-zinc-700 rounded-xl text-center text-xs font-semibold text-zinc-500 hover:text-teal-600 hover:border-teal-400 transition-all">
+                    Voir {activeEnrollments.length - 3} autres formations <ArrowRight className="w-3.5 h-3.5 inline ml-1" />
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Completed courses */}
+          {completedEnrollments.length > 0 && (
+            <div>
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-emerald-600" /> Formations terminées
+              </h2>
+              <div className="grid grid-cols-1 gap-3">
+                {completedEnrollments.slice(0, 2).map((enr) => {
+                  const course = enr.courses;
+                  if (!course) return null;
+                  const styles = getCourseStyles(course.category);
+                  return (
+                    <div key={enr.id} className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {course.thumbnail_url ? (
+                          <div className="w-14 h-9 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 shrink-0 relative bg-zinc-150">
+                            <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className={`w-11 h-11 ${styles.bgColor} rounded-xl flex items-center justify-center shrink-0`}>
+                            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-sm text-zinc-900 dark:text-white truncate">{course.title}</h3>
+                          <p className="text-[11px] text-zinc-400 mt-0.5">{course.category} · 100%</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Link href={`/dashboard/courses/${course.id}/learn`} className="px-3 py-1.5 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                          Revoir
+                        </Link>
+                        <Link href="/dashboard/certificates" className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold">
+                          <Award className="w-3.5 h-3.5 inline mr-1" />Certificat
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Recommendations */}
+        <div className="space-y-5">
+          <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Recommandé pour vous</h2>
+
+          {availableCourses.length > 0 ? (
+            <div className="space-y-4">
+              {availableCourses.map((course) => {
+                const styles = getCourseStyles(course.category);
+                return (
+                  <Link
+                    key={course.id}
+                    href={`/dashboard/discover/${course.id}`}
+                    className={`block bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all group ${styles.borderHover}`}
+                  >
+                    <div className="h-24 rounded-xl mb-4 overflow-hidden relative bg-zinc-100 dark:bg-zinc-800">
+                      {course.thumbnail_url ? (
+                        <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className={`w-full h-full ${styles.bgColor} flex items-center justify-center`}>
+                          {styles.icon}
+                        </div>
+                      )}
+                    </div>
+                    <h4 className="font-bold text-zinc-900 dark:text-white mb-1 line-clamp-2 text-sm">{course.title}</h4>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4 line-clamp-2">{stripHtml(course.description)}</p>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="font-bold text-zinc-900 dark:text-white">
+                        {course.price > 0 ? `$${course.price}` : "Gratuit"}
+                      </span>
+                      <span className={`${styles.color} font-semibold flex items-center text-xs group-hover:translate-x-0.5 transition-transform`}>
+                        Découvrir <ChevronRight className="w-4 h-4 ml-0.5" />
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            profile?.plan === "MAX" ? (
+              <div className="bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30 p-6 text-center space-y-3">
+                <Award className="w-10 h-10 text-emerald-600 mx-auto" />
+                <p className="text-sm font-bold text-zinc-900 dark:text-white">Félicitations !</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">Vous êtes inscrit à toutes nos formations disponibles.</p>
+              </div>
+            ) : (
+              <div className="bg-zinc-50 dark:bg-zinc-800/20 rounded-2xl border border-zinc-200/50 p-6 text-center">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Aucun autre cours recommandé pour le moment.</p>
+              </div>
+            )
+          )}
+
+          <Link
+            href="/dashboard/discover"
+            className="flex items-center justify-center gap-2 w-full py-3 border border-dashed border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-semibold text-zinc-500 hover:text-teal-600 hover:border-teal-400 transition-all"
+          >
+            <Compass className="w-4 h-4" /> Voir tout le catalogue
+          </Link>
+        </div>
+      </div>
+
+      <RequestCoachingModal
+        isOpen={isCoachingModalOpen}
+        onClose={() => setIsCoachingModalOpen(false)}
+      />
+    </div>
+  );
+}

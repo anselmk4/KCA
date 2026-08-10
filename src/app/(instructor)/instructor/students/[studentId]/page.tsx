@@ -1,0 +1,886 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import {
+  ArrowLeft, BookOpen, TrendingUp, DollarSign, Award, Clock,
+  CheckCircle2, Circle, PlayCircle, AlertTriangle, Mail,
+  Calendar, BarChart3, ExternalLink, Loader2, User, Lock, Unlock
+} from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
+import { getSimulatedSession } from "@/lib/rbac";
+
+type CourseDetail = {
+  courseId: string;
+  courseTitle: string;
+  courseSlug: string;
+  coursePrice: number;
+  totalPaid?: number;
+  remainingAmount?: number;
+  isInstallmentCourse?: boolean;
+  totalInstallments?: number;
+  paidInstallmentsCount?: number;
+  remainingInstallmentsCount?: number;
+  enrollmentStatus: string;
+  enrolledAt: string;
+  progressPercent: number;
+  totalLessons: number;
+  completedLessons: number;
+  paymentStatus: string;
+  paymentAmount: number;
+  paymentDate: string | null;
+  hasCertificate: boolean;
+  certificateDate: string | null;
+};
+
+type StudentDetail = {
+  id: string;
+  name: string;
+  email: string;
+  plan: string;
+  joinedAt: string;
+  courses: CourseDetail[];
+};
+
+const STATUS_MAP: Record<string, { label: string; cls: string }> = {
+  ACTIVE: { label: "Actif", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" },
+  COMPLETED: { label: "Terminé", cls: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+  AT_RISK: { label: "En difficulté", cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
+  INACTIVE: { label: "Inactif", cls: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400" },
+};
+
+const PAY_MAP: Record<string, { label: string; cls: string }> = {
+  PAID: { label: "Payé ✓", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" },
+  PENDING: { label: "En attente", cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
+  FAILED: { label: "Échec", cls: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
+  none: { label: "Gratuit", cls: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400" },
+};
+
+function ProgressBar({ percent, label }: { percent: number; label?: string }) {
+  const color = percent >= 80 ? "bg-emerald-500" : percent >= 40 ? "bg-blue-500" : "bg-amber-400";
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs">
+        {label && <span className="text-zinc-500 dark:text-zinc-400">{label}</span>}
+        <span className="font-bold text-zinc-700 dark:text-zinc-300 ml-auto">{percent}%</span>
+      </div>
+      <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+        <div className={`h-full ${color} rounded-full transition-all duration-700`} style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
+}
+
+export default function StudentDetailPage() {
+  const { studentId } = useParams<{ studentId: string }>();
+  const router = useRouter();
+  const [student, setStudent] = useState<StudentDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [homeworks, setHomeworks] = useState<any[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [quizzes, setQuizzes] = useState<any[]>([]);
+  const [attempts, setAttempts] = useState<any[]>([]);
+  const [gradingSubId, setGradingSubId] = useState<string | null>(null);
+  const [editGrade, setEditGrade] = useState<string>("");
+  const [editFeedback, setEditFeedback] = useState<string>("");
+  const [savingGrade, setSavingGrade] = useState<string | null>(null);
+  const [unlockingCertCourseId, setUnlockingCertCourseId] = useState<string | null>(null);
+  const [revokingCourseId, setRevokingCourseId] = useState<string | null>(null);
+  const [blockingCourseId, setBlockingCourseId] = useState<string | null>(null);
+
+  async function handleBlockAccess(courseId: string, currentStatus: string, courseTitle: string) {
+    if (!student) return;
+    const isBlocking = currentStatus !== "SUSPENDED";
+    const confirmMsg = isBlocking
+      ? `Souhaitez-vous bloquer l'accès de ${student.name} au cours "${courseTitle}" (pour tranche impayée) ?`
+      : `Souhaitez-vous réactiver l'accès au cours "${courseTitle}" pour ${student.name} ?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setBlockingCourseId(courseId);
+    try {
+      const res = await fetch("/api/instructor/students/block-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentId: student.id,
+          courseId,
+          action: isBlocking ? "BLOCK" : "UNBLOCK",
+          reason: isBlocking ? `Accès au cours "${courseTitle}" suspendu par le formateur en raison d'une tranche de paiement requise.` : undefined
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur lors de la mise à jour.");
+
+      alert(data.message || `L'accès a été ${isBlocking ? "suspendu" : "réactivé"} avec succès.`);
+      setStudent({
+        ...student,
+        courses: student.courses.map(c => c.courseId === courseId ? { ...c, enrollmentStatus: isBlocking ? "SUSPENDED" : "ACTIVE" } : c)
+      });
+    } catch (err: any) {
+      alert("Erreur : " + err.message);
+    } finally {
+      setBlockingCourseId(null);
+    }
+  }
+
+  async function handleRevokeCourse(courseId: string, courseTitle: string) {
+    if (!student) return;
+    const confirm = window.confirm(`Êtes-vous sûr de vouloir révoquer ${student.name} du cours "${courseTitle}" ?`);
+    if (!confirm) return;
+
+    setRevokingCourseId(courseId);
+    try {
+      const res = await fetch("/api/instructor/students/revoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId: student.id, courseId }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur lors de la révocation.");
+
+      alert(data.message || "Apprenant révoqué du cours avec succès.");
+      setStudent({
+        ...student,
+        courses: student.courses.filter((c) => c.courseId !== courseId),
+      });
+    } catch (err: any) {
+      alert("Erreur lors de la révocation : " + err.message);
+    } finally {
+      setRevokingCourseId(null);
+    }
+  }
+
+  // AI Auto-Grader state
+  const [aiGradingSubId, setAiGradingSubId] = useState<string | null>(null);
+  const [aiEvaluationMap, setAiEvaluationMap] = useState<Record<string, any>>({});
+  const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
+
+  async function handleAIGrade(subId: string) {
+    setAiGradingSubId(subId);
+    try {
+      const res = await fetch("/api/ai/grade-homework", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submissionId: subId }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.code === "PLAN_UPGRADE_REQUIRED" || res.status === 403) {
+          setShowUpgradeModal(true);
+          return;
+        }
+        alert(data.error || "Erreur lors de la correction par l'IA.");
+        return;
+      }
+
+      if (data.evaluation) {
+        setAiEvaluationMap((prev) => ({ ...prev, [subId]: data.evaluation }));
+        setGradingSubId(subId);
+        setEditGrade(data.evaluation.suggestedGrade.toString());
+        setEditFeedback(data.evaluation.summaryFeedback);
+      }
+    } catch (err: any) {
+      alert(err.message || "Erreur de connexion lors de la correction par l'IA.");
+    } finally {
+      setAiGradingSubId(null);
+    }
+  }
+
+  useEffect(() => {
+    const session = getSimulatedSession();
+    if (!session?.userId) { router.replace("/login"); return; }
+    fetchStudentDetail(session.userId, studentId);
+  }, [studentId, router]);
+
+  async function fetchStudentDetail(instructorId: string, sId: string) {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/instructor/students?studentId=${sId}`);
+      if (!res.ok) {
+        if (res.status === 404) {
+          setError("Étudiant introuvable.");
+          return;
+        }
+        throw new Error("Erreur de récupération des données");
+      }
+      const data = await res.json();
+      setStudent(data);
+
+      // Fetch homeworks and submissions
+      const courseIds = data.courses.map((c: any) => c.courseId);
+      if (courseIds.length > 0) {
+        // Homeworks
+        const { data: hws } = await (supabase as any)
+          .from("homeworks")
+          .select("*")
+          .in("course_id", courseIds);
+        setHomeworks(hws || []);
+
+        // Submissions
+        const subRes = await fetch(`/api/homework-submissions?studentId=${sId}`);
+        if (subRes.ok) {
+          const subData = await subRes.json();
+          setSubmissions(subData.submissions || []);
+        }
+
+        // Quizzes
+        const { data: qzs } = await supabase
+          .from("quizzes")
+          .select("*")
+          .in("course_id", courseIds);
+        setQuizzes(qzs || []);
+
+        // Quiz attempts
+        const { data: atts } = await supabase
+          .from("quiz_attempts")
+          .select("*")
+          .eq("student_id", sId)
+          .in("quiz_id", qzs?.map((q: any) => q.id) || []);
+          setAttempts(atts || []);
+      }
+    } catch (err) {
+      console.error("[student-detail] error:", err);
+      setError("Erreur lors du chargement des données.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const handleGradeSubmit = async (submissionId: string) => {
+    if (!editGrade || isNaN(parseFloat(editGrade))) {
+      alert("Veuillez saisir une note valide.");
+      return;
+    }
+    setSavingGrade(submissionId);
+    try {
+      const res = await fetch("/api/homework-submissions", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: submissionId,
+          grade: parseFloat(editGrade),
+          feedback: editFeedback
+        })
+      });
+      if (res.ok) {
+        alert("Note enregistrée avec succès !");
+        setGradingSubId(null);
+        const session = getSimulatedSession();
+        if (session?.userId) {
+          await fetchStudentDetail(session.userId, studentId);
+        }
+      } else {
+        const err = await res.json();
+        alert("Erreur : " + err.error);
+      }
+    } catch (err) {
+      alert("Erreur de connexion.");
+    } finally {
+      setSavingGrade(null);
+    }
+  };
+
+  const handleUnlockCertificate = async (courseId: string) => {
+    setUnlockingCertCourseId(courseId);
+    try {
+      const res = await fetch("/api/certificates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId,
+          studentId
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert("🎉 Certificat débloqué et émis avec succès pour l'apprenant !");
+        const session = getSimulatedSession();
+        if (session?.userId) {
+          await fetchStudentDetail(session.userId, studentId);
+        }
+      } else {
+        alert("Erreur : " + data.error);
+      }
+    } catch (err) {
+      alert("Erreur de connexion.");
+    } finally {
+      setUnlockingCertCourseId(null);
+    }
+  };
+
+  if (loading) return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="h-8 w-32 bg-zinc-200 dark:bg-zinc-800 rounded-xl animate-pulse" />
+      <div className="h-40 bg-zinc-200 dark:bg-zinc-800 rounded-2xl animate-pulse" />
+      {[...Array(3)].map((_, i) => <div key={i} className="h-48 bg-zinc-200 dark:bg-zinc-800 rounded-2xl animate-pulse" />)}
+    </div>
+  );
+
+  if (error || !student) return (
+    <div className="max-w-4xl mx-auto">
+      <div className="text-center py-20 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
+        <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto mb-4" />
+        <p className="text-zinc-700 dark:text-zinc-300 font-medium">{error || "Étudiant introuvable"}</p>
+        <Link href="/instructor/students" className="mt-4 inline-flex items-center gap-2 text-teal-600 text-sm font-semibold hover:underline">
+          <ArrowLeft className="w-4 h-4" /> Retour aux étudiants
+        </Link>
+      </div>
+    </div>
+  );
+
+  const totalPaid = student.courses.reduce((s, c) => s + (c.totalPaid ?? c.paymentAmount ?? 0), 0);
+  const avgProgress = student.courses.length > 0
+    ? Math.round(student.courses.reduce((s, c) => s + c.progressPercent, 0) / student.courses.length)
+    : 0;
+  const initials = student.name.split(" ").map(n => n[0] || "").join("").slice(0, 2).toUpperCase();
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-400">
+
+      {/* Back */}
+      <Link href="/instructor/students" className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-teal-600 dark:hover:text-teal-400 transition-colors font-medium">
+        <ArrowLeft className="w-4 h-4" />
+        Retour aux étudiants
+      </Link>
+
+      {/* Student Profile Card */}
+      <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+        {/* Decorative gradient header */}
+        <div className="h-28 bg-gradient-to-r from-teal-600 via-teal-500 to-emerald-400 relative">
+          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }} />
+        </div>
+
+        <div className="px-6 sm:px-8 pb-8">
+          {/* Avatar and Info Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div className="flex items-start sm:items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl border-4 border-white dark:border-zinc-900 bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center font-extrabold text-2xl text-teal-600 dark:text-teal-400 shadow-xl -mt-10 shrink-0">
+                {initials}
+              </div>
+              <div className="pt-2 sm:pt-1">
+                <h1 className="text-2xl font-extrabold text-zinc-900 dark:text-white tracking-tight">{student.name}</h1>
+                <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 mt-0.5">
+                  <Mail className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                  {student.email}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-1 sm:pt-0">
+              <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800">
+                Plan {student.plan}
+              </span>
+              <span className="text-xs text-zinc-400 flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" />
+                Depuis {new Date(student.joinedAt).toLocaleDateString("fr-FR", { month: "short", year: "numeric" })}
+              </span>
+            </div>
+          </div>
+
+          {/* KPI row */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              { icon: BookOpen, label: "Cours suivis", value: student.courses.length, color: "text-teal-600" },
+              { icon: TrendingUp, label: "Progression moy.", value: `${avgProgress}%`, color: avgProgress >= 60 ? "text-emerald-600" : "text-amber-500" },
+              { icon: DollarSign, label: "Total payé", value: `${totalPaid.toLocaleString()} $`, color: "text-emerald-600" },
+              { icon: Award, label: "Certificats", value: student.courses.filter(c => c.hasCertificate).length, color: "text-purple-600" },
+            ].map((stat, i) => {
+              const Icon = stat.icon;
+              return (
+                <div key={i} className="bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl p-4 text-center">
+                  <Icon className={`w-5 h-5 mx-auto mb-1.5 ${stat.color}`} />
+                  <p className={`text-xl font-extrabold ${stat.color}`}>{stat.value}</p>
+                  <p className="text-[10px] text-zinc-500 mt-0.5">{stat.label}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Course cards */}
+      <div>
+        <h2 className="text-lg font-bold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
+          <BarChart3 className="w-5 h-5 text-teal-600" />
+          Détail par cours
+        </h2>
+
+        {student.courses.length === 0 ? (
+          <div className="text-center py-16 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+            <BookOpen className="w-10 h-10 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
+            <p className="text-zinc-500 dark:text-zinc-400 text-sm">Cet étudiant n&apos;est inscrit à aucun de vos cours.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {student.courses.map(course => {
+              const statusInfo = STATUS_MAP[course.enrollmentStatus] || STATUS_MAP.INACTIVE;
+              const payInfo = PAY_MAP[course.paymentStatus] || PAY_MAP.none;
+              const lessonsText = course.totalLessons > 0
+                ? `${course.completedLessons} / ${course.totalLessons} leçons`
+                : "Progression suivie";
+
+              return (
+                <div key={course.courseId} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+                  {/* Course header */}
+                  <div className="px-6 pt-5 pb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-teal-50 dark:bg-teal-900/20 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+                        <BookOpen className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-zinc-900 dark:text-white">{course.courseTitle}</h3>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusInfo.cls}`}>
+                            {statusInfo.label}
+                          </span>
+                          <span className="text-xs text-zinc-400 flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            Inscrit le {new Date(course.enrolledAt).toLocaleDateString("fr-FR")}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* CTA: Block/Unblock, Revoke & View progress */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleBlockAccess(course.courseId, course.enrollmentStatus, course.courseTitle)}
+                        disabled={blockingCourseId === course.courseId}
+                        className={`inline-flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                          course.enrollmentStatus === "SUSPENDED"
+                            ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500"
+                            : "bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800"
+                        }`}
+                        title={course.enrollmentStatus === "SUSPENDED" ? "Réactiver l'accès au cours" : "Bloquer l'accès pour tranche d'échéance"}
+                      >
+                        {course.enrollmentStatus === "SUSPENDED" ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                        <span>{blockingCourseId === course.courseId ? "Traitement..." : course.enrollmentStatus === "SUSPENDED" ? "Débloquer l'accès" : "Bloquer l'accès"}</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleRevokeCourse(course.courseId, course.courseTitle)}
+                        disabled={revokingCourseId === course.courseId}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-900/40 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                        title="Révoquer l'étudiant de cette formation"
+                      >
+                        <span>🚫</span>
+                        <span>{revokingCourseId === course.courseId ? "Révocation..." : "Révoquer"}</span>
+                      </button>
+
+                      <Link
+                        href={`/dashboard/courses/${course.courseId}/learn`}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold rounded-xl transition-all shadow-sm shrink-0"
+                      >
+                        <PlayCircle className="w-3.5 h-3.5" />
+                        Voir la progression
+                        <ExternalLink className="w-3 h-3 opacity-70" />
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* Body: Progress + Payment + Certificate */}
+                  <div className="px-6 pb-5 grid grid-cols-1 sm:grid-cols-3 gap-6">
+                    {/* Progress */}
+                    <div className="sm:col-span-1 space-y-3">
+                      <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Progression</p>
+                      <ProgressBar percent={course.progressPercent} />
+                      <p className="text-xs text-zinc-400 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                        {lessonsText}
+                      </p>
+                    </div>
+
+                    {/* Payment & Installments Breakdown */}
+                    <div className="space-y-3">
+                      <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Paiement &amp; Tranches</p>
+                      <div className="space-y-2 text-xs">
+                        <div className="flex items-center justify-between font-medium">
+                          <span className="text-zinc-500">Prix total cours :</span>
+                          <span className="font-bold text-zinc-900 dark:text-white">${course.coursePrice} USD</span>
+                        </div>
+                        <div className="flex items-center justify-between font-medium">
+                          <span className="text-zinc-500">Total versé :</span>
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400">${course.paymentAmount || course.totalPaid || 0} USD</span>
+                        </div>
+                        {(course.remainingAmount || 0) > 0 ? (
+                          <div className="p-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-xl space-y-1">
+                            <div className="flex items-center justify-between font-bold text-amber-700 dark:text-amber-400">
+                              <span>Solde restant :</span>
+                              <span>${course.remainingAmount} USD</span>
+                            </div>
+                            <p className="text-[10px] text-amber-600/80 dark:text-amber-400/80">Règlement en tranches en cours</p>
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400">
+                            <CheckCircle2 className="w-3 h-3" /> Réglé intégralement
+                          </span>
+                        )}
+                        {course.paymentDate && (
+                          <p className="text-[11px] text-zinc-400 flex items-center gap-1.5 pt-1">
+                            <Clock className="w-3 h-3" />
+                            Dernier versement : {new Date(course.paymentDate).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Certificate */}
+                    <div className="space-y-3">
+                      <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Certification</p>
+                      {course.hasCertificate ? (
+                        <div className="flex items-start gap-2.5">
+                          <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center shrink-0">
+                            <Award className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-purple-700 dark:text-purple-400">Certifié !</p>
+                            {course.certificateDate && (
+                              <p className="text-xs text-zinc-400 mt-0.5">
+                                {new Date(course.certificateDate).toLocaleDateString("fr-FR")}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-zinc-400">
+                          <Circle className="w-4 h-4" />
+                          <span className="text-xs">
+                            {course.progressPercent >= 100 ? "Éligible — en attente d'émission" : `${Math.max(0, 100 - course.progressPercent)}% restant`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Hybrid Scoring & Grading details */}
+                  {(() => {
+                    const courseQuizzes = quizzes.filter(q => q.course_id === course.courseId);
+                    const bestQuizScores = courseQuizzes.map(quiz => {
+                      const quizAttemptsForQuiz = attempts.filter(a => a.quiz_id === quiz.id);
+                      return quizAttemptsForQuiz.length > 0 ? Math.max(...quizAttemptsForQuiz.map(a => a.score)) : 0;
+                    });
+                    const quizAverage = courseQuizzes.length > 0 ? Math.round(bestQuizScores.reduce((s, score) => s + score, 0) / courseQuizzes.length) : 0;
+
+                    const courseHomeworks = homeworks.filter(h => h.course_id === course.courseId);
+                    const courseSubmissions = submissions.filter(s => courseHomeworks.some(h => h.id === s.homework_id));
+                    const gradedSubmissions = courseSubmissions.filter(s => s.status === "GRADED");
+                    const homeworkAverage = gradedSubmissions.length > 0 ? Math.round(gradedSubmissions.reduce((s, sub) => s + (sub.grade || 0), 0) / gradedSubmissions.length) : 0;
+
+                    const hybridScore = Math.round((quizAverage * 0.7) + (homeworkAverage * 0.3));
+                    const canUnlock = quizAverage >= 80;
+
+                    return (
+                      <div className="px-6 pb-6 border-t border-zinc-100 dark:border-zinc-800 pt-5 space-y-6">
+                        
+                        {/* Hybrid Score Cards */}
+                        <div>
+                          <h4 className="text-xs font-bold text-zinc-550 dark:text-zinc-450 uppercase tracking-wider mb-3">Notes & Barème Hybride</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="bg-zinc-50 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                              <p className="text-[10px] font-bold text-zinc-500 uppercase">Moyenne QCM (70%)</p>
+                              <p className="text-lg font-black text-amber-500 mt-1">{quizAverage}%</p>
+                              <p className="text-[9px] text-zinc-400 mt-0.5">{courseQuizzes.length} quiz au total</p>
+                            </div>
+                            <div className="bg-zinc-50 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                              <p className="text-[10px] font-bold text-zinc-500 uppercase">Moyenne Devoirs (30%)</p>
+                              <p className="text-lg font-black text-indigo-500 mt-1">{homeworkAverage}%</p>
+                              <p className="text-[9px] text-zinc-400 mt-0.5">{courseSubmissions.length} devoirs rendus sur {courseHomeworks.length}</p>
+                            </div>
+                            <div className="bg-zinc-50 dark:bg-zinc-800/30 p-4 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                              <p className="text-[10px] font-bold text-zinc-500 uppercase">Score Général Hybride</p>
+                              <p className="text-lg font-black text-teal-600 mt-1">{hybridScore}%</p>
+                              <p className="text-[9px] text-zinc-400 mt-0.5">Quiz 70% + Devoirs 30%</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Detailed Quiz Results Breakdown */}
+                        {courseQuizzes.length > 0 && (
+                          <div className="space-y-3">
+                            <h4 className="text-xs font-bold text-zinc-550 dark:text-zinc-450 uppercase tracking-wider">Résultats Détaillés des Quiz (QCM)</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {courseQuizzes.map((quiz) => {
+                                const quizAtts = attempts.filter(a => a.quiz_id === quiz.id);
+                                const hasPassed = quizAtts.some(a => a.passed);
+                                const bestScore = quizAtts.length > 0 ? Math.max(...quizAtts.map(a => a.score)) : 0;
+
+                                return (
+                                  <div key={quiz.id} className="p-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl flex items-center justify-between">
+                                    <div>
+                                      <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{quiz.title}</p>
+                                      <p className="text-[10px] text-zinc-400 mt-0.5">
+                                        {quizAtts.length} tentative{quizAtts.length > 1 ? "s" : ""} · Seuil: {quiz.pass_percentage || 80}%
+                                      </p>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className={`text-sm font-black ${hasPassed ? "text-green-600" : quizAtts.length > 0 ? "text-amber-500" : "text-zinc-400"}`}>
+                                        {quizAtts.length > 0 ? `${bestScore}%` : "Non fait"}
+                                      </span>
+                                      {hasPassed && (
+                                        <p className="text-[9px] font-bold text-green-500 uppercase">Validé ✓</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Manual release button */}
+                        <div className="bg-zinc-50 dark:bg-zinc-800/20 p-4 rounded-2xl border border-zinc-150 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <div className="space-y-1 flex-1">
+                            <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Déblocage manuel du Certificat</p>
+                            <p className="text-[10px] text-zinc-500 max-w-lg">
+                              Le certificat final est débloqué manuellement par l&apos;instructeur. L&apos;élève doit valider le cumul des quiz à hauteur de 80% minimum pour activer le bouton.
+                            </p>
+                          </div>
+                          {course.hasCertificate ? (
+                            <div className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250 dark:border-emerald-900/30 px-3 py-2 rounded-xl">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                              Certificat émis
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleUnlockCertificate(course.courseId)}
+                              disabled={!canUnlock || unlockingCertCourseId === course.courseId}
+                              className={`shrink-0 px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                                canUnlock
+                                  ? "bg-purple-600 hover:bg-purple-750 text-white shadow-md shadow-purple-500/10"
+                                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed border border-zinc-205 dark:border-zinc-705"
+                              }`}
+                            >
+                              {unlockingCertCourseId === course.courseId ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Award className="w-3.5 h-3.5" />
+                              )}
+                              Débloquer le certificat
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Homework Submissions Section */}
+                        <div className="space-y-3">
+                          <h4 className="text-xs font-bold text-zinc-550 dark:text-zinc-450 uppercase tracking-wider">Devoirs et Travaux Remis</h4>
+                          {courseHomeworks.length === 0 ? (
+                            <p className="text-xs text-zinc-500 italic">Aucun devoir configuré pour cette formation.</p>
+                          ) : (
+                            <div className="space-y-3.5">
+                              {courseHomeworks.map((hw) => {
+                                const sub = courseSubmissions.find(s => s.homework_id === hw.id);
+                                const isGradingThis = gradingSubId === sub?.id;
+
+                                return (
+                                  <div key={hw.id} className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-3">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-zinc-50 dark:border-zinc-800/40 pb-2">
+                                      <div>
+                                        <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{hw.title}</p>
+                                        <p className="text-[10px] text-zinc-500 whitespace-pre-wrap">{hw.description}</p>
+                                      </div>
+                                      <div className="shrink-0">
+                                        {sub ? (
+                                          <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${sub.status === "GRADED" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400" : "bg-blue-100 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400"}`}>
+                                            {sub.status === "GRADED" ? `Noté : ${sub.grade}/100` : "À corriger"}
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-400 dark:bg-zinc-800">Non soumis</span>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {sub && (
+                                      <div className="space-y-3">
+                                        {/* Submission link */}
+                                        <div className="flex items-center justify-between p-2 bg-zinc-50 dark:bg-zinc-800/40 rounded-lg text-xs">
+                                          <span className="text-zinc-500 font-mono text-[10px] truncate max-w-[200px] sm:max-w-md">Soumission : {sub.file_url.slice(0, 50)}...</span>
+                                          <a
+                                            href={sub.file_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded text-[10px] font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1"
+                                          >
+                                            <ExternalLink className="w-3 h-3" /> Télécharger / Voir
+                                          </a>
+                                        </div>
+
+                                        {/* Grade form or details */}
+                                        {isGradingThis ? (
+                                          <div className="p-3 bg-zinc-50 dark:bg-zinc-800/35 border border-zinc-150 dark:border-zinc-800 rounded-lg space-y-3">
+                                            {aiEvaluationMap[sub.id] && (
+                                              <div className="p-3.5 bg-gradient-to-r from-blue-900/30 to-indigo-900/30 border border-blue-500/30 rounded-xl space-y-2 text-xs">
+                                                <div className="flex items-center justify-between">
+                                                  <span className="font-bold text-blue-300 flex items-center gap-1.5">
+                                                    ✨ Évaluation par Copilot IA (Plan BASE)
+                                                  </span>
+                                                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300">
+                                                    Note Suggérée : {aiEvaluationMap[sub.id].suggestedGrade} / 100
+                                                  </span>
+                                                </div>
+                                                <p className="text-zinc-300 text-[11px] leading-relaxed">
+                                                  {aiEvaluationMap[sub.id].summaryFeedback}
+                                                </p>
+                                                {aiEvaluationMap[sub.id].rubricBreakdown && (
+                                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-blue-500/20">
+                                                    {aiEvaluationMap[sub.id].rubricBreakdown.map((r: any, idx: number) => (
+                                                      <div key={idx} className="p-2 bg-blue-950/40 rounded-lg text-[10px]">
+                                                        <p className="font-bold text-blue-200">{r.criterion}</p>
+                                                        <p className="text-blue-400 font-extrabold">{r.score}/100</p>
+                                                        <p className="text-zinc-400 text-[9px] mt-0.5">{r.comment}</p>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )}
+
+                                            <div className="flex flex-col sm:flex-row gap-3">
+                                              <div className="flex-1 space-y-1">
+                                                <label className="text-[10px] font-bold text-zinc-500">Note (0 - 100)</label>
+                                                <input
+                                                  type="number"
+                                                  value={editGrade}
+                                                  onChange={(e) => setEditGrade(e.target.value)}
+                                                  placeholder="Ex: 85"
+                                                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-white"
+                                                  min="0"
+                                                  max="100"
+                                                />
+                                              </div>
+                                              <div className="flex-[3] space-y-1">
+                                                <label className="text-[10px] font-bold text-zinc-500">Commentaire / Feedback</label>
+                                                <input
+                                                  type="text"
+                                                  value={editFeedback}
+                                                  onChange={(e) => setEditFeedback(e.target.value)}
+                                                  placeholder="Ex: Bon travail, les concepts sont bien assimilés."
+                                                  className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-white"
+                                                />
+                                              </div>
+                                            </div>
+                                            <div className="flex justify-end gap-2">
+                                              <button
+                                                onClick={() => setGradingSubId(null)}
+                                                className="px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-[10px] font-bold hover:bg-zinc-50 transition-colors"
+                                              >
+                                                Annuler
+                                              </button>
+                                              <button
+                                                onClick={() => handleGradeSubmit(sub.id)}
+                                                disabled={savingGrade === sub.id}
+                                                className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-[10px] font-bold transition-colors"
+                                              >
+                                                {savingGrade === sub.id ? "Enregistrement..." : "Enregistrer la note"}
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-zinc-50/50 dark:bg-zinc-800/10 rounded-lg">
+                                            <div>
+                                              {sub.status === "GRADED" ? (
+                                                <div className="space-y-1">
+                                                  <p className="text-xs text-zinc-700 dark:text-zinc-300">
+                                                    Note : <span className="font-bold text-emerald-600">{sub.grade} / 100</span>
+                                                  </p>
+                                                  {sub.feedback && (
+                                                    <p className="text-[11px] text-zinc-500 italic">"{sub.feedback}"</p>
+                                                  )}
+                                                </div>
+                                              ) : (
+                                                <p className="text-xs text-zinc-500 italic">Pas encore de note attribuée.</p>
+                                              )}
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                              <button
+                                                onClick={() => handleAIGrade(sub.id)}
+                                                disabled={aiGradingSubId === sub.id}
+                                                className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white border border-blue-400/30 rounded-lg text-[10px] font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                                              >
+                                                {aiGradingSubId === sub.id ? (
+                                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                                ) : (
+                                                  <span>✨ Auto-Correction IA</span>
+                                                )}
+                                              </button>
+
+                                              <button
+                                                onClick={() => {
+                                                  setGradingSubId(sub.id);
+                                                  setEditGrade(sub.grade?.toString() || "");
+                                                  setEditFeedback(sub.feedback || "");
+                                                }}
+                                                className="px-3 py-1.5 bg-white dark:bg-zinc-800 border rounded-lg text-[10px] font-bold hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                                              >
+                                                {sub.status === "GRADED" ? "Modifier la note" : "Évaluer"}
+                                              </button>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
+                    );
+                  })()}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Plan Upgrade Gating Modal */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto text-xl font-bold">
+              ✨
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+                Copilot IA d'Évaluation & Auto-Grader
+              </h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 leading-relaxed">
+                La correction automatique et l'évaluation personnalisée des devoirs par l'IA sont réservées aux abonnés du <strong>Plan BASE (19$/mois)</strong> ou supérieur.
+              </p>
+            </div>
+            <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 rounded-2xl text-left space-y-2">
+              <p className="text-xs font-bold text-amber-800 dark:text-amber-300">Ce que comprend le Plan BASE :</p>
+              <ul className="text-xs text-amber-700 dark:text-amber-400 space-y-1">
+                <li className="flex items-center gap-1.5">✓ Note et grille d'évaluation IA instantanées</li>
+                <li className="flex items-center gap-1.5">✓ Feedbacks pédagogiques personnalisés pour les élèves</li>
+                <li className="flex items-center gap-1.5">✓ Validation des notes en 1 seul clic</li>
+              </ul>
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                onClick={() => setShowUpgradeModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                Plus tard
+              </button>
+              <Link
+                href="/instructor/billing"
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-teal-500 text-white text-xs font-bold shadow-lg shadow-blue-500/20 hover:scale-[1.02] transition-transform text-center"
+              >
+                Passer au Plan BASE (19$)
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

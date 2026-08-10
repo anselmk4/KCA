@@ -1,0 +1,445 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
+import { Lock, Users, Tag, User, ChevronLeft, Loader2, Sparkles } from "lucide-react";
+import { supabase } from "@/lib/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
+
+// ─── Local Types ──────────────────────────────────────────
+interface Course {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  benefits?: string | null;
+  price: number;
+  status: string;
+  instructorId: string;
+  instructorName: string;
+  category: string;
+  level: string;
+  allowInstallments: boolean;
+  installmentsCount: number;
+  thumbnailUrl?: string | null;
+}
+
+export default function CoursePreviewPage() {
+  const { t } = useLanguage();
+  const params = useParams();
+  const router = useRouter();
+  const courseId = params.courseId as string;
+
+  const [course, setCourse] = useState<Course | null>(null);
+  const [sectionsCount, setSectionsCount] = useState(0);
+  const [lessonsCount, setLessonsCount] = useState(0);
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [enrolledCount, setEnrolledCount] = useState(0);
+  const [onlineCount, setOnlineCount] = useState(0);
+  const [adminCount, setAdminCount] = useState(1);
+  const [loading, setLoading] = useState(true);
+
+  const fetchLivePresence = useCallback(async () => {
+    try {
+      // 1. Send presence heartbeat to register user on this course at instant T
+      await fetch(`/api/courses/${courseId}/presence`, { method: "POST" });
+
+      // 2. Fetch exact DB metrics
+      const res = await fetch(`/api/courses/${courseId}/presence`);
+      if (res.ok) {
+        const stats = await res.json();
+        if (typeof stats.enrolledCount === "number") setEnrolledCount(stats.enrolledCount);
+        if (typeof stats.onlineCount === "number") setOnlineCount(stats.onlineCount);
+        if (typeof stats.adminCount === "number") setAdminCount(stats.adminCount);
+      }
+    } catch (err) {
+      console.warn("[presence] Error fetching live metrics:", err);
+    }
+  }, [courseId]);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      // 1. Charger le cours par ID ou par Slug
+      const { data: rawCourseData, error: courseError } = await supabase
+        .from("courses")
+        .select("*")
+        .or(`id.eq.${courseId},slug.eq.${courseId}`)
+        .maybeSingle();
+
+      if (courseError || !rawCourseData) {
+        console.error("Error loading course:", courseError);
+        setLoading(false);
+        return;
+      }
+
+      const courseData = rawCourseData as any;
+      const realCourseId = courseData.id;
+
+      // 2. Charger le nom du formateur
+      const { data: instructorProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", courseData.instructor_id)
+        .maybeSingle();
+
+      // 3. Charger la catégorie
+      let categoryName = "Général";
+      if (courseData.category_id) {
+        const { data: catData } = await supabase
+          .from("categories")
+          .select("name")
+          .eq("id", courseData.category_id)
+          .maybeSingle();
+        if (catData) categoryName = catData.name;
+      }
+
+      // 4. Charger les sections
+      const { data: sectionsData } = await supabase
+        .from("course_sections")
+        .select("id")
+        .eq("course_id", realCourseId);
+
+      const sCount = sectionsData ? sectionsData.length : 0;
+      setSectionsCount(sCount);
+
+      // 5. Charger les leçons
+      let lCount = 0;
+      if (sectionsData && sectionsData.length > 0) {
+        const sectionIds = sectionsData.map((s) => s.id);
+        const { data: lessonsData } = await supabase
+          .from("lessons")
+          .select("id")
+          .in("section_id", sectionIds);
+        lCount = lessonsData ? lessonsData.length : 0;
+      }
+      setLessonsCount(lCount);
+
+      // 6. Vérifier la session & inscription avec l'UUID réel
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      let enrolled = false;
+      if (user) {
+        const { data: enrollment } = await supabase
+          .from("enrollments")
+          .select("id")
+          .eq("student_id", user.id)
+          .eq("course_id", realCourseId)
+          .eq("status", "ACTIVE")
+          .maybeSingle();
+
+        const { data: completedEnrollment } = !enrollment
+          ? await supabase
+              .from("enrollments")
+              .select("id")
+              .eq("student_id", user.id)
+              .eq("course_id", realCourseId)
+              .eq("status", "COMPLETED")
+              .maybeSingle()
+          : { data: null };
+
+        enrolled = !!(enrollment || completedEnrollment);
+        setIsEnrolled(enrolled);
+      }
+
+      // 7. Compte des inscrits exacts depuis la base de données avec l'UUID réel
+      const { count: enrolledCountData } = await supabase
+        .from("enrollments")
+        .select("id", { count: "exact", head: true })
+        .eq("course_id", realCourseId)
+        .in("status", ["ACTIVE", "COMPLETED"]);
+
+      setEnrolledCount(enrolledCountData || 0);
+
+      // Mapper le niveau
+      let levelLabel = t("student.dashboard.welcome", "Débutant").includes("Ravi") ? "Débutant" : "Beginner";
+      if (courseData.level === "INTERMEDIATE") levelLabel = t("student.dashboard.welcome", "Intermédiaire").includes("Ravi") ? "Intermédiaire" : "Intermediate";
+      else if (courseData.level === "ADVANCED") levelLabel = t("student.dashboard.welcome", "Avancé").includes("Ravi") ? "Avancé" : "Advanced";
+      else if (courseData.level === "EXPERT") levelLabel = "Expert";
+
+      setCourse({
+        id: courseData.id,
+        title: courseData.title,
+        slug: courseData.slug || "",
+        description: courseData.description || "",
+        benefits: courseData.benefits || null,
+        price: courseData.price || 0,
+        status: courseData.status || "DRAFT",
+        instructorId: courseData.instructor_id,
+        instructorName: instructorProfile?.full_name || "Instructeur",
+        category: categoryName,
+        level: levelLabel,
+        allowInstallments: courseData.allow_installments || false,
+        installmentsCount: courseData.installments_count || 2,
+        thumbnailUrl: courseData.thumbnail_url || null,
+      });
+
+    } catch (err) {
+      console.error("Unexpected load error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [courseId, t]);
+
+  useEffect(() => {
+    loadData();
+    fetchLivePresence();
+
+    // Pulse heartbeat every 25 seconds for real-time presence at instant T
+    const presenceInterval = setInterval(() => {
+      fetchLivePresence();
+    }, 25000);
+
+    return () => clearInterval(presenceInterval);
+  }, [loadData, fetchLivePresence]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-10 h-10 text-teal-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!course) {
+    return (
+      <div className="text-center py-20 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
+        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">{t("student.discover.noCourses", "Cours non trouvé")}</h2>
+        <p className="text-zinc-500 dark:text-zinc-400 mb-6">{t("student.discover.noCourses", "Le cours que vous cherchez n'existe pas ou a été retiré.")}</p>
+        <Link href="/dashboard/discover" className="px-5 py-2.5 bg-teal-600 text-white font-semibold rounded-xl">
+          {t("student.courses.browseCatalog", "Retour au catalogue")}
+        </Link>
+      </div>
+    );
+  }
+
+  // Cover image fallback
+  let courseImg = course.thumbnailUrl || `/images/courses/web3.png`;
+  if (!course.thumbnailUrl) {
+    if (course.id === "blockchain") courseImg = `/images/courses/blockchain-dev.png`;
+    else if (course.id === "trading") courseImg = `/images/courses/trading.png`;
+    else if (course.id === "ai") courseImg = `/images/courses/ai.png`;
+    else if (course.id === "web3") courseImg = `/images/courses/web3.png`;
+    else if (course.id === "blockchain-consulting") courseImg = `/images/courses/blockchain-consulting.png`;
+    else if (course.id === "blockchain-dev") courseImg = `/images/courses/blockchain-dev.png`;
+    else if (course.id === "defi") courseImg = `/images/courses/defi.png`;
+  }
+
+  const handleActionClick = () => {
+    if (isEnrolled) {
+      router.push(`/dashboard/courses/${course.id}/learn`);
+    } else {
+      router.push(`/dashboard/payment/${course.id}`);
+    }
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500">
+      {/* Back button */}
+      <Link href="/dashboard/discover" className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-white text-sm font-semibold transition-colors">
+        <ChevronLeft className="w-4 h-4" />
+        {t("student.courses.browseCatalog", "Retour au catalogue").includes("catalogue") ? "Retour" : "Back"}
+      </Link>
+
+      {/* Title */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-extrabold text-zinc-900 dark:text-white tracking-tight">{course.title}</h1>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Main Content Area (Left) */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Cover image banner container */}
+          <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-900 shadow-lg">
+            <Image
+              src={courseImg}
+              alt={course.title}
+              fill
+              className="object-cover"
+              priority
+            />
+          </div>
+
+          {/* Mini thumbnails */}
+          <div className="flex gap-3">
+            <div className="relative w-20 h-12 rounded-lg overflow-hidden border border-zinc-300 dark:border-zinc-700 bg-zinc-100 cursor-pointer hover:border-teal-500 transition-colors">
+              <Image src={courseImg} alt="attachment" fill className="object-cover" />
+            </div>
+            <div className="relative w-20 h-12 rounded-lg overflow-hidden border border-zinc-300 dark:border-zinc-700 bg-zinc-100 cursor-pointer hover:border-teal-500 transition-colors opacity-60">
+              <Image src={courseImg} alt="attachment" fill className="object-cover grayscale" />
+            </div>
+          </div>
+
+          {/* Metadata icons bar */}
+          <div className="flex flex-wrap items-center gap-6 py-4 border-y border-zinc-200 dark:border-zinc-800 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+            <div className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-zinc-400" />
+              <span>{t("student.payment.installmentSubtitle", "Privé").includes("mensua") ? "Private" : "Privé"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-zinc-400" />
+              <span>{enrolledCount} {enrolledCount > 1 ? (t("student.courses.availableSubtitle", "Visitez").includes("Visitez") ? "membres" : "members") : (t("student.courses.availableSubtitle", "Visitez").includes("Visitez") ? "membre" : "member")}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Tag className="w-5 h-5 text-zinc-400" />
+              <span>${course.price}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <User className="w-5 h-5 text-zinc-400" />
+              <span>{t("instructor.settings.title", "Par").toLowerCase().includes("par") ? "Par " : "By "}{course.instructorName || "Prof. Kuettu"}</span>
+            </div>
+          </div>
+
+          {/* Detailed Course Description Section */}
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-8 shadow-sm space-y-6">
+            <div>
+              <h2 className="text-xl font-extrabold text-zinc-900 dark:text-white uppercase tracking-wider mb-4">
+                {t("student.dashboard.welcome", "BIENVENUE DANS L'ACADÉMIE :").includes("Ravi") ? `BIENVENUE DANS L'ACADÉMIE : ${course.title.toUpperCase()}` : `WELCOME TO THE ACADEMY: ${course.title.toUpperCase()}`}
+              </h2>
+              <div className="prose dark:prose-invert max-w-none text-zinc-650 dark:text-zinc-400 leading-relaxed space-y-4">
+                <p className="font-semibold text-zinc-800 dark:text-zinc-200">
+                  {t("student.dashboard.welcome", "Rejoignez-nous").includes("Ravi") ? "Rejoignez-nous de l'autre côté. Ne vous contentez pas de regarder, apprenez activement !" : "Join us on the other side. Don't just watch, learn actively!"}
+                </p>
+                <p>
+                  {t("student.dashboard.welcome", "Ce parcours").includes("Ravi") ? "Ce parcours d'apprentissage intensif est conçu pour vous emmener de zéro aux compétences professionnelles exigées par les entreprises. Que vous soyez débutant ou intermédiaire, nos modules progressifs s'adapteront à votre rythme." : "This intensive learning path is designed to take you from zero to professional skills demanded by employers. Whether you are a beginner or intermediate, our progressive modules will adapt to your pace."}
+                </p>
+                <p>
+                  <strong>{t("student.dashboard.welcome", "Ce que vous").includes("Ravi") ? "Ce que vous allez obtenir dans ce cours :" : "What you will get in this course:"}</strong>
+                </p>
+                <ul className="list-disc pl-5 space-y-2">
+                  <li>{t("student.dashboard.welcome", "Accès à vie").includes("Ravi") ? `Accès à vie à ${lessonsCount} leçons vidéos détaillées divisées en ${sectionsCount} chapitres structurés.` : `Lifetime access to ${lessonsCount} detailed video lessons split into ${sectionsCount} structured chapters.`}</li>
+                  <li>{t("student.dashboard.welcome", "Exercices").includes("Ravi") ? "Exercices pratiques et quiz d'évaluation après chaque chapitre." : "Hands-on exercises and evaluation quizzes after each chapter."}</li>
+                  <li>{t("student.dashboard.welcome", "Un certificat").includes("Ravi") ? "Un certificat de réussite officiel d'ANSELLA vérifiable en ligne." : "An official ANSELLA certificate of completion verifiable online."}</li>
+                  <li>{t("student.dashboard.welcome", "Accès à notre").includes("Ravi") ? "Accès à notre communauté privée d'apprenants pour collaborer et poser vos questions." : "Access to our private learner community to collaborate and ask questions."}</li>
+                </ul>
+                {course.description && (
+                  <div className="mt-6 pt-6 border-t border-zinc-150 dark:border-zinc-800">
+                    <p className="font-bold text-zinc-850 dark:text-zinc-155 mb-2">{t("student.dashboard.welcome", "Description").includes("Ravi") ? "Description de la formation :" : "Course description:"}</p>
+                    <div 
+                      className="prose dark:prose-invert max-w-none text-zinc-650 dark:text-zinc-400 space-y-4"
+                      dangerouslySetInnerHTML={{ __html: course.description }}
+                    />
+                  </div>
+                )}
+                {course.benefits && (
+                  <div className="mt-6 pt-6 border-t border-zinc-150 dark:border-zinc-800">
+                    <p className="font-bold text-zinc-850 dark:text-zinc-155 mb-2">{t("student.dashboard.welcome", "Bénéfices").includes("Ravi") ? "Bénéfices du cours / Ce que vous allez apprendre :" : "Course benefits / What you will learn:"}</p>
+                    <div 
+                      className="prose dark:prose-invert max-w-none text-zinc-650 dark:text-zinc-400 space-y-4"
+                      dangerouslySetInnerHTML={{ __html: course.benefits }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar Panel (Right) */}
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-md p-6 space-y-6 sticky top-24">
+            
+            {/* Logo Card Top Header */}
+            <div className="flex flex-col items-center text-center">
+              <div className="relative w-24 h-24 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 shadow-sm mb-4">
+                <Image src={courseImg} alt="Thumbnail" fill className="object-cover" />
+              </div>
+              <h3 className="font-extrabold text-lg text-zinc-900 dark:text-white leading-tight">{course.title}</h3>
+              <Link 
+                href={`/courses/${course.slug || course.id}`}
+                target="_blank"
+                className="text-xs text-zinc-400 mt-1 font-medium hover:underline cursor-pointer"
+              >
+                ansella.app/{course.slug || course.id}
+              </Link>
+              <p className="text-sm text-zinc-550 dark:text-zinc-400 mt-3 font-semibold px-2">
+                {t("student.dashboard.welcome", "Parcours").includes("Ravi") ? `Parcours certifiant et pratique de ${course.category}` : `Practical and certifying path of ${course.category}`}
+              </p>
+            </div>
+
+            {/* Statistics row */}
+            <div className="grid grid-cols-3 border-y border-zinc-100 dark:border-zinc-800 py-4 text-center">
+              <div>
+                <p className="text-xl font-extrabold text-zinc-900 dark:text-white">{enrolledCount}</p>
+                <p className="text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5 font-bold">
+                  {t("student.dashboard.welcome", "Membres").includes("Ravi") ? "Membres" : "Members"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xl font-extrabold text-teal-600 flex items-center justify-center gap-1">
+                  {onlineCount > 0 && <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>}
+                  {onlineCount}
+                </p>
+                <p className="text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5 font-bold">
+                  {t("student.dashboard.welcome", "En Ligne").includes("Ravi") ? "En Ligne" : "Online"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xl font-extrabold text-blue-500">{adminCount}</p>
+                <p className="text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5 font-bold">Admin</p>
+              </div>
+            </div>
+
+            {/* High-visibility Vibrant Red Installment Payment Banner */}
+            {course.allowInstallments && !isEnrolled && (
+              <div className="p-4 bg-gradient-to-r from-red-600 via-rose-600 to-red-700 border-2 border-red-500 rounded-2xl text-center text-white shadow-xl shadow-red-600/30">
+                <div className="flex items-center justify-center gap-2 font-black text-sm uppercase tracking-wider text-white">
+                  <Sparkles className="w-4 h-4 text-amber-300 fill-amber-300 shrink-0" />
+                  <span>
+                    {t("student.payment.installmentSubtitle", "Option multi-tranches disponible").includes("mensua")
+                      ? "🔥 Installment Plan Available"
+                      : "🔥 Option Multi-Tranches Disponible"}
+                  </span>
+                </div>
+                <p className="text-xs font-black text-white mt-1.5 leading-snug drop-shadow-sm">
+                  {t("student.payment.installmentSubtitle", "Payez").includes("mensua")
+                    ? `Pay in ${course.installmentsCount} installments: ONLY $${Math.round(course.price / (course.installmentsCount || 1))} per installment!`
+                    : `Payez en ${course.installmentsCount} fois : seulement ${Math.round(course.price / (course.installmentsCount || 1))}$ par tranche !`}
+                </p>
+              </div>
+            )}
+
+            {/* CTA button */}
+            <button
+              onClick={handleActionClick}
+              className={`w-full py-4 text-center font-extrabold rounded-xl transition-all duration-300 transform active:scale-[0.98] shadow-lg cursor-pointer ${
+                isEnrolled
+                  ? "bg-teal-600 hover:bg-teal-700 text-white shadow-teal-500/20"
+                  : "bg-yellow-400 hover:bg-yellow-505 text-zinc-900 shadow-yellow-500/20"
+              }`}
+            >
+              {isEnrolled
+                ? (t("student.dashboard.welcome", "ACCÉDER").includes("Ravi") ? "✓ ACCÉDER À LA FORMATION" : "✓ ACCESS COURSE")
+                : (course.price > 0 ? `Procéder au paiement de $${course.price}` : "Procéder à l'inscription gratuite")}
+            </button>
+
+            {/* Additional details */}
+            <div className="space-y-3 text-xs text-zinc-500 dark:text-zinc-400 pt-2">
+              <div className="flex justify-between">
+                <span>{t("student.dashboard.welcome", "Catégorie").includes("Ravi") ? "Catégorie :" : "Category:"}</span>
+                <span className="font-semibold text-zinc-700 dark:text-zinc-300">{course.category}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>{t("student.dashboard.welcome", "Niveau").includes("Ravi") ? "Niveau requis :" : "Required Level:"}</span>
+                <span className="font-semibold text-zinc-700 dark:text-zinc-300">{course.level || "Tous"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>{t("student.dashboard.welcome", "Chapitres").includes("Ravi") ? "Chapitres :" : "Chapters:"}</span>
+                <span className="font-semibold text-zinc-700 dark:text-zinc-300">{sectionsCount}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>{t("student.dashboard.welcome", "Leçons").includes("Ravi") ? "Leçons :" : "Lessons:"}</span>
+                <span className="font-semibold text-zinc-700 dark:text-zinc-300">{lessonsCount}</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,1117 @@
+"use client";
+
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { 
+  ArrowLeft, 
+  CreditCard, 
+  CheckCircle2, 
+  ShieldCheck, 
+  Coins, 
+  Phone, 
+  DollarSign, 
+  Loader2,
+  Sparkles,
+  Bitcoin
+} from "lucide-react";
+import Link from "next/link";
+import Script from "next/script";
+import { supabase } from "@/lib/supabase/client";
+import { getPawaPayConfigForCountry } from "@/lib/pawapay";
+import { OperatorLogo } from "@/components/icons/PaymentLogos";
+import { SOLANA_TREASURY_ADDRESS, getSolanaPayUri, getSolanaQrCodeUrl, getBackupQrCodeUrl, connectSolanaWallet } from "@/lib/crypto";
+import { SolanaQrCode } from "@/components/ui/SolanaQrCode";
+import { fetchBtcPriceInUsd, convertUsdToBtc } from "@/lib/bitcoin";
+import { BitcoinQrCode } from "@/components/ui/BitcoinQrCode";
+
+declare global {
+  interface Window {
+    paypal?: any;
+  }
+}
+
+type PaymentMethod = "mastercard" | "paypal" | "crypto" | "crypto_btc" | "mobile_money";
+
+function PaymentContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [plan, setPlan] = useState<"BASE" | "PRO" | "MAX">("PRO");
+  const [userId, setUserId] = useState<string | null>(null);
+  const [method, setMethod] = useState<PaymentMethod>("mobile_money");
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  // BTC State
+  const [btcTxHash, setBtcTxHash] = useState("");
+  const [btcPriceUsd, setBtcPriceUsd] = useState(65000);
+  const [verifyingBtc, setVerifyingBtc] = useState(false);
+
+  useEffect(() => {
+    fetchBtcPriceInUsd().then(price => {
+      if (price && price > 0) setBtcPriceUsd(price);
+    });
+  }, []);
+  const [showPendingState, setShowPendingState] = useState(false);
+  const [paymentId, setPaymentId] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [simulating, setSimulating] = useState(false);
+  const [paypalLoaded, setPaypalLoaded] = useState(false);
+  const [paypalError, setPaypalError] = useState<string | null>(null);
+  const [isSandboxMode, setIsSandboxMode] = useState(false);
+
+  // Form Fields
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardName, setCardName] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCvc, setCardCvc] = useState("");
+
+  const [userCountry, setUserCountry] = useState("CD");
+  const [phone, setPhone] = useState("");
+  const [carrier, setCarrier] = useState("VODACOM_MPESA_COD");
+  const [momoCurrency, setMomoCurrency] = useState<"USD" | "CDF">("USD");
+
+  const countryConfig = getPawaPayConfigForCountry(userCountry) || getPawaPayConfigForCountry("CD")!;
+
+  useEffect(() => {
+    if (countryConfig?.operators?.length > 0) {
+      const isValid = countryConfig.operators.some(op => op.id === carrier);
+      if (!isValid) {
+        setCarrier(countryConfig.operators[0].id);
+      }
+    }
+  }, [userCountry, countryConfig]);
+
+  const [cryptoCoin, setCryptoCoin] = useState("usdc");
+  const [cryptoTxId, setCryptoTxId] = useState("");
+  const [cryptoVerifying, setCryptoVerifying] = useState(false);
+  const [cryptoError, setCryptoError] = useState<string | null>(null);
+  const [cryptoSuccess, setCryptoSuccess] = useState<string | null>(null);
+  const [connectedWallet, setConnectedWallet] = useState<string | null>(null);
+  const [copiedAddress, setCopiedAddress] = useState(false);
+  const [cryptoQrType, setCryptoQrType] = useState<"solanapay" | "address">("solanapay");
+
+  const handleVerifyCryptoPayment = async (overrideTxId?: string) => {
+    const txToVerify = (overrideTxId || cryptoTxId).trim();
+    if (!txToVerify) {
+      setCryptoError("Veuillez saisir ou coller la signature de transaction Solana (TxID).");
+      return;
+    }
+
+    setCryptoVerifying(true);
+    setCryptoError(null);
+    setCryptoSuccess(null);
+
+    try {
+      const res = await fetch("/api/payments/crypto-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          txId: txToVerify,
+          type: "INSTRUCTOR_PLAN",
+          plan: plan,
+          amount: currentPlanDetails.price
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur de vérification");
+
+      setCryptoSuccess(data.message || `Abonnement au Plan ${plan} activé avec succès !`);
+      setSuccess(true);
+      router.refresh();
+      setTimeout(() => {
+        router.push("/instructor/dashboard");
+      }, 2500);
+    } catch (err: any) {
+      setCryptoError(err.message || "Erreur lors de la vérification de la transaction.");
+    } finally {
+      setCryptoVerifying(false);
+    }
+  };
+
+  const handleConnectAndPaySolana = async () => {
+    try {
+      setCryptoError(null);
+      const pubKey = await connectSolanaWallet();
+      setConnectedWallet(pubKey);
+
+      const generatedTx = `SOL-PLAN-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
+      setCryptoTxId(generatedTx);
+      await handleVerifyCryptoPayment(generatedTx);
+    } catch (err: any) {
+      setCryptoError(err.message || "Impossible de se connecter au portefeuille Solana.");
+    }
+  };
+
+  useEffect(() => {
+    const queryPlan = searchParams.get("plan")?.toUpperCase();
+    if (queryPlan === "MAX") {
+      setPlan("MAX");
+    } else if (queryPlan === "BASE") {
+      setPlan("BASE");
+    } else {
+      setPlan("PRO");
+    }
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (user) {
+        setUserId(user.id);
+        
+        // Fetch profile to get country, phone & payment preferences
+        const { data: profile } = await (supabase
+          .from("profiles")
+          .select("country, phone_number, nationality, phone, payment_methods, preferred_payment_method") as any)
+          .eq("id", user.id)
+          .maybeSingle();
+
+        const resolvedCountry = profile?.nationality || profile?.country;
+        const resolvedPhone = profile?.phone || profile?.phone_number;
+
+        // Check if user has a preferred payment method
+        const preferredId = profile?.preferred_payment_method;
+        const methods = profile?.payment_methods;
+        let preferredApplied = false;
+
+        if (preferredId && Array.isArray(methods)) {
+          const preferred = methods.find((m: any) => m.id === preferredId);
+          if (preferred) {
+            if (preferred.type === "mobile_money") {
+              setMethod("mobile_money");
+              if (preferred.phone) setPhone(preferred.phone);
+              if (preferred.country) setUserCountry(preferred.country);
+              
+              const cleanLabel = (preferred.label || "").toLowerCase();
+              const targetCountry = preferred.country || resolvedCountry || "CD";
+              const targetConfig = getPawaPayConfigForCountry(targetCountry);
+              if (targetConfig) {
+                const matchedOp = targetConfig.operators.find(op => 
+                  cleanLabel.includes(op.name.toLowerCase()) || 
+                  op.name.toLowerCase().includes(cleanLabel)
+                );
+                if (matchedOp) {
+                  setCarrier(matchedOp.id);
+                } else if (targetConfig.operators.length > 0) {
+                  setCarrier(targetConfig.operators[0].id);
+                }
+              }
+            } else if (preferred.type === "paypal") {
+              setMethod("paypal");
+            }
+            preferredApplied = true;
+          }
+        }
+
+        if (!preferredApplied) {
+          if (resolvedCountry) {
+            setUserCountry(resolvedCountry);
+          }
+          if (resolvedPhone) {
+            setPhone(resolvedPhone);
+          }
+        }
+      }
+    });
+  }, [searchParams]);
+
+  const cycleParam = searchParams.get("cycle")?.toUpperCase();
+  const isAnnual = cycleParam === "ANNUAL";
+
+  const rawPrices = {
+    BASE: 19,
+    PRO: 49,
+    MAX: 200
+  };
+
+  const baseMonthlyPrice = rawPrices[plan] || 49;
+  const annualTotalBeforeDiscount = baseMonthlyPrice * 12;
+  const discountAmount = isAnnual ? Math.round(annualTotalBeforeDiscount * 0.10 * 100) / 100 : 0;
+  const finalPrice = isAnnual ? Math.round((annualTotalBeforeDiscount - discountAmount) * 100) / 100 : baseMonthlyPrice;
+
+  const currentPlanDetails = {
+    name: plan === "BASE" ? "Plan Base" : (plan === "MAX" ? "Plan Max" : "Plan Pro"),
+    price: finalPrice,
+    basePrice: baseMonthlyPrice,
+    isAnnual,
+    annualTotalBeforeDiscount,
+    discountAmount,
+    desc: plan === "BASE" 
+      ? "Jusqu'à 3 cours actifs et 50 apprenants. Commission 10%." 
+      : (plan === "MAX" ? "Cours et apprenants illimités, 0% commission." : "Jusqu'à 10 cours actifs et 200 apprenants. Commission 2%.")
+  };
+
+  // Dynamic Fee Surcharge: +2.5% for Mobile Money (pawaPay), +3% for PayPal / Card, 0% for Crypto
+  const feeRate = method === "mobile_money" ? 0.025 : (method === "paypal" || method === "mastercard") ? 0.03 : 0;
+  const feeSurchargeAmount = Number((currentPlanDetails.price * feeRate).toFixed(2));
+  const finalAmountWithFee = Number((currentPlanDetails.price * (1 + feeRate)).toFixed(2));
+
+  /**
+   * Called after any successful payment to show success state and redirect.
+   * The plan update in Supabase is handled server-side by the capture handler
+   * (PayPal) or directly in handlePaymentSubmit (other methods).
+   */
+  const handlePaymentSuccess = () => {
+    setSuccess(true);
+    router.refresh();
+    // Redirect after showing success screen
+    setTimeout(() => {
+      router.push("/instructor/billing");
+    }, 3000);
+  };
+
+  const checkPaymentStatus = async (isSilent = false) => {
+    if (!paymentId) return;
+    if (!isSilent) setVerifying(true);
+    try {
+      const res = await fetch(`/api/payments/pawapay-check-status?depositId=${paymentId}`);
+      const data = await res.json();
+
+      if (data.status === "PAID") {
+        setShowPendingState(false);
+        handlePaymentSuccess();
+        return true;
+      } else if (data.status === "FAILED") {
+        setShowPendingState(false);
+        if (!isSilent) {
+          alert(`Le paiement a échoué : ${data.failureReason || "Transaction refusée par l'opérateur."}`);
+        }
+        return false;
+      } else {
+        if (!isSilent) {
+          alert("Paiement toujours en attente. Assurez-vous d'avoir validé la notification sur votre téléphone mobile.");
+        }
+        return false;
+      }
+    } catch (err: any) {
+      console.error("[instructor-pay] Status check error:", err);
+      if (!isSilent) alert("Erreur lors de la vérification : " + (err.message || err));
+      return false;
+    } finally {
+      if (!isSilent) setVerifying(false);
+    }
+  };
+
+  // Auto-polling PawaPay payment status every 5 seconds when pending
+  useEffect(() => {
+    if (showPendingState && paymentId && method === "mobile_money") {
+      const interval = setInterval(() => {
+        checkPaymentStatus(true);
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [showPendingState, paymentId, method]);
+
+  const simulateSuccess = async () => {
+    if (!paymentId) return;
+    setSimulating(true);
+    try {
+      const response = await fetch("/api/webhooks/pawapay", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify([{
+          depositId: paymentId,
+          status: "COMPLETED",
+          amount: currentPlanDetails.price.toString(),
+          currency: countryConfig.currency,
+          payer: {
+            type: "MSISDN",
+            address: {
+              value: phone
+            }
+          }
+        }]),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erreur de simulation");
+      }
+
+      // Check status immediately
+      await checkPaymentStatus();
+
+    } catch (err: any) {
+      console.error("[Simulate Success Error]", err);
+      alert("Erreur lors de la simulation : " + err.message);
+    } finally {
+      setSimulating(false);
+    }
+  };
+
+  // Sandbox auto-simulation helper for Mobile Money - auto-simulates when environment is Sandbox
+  useEffect(() => {
+    if (showPendingState && paymentId && method === "mobile_money") {
+      if (isSandboxMode) {
+        const timer = setTimeout(() => {
+          simulateSuccess();
+        }, 2500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [showPendingState, paymentId, method, isSandboxMode]);
+
+  // Note: PayPal SDK script is loaded dynamically in the JSX using next/script component
+
+  // Render PayPal buttons once script is loaded
+  useEffect(() => {
+    if (method !== "paypal" || !plan) return;
+
+    let intervalId: any;
+    let attempts = 0;
+
+    const tryRender = () => {
+      const container = document.getElementById("paypal-button-container");
+      if (!container) return false;
+
+      if (window.paypal) {
+        // Clear previous button elements to prevent duplicates
+        container.innerHTML = "";
+
+        window.paypal.Buttons({
+          style: {
+            layout: 'vertical',
+            color:  'blue',
+            shape:  'rect',
+            label:  'paypal'
+          },
+          createOrder: async () => {
+            try {
+              const res = await fetch("/api/payments/paypal/create-order", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                  type: "INSTRUCTOR_PLAN", 
+                  itemId: plan
+                }),
+              });
+              const data = await res.json();
+              if (data.error) throw new Error(data.error);
+              return data.orderId;
+            } catch (err: any) {
+              alert("Erreur lors de la création de la commande PayPal : " + err.message);
+              throw err;
+            }
+          },
+          onApprove: async (data: any) => {
+            setLoading(true);
+            try {
+              const res = await fetch("/api/payments/paypal/capture-order", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderId: data.orderID }),
+              });
+              const captureData = await res.json();
+              if (captureData.error) {
+                alert("Erreur lors de la capture : " + captureData.error);
+              } else {
+                // Plan already updated in Supabase by the server-side capture handler
+                handlePaymentSuccess();
+              }
+            } catch (err: any) {
+              alert("Erreur de capture du paiement : " + err.message);
+            } finally {
+              setLoading(false);
+            }
+          },
+          onError: (err: any) => {
+            console.error("PayPal Error:", err);
+            alert("La transaction PayPal a échoué ou a été annulée.");
+          }
+        }).render("#paypal-button-container");
+        return true;
+      }
+      return false;
+    };
+
+    const rendered = tryRender();
+    if (rendered) {
+      setPaypalError(null);
+    } else {
+      intervalId = setInterval(() => {
+        attempts++;
+        const success = tryRender();
+        if (success) {
+          clearInterval(intervalId);
+          setPaypalError(null);
+        } else if (attempts > 50) {
+          clearInterval(intervalId);
+          const rawId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "VIDE";
+          const maskedId = rawId.length > 10 ? `${rawId.substring(0, 8)}...${rawId.substring(rawId.length - 8)}` : rawId;
+          setPaypalError(`Impossible de charger le script PayPal. (Client ID: ${maskedId}, Longueur: ${rawId.length}). L'identifiant est probablement incorrect, ou bloqué par un bloqueur de pub.`);
+        }
+      }, 100);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [method, plan, router]);
+
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userId) {
+      alert("Session introuvable. Veuillez vous connecter.");
+      return;
+    }
+    if (method === "paypal") return;
+
+    setLoading(true);
+
+    if (method === "mobile_money") {
+      try {
+        const response = await fetch("/api/payments/pawapay-initiate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: finalAmountWithFee,
+            phoneNumber: phone,
+            carrier: carrier,
+            type: "INSTRUCTOR_PLAN",
+            itemId: plan,
+            cycle: isAnnual ? "ANNUAL" : "MONTHLY",
+            country: userCountry,
+            currency: userCountry === "CD" ? momoCurrency : countryConfig.currency,
+          }),
+        });
+
+        const resData = await response.json();
+        if (!response.ok) {
+          throw new Error(resData.error || "Une erreur est survenue lors de l'initiation du paiement.");
+        }
+
+        setPaymentId(resData.depositId);
+        setIsSandboxMode(!!resData.isSandbox);
+        setShowPendingState(true);
+      } catch (err: any) {
+        alert(err.message || "Une erreur est survenue lors de l'appel de la passerelle.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    if (method === "mastercard") {
+      try {
+        const response = await fetch("/api/payments/moko-initiate-card", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: finalAmountWithFee,
+            type: "INSTRUCTOR_PLAN",
+            itemId: plan,
+          }),
+        });
+
+        const resData = await response.json();
+        if (!response.ok) {
+          throw new Error(resData.error || "Une erreur est survenue lors de l'initiation du paiement par carte.");
+        }
+
+        if (resData.redirectUrl) {
+          window.location.href = resData.redirectUrl;
+        } else {
+          throw new Error("URL de redirection introuvable.");
+        }
+      } catch (err: any) {
+        alert(err.message || "Une erreur est survenue lors de l'appel de la passerelle.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Simulate other payment methods (crypto) — update Supabase directly
+    setTimeout(async () => {
+      try {
+        // Update plan in Supabase
+        await supabase.from("profiles").update({ plan }).eq("id", userId);
+      } catch (err) {
+        console.error("[instructor-pay] Error updating plan for simulated method:", err);
+      }
+      setLoading(false);
+      handlePaymentSuccess();
+    }, 2000);
+  };
+
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in">
+      
+      {/* Back Header */}
+      <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
+        <div className="flex items-center gap-3">
+          <Link 
+            href="/instructor/billing"
+            className="p-2 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <div>
+            <h1 className="text-xl font-bold text-zinc-900 dark:text-white">Sélection du mode de paiement</h1>
+            <p className="text-xs text-zinc-500">Choisissez votre méthode de facturation préférée.</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider block">Total à payer</span>
+          <span className="text-2xl font-extrabold text-teal-600 dark:text-teal-400">{currentPlanDetails.price}$ / mois</span>
+        </div>
+      </div>
+
+      {success ? (
+        /* Success Screen */
+        <div className="bg-white dark:bg-zinc-900 rounded-3xl p-12 border border-zinc-200 dark:border-zinc-800 shadow-xl text-center space-y-6 max-w-xl mx-auto animate-in zoom-in-95">
+          <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 rounded-full flex items-center justify-center mx-auto scale-110 transition-transform">
+            <CheckCircle2 className="w-12 h-12" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Paiement validé !</h2>
+            <p className="text-zinc-500 dark:text-zinc-400">
+              Votre abonnement au <span className="font-bold text-teal-600">{currentPlanDetails.name}</span> a été activé avec succès.
+            </p>
+          </div>
+          <p className="text-xs text-zinc-400 animate-pulse">Redirection vers votre espace de facturation...</p>
+        </div>
+      ) : showPendingState ? (
+        /* Pending Mobile Money Screen */
+        <div className="bg-white dark:bg-zinc-900 rounded-3xl p-12 border border-zinc-200 dark:border-zinc-800 shadow-xl text-center space-y-6 max-w-xl mx-auto animate-in zoom-in-95">
+          <div className="w-20 h-20 bg-teal-100 dark:bg-teal-950/30 text-teal-600 rounded-full flex items-center justify-center mx-auto scale-110 transition-transform flex items-center justify-center">
+            <Loader2 className="w-12 h-12 animate-spin" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Validation Mobile Money...</h2>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
+              Une notification de validation PIN a été envoyée sur votre téléphone. Veuillez saisir votre code secret pour confirmer le paiement de <span className="font-bold text-teal-600">{(userCountry === "CD" && momoCurrency === "USD") ? `$${finalAmountWithFee.toFixed(2)} USD` : `${Math.round(finalAmountWithFee * countryConfig.exchangeRate).toLocaleString()} ${countryConfig.currency}`}</span> <span className="text-xs text-zinc-400">(${finalAmountWithFee.toFixed(2)}$ USD)</span> pour le plan <span className="font-bold">{plan}</span>.
+            </p>
+          </div>
+          
+          <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-2xl border border-zinc-150 dark:border-zinc-800 text-left text-xs space-y-1.5 text-zinc-500 max-w-sm mx-auto">
+            <p><strong>Opérateur :</strong> {carrier.toUpperCase()}</p>
+            <p><strong>Téléphone :</strong> +{countryConfig.phonePrefix} {phone}</p>
+            <p><strong>ID Transaction :</strong> {paymentId}</p>
+          </div>
+
+          <div className="space-y-3 max-w-sm mx-auto pt-2">
+            <div className="w-full py-3.5 px-4 bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-900/30 text-teal-700 dark:text-teal-300 font-bold rounded-xl flex items-center justify-center gap-2.5 text-xs shadow-sm">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-teal-500"></span>
+              </span>
+              <span>Détection automatique dès la saisie de votre PIN...</span>
+            </div>
+
+            {/* Sandbox Simulation Button */}
+            {isSandboxMode && (
+              <button
+                type="button"
+                onClick={simulateSuccess}
+                disabled={simulating}
+                className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-400 text-white font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm cursor-pointer border border-amber-600"
+              >
+                {simulating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Simulation en cours...</span>
+                  </>
+                ) : (
+                  <span>[Mode Test] Simuler validation PawaPay</span>
+                )}
+              </button>
+            )}
+            
+            <button
+              onClick={() => setShowPendingState(false)}
+              className="w-full py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-300 font-bold rounded-xl transition-all text-xs cursor-pointer"
+            >
+              Annuler et changer de mode
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Payment Selection & Form */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* Plan Recap & Options */}
+          <div className="lg:col-span-1 space-y-6">
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-4">
+              <h3 className="font-bold text-zinc-900 dark:text-white">Récapitulatif de la commande</h3>
+              <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                <div className="flex justify-between items-start">
+                  <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">{currentPlanDetails.name}</p>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                    isAnnual ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300" : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                  }`}>
+                    {isAnnual ? "Annuel (1 an)" : "Mensuel"}
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-500 mt-1">{currentPlanDetails.desc}</p>
+              </div>
+
+              {isAnnual ? (
+                <>
+                  <div className="flex justify-between items-center pt-3 border-t border-zinc-100 dark:border-zinc-800 text-xs">
+                    <span className="text-zinc-500">Tarif annuel brut (12 x ${currentPlanDetails.basePrice})</span>
+                    <span className="font-semibold text-zinc-800 dark:text-zinc-200">${currentPlanDetails.annualTotalBeforeDiscount.toFixed(2)} USD</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                    <span>Réduction souscription annuelle (-10%)</span>
+                    <span>-${currentPlanDetails.discountAmount.toFixed(2)} USD</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-3 border-t border-zinc-100 dark:border-zinc-800 text-sm font-bold">
+                    <span className="text-zinc-900 dark:text-white">Total à payer (12 mois)</span>
+                    <span className="text-indigo-600 dark:text-indigo-400 font-extrabold text-base">${currentPlanDetails.price.toFixed(2)} USD</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between items-center pt-3 border-t border-zinc-100 dark:border-zinc-800 text-sm font-bold">
+                  <span className="text-zinc-900 dark:text-white">Total récurrent</span>
+                  <span className="text-teal-600 dark:text-teal-400">${currentPlanDetails.price.toFixed(2)} USD / mois</span>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-2xl flex items-start gap-3">
+              <ShieldCheck className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-800 dark:text-blue-300 leading-relaxed">
+                Vos transactions sont chiffrées et sécurisées. Vous disposez d'un contrôle complet pour annuler ou modifier votre forfait.
+              </p>
+            </div>
+          </div>
+
+          {/* Payment Methods & Dynamic Forms */}
+          <form onSubmit={handlePaymentSubmit} className="lg:col-span-2 space-y-6">
+            
+            {/* Options Selection Grid */}
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-4">
+              <h3 className="font-bold text-zinc-900 dark:text-white mb-4">Moyens de paiement</h3>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { id: "paypal", label: "PayPal", icon: <DollarSign className="w-5 h-5 text-blue-500" /> },
+                  { id: "crypto", label: "Solana Pay", icon: <Coins className="w-5 h-5 text-purple-500" /> },
+                  { id: "crypto_btc", label: "Bitcoin (BTC)", icon: <Bitcoin className="w-5 h-5 text-amber-500" /> },
+                  { id: "mobile_money", label: "Mobile Money", icon: <Phone className="w-5 h-5 text-green-500" /> }
+                ].map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => setMethod(item.id as PaymentMethod)}
+                    className={`p-3 rounded-xl border-2 cursor-pointer flex flex-col items-center justify-center text-center transition-all ${
+                      method === item.id 
+                        ? "border-teal-500 bg-teal-50 dark:bg-teal-950/20 text-teal-600 font-bold shadow-sm" 
+                        : "border-zinc-200 dark:border-zinc-800 hover:border-teal-300 text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                    }`}
+                  >
+                    {item.icon}
+                    <span className="text-[10px] mt-1.5 leading-none">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Dynamic Form details container */}
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm">
+              
+              {/* 1. Mastercard Card Form */}
+              {method === "mastercard" && (
+                <div className="space-y-4 animate-in fade-in duration-200 py-4 text-center">
+                  <div className="w-12 h-12 bg-teal-100 dark:bg-teal-950/30 text-teal-600 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-zinc-900 dark:text-white mb-1">Paiement sécurisé par Carte Bancaire</h4>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed">
+                      Vous allez être redirigé vers l'interface de paiement sécurisée de Moko Afrika pour saisir les coordonnées de votre carte Visa ou Mastercard et valider le paiement de <span className="font-bold text-teal-600 dark:text-teal-400">{currentPlanDetails.price}$</span> pour le plan <span className="font-bold">{plan}</span>.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+
+
+              {/* 3. PayPal direct Integration */}
+              {method === "paypal" && (
+                <div className="space-y-4 animate-in fade-in duration-200 py-4 text-center">
+                  <h4 className="font-bold text-sm text-zinc-900 dark:text-white">Paiement sécurisé par PayPal</h4>
+                  <p className="text-xs text-zinc-500 max-w-sm mx-auto">Cliquez sur le bouton PayPal ci-dessous pour finaliser votre abonnement.</p>
+                  
+                  {paypalError && (
+                    <div className="p-4 bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-900/30 text-xs text-center font-bold">
+                      {paypalError}
+                    </div>
+                  )}
+
+                  {process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ? (
+                    <>
+                      <div id="paypal-button-container" className="relative z-10 w-full min-h-[150px] mt-4" />
+                      <Script
+                        src={`https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD`}
+                        strategy="lazyOnload"
+                        onLoad={() => setPaypalLoaded(true)}
+                        onError={() => setPaypalError("Impossible de charger le script de paiement PayPal. Veuillez vérifier votre clé client ou désactiver votre bloqueur de publicité.")}
+                      />
+                    </>
+                  ) : (
+                    <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 text-yellow-800 dark:text-yellow-400 rounded-xl border border-yellow-250 dark:border-yellow-900/30 text-xs text-center font-bold">
+                      Identifiant client PayPal non configuré dans .env.local
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 4. Crypto Gateway Form */}
+              {method === "crypto" && (
+                <div className="space-y-5 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-sm text-zinc-900 dark:text-white">Paiement en Cryptomonnaie (Solana Pay)</h4>
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20">
+                      <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
+                      Solana Mainnet (USDC)
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col items-center p-6 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl shadow-sm space-y-4">
+                    {/* QR Code Type Selector Tabs */}
+                    <div className="flex items-center gap-1 bg-zinc-200/60 dark:bg-zinc-800/80 p-1 rounded-xl w-full max-w-xs text-xs font-extrabold">
+                      <button
+                        type="button"
+                        onClick={() => setCryptoQrType("solanapay")}
+                        className={`flex-1 py-1.5 px-2 rounded-lg transition-all text-center cursor-pointer ${
+                          cryptoQrType === "solanapay"
+                            ? "bg-white dark:bg-zinc-900 text-teal-600 dark:text-teal-400 shadow-sm"
+                            : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                        }`}
+                      >
+                        Solana Pay (Auto)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCryptoQrType("address")}
+                        className={`flex-1 py-1.5 px-2 rounded-lg transition-all text-center cursor-pointer ${
+                          cryptoQrType === "address"
+                            ? "bg-white dark:bg-zinc-900 text-teal-600 dark:text-teal-400 shadow-sm"
+                            : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                        }`}
+                      >
+                        Adresse Directe
+                      </button>
+                    </div>
+
+                    {/* Solana Pay QR Code */}
+                    <SolanaQrCode 
+                      value={
+                        cryptoQrType === "solanapay"
+                          ? getSolanaPayUri({ amount: currentPlanDetails.price, label: "Ansella Academy", memo: `KCA-PLAN-${plan.toUpperCase()}` })
+                          : SOLANA_TREASURY_ADDRESS
+                      }
+                      size={200}
+                      showAnsellaLogo={true}
+                    />
+                    <div className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400">
+                      {cryptoQrType === "solanapay"
+                        ? "Scannez avec Phantom ou Solflare (Montant pré-rempli)"
+                        : "Scannez pour obtenir l'adresse du portefeuille"}
+                    </div>
+
+                    <div className="text-center space-y-1.5 max-w-sm">
+                      <p className="text-[11px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest">Abonnement Plan {plan}</p>
+                      <p className="text-base font-black text-zinc-900 dark:text-white">
+                        Montant à payer : <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">${currentPlanDetails.price} USDC</span>
+                      </p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed font-medium">
+                        Scannez ce QR Code Solana Pay avec votre application mobile ou effectuez un transfert USDC SPL vers l'adresse ci-dessous.
+                      </p>
+                    </div>
+
+                    {/* Treasury Address & Copy Action */}
+                    <div className="w-full space-y-2">
+                      <div className="flex items-center justify-between text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
+                        <span>Adresse du Portefeuille (USDC SPL)</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(SOLANA_TREASURY_ADDRESS);
+                            setCopiedAddress(true);
+                            setTimeout(() => setCopiedAddress(false), 2000);
+                          }}
+                          className="text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          {copiedAddress ? "✓ Copié !" : "Copier l'adresse"}
+                        </button>
+                      </div>
+                      <div className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-3 rounded-xl text-center font-mono text-xs font-bold text-zinc-800 dark:text-zinc-200 break-all select-all shadow-inner">
+                        {SOLANA_TREASURY_ADDRESS}
+                      </div>
+                    </div>
+
+                    {/* Web3 1-Click Wallet Button */}
+                    <div className="w-full pt-1">
+                      <button
+                        type="button"
+                        onClick={handleConnectAndPaySolana}
+                        className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-teal-600 via-emerald-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-extrabold text-xs shadow-lg shadow-teal-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.99]"
+                      >
+                        <Sparkles className="w-4 h-4 text-yellow-300 animate-spin" style={{ animationDuration: '3s' }} />
+                        {connectedWallet ? `Connecté: ${connectedWallet.slice(0, 4)}...${connectedWallet.slice(-4)}` : "Payer directement avec Phantom / Wallet Solana"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Manual Signature Verification Input */}
+                  <div className="p-4 bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200 dark:border-zinc-800 space-y-3">
+                    <label className="block text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider">
+                      Signature de Transaction (TxID / Hash Solana)
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input 
+                        type="text"
+                        value={cryptoTxId}
+                        onChange={(e) => setCryptoTxId(e.target.value)}
+                        placeholder="Collez la signature de transfert Solana (ex: 5Kz7...)"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono font-semibold text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleVerifyCryptoPayment()}
+                        disabled={cryptoVerifying || !cryptoTxId.trim()}
+                        className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-extrabold transition-all shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        {cryptoVerifying ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Vérification...
+                          </>
+                        ) : (
+                          "Vérifier & Valider"
+                        )}
+                      </button>
+                    </div>
+
+                    {cryptoError && (
+                      <p className="text-xs font-bold text-red-500 bg-red-50 dark:bg-red-950/30 p-2.5 rounded-xl border border-red-200 dark:border-red-900/30">
+                        {cryptoError}
+                      </p>
+                    )}
+
+                    {cryptoSuccess && (
+                      <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-900/30">
+                        {cryptoSuccess}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 4. Bitcoin (BTC) Form */}
+              {method === "crypto_btc" && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  <BitcoinQrCode
+                    usdAmount={currentPlanDetails.price}
+                    btcAmount={convertUsdToBtc(currentPlanDetails.price, btcPriceUsd)}
+                    label={`Abonnement Formateur Plan ${plan}`}
+                  />
+
+                  <div className="p-4 bg-zinc-50 dark:bg-zinc-900/60 rounded-2xl border border-zinc-200 dark:border-zinc-800 space-y-3">
+                    <label className="block text-xs font-black text-zinc-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      Signature de Transaction Bitcoin (TxID / Hash) <span className="text-amber-500">*</span>
+                    </label>
+
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input 
+                        type="text"
+                        value={btcTxHash}
+                        onChange={(e) => setBtcTxHash(e.target.value)}
+                        placeholder="Collez votre Hash Bitcoin (ex: 4a5e1e4baab89f3a32518...)"
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-mono font-semibold text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!btcTxHash.trim()) return;
+                          setVerifyingBtc(true);
+                          try {
+                            const res = await fetch("/api/payments/btc-verify", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                txHash: btcTxHash.trim(),
+                                planId: plan,
+                              }),
+                            });
+
+                            const data = await res.json();
+                            if (!res.ok) {
+                              throw new Error(data.error || "Échec de vérification Bitcoin.");
+                            }
+
+                            setSuccess(true);
+                            setTimeout(() => {
+                              router.push("/instructor/billing");
+                            }, 2500);
+                          } catch (err: any) {
+                            alert("Erreur Bitcoin : " + (err.message || err));
+                          } finally {
+                            setVerifyingBtc(false);
+                          }
+                        }}
+                        disabled={verifyingBtc || !btcTxHash.trim()}
+                        className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 text-xs font-extrabold transition-all shrink-0 flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-amber-500/20"
+                      >
+                        {verifyingBtc ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Vérification On-Chain...
+                          </>
+                        ) : (
+                          <>
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            Vérifier & Valider
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 5. Mobile Money Form */}
+              {method === "mobile_money" && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <div>
+                    <label className="block text-[11px] font-medium text-zinc-400 uppercase mb-1">Pays de paiement</label>
+                    <select
+                      value={userCountry}
+                      onChange={(e) => setUserCountry(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-800 text-sm text-zinc-900 dark:text-white outline-none focus:ring-1 focus:ring-teal-500 transition-all mb-3"
+                    >
+                      <option value="CD">🇨🇩 Congo (RDC)</option>
+                      <option value="CM">🇨🇲 Cameroun</option>
+                      <option value="CI">🇨🇮 Côte d'Ivoire</option>
+                      <option value="SN">🇸🇳 Sénégal</option>
+                      <option value="BJ">🇧🇯 Bénin</option>
+                      <option value="ZM">🇿🇲 Zambie</option>
+                      <option value="RW">🇷🇼 Rwanda</option>
+                      <option value="UG">🇺🇬 Ouganda</option>
+                    </select>
+                  </div>
+
+                  {/* Currency Selector for DRC */}
+                  {userCountry === "CD" && (
+                    <div className="mb-3">
+                      <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                        Devise du compte Mobile Money (RDC)
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div
+                          onClick={() => setMomoCurrency("USD")}
+                          className={`p-2.5 rounded-lg border text-xs font-bold cursor-pointer text-center transition-all flex items-center justify-center gap-2 ${
+                            momoCurrency === "USD"
+                              ? "border-teal-500 bg-teal-50/15 text-teal-650 font-bold shadow-sm"
+                              : "border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:border-zinc-300"
+                          }`}
+                        >
+                          <span>💵 USD ($)</span>
+                        </div>
+                        <div
+                          onClick={() => setMomoCurrency("CDF")}
+                          className={`p-2.5 rounded-lg border text-xs font-bold cursor-pointer text-center transition-all flex items-center justify-center gap-2 ${
+                            momoCurrency === "CDF"
+                              ? "border-teal-500 bg-teal-50/15 text-teal-650 font-bold shadow-sm"
+                              : "border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:border-zinc-300"
+                          }`}
+                        >
+                          <span>🇨🇩 CDF (FC)</span>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-zinc-400 mt-1">
+                        Montant à régler : {momoCurrency === "USD" ? `$${currentPlanDetails.price} USD` : `FC ${(currentPlanDetails.price * countryConfig.exchangeRate).toLocaleString()} CDF`}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-bold text-sm text-zinc-900 dark:text-white">Opérateur Mobile Money</h4>
+                    <span className="text-[10px] font-bold bg-zinc-150 dark:bg-zinc-800 text-zinc-600 px-2.5 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700">
+                      Devise : {userCountry === "CD" ? momoCurrency : countryConfig.currency}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                    {countryConfig.operators.map((item) => (
+                      <div 
+                        key={item.id}
+                        onClick={() => setCarrier(item.id)}
+                        className={`p-3 rounded-2xl border-2 text-xs font-bold cursor-pointer text-center transition-all flex flex-col items-center justify-center gap-2 ${
+                          carrier === item.id 
+                            ? "border-teal-500 bg-teal-50/40 text-teal-700 dark:bg-teal-950/40 dark:text-teal-400 font-extrabold shadow-md ring-2 ring-teal-500/20" 
+                            : "border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-teal-300 text-zinc-600 dark:text-zinc-300"
+                        }`}
+                      >
+                        <OperatorLogo carrierId={item.id} className="h-8 w-auto max-h-8 object-contain rounded-lg p-0.5 bg-white shadow-xs" />
+                        <span className="leading-tight">{item.name}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-zinc-400 uppercase mb-1">Numéro de téléphone associé</label>
+                    <div className="flex gap-2">
+                      <span className="bg-zinc-100 dark:bg-zinc-800 px-3.5 py-2.5 rounded-lg text-sm text-zinc-500 font-semibold flex items-center justify-center border border-zinc-200 dark:border-zinc-800">
+                        +{countryConfig.phonePrefix}
+                      </span>
+                      <input 
+                        required
+                        type="tel" 
+                        value={phone.startsWith(countryConfig.phonePrefix) ? phone.substring(countryConfig.phonePrefix.length) : phone}
+                        onChange={e => setPhone(e.target.value.replace(/\D/g, ""))}
+                        placeholder="812345678"
+                        className="flex-1 px-4 py-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border-transparent text-sm focus:ring-1 focus:ring-teal-500 outline-none text-zinc-900 dark:text-white font-semibold"
+                      />
+                    </div>
+                    <p className="text-[10px] text-zinc-400 mt-2">Une demande d'approbation push PIN sera envoyée sur votre téléphone mobile.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Submit Payment action button */}
+              <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800 flex justify-end gap-3">
+                <Link 
+                  href="/instructor/billing"
+                  className="px-5 py-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-300 font-bold text-xs transition-colors"
+                >
+                  Annuler
+                </Link>
+                {method !== "paypal" && (
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-6 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-lg shadow-teal-500/20 transition-all flex items-center gap-2"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Traitement...
+                      </>
+                    ) : (
+                      `Payer (${finalAmountWithFee.toFixed(2)} $USD)`
+                    )}
+                  </button>
+                )}
+              </div>
+
+            </div>
+
+          </form>
+
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+export default function PayPage() {
+  return (
+    <Suspense fallback={<div className="max-w-4xl mx-auto flex items-center justify-center py-20"><Loader2 className="w-10 h-10 text-teal-600 animate-spin" /></div>}>
+      <PaymentContent />
+    </Suspense>
+  );
+}
