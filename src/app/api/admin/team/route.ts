@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createAdmin } from "@supabase/supabase-js";
-
-const supabaseAdmin = createAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const ADMIN_ROLE_NAMES = [
   "SUPER_ADMIN",
@@ -20,11 +15,11 @@ const ADMIN_ROLE_NAMES = [
 async function getCallerRole(userId: string): Promise<string | null> {
   try {
     // 1. Check admin_permissions table
-    const { data: permRow } = await supabaseAdmin
-      .from("admin_permissions")
+    const { data: permRow } = await (supabaseAdmin
+      .from("admin_permissions" as any)
       .select("role")
       .eq("user_id", userId)
-      .maybeSingle();
+      .maybeSingle() as any);
 
     if (permRow?.role && ADMIN_ROLE_NAMES.includes(permRow.role)) {
       return permRow.role;
@@ -129,9 +124,9 @@ export async function GET(req: NextRequest) {
 
     // 4. Fetch admin_permissions overrides
     let permsMap = new Map<string, any>();
-    const { data: permsData } = await supabaseAdmin
-      .from("admin_permissions")
-      .select("user_id, role, granted_permissions, revoked_permissions, notes");
+    const { data: permsData } = await (supabaseAdmin
+      .from("admin_permissions" as any)
+      .select("user_id, role, granted_permissions, revoked_permissions, notes") as any);
     if (permsData) {
       permsData.forEach((p: any) => permsMap.set(p.user_id, p));
     }
@@ -241,7 +236,7 @@ export async function POST(req: NextRequest) {
       } catch {
         // Ignore Auth API error
       }
-      await supabaseAdmin.from("admin_permissions").delete().eq("user_id", targetUserId);
+      await (supabaseAdmin.from("admin_permissions" as any) as any).delete().eq("user_id", targetUserId);
       return NextResponse.json({ success: true, action: "revoked" });
     }
 
@@ -320,7 +315,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Upsert admin_permissions
-      await supabaseAdmin.from("admin_permissions").upsert({
+      await (supabaseAdmin.from("admin_permissions" as any) as any).upsert({
         user_id: targetId,
         role: targetRoleName,
         granted_permissions: grantedPermissions,
@@ -350,7 +345,7 @@ export async function POST(req: NextRequest) {
       // Ignore
     }
 
-    await supabaseAdmin.from("admin_permissions").upsert({
+    await (supabaseAdmin.from("admin_permissions" as any) as any).upsert({
       user_id: targetUserId,
       role: targetRoleName,
       granted_permissions: grantedPermissions,

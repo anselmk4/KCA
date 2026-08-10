@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createNotification } from "@/lib/supabase/notifications-helper";
-
-const supabaseAdmin = createSupabaseAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 /**
  * GET /api/coaching/requests
@@ -34,7 +29,7 @@ export async function GET(req: NextRequest) {
       ["SUPER_ADMIN", "ADMIN", "INSTRUCTOR", "TEACHING_ASSISTANT"].includes(r)
     );
 
-    let query = dbClient.from("coaching_requests").select("*");
+    let query = (dbClient as any).from("coaching_requests").select("*");
 
     if (isInstructorOrAdmin) {
       // Instructors see requests assigned to them or unassigned requests

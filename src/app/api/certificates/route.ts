@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { createNotification } from '@/lib/supabase/notifications-helper';
-
-// Initialize admin client to bypass RLS restrictions on certificate creation and quiz queries
-const supabaseAdmin = createSupabaseClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 /**
  * POST /api/certificates
@@ -68,11 +62,11 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Vérifier que le cours existe et est publié
-    const { data: course, error: courseError } = await activeClient
+    const { data: course, error: courseError } = await (activeClient
       .from('courses')
       .select('id, title, status, type')
       .eq('id', courseId)
-      .maybeSingle();
+      .maybeSingle() as any);
 
     if (courseError || !course) {
       return NextResponse.json({ error: 'Cours introuvable', eligible: false }, { status: 404 });

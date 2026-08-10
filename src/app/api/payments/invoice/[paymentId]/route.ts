@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createDirectClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { escapeHtml } from "@/lib/sanitize";
-
-const supabaseAdmin = createDirectClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 const PROVIDER_LABELS: Record<string, string> = {
   PAYPAL: "PayPal",
@@ -115,7 +110,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ paym
       month: "long",
       day: "numeric",
     });
-    const providerLabel = PROVIDER_LABELS[payment.provider] || payment.provider || "—";
+    const providerLabel = (payment.provider ? PROVIDER_LABELS[payment.provider] : undefined) || payment.provider || "—";
     const currency = payment.currency || "USD";
     const amount = Number(payment.amount).toFixed(2);
     const userName = profile?.full_name || user.email || "Client";

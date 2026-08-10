@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createDirectClient } from '@supabase/supabase-js';
-
-const supabaseAdmin = createDirectClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export async function POST(req: NextRequest) {
   try {
@@ -55,7 +50,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (!existingProfile) {
-      await dbClient.from('profiles').upsert({
+      await (dbClient.from('profiles') as any).upsert({
         id: user.id,
         email: user.email,
         full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Formateur',
@@ -158,14 +153,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Auto-create initial section
-    try {
-      await dbClient.from('course_sections').insert({
-        course_id: data.id,
-        title: 'Module 1 : Introduction',
-        sort_order: 1
-      });
-    } catch (secErr) {
-      console.warn('[API /courses POST] Warning creating initial section:', secErr);
+    if (data) {
+      try {
+        await dbClient.from('course_sections').insert({
+          course_id: data.id,
+          title: 'Module 1 : Introduction',
+          sort_order: 1
+        });
+      } catch (secErr) {
+        console.warn('[API /courses POST] Warning creating initial section:', secErr);
+      }
     }
 
     return NextResponse.json({ course: data }, { status: 201 });

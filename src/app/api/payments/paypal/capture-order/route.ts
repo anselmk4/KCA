@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { capturePayPalOrder } from "@/lib/paypal";
-import { createClient as createDirectClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { incrementCouponUses } from "@/lib/supabase/orders-helper";
-
-// Service client to bypass RLS for administrative operations
-const supabaseAdmin = createDirectClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export async function POST(req: NextRequest) {
   console.log("[paypal-capture-order] API Route invoked.");

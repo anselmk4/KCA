@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createAdmin } from "@supabase/supabase-js";
-
-const supabaseAdmin = createAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 // ─── Helper: get caller role from user_roles table ─────────────────────────
 async function getCallerRole(userId: string): Promise<string | null> {
@@ -88,13 +83,14 @@ export async function PUT(req: NextRequest) {
 
       const { error } = await supabaseAdmin
         .from("settings")
-        .update({ value, updated_by: user.id, updated_at: new Date().toISOString() })
+        .update({ value: value as any, updated_by: user.id, updated_at: new Date().toISOString() })
         .eq("key", key);
 
       if (error) {
         // Insert if not exists
         const { error: insertErr } = await supabaseAdmin.from("settings").insert({
-          key, value,
+          key,
+          value: value as any,
           group_name: key.split(".")[0],
           is_public: true,
           updated_by: user.id,

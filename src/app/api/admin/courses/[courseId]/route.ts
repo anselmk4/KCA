@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createAdmin } from "@supabase/supabase-js";
-
-const supabaseAdmin = createAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 async function getCallerRole(userId: string): Promise<string | null> {
   const { data } = await supabaseAdmin
@@ -93,13 +88,13 @@ export async function GET(
     // Nest lessons inside sections
     const enrichedSections = (sections || []).map(sec => ({
       ...sec,
-      order: sec.sort_order ?? sec.order ?? 0,
+      order: sec.sort_order ?? (sec as any).order ?? 0,
       lessons: lessons
         .filter(l => l.section_id === sec.id)
         .map(l => ({
           ...l,
-          duration_min: l.duration_minutes ?? l.duration_min ?? 0,
-          order: l.sort_order ?? l.order ?? 0,
+          duration_min: l.duration_minutes ?? (l as any).duration_min ?? 0,
+          order: l.sort_order ?? (l as any).order ?? 0,
         })),
     }));
 
@@ -110,7 +105,7 @@ export async function GET(
       stats: {
         totalSections: sections?.length || 0,
         totalLessons: lessons.length,
-        totalDurationMin: lessons.reduce((sum, l) => sum + (l.duration_minutes || l.duration_min || 0), 0),
+        totalDurationMin: lessons.reduce((sum, l) => sum + (l.duration_minutes || (l as any).duration_min || 0), 0),
         hasQuiz: (quizzes?.length || 0) > 0,
       }
     });
@@ -155,7 +150,7 @@ export async function PUT(
 
       const { data: updated, error } = await supabaseAdmin
         .from("courses")
-        .update(updates)
+        .update(updates as any)
         .eq("id", courseId)
         .select()
         .single();

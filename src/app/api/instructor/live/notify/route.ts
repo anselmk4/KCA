@@ -1,17 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { sendLiveSessionNotificationEmail } from "@/lib/email";
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY || "",
-  {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  }
-);
 
 export async function POST(req: Request) {
   try {
@@ -72,7 +61,7 @@ export async function POST(req: Request) {
           created_at: new Date().toISOString()
         }));
 
-        await supabaseAdmin.from("notifications").insert(notificationInserts);
+        await (supabaseAdmin.from("notifications") as any).insert(notificationInserts);
 
         for (const profile of profiles) {
           if (profile.email) {

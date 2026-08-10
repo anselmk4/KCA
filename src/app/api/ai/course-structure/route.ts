@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createDirectClient } from "@supabase/supabase-js";
-
-const supabaseAdmin = createDirectClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,9 +26,7 @@ export async function POST(req: NextRequest) {
 
     // Create the client dynamically to ensure it reads the latest process.env vars
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const clientToUse = serviceKey
-      ? createDirectClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey)
-      : supabase;
+    const clientToUse = serviceKey ? supabaseAdmin : supabase;
 
     // Verify course ownership
     const { data: course, error: courseError } = await clientToUse

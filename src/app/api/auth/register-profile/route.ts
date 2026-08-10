@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createDirectClient } from "@supabase/supabase-js";
-
-// Initialize a service role client to bypass RLS during registration setup
-const supabaseAdmin = createDirectClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const ALLOWED_REGISTRATION_ROLES = ["STUDENT", "INSTRUCTOR"];
 
@@ -154,33 +148,33 @@ export async function POST(req: NextRequest) {
     // 4. Affiliation registration
     if (referralCode) {
       try {
-        const { data: referrer, error: referrerErr } = await supabaseAdmin
-          .from("profiles")
+        const { data: referrer, error: referrerErr } = await (supabaseAdmin
+          .from("profiles" as any)
           .select("id, affiliate_points")
           .eq("referral_code", referralCode.toUpperCase())
-          .single();
+          .single() as any);
 
         if (!referrerErr && referrer && referrer.id !== userId) {
-          const { data: existingAff } = await supabaseAdmin
+          const { data: existingAff } = await (supabaseAdmin
             .from("affiliations" as any)
             .select("id")
             .eq("referred_id", userId)
-            .maybeSingle();
+            .maybeSingle() as any);
 
           if (!existingAff) {
             const POINTS_PER_AFFILIATE = 10;
-            const { error: insErr } = await supabaseAdmin.from("affiliations" as any).insert({
+            const { error: insErr } = await (supabaseAdmin.from("affiliations" as any).insert({
               referrer_id: referrer.id,
               referred_id: userId,
               points_awarded: POINTS_PER_AFFILIATE,
-            });
+            } as any) as any);
 
             if (!insErr) {
               const curPoints = referrer.affiliate_points || 0;
-              await supabaseAdmin
-                .from("profiles")
-                .update({ affiliate_points: curPoints + POINTS_PER_AFFILIATE })
-                .eq("id", referrer.id);
+              await (supabaseAdmin
+                .from("profiles" as any)
+                .update({ affiliate_points: curPoints + POINTS_PER_AFFILIATE } as any)
+                .eq("id", referrer.id) as any);
             }
           }
         }

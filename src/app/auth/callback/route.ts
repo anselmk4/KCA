@@ -1,14 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { Database } from '@/lib/supabase/types';
-
-// Service role admin client to bypass any client-side RLS constraints
-const supabaseAdmin = createSupabaseClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -26,8 +20,8 @@ export async function GET(request: Request) {
   const pendingCookiesToSet: Array<{ name: string; value: string; options?: any }> = [];
 
   const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder',
     {
       cookies: {
         getAll() {
@@ -116,7 +110,7 @@ async function bootstrapUserAndGetRole(user: any): Promise<string> {
   const existingRoleNames: string[] =
     existingUserRoles?.map((ur: any) => ur.roles?.name).filter(Boolean) || [];
 
-  let targetRole: string;
+  let targetRole = 'STUDENT';
   if (existingRoleNames.length > 0) {
     if (existingRoleNames.includes('SUPER_ADMIN')) targetRole = 'SUPER_ADMIN';
     else if (existingRoleNames.includes('ADMIN')) targetRole = 'ADMIN';
@@ -125,6 +119,7 @@ async function bootstrapUserAndGetRole(user: any): Promise<string> {
     else if (existingRoleNames.includes('SUPPORT_AGENT')) targetRole = 'SUPPORT_AGENT';
     else if (existingRoleNames.includes('INSTRUCTOR')) targetRole = 'INSTRUCTOR';
     else if (existingRoleNames.includes('TEACHING_ASSISTANT')) targetRole = 'TEACHING_ASSISTANT';
+    else targetRole = 'STUDENT';
   } else {
     const rawRole = (user.user_metadata?.role || 'STUDENT').toUpperCase();
     targetRole = (rawRole === 'INSTRUCTOR' || rawRole === 'TEACHING_ASSISTANT') ? rawRole : 'STUDENT';
@@ -163,7 +158,7 @@ async function bootstrapUserAndGetRole(user: any): Promise<string> {
   const { data: targetDbRole } = await supabaseAdmin
     .from('roles')
     .select('id')
-    .eq('name', targetRole)
+    .eq('name', targetRole as any)
     .single();
 
   if (targetDbRole) {

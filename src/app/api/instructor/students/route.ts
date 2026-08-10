@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createDirectClient } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createNotification } from "@/lib/supabase/notifications-helper";
-
-const supabaseAdmin = createDirectClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export async function GET(req: NextRequest) {
   try {
@@ -465,9 +460,12 @@ export async function POST(req: NextRequest) {
     if (manualAmount > 0) {
       try {
         const orderId = crypto.randomUUID();
-        await supabaseAdmin.from("orders").insert({
+        await (supabaseAdmin.from("orders") as any).insert({
           id: orderId,
           user_id: studentId,
+          order_number: `MAN-${Date.now()}`,
+          subtotal: manualAmount,
+          total: manualAmount,
           total_amount: manualAmount,
           status: "COMPLETED",
           created_at: new Date().toISOString(),

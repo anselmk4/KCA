@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-
-const supabaseAdmin = createSupabaseClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export async function GET(req: NextRequest) {
   try {
@@ -66,10 +61,10 @@ export async function GET(req: NextRequest) {
     const courseMap = new Map(courses.map((c) => [c.id, c]));
 
     // 3. Fetch enrollments for these courses
-    const { data: enrollmentsData } = await dbClient
+    const { data: enrollmentsData } = await (dbClient
       .from("enrollments")
-      .select("id, student_id, course_id, enrolled_at, enrollment_type, manual_payment_status, manual_amount_paid, profiles(full_name)")
-      .in("course_id", courseIds);
+      .select("id, student_id, course_id, enrolled_at, manual_payment_status, manual_amount_paid, profiles(full_name)")
+      .in("course_id", courseIds) as any);
 
     const enrollmentsList = enrollmentsData || [];
 
@@ -157,7 +152,7 @@ export async function GET(req: NextRequest) {
     const cleanTransactions = rawTransactions.filter((t) => t.status === "PAID");
 
     const totalRevenue = cleanTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
-    const uniqueStudentsCount = new Set(enrollmentsList.map((e) => e.student_id)).size;
+    const uniqueStudentsCount = new Set(enrollmentsList.map((e: any) => e.student_id)).size;
 
     return NextResponse.json({
       plan: profile.plan || 'FREE',

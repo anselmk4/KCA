@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient as createDirectClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { createNotification } from '@/lib/supabase/notifications-helper';
-
-const supabaseAdmin = createDirectClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export async function GET(req: NextRequest) {
   try {
@@ -89,7 +84,7 @@ export async function GET(req: NextRequest) {
         await sendInstructorSubscriptionExpiryReminderEmail(
           instructor.email,
           instructor.full_name || 'Formateur',
-          instructor.plan,
+          instructor.plan ?? 'FREE',
           0
         );
 
@@ -114,7 +109,7 @@ export async function GET(req: NextRequest) {
           await sendInstructorSubscriptionExpiryReminderEmail(
             instructor.email,
             instructor.full_name || 'Formateur',
-            instructor.plan,
+            instructor.plan ?? 'FREE',
             3
           );
 

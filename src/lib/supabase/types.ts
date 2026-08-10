@@ -403,6 +403,7 @@ export type Database = {
       }
       courses: {
         Row: {
+          allow_installments: boolean | null
           category_id: string | null
           compare_price: number | null
           created_at: string
@@ -411,12 +412,15 @@ export type Database = {
           enrollment_count: number | null
           estimated_duration_hours: number | null
           id: string
+          installments_count: number | null
           instructor_id: string
           is_featured: boolean | null
           is_free: boolean | null
           language: string | null
+          learning_outcomes: string[] | null
           level: Database["public"]["Enums"]["difficulty_level"] | null
           max_students: number | null
+          prerequisites: string[] | null
           preview_video_url: string | null
           price: number
           published_at: string | null
@@ -428,9 +432,11 @@ export type Database = {
           status: Database["public"]["Enums"]["course_status"]
           thumbnail_url: string | null
           title: string
+          type: string | null
           updated_at: string
         }
         Insert: {
+          allow_installments?: boolean | null
           category_id?: string | null
           compare_price?: number | null
           created_at?: string
@@ -439,12 +445,15 @@ export type Database = {
           enrollment_count?: number | null
           estimated_duration_hours?: number | null
           id?: string
+          installments_count?: number | null
           instructor_id: string
           is_featured?: boolean | null
           is_free?: boolean | null
           language?: string | null
+          learning_outcomes?: string[] | null
           level?: Database["public"]["Enums"]["difficulty_level"] | null
           max_students?: number | null
+          prerequisites?: string[] | null
           preview_video_url?: string | null
           price?: number
           published_at?: string | null
@@ -456,9 +465,11 @@ export type Database = {
           status?: Database["public"]["Enums"]["course_status"]
           thumbnail_url?: string | null
           title: string
+          type?: string | null
           updated_at?: string
         }
         Update: {
+          allow_installments?: boolean | null
           category_id?: string | null
           compare_price?: number | null
           created_at?: string
@@ -467,12 +478,15 @@ export type Database = {
           enrollment_count?: number | null
           estimated_duration_hours?: number | null
           id?: string
+          installments_count?: number | null
           instructor_id?: string
           is_featured?: boolean | null
           is_free?: boolean | null
           language?: string | null
+          learning_outcomes?: string[] | null
           level?: Database["public"]["Enums"]["difficulty_level"] | null
           max_students?: number | null
+          prerequisites?: string[] | null
           preview_video_url?: string | null
           price?: number
           published_at?: string | null
@@ -484,6 +498,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["course_status"]
           thumbnail_url?: string | null
           title?: string
+          type?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -509,8 +524,11 @@ export type Database = {
           course_id: string
           created_at: string
           enrolled_at: string
+          enrollment_type: string | null
           id: string
           last_accessed_at: string | null
+          manual_amount_paid: number | null
+          manual_payment_status: string | null
           progress_percent: number | null
           status: Database["public"]["Enums"]["student_status"] | null
           student_id: string
@@ -521,8 +539,11 @@ export type Database = {
           course_id: string
           created_at?: string
           enrolled_at?: string
+          enrollment_type?: string | null
           id?: string
           last_accessed_at?: string | null
+          manual_amount_paid?: number | null
+          manual_payment_status?: string | null
           progress_percent?: number | null
           status?: Database["public"]["Enums"]["student_status"] | null
           student_id: string
@@ -533,8 +554,11 @@ export type Database = {
           course_id?: string
           created_at?: string
           enrolled_at?: string
+          enrollment_type?: string | null
           id?: string
           last_accessed_at?: string | null
+          manual_amount_paid?: number | null
+          manual_payment_status?: string | null
           progress_percent?: number | null
           status?: Database["public"]["Enums"]["student_status"] | null
           student_id?: string
@@ -914,6 +938,7 @@ export type Database = {
           subtotal: number
           tax_amount: number | null
           total: number
+          total_amount: number | null
           updated_at: string
           user_id: string
         }
@@ -925,11 +950,12 @@ export type Database = {
           discount_amount?: number | null
           id?: string
           notes?: string | null
-          order_number: string
+          order_number?: string
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
           tax_amount?: number | null
           total?: number
+          total_amount?: number | null
           updated_at?: string
           user_id: string
         }
@@ -946,6 +972,7 @@ export type Database = {
           subtotal?: number
           tax_amount?: number | null
           total?: number
+          total_amount?: number | null
           updated_at?: string
           user_id?: string
         }
@@ -1168,9 +1195,9 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
-          email: string
+          email?: string
           email_verified?: boolean | null
-          full_name: string
+          full_name?: string
           id: string
           last_login_at?: string | null
           level?: Database["public"]["Enums"]["difficulty_level"] | null
@@ -1992,6 +2019,10 @@ export type Database = {
         | "MOBILE_MONEY"
         | "CRYPTO"
         | "MANUAL"
+        | "CRYPTO_BTC"
+        | "CRYPTO_ETH"
+        | "PAWAPAY"
+        | "MOKO_CARD"
       payment_status:
         | "PENDING"
         | "PROCESSING"
@@ -2165,6 +2196,9 @@ export const Constants = {
         "MOBILE_MONEY",
         "CRYPTO",
         "MANUAL",
+        "CRYPTO_BTC",
+        "CRYPTO_ETH",
+        "PAWAPAY",
         "MOKO_CARD",
       ],
       payment_status: [

@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { BITCOIN_TREASURY_ADDRESS, fetchBtcPriceInUsd, convertUsdToBtc } from "@/lib/bitcoin";
 import { createNotification } from "@/lib/supabase/notifications-helper";
-
-const supabaseAdmin = createSupabaseAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 /**
  * Queries Mempool.space or Blockstream Explorer APIs to verify a Bitcoin transaction.

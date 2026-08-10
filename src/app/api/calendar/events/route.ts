@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createNotification } from "@/lib/supabase/notifications-helper";
-
-const supabaseAdmin = createSupabaseAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 /**
  * GET /api/calendar/events
@@ -46,12 +41,12 @@ export async function GET(req: NextRequest) {
       if (authoredEvents) liveSessionsList = authoredEvents;
 
       // 2. Fetch scheduled coaching requests
-      const { data: coachReqs } = await dbClient
-        .from("coaching_requests")
+      const { data: coachReqs } = await (dbClient
+        .from("coaching_requests" as any)
         .select("*")
         .or(`instructor_id.eq.${user.id},instructor_id.is.null`)
         .not("scheduled_at", "is", null)
-        .order("scheduled_at", { ascending: true });
+        .order("scheduled_at", { ascending: true }) as any);
 
       if (coachReqs) coachingRequestsList = coachReqs;
 
@@ -80,12 +75,12 @@ export async function GET(req: NextRequest) {
       }
 
       // Fetch scheduled coaching requests for student
-      const { data: coachReqs } = await dbClient
-        .from("coaching_requests")
+      const { data: coachReqs } = await (dbClient
+        .from("coaching_requests" as any)
         .select("*")
         .eq("student_id", user.id)
         .not("scheduled_at", "is", null)
-        .order("scheduled_at", { ascending: true });
+        .order("scheduled_at", { ascending: true }) as any);
 
       if (coachReqs) coachingRequestsList = coachReqs;
     }

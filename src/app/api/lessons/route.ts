@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createAdmin } from '@supabase/supabase-js';
-
-const supabaseAdmin = createAdmin(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 async function canUserEditSection(userId: string, sectionId: string): Promise<boolean> {
   const { data: section } = await supabaseAdmin
@@ -25,12 +20,12 @@ async function canUserEditSection(userId: string, sectionId: string): Promise<bo
   if (!course) return false;
   if (course.instructor_id === userId) return true;
 
-  const { data: collab } = await supabaseAdmin
-    .from('course_collaborators')
+  const { data: collab } = await (supabaseAdmin
+    .from('course_collaborators' as any)
     .select('id')
     .eq('course_id', section.course_id)
     .eq('collaborator_id', userId)
-    .maybeSingle();
+    .maybeSingle() as any);
 
   if (collab) return true;
 
