@@ -11,11 +11,11 @@ export default function PrivacyPage() {
   const [activeSection, setActiveSection] = useState("section-1");
 
   const sections = [
-    { id: "section-1", title: "1. Données Collectées", icon: Database },
-    { id: "section-2", title: "2. Utilisation de vos Données", icon: Activity },
-    { id: "section-3", title: "3. Confidentialité et Partage", icon: EyeOff },
-    { id: "section-4", title: "4. Sécurité des Informations", icon: Lock },
-    { id: "section-5", title: "5. Vos Droits", icon: UserCheck },
+    { id: "section-1", title: "1. Data Collected", icon: Database },
+    { id: "section-2", title: "2. Use of Your Data", icon: Activity },
+    { id: "section-3", title: "3. Confidentiality & Sharing", icon: EyeOff },
+    { id: "section-4", title: "4. Information Security", icon: Lock },
+    { id: "section-5", title: "5. Your Rights", icon: UserCheck },
   ];
 
   const scrollToSection = (id: string) => {
@@ -31,7 +31,6 @@ export default function PrivacyPage() {
       <Navbar />
 
       <main className="flex-1 py-28 relative overflow-hidden">
-        {/* Glow Effects */}
         <div className="absolute top-1/4 right-10 w-96 h-96 bg-teal-500/5 dark:bg-teal-500/[0.03] rounded-full blur-[100px] pointer-events-none" />
         <div className="absolute bottom-1/4 left-10 w-96 h-96 bg-indigo-500/5 dark:bg-indigo-500/[0.03] rounded-full blur-[100px] pointer-events-none" />
 
@@ -43,7 +42,7 @@ export default function PrivacyPage() {
               href="/" 
               className="inline-flex items-center gap-2 text-xs font-semibold text-zinc-500 hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
             >
-              <ArrowLeft className="w-4 h-4" /> Retour à l'accueil
+              <ArrowLeft className="w-4 h-4" /> Back to home
             </Link>
             <div className="flex flex-col md:flex-row items-center md:items-start gap-4">
               <div className="p-3.5 bg-teal-500/10 dark:bg-teal-500/5 border border-teal-500/20 text-teal-600 dark:text-teal-400 rounded-2xl">
@@ -51,10 +50,10 @@ export default function PrivacyPage() {
               </div>
               <div className="space-y-1 text-center md:text-left">
                 <h1 className="text-3xl sm:text-4xl font-black text-zinc-900 dark:text-white leading-tight">
-                  Politique de Confidentialité
+                  Privacy Policy
                 </h1>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Dernière mise à jour : 30 Juin 2026 • Plateforme ANSELLA
+                  Last updated: June 30, 2026 • ANSELLA Platform
                 </p>
               </div>
             </div>
@@ -62,11 +61,11 @@ export default function PrivacyPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
             
-            {/* Sidebar Table of Contents (Left) */}
+            {/* Sidebar Table of Contents */}
             <aside className="lg:col-span-4 sticky top-28 hidden lg:block space-y-4">
               <div className="bg-white/80 dark:bg-zinc-900/50 backdrop-blur-md border border-zinc-200 dark:border-zinc-800/80 rounded-3xl p-6 shadow-sm">
                 <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white uppercase tracking-wider mb-4">
-                  Sommaire
+                  Table of Contents
                 </h3>
                 <nav className="space-y-2">
                   {sections.map((sec) => {
@@ -90,7 +89,7 @@ export default function PrivacyPage() {
               </div>
             </aside>
 
-            {/* Detailed Content (Right) */}
+            {/* Detailed Content */}
             <div className="lg:col-span-8 space-y-6">
               
               <motion.div
@@ -99,7 +98,7 @@ export default function PrivacyPage() {
                 transition={{ duration: 0.5 }}
                 className="space-y-6"
               >
-                {/* 1. Données Collectées */}
+                {/* 1. Data Collected */}
                 <section 
                   id="section-1" 
                   className="bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800/80 rounded-3xl p-6 md:p-8 space-y-4 scroll-mt-28 transition-all hover:border-teal-500/30"
@@ -107,31 +106,31 @@ export default function PrivacyPage() {
                   <div className="flex items-center gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-3">
                     <Database className="w-5 h-5 text-teal-500" />
                     <h2 className="text-lg font-extrabold text-zinc-900 dark:text-white">
-                      1. Données Collectées
+                      1. Data Collected
                     </h2>
                   </div>
                   <div className="space-y-3 text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed">
                     <p>
-                      Lorsque vous créez un compte apprenant ou formateur sur ANSELLA, nous collectons les informations nécessaires à votre identification et à la fourniture de nos services :
+                      When you create a learner or instructor account on ANSELLA, we collect the information necessary for your identification and for the provision of our services:
                     </p>
                     <ul className="list-none space-y-2.5 pl-2">
                       <li className="flex items-start gap-2 text-zinc-500 dark:text-zinc-400">
                         <span className="w-1.5 h-1.5 bg-teal-500 rounded-full mt-2" />
-                        <span>Votre nom complet et adresse e-mail.</span>
+                        <span>Your full name and email address.</span>
                       </li>
                       <li className="flex items-start gap-2 text-zinc-500 dark:text-zinc-400">
                         <span className="w-1.5 h-1.5 bg-teal-500 rounded-full mt-2" />
-                        <span>Les informations de votre profil public (nationalité, biographie, photo de profil).</span>
+                        <span>Your public profile information (nationality, biography, profile photo).</span>
                       </li>
                       <li className="flex items-start gap-2 text-zinc-500 dark:text-zinc-400">
                         <span className="w-1.5 h-1.5 bg-teal-500 rounded-full mt-2" />
-                        <span>Vos coordonnées de facturation pour les encaissements ou les paiements Mobile Money.</span>
+                        <span>Your billing details for Mobile Money collections or payments.</span>
                       </li>
                     </ul>
                   </div>
                 </section>
 
-                {/* 2. Utilisation de vos Données */}
+                {/* 2. Use of Your Data */}
                 <section 
                   id="section-2" 
                   className="bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800/80 rounded-3xl p-6 md:p-8 space-y-4 scroll-mt-28 transition-all hover:border-teal-500/30"
@@ -139,35 +138,35 @@ export default function PrivacyPage() {
                   <div className="flex items-center gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-3">
                     <Activity className="w-5 h-5 text-teal-500" />
                     <h2 className="text-lg font-extrabold text-zinc-900 dark:text-white">
-                      2. Utilisation de vos Données
+                      2. Use of Your Data
                     </h2>
                   </div>
                   <div className="space-y-3 text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed">
                     <p>
-                      Vos informations personnelles nous permettent de personnaliser votre expérience sur la plateforme éducative, notamment pour :
+                      Your personal information allows us to personalize your experience on the educational platform, in particular to:
                     </p>
                     <ul className="list-none space-y-2.5 pl-2">
                       <li className="flex items-start gap-2 text-zinc-500 dark:text-zinc-400">
                         <span className="w-1.5 h-1.5 bg-teal-500 rounded-full mt-2" />
-                        <span>Gérer vos inscriptions à des cours et suivre votre progression.</span>
+                        <span>Manage your course enrollments and track your progress.</span>
                       </li>
                       <li className="flex items-start gap-2 text-zinc-500 dark:text-zinc-400">
                         <span className="w-1.5 h-1.5 bg-teal-500 rounded-full mt-2" />
-                        <span>Valider et exécuter les paiements de cours via M-Pesa, Orange Money, Airtel Money.</span>
+                        <span>Validate and process course payments via M-Pesa, Orange Money, Airtel Money.</span>
                       </li>
                       <li className="flex items-start gap-2 text-zinc-500 dark:text-zinc-400">
                         <span className="w-1.5 h-1.5 bg-teal-500 rounded-full mt-2" />
-                        <span>Générer et certifier vos diplômes ou certificats de réussite.</span>
+                        <span>Generate and certify your diplomas or completion certificates.</span>
                       </li>
                       <li className="flex items-start gap-2 text-zinc-500 dark:text-zinc-400">
                         <span className="w-1.5 h-1.5 bg-teal-500 rounded-full mt-2" />
-                        <span>Assurer le support client et vous envoyer des notifications de sécurité.</span>
+                        <span>Provide customer support and send you security notifications.</span>
                       </li>
                     </ul>
                   </div>
                 </section>
 
-                {/* 3. Confidentialité et Partage */}
+                {/* 3. Confidentiality & Sharing */}
                 <section 
                   id="section-3" 
                   className="bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800/80 rounded-3xl p-6 md:p-8 space-y-4 scroll-mt-28 transition-all hover:border-teal-500/30"
@@ -175,15 +174,15 @@ export default function PrivacyPage() {
                   <div className="flex items-center gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-3">
                     <EyeOff className="w-5 h-5 text-teal-500" />
                     <h2 className="text-lg font-extrabold text-zinc-900 dark:text-white">
-                      3. Confidentialité et Partage
+                      3. Confidentiality &amp; Sharing
                     </h2>
                   </div>
                   <p className="text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                    ANSELLA s'engage à ne jamais revendre vos données personnelles à des fins commerciales. Elles ne sont partagées qu'avec les tiers essentiels à notre bon fonctionnement (services de base de données Supabase, passerelles de paiement électronique pour les transactions Mobile Money).
+                    ANSELLA is committed to never reselling your personal data for commercial purposes. It is only shared with the essential third parties required for our proper operation (Supabase database services, electronic payment gateways for Mobile Money transactions).
                   </p>
                 </section>
 
-                {/* 4. Sécurité des Informations */}
+                {/* 4. Information Security */}
                 <section 
                   id="section-4" 
                   className="bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800/80 rounded-3xl p-6 md:p-8 space-y-4 scroll-mt-28 transition-all hover:border-teal-500/30"
@@ -191,15 +190,15 @@ export default function PrivacyPage() {
                   <div className="flex items-center gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-3">
                     <Lock className="w-5 h-5 text-teal-500" />
                     <h2 className="text-lg font-extrabold text-zinc-900 dark:text-white">
-                      4. Sécurité des Informations
+                      4. Information Security
                     </h2>
                   </div>
                   <p className="text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                    Nous utilisons les standards de l'industrie technologique pour protéger vos informations personnelles. L'authentification de notre plateforme s'appuie sur Supabase Auth, assurant un cryptage renforcé de vos identifiants et données de sessions de connexion.
+                    We use industry-standard technology to protect your personal information. Our platform&apos;s authentication relies on Supabase Auth, ensuring strong encryption of your credentials and session login data.
                   </p>
                 </section>
 
-                {/* 5. Vos Droits */}
+                {/* 5. Your Rights */}
                 <section 
                   id="section-5" 
                   className="bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800/80 rounded-3xl p-6 md:p-8 space-y-4 scroll-mt-28 transition-all hover:border-teal-500/30"
@@ -207,11 +206,11 @@ export default function PrivacyPage() {
                   <div className="flex items-center gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-3">
                     <UserCheck className="w-5 h-5 text-teal-500" />
                     <h2 className="text-lg font-extrabold text-zinc-900 dark:text-white">
-                      5. Vos Droits
+                      5. Your Rights
                     </h2>
                   </div>
                   <p className="text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                    Conformément à la réglementation sur la protection des données personnelles, vous disposez d'un droit d'accès, de rectification et de suppression de vos données. Vous pouvez effectuer ces modifications depuis votre page de paramètres de profil sur la plateforme ou en contactant notre équipe d'administration.
+                    In accordance with personal data protection regulations, you have the right to access, rectify, and delete your data. You can make these changes from your profile settings page on the platform or by contacting our administration team.
                   </p>
                 </section>
 

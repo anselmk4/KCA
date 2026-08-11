@@ -32,11 +32,11 @@ function ResetPasswordForm() {
     setError(null);
 
     if (password.length < 8) {
-      setError("Le mot de passe doit contenir au moins 8 caractères.");
+      setError("Password must be at least 8 characters.");
       return;
     }
     if (password !== confirm) {
-      setError("Les mots de passe ne correspondent pas.");
+      setError("Passwords do not match.");
       return;
     }
 
@@ -50,7 +50,7 @@ function ResetPasswordForm() {
         setTimeout(() => router.push("/login"), 3000);
       }
     } catch (err: any) {
-      setError(err?.message || "Une erreur est survenue.");
+      setError(err?.message || "An error occurred.");
     } finally {
       setLoading(false);
     }
@@ -63,17 +63,17 @@ function ResetPasswordForm() {
           <Image src="/logo.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto dark:hidden" priority />
           <Image src="/logo-dark.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto hidden dark:block" priority />
         </Link>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Nouveau mot de passe</h1>
+        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">New Password</h1>
         <p className="text-zinc-500 dark:text-zinc-400 text-center text-sm">
-          Choisissez un nouveau mot de passe sécurisé pour votre compte.
+          Choose a new secure password for your account.
         </p>
       </div>
 
       {success ? (
         <div className="text-center space-y-4 py-4">
           <CheckCircle2 className="w-14 h-14 text-green-500 mx-auto" />
-          <p className="font-bold text-zinc-900 dark:text-white">Mot de passe mis à jour !</p>
-          <p className="text-zinc-500 text-sm">Redirection vers la connexion...</p>
+          <p className="font-bold text-zinc-900 dark:text-white">Password updated!</p>
+          <p className="text-zinc-500 text-sm">Redirecting to login...</p>
         </div>
       ) : (
         <>
@@ -86,7 +86,7 @@ function ResetPasswordForm() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
-                Nouveau mot de passe
+                New Password
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
@@ -96,7 +96,7 @@ function ResetPasswordForm() {
                   value={password}
                   minLength={8}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="Min. 8 caractères"
+                  placeholder="Min. 8 characters"
                   className="w-full pl-10 pr-10 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white"
                 />
                 <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 cursor-pointer">
@@ -106,7 +106,7 @@ function ResetPasswordForm() {
             </div>
             <div>
               <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
-                Confirmer le mot de passe
+                Confirm Password
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
@@ -115,7 +115,7 @@ function ResetPasswordForm() {
                   type={show ? "text" : "password"}
                   value={confirm}
                   onChange={e => setConfirm(e.target.value)}
-                  placeholder="Répétez le mot de passe"
+                  placeholder="Repeat your password"
                   className="w-full pl-10 pr-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white"
                 />
               </div>
@@ -125,7 +125,7 @@ function ResetPasswordForm() {
               disabled={loading}
               className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer text-sm"
             >
-              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Mise à jour...</> : "Enregistrer le nouveau mot de passe"}
+              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Updating...</> : "Save new password"}
             </button>
           </form>
         </>
@@ -137,7 +137,7 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-6 font-sans">
-      <Suspense fallback={<div className="text-zinc-500 text-sm">Chargement...</div>}>
+      <Suspense fallback={<div className="text-zinc-500 text-sm">Loading...</div>}>
         <ResetPasswordForm />
       </Suspense>
     </div>

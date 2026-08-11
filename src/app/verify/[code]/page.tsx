@@ -2,8 +2,8 @@ import { Metadata } from 'next';
 import VerifyClient from './VerifyClient';
 
 export const metadata: Metadata = {
-  title: 'Vérification de Certificat — ANSELLA',
-  description: 'Vérifiez l\'authenticité d\'un certificat ANSELLA.',
+  title: 'Certificate Verification — ANSELLA',
+  description: 'Verify the authenticity of an official ANSELLA certificate.',
 };
 
 export default async function VerifyPage({ params }: { params: Promise<{ code: string }> }) {

@@ -15,7 +15,6 @@ export default function FeaturesPage() {
       <Navbar />
       
       <main className="flex-1 py-20">
-        {/* Background Decorative Gradients & Glows */}
         <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-teal-500/5 rounded-full blur-[120px] pointer-events-none" />
         <div className="absolute bottom-10 right-10 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-[150px] pointer-events-none" />
 
@@ -24,16 +23,16 @@ export default function FeaturesPage() {
           {/* Header Banner */}
           <div className="text-center max-w-3xl mx-auto space-y-6">
             <span className="text-xs font-bold text-teal-400 bg-teal-400/10 border border-teal-500/20 px-3.5 py-1 rounded-full uppercase tracking-widest">
-              Fonctionnalités
+              Features
             </span>
             <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-[1.1] text-zinc-900 dark:text-white">
-              Une plateforme éducative de{" "}
+              A world-class{" "}
               <span className="bg-gradient-to-r from-teal-500 via-teal-450 to-indigo-500 dark:from-teal-400 dark:to-indigo-400 bg-clip-text text-transparent">
-                classe mondiale.
+                educational platform.
               </span>
             </h1>
             <p className="text-lg text-zinc-650 dark:text-zinc-400 leading-relaxed">
-              Explorez tous les outils haut de gamme développés spécifiquement pour concevoir, structurer, dispenser et rentabiliser vos cours dans le monde entier.
+              Explore all the premium tools developed specifically to design, structure, deliver, and monetize your courses worldwide.
             </p>
           </div>
 
@@ -47,15 +46,15 @@ export default function FeaturesPage() {
                 <Smartphone className="h-6 w-6" />
               </div>
               <div className="space-y-3">
-                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Paiements Flexibles & Globaux</h3>
+                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Flexible &amp; Global Payments</h3>
                 <p className="text-zinc-650 dark:text-zinc-400 text-sm leading-relaxed">
-                  Encaissez directement les inscriptions via cartes bancaires, PayPal et les réseaux Mobile Money mondiaux et locaux. Retirez instantanément vos revenus d'instructeur de manière simple et sécurisée, sans intermédiaires compliqués.
+                  Collect enrollments directly via bank cards, PayPal, and global and local Mobile Money networks. Withdraw your instructor earnings instantly in a simple and secure manner, without complicated intermediaries.
                 </p>
               </div>
               <ul className="space-y-2.5 text-sm text-zinc-700 dark:text-zinc-300">
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Simulation instantanée en mode sandbox</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Rapprochement automatique des commandes</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Historique et statistiques détaillés</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Instant simulation in sandbox mode</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Automatic order reconciliation</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Detailed history and statistics</li>
               </ul>
             </div>
 
@@ -66,34 +65,34 @@ export default function FeaturesPage() {
                 <Lock className="h-6 w-6" />
               </div>
               <div className="space-y-3">
-                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Hébergement Vidéo & Sécurité</h3>
+                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Video Hosting &amp; Security</h3>
                 <p className="text-zinc-650 dark:text-zinc-400 text-sm leading-relaxed">
-                  Protéger votre propriété intellectuelle est notre priorité absolue. Intégrez vos vidéos de leçons de manière fluide et sécurisée via notre lecteur propriétaire bloquant le téléchargement direct non autorisé.
+                  Protecting your intellectual property is our absolute priority. Integrate your lesson videos smoothly and securely through our proprietary player that blocks unauthorized direct downloads.
                 </p>
               </div>
               <ul className="space-y-2.5 text-sm text-zinc-700 dark:text-zinc-300">
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Protection anti-téléchargement</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Intégration YouTube, Vimeo et Direct Video</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Lecteur optimisé pour faibles connexions internet</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Anti-download protection</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> YouTube, Vimeo &amp; Direct Video integration</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Player optimized for low internet connections</li>
               </ul>
             </div>
 
-            {/* Feature 3: Live Course Builder */}
+            {/* Feature 3: Modular Course Builder */}
             <div className="bg-white/40 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800/80 rounded-3xl p-8 space-y-6 hover:border-zinc-350 dark:hover:border-zinc-700/80 transition-all group relative overflow-hidden text-left">
               <div className="absolute inset-0 bg-gradient-to-r from-teal-500/10 to-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
               <div className="bg-indigo-500/15 w-12 h-12 rounded-2xl flex items-center justify-center text-indigo-500 dark:text-indigo-400 border border-indigo-500/20 shrink-0">
                 <Layers className="h-6 w-6" />
               </div>
               <div className="space-y-3">
-                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Générateur de Cours Modulaire</h3>
+                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Modular Course Builder</h3>
                 <p className="text-zinc-650 dark:text-zinc-400 text-sm leading-relaxed">
-                  Structurez vos formations de manière didactique et professionnelle. Divisez votre contenu en modules et chapitres clairs, ajoutez des quiz d'évaluation, et fournissez des supports de cours téléchargeables (PDF, ZIP).
+                  Structure your training didactically and professionally. Divide your content into clear modules and chapters, add assessment quizzes, and provide downloadable course materials (PDF, ZIP).
                 </p>
               </div>
               <ul className="space-y-2.5 text-sm text-zinc-700 dark:text-zinc-300">
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Ajout illimité de sections et chapitres</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Gestionnaire de fichiers pour ressources externes</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Mode brouillon pour préparer vos publications</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Unlimited sections and chapters</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> File manager for external resources</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Draft mode to prepare your publications</li>
               </ul>
             </div>
 
@@ -104,29 +103,29 @@ export default function FeaturesPage() {
                 <FileCheck className="h-6 w-6" />
               </div>
               <div className="space-y-3">
-                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Quiz interactifs & Certifications</h3>
+                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Interactive Quizzes &amp; Certifications</h3>
                 <p className="text-zinc-650 dark:text-zinc-400 text-sm leading-relaxed">
-                  Validez les compétences acquises par vos apprenants. Créez des questionnaires à choix multiples (QCM) avec calcul automatique des notes et générez instantanément des certificats de réussite personnalisés et vérifiables en ligne par code unique.
+                  Validate the skills acquired by your learners. Create multiple-choice questionnaires (MCQ) with automatic grade calculation and instantly generate personalized, online-verifiable completion certificates with a unique code.
                 </p>
               </div>
               <ul className="space-y-2.5 text-sm text-zinc-700 dark:text-zinc-300">
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Éditeur de questions complet</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Seuils de réussite personnalisables</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Code de vérification public pour les employeurs</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Complete question editor</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Customizable passing thresholds</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Public verification code for employers</li>
               </ul>
             </div>
             
           </div>
 
-          {/* Value Proposition Call to Action */}
+          {/* CTA */}
           <div className="bg-gradient-to-br from-teal-900 to-indigo-950 dark:from-zinc-950 dark:to-zinc-900 border border-teal-850 dark:border-zinc-800 rounded-3xl p-8 md:p-12 flex flex-col md:flex-row justify-between items-center gap-8 relative overflow-hidden text-white shadow-2xl">
             <div className="space-y-4 max-w-2xl relative z-10 text-left">
               <div className="flex items-center gap-2 text-teal-400 text-xs font-bold uppercase tracking-wider">
-                <Sparkles className="w-4 h-4" /> Prêt à vous lancer ?
+                <Sparkles className="w-4 h-4" /> Ready to get started?
               </div>
-              <h2 className="text-2xl md:text-3xl font-black">Rejoignez Ansella aujourd&apos;hui</h2>
+              <h2 className="text-2xl md:text-3xl font-black">Join Ansella today</h2>
               <p className="text-zinc-300 text-sm leading-relaxed">
-                Créez votre académie personnalisée en quelques clics et commencez à dispenser vos formations dès maintenant.
+                Create your personalized academy in a few clicks and start delivering your training right now.
               </p>
             </div>
             <div className="shrink-0 relative z-10 w-full md:w-auto">
@@ -134,7 +133,7 @@ export default function FeaturesPage() {
                 href="/register" 
                 className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white font-bold text-sm transition-all shadow-lg shadow-teal-500/10"
               >
-                Commencer gratuitement <ArrowRight className="w-4 h-4" />
+                Get started for free <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
           </div>

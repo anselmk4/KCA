@@ -237,12 +237,12 @@ export default function UserProfilePage() {
 
     const enriched: Post[] = postsData.map((p: any) => ({
       ...p,
-      author_name: authorProfile?.full_name || "Utilisateur",
+      author_name: authorProfile?.full_name || "User",
       author_avatar: authorProfile?.avatar_url || null,
       showComments: false,
       comments: (commentsData || [])
         .filter((c: any) => c.post_id === p.id)
-        .map((c: any) => ({ ...c, author_name: commenterMap[c.user_id] || "Utilisateur" })),
+        .map((c: any) => ({ ...c, author_name: commenterMap[c.user_id] || "User" })),
     }));
 
     setPosts(enriched);
@@ -264,7 +264,7 @@ export default function UserProfilePage() {
   };
 
   const handleDeletePost = async (postId: string) => {
-    if (!confirm("Supprimer cette publication ?")) return;
+    if (!confirm("Delete this post?")) return;
     await db.from("community_posts").delete().eq("id", postId);
     await loadPosts(currentUser?.id);
   };
@@ -293,7 +293,7 @@ export default function UserProfilePage() {
     (name || "AN").split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
   const formatDate = (d: string) =>
-    new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
+    new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
 
   const totalEnrolled = courses.reduce((s, c) => s + c.enrollmentCount, 0);
 
@@ -312,7 +312,7 @@ export default function UserProfilePage() {
         <Navbar />
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
           <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
-          <p className="text-sm text-zinc-400 font-medium">Chargement du profil...</p>
+          <p className="text-sm text-zinc-400 font-medium">Loading profile...</p>
         </div>
         <Footer />
       </div>
@@ -328,8 +328,8 @@ export default function UserProfilePage() {
           <div className="w-20 h-20 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
             <User className="w-10 h-10 text-zinc-400" />
           </div>
-          <p className="text-zinc-500 font-medium">Profil introuvable.</p>
-          <Link href="/" className="text-sm text-teal-600 hover:underline">Retour à l&apos;accueil</Link>
+          <p className="text-zinc-500 font-medium">Profile not found.</p>
+          <Link href="/" className="text-sm text-teal-600 hover:underline">Back to home</Link>
         </div>
         <Footer />
       </div>
@@ -355,7 +355,7 @@ export default function UserProfilePage() {
                 href="/"
                 className="inline-flex items-center gap-1.5 text-xs text-white/50 hover:text-white/90 transition-colors font-medium"
               >
-                ← Accueil
+                ← Home
               </Link>
               <div className="flex items-center gap-2">
                 {currentUser && (
@@ -372,7 +372,7 @@ export default function UserProfilePage() {
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/10 hover:bg-white/15 border border-white/15 rounded-xl text-xs font-semibold text-white/80 hover:text-white transition-all"
                 >
                   <Share2 className="w-3.5 h-3.5" />
-                  {copied ? "Copié !" : "Partager"}
+                  {copied ? "Copied!" : "Share"}
                 </button>
               </div>
             </div>
@@ -396,7 +396,7 @@ export default function UserProfilePage() {
                   {isInstructor && (
                     <div className="absolute -bottom-2 -right-2 flex items-center gap-1 px-2 py-0.5 bg-teal-500 rounded-full border-2 border-slate-900 shadow">
                       <Shield className="w-2.5 h-2.5 text-white" />
-                      <span className="text-[9px] font-black text-white uppercase tracking-wide">Certifié</span>
+                      <span className="text-[9px] font-black text-white uppercase tracking-wide">Certified</span>
                     </div>
                   )}
                 </div>
@@ -408,7 +408,7 @@ export default function UserProfilePage() {
                   <h1 className="text-2xl md:text-3xl font-black tracking-tight">{profile.full_name}</h1>
                   {isInstructor && (
                     <span className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-teal-500/20 border border-teal-400/30 text-teal-300 uppercase tracking-wider">
-                      Formateur
+                      Instructor
                     </span>
                   )}
                 </div>
@@ -438,7 +438,7 @@ export default function UserProfilePage() {
                     <a href={profile.website} target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/10 hover:border-white/20 rounded-xl text-xs text-white/70 hover:text-white transition-all"
                       title="Site web">
-                      <Globe className="w-3.5 h-3.5" /> Site web
+                      <Globe className="w-3.5 h-3.5" /> Website
                     </a>
                   )}
                   {profile.twitter && (
@@ -471,8 +471,8 @@ export default function UserProfilePage() {
               {/* Instructor Stats */}
               {isInstructor && (
                 <div className="flex md:flex-col gap-3 shrink-0">
-                  <StatCard value={courses.length} label="Cours" icon={BookOpen} color="text-teal-400" />
-                  <StatCard value={totalEnrolled} label="Inscrits" icon={Users} color="text-blue-400" />
+                  <StatCard value={courses.length} label="Courses" icon={BookOpen} color="text-teal-400" />
+                  <StatCard value={totalEnrolled} label="Learners" icon={Users} color="text-blue-400" />
                 </div>
               )}
             </div>
@@ -488,7 +488,7 @@ export default function UserProfilePage() {
 
               {/* Bio */}
               {profile.bio && (
-                <SectionCard title="À propos" icon={User}>
+                <SectionCard title="About" icon={User}>
                   <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed whitespace-pre-line">
                     {profile.bio}
                   </p>
@@ -497,7 +497,7 @@ export default function UserProfilePage() {
 
               {/* Academic Background (Instructor) */}
               {isInstructor && profile.academic_background && (
-                <SectionCard title="Formation académique" icon={GraduationCap}>
+                <SectionCard title="Academic Background" icon={GraduationCap}>
                   <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed whitespace-pre-line">
                     {profile.academic_background}
                   </p>
@@ -506,7 +506,7 @@ export default function UserProfilePage() {
 
               {/* Certifications (Instructor) */}
               {isInstructor && profile.certifications && (
-                <SectionCard title="Certifications & Accréditations" icon={Award}>
+                <SectionCard title="Certifications & Accreditations" icon={Award}>
                   <div className="flex flex-wrap gap-2">
                     {profile.certifications.split(/[,\n]+/).map((cert, i) => cert.trim() && (
                       <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800 rounded-xl text-xs font-semibold text-teal-700 dark:text-teal-400">
@@ -524,7 +524,7 @@ export default function UserProfilePage() {
 
               {/* Instructor Courses */}
               {isInstructor && courses.length > 0 && (
-                <SectionCard title={`Cours proposés (${courses.length})`} icon={BookOpen}>
+                <SectionCard title={`Offered Courses (${courses.length})`} icon={BookOpen}>
                   <div className="space-y-3">
                     {courses.map((c) => (
                       <Link key={c.id} href={`/courses/${c.id}`}
@@ -548,13 +548,13 @@ export default function UserProfilePage() {
                           )}
                           <div className="flex items-center gap-3 mt-1.5">
                             <span className="text-xs text-zinc-400 flex items-center gap-1">
-                              <Users className="w-3 h-3" /> {c.enrollmentCount} inscrit{c.enrollmentCount !== 1 ? "s" : ""}
+                              <Users className="w-3 h-3" /> {c.enrollmentCount} enrolled
                             </span>
                           </div>
                         </div>
                         <div className="text-right shrink-0 flex flex-col items-end justify-center">
                           <p className="text-sm font-black text-teal-600 dark:text-teal-400">
-                            {c.price > 0 ? `${c.price.toLocaleString()} $` : "Gratuit"}
+                            {c.price > 0 ? `$${c.price.toLocaleString()}` : "Free"}
                           </p>
                           <ArrowRight className="w-3.5 h-3.5 text-zinc-300 dark:text-zinc-600 group-hover:text-teal-500 transition-colors mt-1" />
                         </div>
@@ -566,7 +566,7 @@ export default function UserProfilePage() {
 
               {/* Student Paid Courses */}
               {!isInstructor && paidCourses.length > 0 && (
-                <SectionCard title="Formations suivies" icon={BookOpen}>
+                <SectionCard title="Enrolled Courses" icon={BookOpen}>
                   <div className="space-y-3">
                     {paidCourses.map((c) => (
                       <div key={c.id} className="flex items-center gap-4 p-4 rounded-xl border border-zinc-100 dark:border-zinc-800">
@@ -581,7 +581,7 @@ export default function UserProfilePage() {
                         </div>
                         <p className="font-semibold text-sm text-zinc-900 dark:text-white flex-1 truncate">{c.title}</p>
                         <span className="text-xs text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 px-2.5 py-1 rounded-lg shrink-0">
-                          Inscrit
+                          Enrolled
                         </span>
                       </div>
                     ))}
@@ -602,7 +602,7 @@ export default function UserProfilePage() {
                         <textarea
                           value={newPost}
                           onChange={(e) => setNewPost(e.target.value)}
-                          placeholder="Partagez une pensée, une ressource ou une mise à jour…"
+                          placeholder="Share a thought, resource, or update…"
                           rows={3}
                           className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none text-sm resize-none transition-all placeholder:text-zinc-400"
                         />
@@ -613,7 +613,7 @@ export default function UserProfilePage() {
                             className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white text-xs font-bold rounded-xl transition-all"
                           >
                             {submittingPost ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                            Publier
+                            Publish
                           </button>
                         </div>
                       </div>
@@ -624,8 +624,8 @@ export default function UserProfilePage() {
                 {posts.length === 0 ? (
                   <div className="text-center py-10">
                     <MessageCircle className="w-10 h-10 text-zinc-200 dark:text-zinc-800 mx-auto mb-3" />
-                    <p className="text-sm text-zinc-400">Aucune publication pour l&apos;instant.</p>
-                    {isOwn && <p className="text-xs text-zinc-500 mt-1">Commencez à partager avec la communauté.</p>}
+                    <p className="text-sm text-zinc-400">No posts yet.</p>
+                    {isOwn && <p className="text-xs text-zinc-500 mt-1">Start sharing with the community.</p>}
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -660,7 +660,7 @@ export default function UserProfilePage() {
                         <button onClick={() => toggleComments(post.id)}
                           className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-teal-600 font-medium transition-colors">
                           <MessageCircle className="w-3.5 h-3.5" />
-                          {post.comments?.length || 0} commentaire{(post.comments?.length || 0) !== 1 ? "s" : ""}
+                          {post.comments?.length || 0} comment{(post.comments?.length || 0) !== 1 ? "s" : ""}
                           {post.showComments ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                         </button>
 
@@ -680,7 +680,7 @@ export default function UserProfilePage() {
                                   value={newComments[post.id] || ""}
                                   onChange={(e) => setNewComments((prev) => ({ ...prev, [post.id]: e.target.value }))}
                                   onKeyDown={(e) => e.key === "Enter" && handleSubmitComment(post.id)}
-                                  placeholder="Ajouter un commentaire…"
+                                  placeholder="Add a comment…"
                                   className="flex-1 px-3 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:border-teal-500 outline-none text-zinc-900 dark:text-white"
                                 />
                                 <button onClick={() => handleSubmitComment(post.id)}
@@ -709,21 +709,21 @@ export default function UserProfilePage() {
                     className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-sm transition-all shadow-lg shadow-teal-600/20 hover:shadow-teal-500/30"
                   >
                     <Edit3 className="w-4 h-4" />
-                    Modifier mon profil
+                    Edit my profile
                   </Link>
                   <Link
                     href={dashboardHref}
                     className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-750 text-zinc-900 dark:text-white font-semibold text-sm transition-all"
                   >
                     <LayoutDashboard className="w-4 h-4" />
-                    Tableau de bord
+                    Dashboard
                   </Link>
                 </div>
               )}
 
               {/* Info Card */}
               <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm p-5">
-                <h3 className="font-bold text-sm text-zinc-900 dark:text-white mb-4">Informations</h3>
+                <h3 className="font-bold text-sm text-zinc-900 dark:text-white mb-4">Information</h3>
                 <div className="space-y-3">
                   {profile.nationality && (
                     <div className="flex items-center gap-2.5 text-sm">
@@ -746,7 +746,7 @@ export default function UserProfilePage() {
                       <div className="w-7 h-7 rounded-lg bg-teal-50 dark:bg-teal-950/30 flex items-center justify-center shrink-0">
                         <GraduationCap className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                       </div>
-                      <span className="text-teal-600 dark:text-teal-400 text-sm font-semibold">Formateur agréé</span>
+                      <span className="text-teal-600 dark:text-teal-400 text-sm font-semibold">Certified Instructor</span>
                     </div>
                   )}
                   {profile.website && (
@@ -766,11 +766,11 @@ export default function UserProfilePage() {
               {/* Instructor Stats Sidebar */}
               {isInstructor && (
                 <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm p-5">
-                  <h3 className="font-bold text-sm text-zinc-900 dark:text-white mb-4">Statistiques</h3>
+                  <h3 className="font-bold text-sm text-zinc-900 dark:text-white mb-4">Statistics</h3>
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { label: "Cours publiés", value: courses.length, icon: BookOpen, color: "bg-teal-50 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400" },
-                      { label: "Apprenants", value: totalEnrolled, icon: Users, color: "bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400" },
+                      { label: "Published Courses", value: courses.length, icon: BookOpen, color: "bg-teal-50 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400" },
+                      { label: "Learners", value: totalEnrolled, icon: Users, color: "bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400" },
                     ].map(({ label, value, icon: Icon, color }) => (
                       <div key={label} className={`rounded-xl p-3.5 ${color.split(" ").slice(0, 2).join(" ")} border border-zinc-100 dark:border-zinc-800`}>
                         <Icon className={`w-4 h-4 mb-2 ${color.split(" ").slice(2).join(" ")}`} />
@@ -787,7 +787,7 @@ export default function UserProfilePage() {
                 <div className="bg-gradient-to-br from-teal-600 to-teal-700 rounded-2xl p-5 text-white shadow-lg shadow-teal-600/20">
                   <div className="flex items-center gap-2 mb-2">
                     <GraduationCap className="w-4 h-4 text-teal-200" />
-                    <span className="text-xs font-bold uppercase tracking-widest text-teal-200">Académie</span>
+                    <span className="text-xs font-bold uppercase tracking-widest text-teal-200">Academy</span>
                   </div>
                   <p className="font-black text-base">{profile.academy_name}</p>
                   {profile.academy_tagline && (
@@ -798,13 +798,13 @@ export default function UserProfilePage() {
 
               {/* Share card */}
               <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm p-5">
-                <h3 className="font-bold text-sm text-zinc-900 dark:text-white mb-3">Partager ce profil</h3>
+                <h3 className="font-bold text-sm text-zinc-900 dark:text-white mb-3">Share this profile</h3>
                 <button
                   onClick={handleShare}
                   className="flex items-center gap-2 w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-750 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-medium text-zinc-600 dark:text-zinc-400 transition-all"
                 >
                   <Share2 className="w-3.5 h-3.5" />
-                  {copied ? "Lien copié !" : "Copier le lien du profil"}
+                  {copied ? "Link copied!" : "Copy profile link"}
                 </button>
               </div>
             </div>

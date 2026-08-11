@@ -32,11 +32,11 @@ export default function VerifyClient({ code }: { code: string }) {
     fetch(`/api/verify?code=${encodeURIComponent(code)}`)
       .then(r => r.json())
       .then(data => { setResult(data); setLoading(false); })
-      .catch(() => { setResult({ valid: false, message: "Erreur réseau." }); setLoading(false); });
+      .catch(() => { setResult({ valid: false, message: "Network error." }); setLoading(false); });
   }, [code]);
 
   const issuedDate = result?.valid
-    ? new Date(result.certificate.issuedAt).toLocaleDateString("fr-FR", {
+    ? new Date(result.certificate.issuedAt).toLocaleDateString("en-US", {
         year: "numeric", month: "long", day: "numeric",
       })
     : null;
@@ -56,28 +56,28 @@ export default function VerifyClient({ code }: { code: string }) {
         {loading && (
           <div className="bg-zinc-800/60 backdrop-blur-sm border border-zinc-700/50 rounded-3xl p-12 text-center">
             <Loader2 className="w-12 h-12 text-blue-400 animate-spin mx-auto mb-4" />
-            <p className="text-zinc-400 text-sm font-medium">Vérification du certificat en cours...</p>
+            <p className="text-zinc-400 text-sm font-medium">Verifying certificate authenticity...</p>
             <p className="text-zinc-600 text-xs mt-1 font-mono">{code}</p>
           </div>
         )}
 
-        {/* Certificat valide */}
+        {/* Valid Certificate */}
         {!loading && result?.valid && (
           <div className="space-y-6">
-            {/* Badge de validation */}
+            {/* Validation Badge */}
             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-3xl p-8 text-center space-y-3">
               <div className="inline-flex p-4 rounded-full bg-emerald-500/10 border border-emerald-500/20 mb-2">
                 <CheckCircle2 className="w-16 h-16 text-emerald-400" />
               </div>
-              <h1 className="text-2xl font-bold text-white">Certificat Authentique</h1>
+              <h1 className="text-2xl font-bold text-white">Authentic Certificate</h1>
               <p className="text-emerald-400 font-semibold text-sm">
-                Ce certificat a été vérifié et est authentique.
+                This certificate has been verified and is authentic.
               </p>
             </div>
 
-            {/* Détails du certificat */}
+            {/* Certificate Details */}
             <div className="bg-zinc-800/60 backdrop-blur-sm border border-zinc-700/50 rounded-3xl overflow-hidden">
-              {/* Visuel miniature */}
+              {/* Visual Thumbnail */}
               <div className="bg-gradient-to-br from-slate-100 to-zinc-200 border-b border-zinc-200/50 p-8 flex items-center justify-center">
                 <div className="w-full max-w-sm bg-white/95 rounded-xl p-6 text-center shadow-2xl border border-zinc-200/50">
                   <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -87,7 +87,7 @@ export default function VerifyClient({ code }: { code: string }) {
                     {result.certificate.academyName || "ANSELLA ACADEMY"}
                   </p>
                   <p className="text-[9px] text-zinc-405 uppercase tracking-wider mb-2 font-mono">
-                    Certificat d&apos;Accomplissement
+                    Certificate of Achievement
                   </p>
                   <p className="text-sm font-bold text-zinc-900 line-clamp-2 mb-2">
                     {result.certificate.courseTitle}
@@ -105,11 +105,11 @@ export default function VerifyClient({ code }: { code: string }) {
               <div className="p-6 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[
-                    { icon: User, label: "Diplômé", value: result.certificate.studentName },
-                    { icon: BookOpen, label: "Formation", value: result.certificate.courseTitle },
-                    { icon: GraduationCap, label: "Académie", value: result.certificate.academyName || "ANSELLA ACADEMY" },
-                    { icon: User, label: "Instructeur", value: result.certificate.instructorName },
-                    { icon: Calendar, label: "Date d'émission", value: issuedDate! },
+                    { icon: User, label: "Graduate", value: result.certificate.studentName },
+                    { icon: BookOpen, label: "Course", value: result.certificate.courseTitle },
+                    { icon: GraduationCap, label: "Academy", value: result.certificate.academyName || "ANSELLA ACADEMY" },
+                    { icon: User, label: "Instructor", value: result.certificate.instructorName },
+                    { icon: Calendar, label: "Issue Date", value: issuedDate! },
                   ].map(({ icon: Icon, label, value }) => (
                     <div key={label} className="flex items-start gap-3 p-3 bg-zinc-900/50 rounded-xl border border-zinc-700/40">
                       <div className="p-2 bg-blue-600/10 rounded-lg">
@@ -126,12 +126,12 @@ export default function VerifyClient({ code }: { code: string }) {
                 {/* Code */}
                 <div className="p-3 bg-zinc-900/70 rounded-xl border border-zinc-700/40 flex items-center justify-between">
                   <div>
-                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-0.5">Code de vérification</p>
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-0.5">Verification Code</p>
                     <p className="text-sm font-mono text-emerald-400 font-bold">{result.certificate.code}</p>
                   </div>
                   <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span className="text-xs font-bold text-emerald-400">VALIDE</span>
+                    <span className="text-xs font-bold text-emerald-400">VALID</span>
                   </div>
                 </div>
               </div>
@@ -144,31 +144,31 @@ export default function VerifyClient({ code }: { code: string }) {
                 className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors text-sm"
               >
                 <ExternalLink className="w-4 h-4" />
-                Découvrir ANSELLA
+                Discover ANSELLA
               </Link>
             </div>
           </div>
         )}
 
-        {/* Certificat invalide */}
+        {/* Invalid Certificate */}
         {!loading && result !== null && !result.valid && (
           <div className="bg-red-500/10 border border-red-500/20 rounded-3xl p-12 text-center space-y-5">
             <div className="inline-flex p-4 rounded-full bg-red-500/10 border border-red-500/20">
               <XCircle className="w-16 h-16 text-red-400" />
             </div>
-            <h1 className="text-2xl font-bold text-white">Certificat Non Valide</h1>
+            <h1 className="text-2xl font-bold text-white">Invalid Certificate</h1>
             <p className="text-red-400 font-medium text-sm max-w-md mx-auto">
-              {result.message || "Ce certificat est introuvable ou a été révoqué. Si vous pensez qu'il s'agit d'une erreur, contactez le support."}
+              {result.message || "This certificate was not found or has been revoked. If you believe this is an error, please contact support."}
             </p>
             <div className="p-3 bg-zinc-900/50 rounded-xl border border-zinc-700/40 inline-block">
-              <p className="text-xs text-zinc-500 font-mono">Code fourni : <span className="text-zinc-300">{code}</span></p>
+              <p className="text-xs text-zinc-500 font-mono">Provided code: <span className="text-zinc-300">{code}</span></p>
             </div>
             <div className="pt-4">
               <Link
                 href="/"
                 className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-700 hover:bg-zinc-600 text-white font-bold rounded-xl transition-colors text-sm"
               >
-                Retour à l&apos;accueil
+                Back to home
               </Link>
             </div>
           </div>
@@ -176,7 +176,7 @@ export default function VerifyClient({ code }: { code: string }) {
 
         {/* Footer */}
         <p className="text-center text-zinc-650 text-[11px] mt-8">
-          © {new Date().getFullYear()} ANSELLA · Certificats d&apos;études vérifiables
+          © {new Date().getFullYear()} ANSELLA · Verifiable Academic Certificates
         </p>
       </div>
     </div>

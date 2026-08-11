@@ -57,9 +57,9 @@ interface Lesson {
 }
 
 const LEVEL_MAP: Record<string, string> = {
-  BEGINNER: "Débutant",
-  INTERMEDIATE: "Intermédiaire",
-  ADVANCED: "Avancé",
+  BEGINNER: "Beginner",
+  INTERMEDIATE: "Intermediate",
+  ADVANCED: "Advanced",
   EXPERT: "Expert",
 };
 
@@ -135,7 +135,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
         estimated_duration_hours: courseData.estimated_duration_hours,
         enrollment_count: courseData.enrollment_count,
         instructor_id: courseData.instructor_id,
-        instructorName: profile?.full_name || "Formateur",
+        instructorName: profile?.full_name || "Instructor",
         categoryName,
         thumbnail_url: (courseData as any).thumbnail_url || null,
       });
@@ -221,10 +221,10 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
         <Navbar />
         <div className="flex-1 flex flex-col items-center justify-center gap-4 py-20">
           <AlertTriangle className="w-16 h-16 text-amber-500" />
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Cours introuvable</h1>
-          <p className="text-zinc-500 dark:text-zinc-400">Ce cours n&apos;existe pas ou n&apos;est plus disponible.</p>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Course Not Found</h1>
+          <p className="text-zinc-500 dark:text-zinc-400">This course does not exist or is no longer available.</p>
           <Link href="/courses" className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition-colors">
-            Voir le catalogue
+            Browse Catalog
           </Link>
         </div>
         <Footer />
@@ -240,7 +240,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
       <div className="bg-gradient-to-br from-zinc-900 via-zinc-900 to-teal-950 text-white pt-24 pb-16">
         <div className="container mx-auto px-4 md:px-8 max-w-6xl">
           <Link href="/courses" className="inline-flex items-center text-zinc-400 hover:text-white mb-8 transition-colors text-sm font-medium gap-1.5">
-            <ArrowLeft className="w-4 h-4" /> Retour au catalogue
+            <ArrowLeft className="w-4 h-4" /> Back to catalog
           </Link>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-start">
@@ -268,7 +268,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                 {totalLessons > 0 && (
                   <span className="flex items-center gap-1.5">
                     <BookOpen className="w-4 h-4 text-blue-400" />
-                    {totalLessons} leçon{totalLessons > 1 ? "s" : ""}
+                    {totalLessons} lesson{totalLessons > 1 ? "s" : ""}
                   </span>
                 )}
                 {totalMinutes > 0 && (
@@ -280,7 +280,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                 {course.enrollment_count !== null && course.enrollment_count > 0 && (
                   <span className="flex items-center gap-1.5">
                     <Users className="w-4 h-4 text-emerald-400" />
-                    {course.enrollment_count} apprenants
+                    {course.enrollment_count} learners
                   </span>
                 )}
                 {course.rating_avg !== null && course.rating_avg > 0 && (
@@ -292,7 +292,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
               </div>
 
               <p className="mt-4 text-xs text-zinc-500">
-                Par <span className="text-white font-semibold">{course.instructorName}</span>
+                By <span className="text-white font-semibold">{course.instructorName}</span>
               </p>
             </div>
 
@@ -307,9 +307,9 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                   <CourseHeroIcon category={course.categoryName || course.title} />
                 </div>
               )}
-              <p className="text-zinc-400 text-xs uppercase tracking-widest font-bold">Prix de la formation</p>
+              <p className="text-zinc-400 text-xs uppercase tracking-widest font-bold">Course Price</p>
               <p className="text-4xl font-black">
-                {course.price === 0 ? "Gratuit" : `$${course.price}`}
+                {course.price === 0 ? "Free" : `$${course.price}`}
               </p>
 
               {hasCertificate ? (
@@ -318,7 +318,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                   className="block w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 text-sm animate-pulse"
                 >
                   <Award className="w-5 h-5 inline mr-2 animate-spin-slow" />
-                  Afficher certificat
+                  View Certificate
                 </Link>
               ) : isEnrolled ? (
                 <Link
@@ -326,37 +326,37 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                   className="block w-full py-3.5 bg-teal-500 hover:bg-teal-400 text-white font-bold rounded-xl transition-all shadow-lg shadow-teal-500/20 text-sm"
                 >
                   <PlayCircle className="w-5 h-5 inline mr-2" />
-                  Continuer le cours
+                  Continue Course
                 </Link>
               ) : isLoggedIn ? (
                 <Link
                   href={`/dashboard/payment?courseId=${course.id}`}
                   className="block w-full py-3.5 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-teal-500/20 text-sm"
                 >
-                  {course.price > 0 ? `Procéder au paiement de $${course.price}` : "S'inscrire gratuitement"}
+                  {course.price > 0 ? `Enroll for $${course.price}` : "Enroll for Free"}
                 </Link>
               ) : (
                 <Link
                   href={`/register?next=/dashboard/payment?courseId=${course.id}`}
                   className="block w-full py-3.5 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-teal-500/20 text-sm"
                 >
-                  {course.price > 0 ? `Procéder au paiement de $${course.price}` : "Commencer gratuitement"}
+                  {course.price > 0 ? `Enroll for $${course.price}` : "Start for Free"}
                 </Link>
               )}
 
               {!isLoggedIn && (
                 <p className="text-xs text-zinc-400">
-                  Déjà un compte ?{" "}
+                  Already have an account?{" "}
                   <Link href={`/login?next=/courses/${courseId}`} className="text-teal-400 hover:text-teal-300 font-semibold">
-                    Se connecter
+                    Log in
                   </Link>
                 </p>
               )}
 
               <div className="text-xs text-zinc-500 space-y-1 pt-2 border-t border-white/10">
-                <p>✓ Accès à vie au contenu</p>
-                <p>✓ Certificat de réussite</p>
-                <p>✓ Support par l&apos;instructeur</p>
+                <p>✓ Lifetime access to course content</p>
+                <p>✓ Verified Certificate of Completion</p>
+                <p>✓ Direct instructor support</p>
               </div>
             </div>
           </div>
@@ -366,16 +366,16 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
       {/* Syllabus */}
       <main className="flex-1 bg-zinc-50 dark:bg-zinc-950 py-16">
         <div className="container mx-auto px-4 md:px-8 max-w-4xl">
-          <h2 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-white">Programme du cours</h2>
+          <h2 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-white">Course Curriculum</h2>
           <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-8">
-            {sections.length} module{sections.length > 1 ? "s" : ""} · {totalLessons} leçon{totalLessons > 1 ? "s" : ""}
-            {totalMinutes > 0 && ` · ${hours > 0 ? `${hours}h ` : ""}${mins > 0 ? `${mins}m` : ""} de contenu`}
+            {sections.length} module{sections.length > 1 ? "s" : ""} · {totalLessons} lesson{totalLessons > 1 ? "s" : ""}
+            {totalMinutes > 0 && ` · ${hours > 0 ? `${hours}h ` : ""}${mins > 0 ? `${mins}m` : ""} total content`}
           </p>
 
           {sections.length === 0 ? (
             <div className="bg-white dark:bg-zinc-900 rounded-2xl p-8 border border-zinc-200 dark:border-zinc-800 text-center text-zinc-500">
               <BookOpen className="w-12 h-12 mx-auto mb-4 text-zinc-300" />
-              <p>Le programme de ce cours sera bientôt disponible.</p>
+              <p>The syllabus for this course will be available soon.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -398,7 +398,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                       </div>
                       <div className="flex items-center gap-4 shrink-0 ml-4">
                         <span className="hidden sm:flex items-center gap-1 text-xs text-zinc-400">
-                          <BookOpen className="w-3.5 h-3.5" /> {section.lessons.length} leçon{section.lessons.length > 1 ? "s" : ""}
+                          <BookOpen className="w-3.5 h-3.5" /> {section.lessons.length} lesson{section.lessons.length > 1 ? "s" : ""}
                         </span>
                         {sectionMinutes > 0 && (
                           <span className="hidden sm:flex items-center gap-1 text-xs text-zinc-400">
@@ -412,7 +412,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                     {isOpen && (
                       <div className="border-t border-zinc-100 dark:border-zinc-800 divide-y divide-zinc-100 dark:divide-zinc-800 animate-in slide-in-from-top-2 duration-200">
                         {section.lessons.length === 0 ? (
-                          <p className="text-xs text-zinc-400 italic p-5 text-center">Aucune leçon dans ce module pour l&apos;instant.</p>
+                          <p className="text-xs text-zinc-400 italic p-5 text-center">No lessons in this module yet.</p>
                         ) : (
                           section.lessons.map((lesson) => (
                             <div key={lesson.id} className="flex items-center justify-between px-5 py-3.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
@@ -442,15 +442,15 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
 
           {/* Bottom CTA */}
           <div className="mt-12 bg-gradient-to-r from-teal-600 to-teal-700 rounded-2xl p-8 text-white text-center space-y-4">
-            <h3 className="text-2xl font-bold">Prêt à commencer ?</h3>
-            <p className="text-teal-100">Rejoignez les apprenants qui maîtrisent déjà cette formation.</p>
+            <h3 className="text-2xl font-bold">Ready to start?</h3>
+            <p className="text-teal-100">Join other ambitious learners who are mastering this curriculum.</p>
             {isEnrolled ? (
               <Link href={`/dashboard/courses/${course.id}/learn`} className="inline-flex items-center gap-2 px-8 py-3 bg-white text-teal-700 hover:bg-teal-50 font-bold rounded-xl transition-all shadow-md">
-                <PlayCircle className="w-5 h-5" /> Reprendre le cours
+                <PlayCircle className="w-5 h-5" /> Resume Course
               </Link>
             ) : (
               <Link href={isLoggedIn ? `/dashboard/payment?courseId=${course.id}` : `/register?next=/courses/${courseId}`} className="inline-flex items-center gap-2 px-8 py-3 bg-white text-teal-700 hover:bg-teal-50 font-bold rounded-xl transition-all shadow-md">
-                S&apos;inscrire · {course.price === 0 ? "Gratuit" : `$${course.price}`}
+                Enroll Now · {course.price === 0 ? "Free" : `$${course.price}`}
               </Link>
             )}
           </div>

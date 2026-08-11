@@ -125,11 +125,11 @@ export default function TemplatesPage() {
 
   const getLevelLabel = (lvl: string | null) => {
     const l = (lvl || "").toUpperCase();
-    if (l === "BEGINNER") return "Débutant";
-    if (l === "INTERMEDIATE") return "Intermédiaire";
-    if (l === "ADVANCED") return "Avancé";
+    if (l === "BEGINNER") return "Beginner";
+    if (l === "INTERMEDIATE") return "Intermediate";
+    if (l === "ADVANCED") return "Advanced";
     if (l === "EXPERT") return "Expert";
-    return "Tous niveaux";
+    return "All Levels";
   };
 
   const getLevelColor = (lvl: string | null) => {
@@ -155,17 +155,17 @@ export default function TemplatesPage() {
           <div className="relative container mx-auto max-w-4xl text-center space-y-6">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-teal-500/10 border border-teal-500/20 rounded-full text-teal-600 dark:text-teal-400 text-xs font-bold uppercase tracking-widest">
               <Sparkles className="w-3.5 h-3.5" />
-              Modèles d&apos;Académies
+              Academies & Learning Models
             </div>
             <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-[1.1]">
-              Éducation active &amp;{" "}
+              Active Education &amp;{" "}
               <span className="bg-gradient-to-r from-teal-500 via-teal-400 to-indigo-500 bg-clip-text text-transparent">
-                modèles d&apos;apprentissage.
+                learning models.
               </span>
             </h1>
             <p className="text-lg text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-2xl mx-auto">
-              Explorez nos académies virtuelles. Découvrez des cours certifiants
-              et apprenez des meilleurs experts mondiaux en blockchain, crypto, et IA.
+              Explore our virtual academies. Discover certified courses
+              and learn from the world&apos;s best experts in blockchain, crypto, and AI.
             </p>
           </div>
         </section>
@@ -178,29 +178,29 @@ export default function TemplatesPage() {
               <div>
                 <h2 className="text-2xl font-bold flex items-center gap-2">
                   <Flame className="w-5 h-5 text-orange-500" />
-                  Formations à la une
+                  Featured Training
                 </h2>
                 <p className="text-sm text-zinc-500 dark:text-zinc-500 mt-1">
-                  Cours récemment publiés par nos formateurs agréés.
+                  Recently published courses by our certified instructors.
                 </p>
               </div>
               <Link
                 href="/courses"
                 className="inline-flex items-center gap-1.5 text-sm font-semibold text-teal-600 dark:text-teal-400 hover:text-teal-500 transition-colors"
               >
-                Voir tout le catalogue <ArrowRight className="w-4 h-4" />
+                View the full catalog <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
 
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
                 <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
-                <p className="text-xs text-zinc-500">Chargement des cours...</p>
+                <p className="text-xs text-zinc-500">Loading courses...</p>
               </div>
             ) : courses.length === 0 ? (
               <div className="border border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl p-16 text-center space-y-3">
                 <BookOpen className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto" />
-                <p className="text-sm text-zinc-400">Aucun cours publié pour le moment.</p>
+                <p className="text-sm text-zinc-400">No published courses yet.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -226,7 +226,7 @@ export default function TemplatesPage() {
                       <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                       <div className="absolute top-3 left-3 flex gap-2">
                         <span className="bg-white/90 dark:bg-zinc-950/90 backdrop-blur px-2.5 py-1 rounded-lg text-[10px] font-bold text-teal-700 dark:text-teal-400 border border-zinc-200/50 dark:border-zinc-700/50">
-                          {course.categories?.name || "Général"}
+                          {course.categories?.name || "General"}
                         </span>
                       </div>
                       <div className="absolute bottom-3 right-3">
@@ -241,16 +241,16 @@ export default function TemplatesPage() {
                         {course.title}
                       </h3>
                       <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed flex-1 min-h-[36px]">
-                        {course.short_description || "Formation certifiante de haut niveau."}
+                        {course.short_description || "Top-tier certified training."}
                       </p>
 
                       <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                         <div className="flex items-center gap-1 text-amber-500">
                           <Star className="w-3.5 h-3.5 fill-current" />
-                          <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Certifiant</span>
+                          <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Certified</span>
                         </div>
                         <span className="font-black text-teal-600 dark:text-teal-400 text-sm">
-                          {course.price > 0 ? `${course.price.toLocaleString()} $` : "Gratuit"}
+                          {course.price > 0 ? `${course.price.toLocaleString()} $` : "Free"}
                         </span>
                       </div>
                     </div>
@@ -266,17 +266,17 @@ export default function TemplatesPage() {
               <div>
                 <h2 className="text-2xl font-bold flex items-center gap-2">
                   <GraduationCap className="w-5 h-5 text-teal-500" />
-                  Formateurs Ansella
+                  Ansella Instructors
                 </h2>
                 <p className="text-sm text-zinc-500 dark:text-zinc-500 mt-1">
-                  Apprenez auprès des experts reconnus mondialement.
+                  Learn from globally recognized experts.
                 </p>
               </div>
               <Link
                 href="/instructors"
                 className="inline-flex items-center gap-1.5 text-sm font-semibold text-teal-600 dark:text-teal-400 hover:text-teal-500 transition-colors"
               >
-                Voir tous les formateurs <ArrowRight className="w-4 h-4" />
+                View all instructors <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
 
@@ -287,8 +287,8 @@ export default function TemplatesPage() {
             ) : instructors.length === 0 ? (
               <div className="border border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl p-16 text-center space-y-3">
                 <Users className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto" />
-                <p className="text-sm text-zinc-400">Aucun formateur disponible pour le moment.</p>
-                <p className="text-xs text-zinc-500">Les formateurs apparaîtront ici une fois leurs profils configurés.</p>
+                <p className="text-sm text-zinc-400">No instructors available yet.</p>
+                <p className="text-xs text-zinc-500">Instructors will appear here once their profiles are set up.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
@@ -323,7 +323,7 @@ export default function TemplatesPage() {
                       {inst.full_name}
                     </h3>
                     <p className="text-xs font-semibold text-teal-600 dark:text-teal-400 mb-1.5">
-                      {inst.specialty || "Formateur Expert"}
+                      {inst.specialty || "Expert Instructor"}
                     </p>
 
                     {/* Academy name */}
@@ -344,7 +344,7 @@ export default function TemplatesPage() {
 
                     {/* Bio */}
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-3 leading-relaxed flex-1 mb-5 min-h-[48px]">
-                      {inst.bio || "Expert passionné par la transmission du savoir dans le domaine des technologies décentralisées."}
+                      {inst.bio || "Passionate expert in sharing knowledge in the field of decentralized technologies."}
                     </p>
 
                     {/* CTA */}
@@ -352,7 +352,7 @@ export default function TemplatesPage() {
                       href={`/profile/${inst.id}`}
                       className="w-full py-2.5 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white font-bold rounded-xl text-xs transition-all duration-200 block text-center shadow-sm shadow-teal-500/20 group-hover:shadow-teal-500/30"
                     >
-                      Voir le profil
+                      View Profile
                     </Link>
                   </div>
                 ))}
@@ -366,13 +366,13 @@ export default function TemplatesPage() {
             <div className="relative max-w-2xl mx-auto space-y-5">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/10 border border-white/20 rounded-full text-xs font-bold uppercase tracking-widest">
                 <Globe className="w-3.5 h-3.5" />
-                Rejoignez la communauté mondiale
+                Join the global community
               </div>
               <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
-                Prêt à transformer vos connaissances en expertise ?
+                Ready to transform your knowledge into expertise?
               </h2>
               <p className="text-white/70 text-base leading-relaxed">
-                Rejoignez des milliers d&apos;apprenants et formateurs sur Ansella. Commencez gratuitement, progressez à votre rythme.
+                Join thousands of learners and instructors on Ansella. Start for free, progress at your own pace.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
                 <Link
@@ -380,13 +380,13 @@ export default function TemplatesPage() {
                   className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-white text-teal-700 font-bold rounded-2xl hover:bg-zinc-100 transition-colors shadow-lg text-sm"
                 >
                   <Sparkles className="w-4 h-4" />
-                  Créer mon compte gratuitement
+                  Create my free account
                 </Link>
                 <Link
                   href="/courses"
                   className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-white/10 border border-white/20 text-white font-bold rounded-2xl hover:bg-white/20 transition-colors text-sm"
                 >
-                  Explorer le catalogue
+                  Explore the catalog
                   <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>

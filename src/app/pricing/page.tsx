@@ -10,92 +10,92 @@ export default function PricingPage() {
   const rawPlans = [
     {
       id: "free",
-      name: "Plan Free",
+      name: "Free Plan",
       monthlyPrice: 0,
-      description: "Parfait pour lancer votre académie et valider vos premiers cours auprès d'un petit groupe d'apprenants.",
+      description: "Perfect for launching your academy and validating your first courses with a small group of learners.",
       features: [
-        "1 cours actif maximum",
-        "Jusqu'à 15 apprenants inscrits",
-        "Quiz de validation simples",
-        "Encaissement Mobile Money & Carte",
-        "Frais de transaction : 20%",
-        "Support communautaire"
+        "1 active course maximum",
+        "Up to 15 enrolled learners",
+        "Simple validation quizzes",
+        "Mobile Money & Card collection",
+        "Transaction fee: 20%",
+        "Community support"
       ],
       popular: false,
-      buttonText: "Commencer gratuitement",
+      buttonText: "Start for free",
       colorClass: "text-teal-400"
     },
     {
       id: "base",
-      name: "Plan Base",
+      name: "Base Plan",
       monthlyPrice: 19,
-      description: "Pour les créateurs sérieux qui lancent leur académie.",
+      description: "For serious creators launching their academy.",
       features: [
-        "Jusqu'à 3 cours actifs",
-        "Jusqu'à 50 apprenants inscrits",
-        "✨ Auto-Grader & Correction Devoirs par IA",
-        "🛡️ AI Retention Guard (Relance Anti-Décrochage)",
-        "📝 Générateur IA de Quizz & Examens sur-mesure",
-        "Encaissement Mobile Money & Carte",
-        "Frais de transaction : 10%",
-        "Support par email"
+        "Up to 3 active courses",
+        "Up to 50 enrolled learners",
+        "✨ AI Auto-Grader & Homework Correction",
+        "🛡️ AI Retention Guard (Anti-Dropout Follow-up)",
+        "📝 AI Quiz & Exam Generator",
+        "Mobile Money & Card collection",
+        "Transaction fee: 10%",
+        "Email support"
       ],
       popular: false,
-      buttonText: "Démarrer avec le Plan Base",
+      buttonText: "Start with the Base Plan",
       colorClass: "text-indigo-400"
     },
     {
       id: "pro",
-      name: "Plan Pro",
+      name: "Pro Plan",
       monthlyPrice: 49,
-      description: "La solution idéale pour les formateurs professionnels et les académies en croissance.",
+      description: "The ideal solution for professional instructors and growing academies.",
       features: [
-        "Jusqu'à 10 cours actifs",
-        "Jusqu'à 200 apprenants inscrits",
-        "✨ Copilot IA d'Évaluation & Auto-Grader inclus",
-        "🛡️ AI Retention Guard (Détection Décrochage IA)",
-        "📝 Générateur IA de Quizz & Examens sur-mesure",
-        "Certificats de réussite automatisés",
-        "Frais de transaction réduits : 5%",
-        "Support prioritaire sous 24h"
+        "Up to 10 active courses",
+        "Up to 200 enrolled learners",
+        "✨ AI Assessment Copilot & Auto-Grader included",
+        "🛡️ AI Retention Guard (AI Dropout Detection)",
+        "📝 AI Quiz & Exam Generator",
+        "Automated completion certificates",
+        "Reduced transaction fee: 5%",
+        "Priority support within 24h"
       ],
       popular: true,
-      buttonText: "Démarrer avec le Plan Pro",
+      buttonText: "Start with the Pro Plan",
       colorClass: "text-teal-400"
     },
     {
       id: "max",
-      name: "Plan Max",
+      name: "Max Plan",
       monthlyPrice: 200,
-      description: "Pour les grandes académies et les écoles de formation exigeant une puissance et un accompagnement sans limites.",
+      description: "For large academies and training schools requiring unlimited power and support.",
       features: [
-        "Cours en ligne illimités",
-        "Apprenants illimités",
-        "✨ Auto-Grader & Copilot IA illimité",
-        "🛡️ AI Retention Guard & Relance Auto illimitée",
-        "📝 Générateur IA de Quizz & Examens sur-mesure",
-        "0% de frais de transaction",
-        "Nom de domaine personnalisé (ex: ecole.com)",
-        "Gestionnaire de compte dédié & WhatsApp"
+        "Unlimited online courses",
+        "Unlimited learners",
+        "✨ Unlimited AI Auto-Grader & Copilot",
+        "🛡️ AI Retention Guard & Unlimited Auto-Followup",
+        "📝 AI Quiz & Exam Generator",
+        "0% transaction fees",
+        "Custom domain name (e.g. school.com)",
+        "Dedicated account manager & WhatsApp"
       ],
       popular: false,
-      buttonText: "Activer le Plan Max",
+      buttonText: "Activate the Max Plan",
       colorClass: "text-pink-400"
     }
   ];
 
   const faqs = [
     {
-      q: "Comment fonctionnent les retraits par Mobile Money ?",
-      a: "Dès qu'un étudiant achète votre cours, le solde s'ajoute à votre compte instructeur Ansella. Vous pouvez ensuite demander un transfert vers M-Pesa, Orange Money ou Airtel Money directement depuis votre espace de facturation."
+      q: "How do Mobile Money withdrawals work?",
+      a: "As soon as a student purchases your course, the balance is added to your Ansella instructor account. You can then request a transfer to M-Pesa, Orange Money, or Airtel Money directly from your billing dashboard."
     },
     {
-      q: "Y a-t-il des frais d'inscription ou d'installation ?",
-      a: "Absolument aucun. Vous pouvez configurer votre compte de formateur Ansella entièrement gratuitement. Pour le plan Free, nous ne percevons des frais que sur les transactions réussies."
+      q: "Are there any signup or setup fees?",
+      a: "Absolutely none. You can set up your Ansella instructor account entirely for free. For the Free plan, we only charge fees on successful transactions."
     },
     {
-      q: "Puis-je changer de forfait ou annuler à tout moment ?",
-      a: "Oui, Ansella est sans engagement de durée. Vous pouvez surclasser, déclasser votre formule d'abonnement ou résilier l'abonnement mensuel directement depuis les paramètres de facturation."
+      q: "Can I change my plan or cancel at any time?",
+      a: "Yes, Ansella has no long-term commitment. You can upgrade, downgrade, or cancel your monthly subscription directly from the billing settings."
     }
   ];
 
@@ -111,16 +111,16 @@ export default function PricingPage() {
           {/* Title Header */}
           <div className="text-center max-w-3xl mx-auto space-y-6">
             <span className="text-xs font-bold text-teal-400 bg-teal-400/10 border border-teal-500/20 px-3.5 py-1 rounded-full uppercase tracking-widest">
-              Tarification
+              Pricing
             </span>
             <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-[1.1] text-zinc-900 dark:text-white">
-              Forfaits simples,{" "}
+              Simple plans,{" "}
               <span className="bg-gradient-to-r from-teal-500 via-teal-450 to-indigo-500 dark:from-teal-400 dark:to-indigo-400 bg-clip-text text-transparent">
-                sans mauvaise surprise.
+                no hidden surprises.
               </span>
             </h1>
             <p className="text-lg text-zinc-650 dark:text-zinc-400">
-              Choisissez le plan parfait pour le niveau de développement de votre académie.
+              Choose the perfect plan for your academy&apos;s stage of development.
             </p>
           </div>
 
@@ -138,7 +138,7 @@ export default function PricingPage() {
                 >
                   {plan.popular && (
                     <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-teal-500 text-zinc-950 px-4 py-1 text-xxs font-black uppercase tracking-widest rounded-full shadow-lg flex items-center gap-1">
-                      <Star className="w-3 h-3 fill-zinc-950" /> Recommandé
+                      <Star className="w-3 h-3 fill-zinc-950" /> Recommended
                     </div>
                   )}
 
@@ -148,7 +148,7 @@ export default function PricingPage() {
                     <div>
                       <div className="flex items-baseline">
                         <span className="text-3xl font-black text-zinc-900 dark:text-white">${plan.monthlyPrice}</span>
-                        <span className="text-xs text-zinc-500 ml-1.5">/ mois</span>
+                        <span className="text-xs text-zinc-500 ml-1.5">/ month</span>
                       </div>
                     </div>
 
@@ -185,21 +185,21 @@ export default function PricingPage() {
           <div className="border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 bg-white/40 dark:bg-zinc-950/20 max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-around gap-6 text-sm text-zinc-650 dark:text-zinc-400">
             <div className="flex items-center gap-3">
               <ShieldCheck className="w-6 h-6 text-teal-500 dark:text-teal-400" />
-              <span>Garantie de sécurité internationale</span>
+              <span>International security guarantee</span>
             </div>
             <div className="flex items-center gap-3">
               <CreditCard className="w-6 h-6 text-teal-500 dark:text-teal-400" />
-              <span>Facturation souple (Mensuelle ou Annuelle -10%)</span>
+              <span>Flexible billing (Monthly or Annual -10%)</span>
             </div>
             <div className="flex items-center gap-3">
               <Sparkles className="w-6 h-6 text-teal-500 dark:text-teal-400" />
-              <span>Retraits Mobile Money directs</span>
+              <span>Direct Mobile Money withdrawals</span>
             </div>
           </div>
 
           {/* FAQ Section */}
           <div className="max-w-3xl mx-auto space-y-8 pt-8">
-            <h2 className="text-2xl md:text-3xl font-bold text-center text-zinc-900 dark:text-white">Foire Aux Questions</h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-center text-zinc-900 dark:text-white">Frequently Asked Questions</h2>
             <div className="grid grid-cols-1 gap-6 text-left">
               {faqs.map((faq, idx) => (
                 <div key={idx} className="bg-white/40 dark:bg-zinc-950/30 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl p-6 space-y-2">

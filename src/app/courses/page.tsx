@@ -45,9 +45,9 @@ export default function CoursesPage() {
 
         if (data) {
           const mapped: Course[] = data.map((item: any) => {
-            let level = "Débutant";
-            if (item.level === "INTERMEDIATE") level = "Intermédiaire";
-            else if (item.level === "ADVANCED") level = "Avancé";
+            let level = "Beginner";
+            if (item.level === "INTERMEDIATE") level = "Intermediate";
+            else if (item.level === "ADVANCED") level = "Advanced";
             else if (item.level === "EXPERT") level = "Expert";
 
             return {
@@ -55,7 +55,7 @@ export default function CoursesPage() {
               title: item.title,
               description: stripHtml(item.short_description || item.description || ""),
               image: item.thumbnail_url || "",
-              category: item.categories?.name || "Général",
+              category: item.categories?.name || "General",
               price: item.price || 0,
               weeks: 8,
               hours: 45,
@@ -76,7 +76,7 @@ export default function CoursesPage() {
   const categories = useMemo(() => {
     const list = Array.from(new Set(courses.map((c) => c.category)));
     return [
-      { label: "Toutes les catégories", value: "all" },
+      { label: "All Categories", value: "all" },
       ...list.map((c) => ({ label: c, value: c })),
     ];
   }, [courses]);
@@ -129,7 +129,7 @@ export default function CoursesPage() {
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase bg-teal-500/10 dark:bg-teal-500/5 border border-teal-500/20 text-teal-600 dark:text-teal-400 mx-auto"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              Catalogue E-learning
+              E-Learning Catalog
             </motion.div>
             <motion.h1 
               initial={{ opacity: 0, y: 15 }}
@@ -137,9 +137,9 @@ export default function CoursesPage() {
               transition={{ delay: 0.1 }}
               className="text-3xl sm:text-5xl font-black text-zinc-900 dark:text-white leading-tight tracking-tight"
             >
-              Explorez nos parcours{" "}
+              Explore our certified{" "}
               <span className="bg-gradient-to-r from-teal-500 to-indigo-500 bg-clip-text text-transparent">
-                hautement qualifiants
+                learning paths
               </span>
             </motion.h1>
             <motion.p 
@@ -148,7 +148,7 @@ export default function CoursesPage() {
               transition={{ delay: 0.15 }}
               className="text-sm md:text-base text-zinc-500 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed"
             >
-              Des cursus complets et immersifs sur la blockchain, l'intelligence artificielle, et la finance décentralisée, encadrés par des experts.
+              Comprehensive, immersive training programs in blockchain, artificial intelligence, and decentralized finance, taught by world-class experts.
             </motion.p>
           </div>
         </section>
@@ -163,7 +163,7 @@ export default function CoursesPage() {
                 <input
                   id="course-search"
                   type="text"
-                  placeholder="Rechercher un mot clé, une formation..."
+                  placeholder="Search by keyword, topic, or course..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-11 pr-4 py-3 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20 transition-all outline-none"
@@ -196,19 +196,19 @@ export default function CoursesPage() {
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
                 <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
-                <p className="text-xs text-zinc-500">Chargement de nos formations d'excellence...</p>
+                <p className="text-xs text-zinc-500">Loading courses...</p>
               </div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-20 bg-white dark:bg-zinc-900/20 border border-zinc-200 dark:border-zinc-900 rounded-3xl p-8">
                 <GraduationCap className="w-12 h-12 text-zinc-400 mx-auto mb-3" />
                 <p className="text-zinc-500 text-sm font-semibold">
-                  Aucune formation ne correspond à vos critères de recherche.
+                  No courses match your search criteria.
                 </p>
                 <button 
                   onClick={() => { setSearch(""); setActiveCategory("all"); }}
                   className="mt-4 text-xs font-bold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer"
                 >
-                  Réinitialiser les filtres
+                  Reset filters
                 </button>
               </div>
             ) : (
@@ -240,11 +240,11 @@ export default function CoursesPage() {
 function CourseCard({ course }: { course: Course }) {
   const getLevelColor = (level: string) => {
     switch (level.toLowerCase()) {
-      case "débutant":
+      case "beginner":
         return "bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/30";
-      case "intermédiaire":
+      case "intermediate":
         return "bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/30";
-      case "avancé":
+      case "advanced":
         return "bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-900/30";
       default:
         return "bg-purple-100 dark:bg-purple-950/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-900/30";
@@ -301,13 +301,13 @@ function CourseCard({ course }: { course: Course }) {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase">
               <Clock className="w-3.5 h-3.5" />
-              <span>{course.weeks} SEMAINES</span>
+              <span>{course.weeks} WEEKS</span>
             </div>
           </div>
           <div className="text-right">
-            <span className="text-xs text-zinc-400 block leading-none mb-0.5">Tarif</span>
+            <span className="text-xs text-zinc-400 block leading-none mb-0.5">Price</span>
             <span className="text-base font-black text-zinc-900 dark:text-white">
-              {course.price > 0 ? `$${course.price}` : "Gratuit"}
+              {course.price > 0 ? `$${course.price}` : "Free"}
             </span>
           </div>
         </div>
@@ -317,7 +317,7 @@ function CourseCard({ course }: { course: Course }) {
           href={`/courses/${course.id}`}
           className="w-full py-3.5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800/80 dark:hover:bg-zinc-700/80 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all group/btn shadow-xs cursor-pointer"
         >
-          <span>Consulter le programme</span>
+          <span>View Course Details</span>
           <ArrowRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-0.5" />
         </Link>
 

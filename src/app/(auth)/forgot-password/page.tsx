@@ -20,7 +20,7 @@ export default function ForgotPasswordPage() {
     setError(null);
 
     if (!captchaToken) {
-      setError("Veuillez valider le test de sécurité (CAPTCHA).");
+      setError("Please complete the security check (CAPTCHA).");
       return;
     }
 
@@ -36,7 +36,7 @@ export default function ForgotPasswordPage() {
 
       if (!secRes.ok) {
         const secData = await secRes.json();
-        throw new Error(secData.error || "La vérification de sécurité a échoué.");
+        throw new Error(secData.error || "Security check failed.");
       }
 
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
@@ -46,7 +46,7 @@ export default function ForgotPasswordPage() {
       if (resetError) {
         const msg = resetError.message.toLowerCase();
         if (msg.includes("rate limit")) {
-          setError("Trop de tentatives. Attendez quelques minutes avant de réessayer.");
+          setError("Too many attempts. Please wait a few minutes before trying again.");
         } else {
           setError(resetError.message);
         }
@@ -55,7 +55,7 @@ export default function ForgotPasswordPage() {
         setSuccess(true);
       }
     } catch (err: any) {
-      setError(err?.message || "Une erreur est survenue.");
+      setError(err?.message || "An error occurred.");
       setCaptchaResetKey(prev => prev + 1); // Reset CAPTCHA on error
     } finally {
       setLoading(false);
@@ -72,9 +72,9 @@ export default function ForgotPasswordPage() {
             <Image src="/logo.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto dark:hidden" priority />
             <Image src="/logo-dark.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto hidden dark:block" priority />
           </Link>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Mot de passe oublié</h1>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Forgot Password</h1>
           <p className="text-zinc-500 dark:text-zinc-400 text-center text-sm">
-            Saisissez votre email pour recevoir un lien de réinitialisation.
+            Enter your email address to receive a reset link.
           </p>
         </div>
 
@@ -84,10 +84,10 @@ export default function ForgotPasswordPage() {
               <CheckCircle2 className="w-14 h-14 text-green-500" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-zinc-900 dark:text-white mb-2">Email envoyé !</h2>
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-white mb-2">Email sent!</h2>
               <p className="text-zinc-500 dark:text-zinc-400 text-sm">
-                Un lien de réinitialisation a été envoyé à <strong>{email}</strong>.
-                Vérifiez votre boîte mail (et les spams).
+                A reset link has been sent to <strong>{email}</strong>.
+                Check your inbox (and spam folder).
               </p>
             </div>
             <Link
@@ -95,7 +95,7 @@ export default function ForgotPasswordPage() {
               className="inline-flex items-center gap-2 px-5 py-3 bg-blue-600 text-white font-bold rounded-xl text-sm hover:bg-blue-700 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
-              Retour à la connexion
+              Back to login
             </Link>
           </div>
         ) : (
@@ -110,7 +110,7 @@ export default function ForgotPasswordPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
-                  Adresse Email
+                  Email Address
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
@@ -119,7 +119,7 @@ export default function ForgotPasswordPage() {
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    placeholder="vous@exemple.com"
+                    placeholder="you@example.com"
                     className="w-full pl-10 pr-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white"
                   />
                 </div>
@@ -135,9 +135,9 @@ export default function ForgotPasswordPage() {
                 className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer text-sm"
               >
                 {loading ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Envoi en cours...</>
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
                 ) : (
-                  "Envoyer le lien de réinitialisation"
+                  "Send reset link"
                 )}
               </button>
             </form>
@@ -145,7 +145,7 @@ export default function ForgotPasswordPage() {
             <div className="mt-6 text-center text-sm text-zinc-600 dark:text-zinc-400">
               <Link href="/login" className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-500 font-bold transition-colors">
                 <ArrowLeft className="w-4 h-4" />
-                Retour à la connexion
+                Back to login
               </Link>
             </div>
           </>

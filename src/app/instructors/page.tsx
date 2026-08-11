@@ -52,7 +52,6 @@ export default function InstructorsPage() {
           }
         }
 
-        // Fallback: fetch profiles that have academy_name or specialty
         if (!profilesData || profilesData.length === 0) {
           const { data: fallbackA } = await supabase
             .from("profiles")
@@ -75,7 +74,6 @@ export default function InstructorsPage() {
           }) as Instructor[];
         }
 
-        // Last resort: load any profile that has a name
         if (!profilesData || profilesData.length === 0) {
           const { data: anyProfiles } = await supabase
             .from("profiles")
@@ -115,7 +113,6 @@ export default function InstructorsPage() {
       <Navbar />
       
       <main className="flex-1 py-28 relative overflow-hidden">
-        {/* Glow Effects */}
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-500/5 dark:bg-teal-500/[0.02] rounded-full blur-[120px] pointer-events-none" />
         <div className="absolute bottom-10 left-10 w-[600px] h-[600px] bg-indigo-500/5 dark:bg-indigo-500/[0.02] rounded-full blur-[150px] pointer-events-none" />
 
@@ -125,16 +122,16 @@ export default function InstructorsPage() {
           <div className="text-center max-w-3xl mx-auto space-y-6">
             <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase bg-teal-500/10 dark:bg-teal-500/5 border border-teal-500/20 text-teal-600 dark:text-teal-400 mx-auto">
               <Sparkles className="w-3.5 h-3.5" />
-              Formateurs certifiés
+              Certified Instructors
             </span>
             <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight text-zinc-900 dark:text-white">
-              Apprenez auprès des{" "}
+              Learn from the{" "}
               <span className="bg-gradient-to-r from-teal-500 via-emerald-500 to-indigo-500 bg-clip-text text-transparent">
-                meilleurs experts.
+                best experts.
               </span>
             </h1>
             <p className="text-sm md:text-base text-zinc-500 dark:text-zinc-400 leading-relaxed">
-              Découvrez la liste complète des instructeurs agréés d'ANSELLA. Des professionnels actifs du secteur qui partagent leurs compétences et vous accompagnent pas à pas.
+              Discover the full list of ANSELLA certified instructors. Active industry professionals who share their expertise and guide you step by step.
             </p>
           </div>
 
@@ -142,12 +139,12 @@ export default function InstructorsPage() {
           {loading ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3">
               <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
-              <p className="text-xs text-zinc-500">Chargement des formateurs...</p>
+              <p className="text-xs text-zinc-500">Loading instructors...</p>
             </div>
           ) : instructors.length === 0 ? (
             <div className="border border-zinc-200 dark:border-zinc-800 rounded-3xl p-16 text-center text-zinc-500 bg-white dark:bg-zinc-900/10 max-w-xl mx-auto">
               <Users className="w-10 h-10 text-zinc-400 mx-auto mb-3" />
-              <p className="text-sm font-semibold">Aucun formateur enregistré pour le moment.</p>
+              <p className="text-sm font-semibold">No instructors registered yet.</p>
             </div>
           ) : (
             <motion.div 
@@ -162,7 +159,6 @@ export default function InstructorsPage() {
                   variants={cardVariants}
                   className="group bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800/80 rounded-3xl p-6 md:p-8 flex flex-col sm:flex-row items-start sm:items-center gap-6 hover:border-teal-500/30 hover:shadow-[0_10px_30px_rgba(20,184,166,0.03)] transition-all duration-300 relative overflow-hidden"
                 >
-                  {/* Decorative card glow */}
                   <div className="absolute top-0 right-0 w-24 h-24 bg-teal-500/[0.01] rounded-full blur-2xl pointer-events-none group-hover:bg-teal-500/[0.03] transition-colors" />
 
                   {/* Profile Photo */}
@@ -190,7 +186,7 @@ export default function InstructorsPage() {
                       </h3>
                       <div className="flex flex-wrap gap-2 items-center">
                         <span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-teal-500/10 dark:bg-teal-500/5 text-teal-600 dark:text-teal-400 border border-teal-500/20">
-                          {inst.specialty || "Expert Formateur"}
+                          {inst.specialty || "Expert Instructor"}
                         </span>
                         {inst.academy_name && (
                           <span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700/60 flex items-center gap-1">
@@ -202,7 +198,7 @@ export default function InstructorsPage() {
                     </div>
                     
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed line-clamp-2">
-                      {inst.bio || "Ce formateur d'exception n'a pas encore rédigé de biographie."}
+                      {inst.bio || "This instructor has not yet written a biography."}
                     </p>
 
                     <div className="flex flex-wrap items-center gap-4 text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
@@ -221,7 +217,7 @@ export default function InstructorsPage() {
                             rel="noopener noreferrer" 
                             className="hover:underline hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
                           >
-                            Site personnel
+                            Personal website
                           </a>
                         </span>
                       )}
@@ -234,7 +230,7 @@ export default function InstructorsPage() {
                       href={`/profile/${inst.id}`}
                       className="w-full sm:w-auto inline-flex items-center justify-center gap-1 px-4 py-3 rounded-2xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-950/80 dark:hover:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white font-extrabold text-xs transition-all cursor-pointer shadow-xs"
                     >
-                      <span>Profil</span>
+                      <span>Profile</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </Link>
                   </div>

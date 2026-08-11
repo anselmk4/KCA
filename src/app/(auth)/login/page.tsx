@@ -40,7 +40,7 @@ function LoginForm() {
           let profile = await fetchUserProfile(user.id);
 
           if (!profile) {
-            const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Utilisateur';
+            const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
             const intendedRole = (user.user_metadata?.role || 'STUDENT').toUpperCase() as any;
             await ensureProfile(user.id, user.email!, fullName, intendedRole);
             profile = await fetchUserProfile(user.id);
@@ -58,7 +58,7 @@ function LoginForm() {
           }
 
           const userRole = profile?.role || (user.user_metadata?.role as any) || 'STUDENT';
-          const userName = profile?.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Utilisateur';
+          const userName = profile?.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
           const userPlan = profile?.plan || 'FREE';
 
           setSimulatedSession({
@@ -99,13 +99,13 @@ function LoginForm() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (lockoutTime > 0) {
-      setError(`Trop de tentatives. Veuillez patienter ${lockoutTime} secondes.`);
+      setError(`Too many attempts. Please wait ${lockoutTime} seconds.`);
       return;
     }
     setError(null);
 
     if (!captchaToken) {
-      setError("Veuillez valider le test de sécurité (CAPTCHA).");
+      setError("Please complete the security check (CAPTCHA).");
       return;
     }
 
@@ -120,20 +120,20 @@ function LoginForm() {
 
       if (!secRes.ok) {
         const secData = await secRes.json();
-        throw new Error(secData.error || "La vérification de sécurité a échoué.");
+        throw new Error(secData.error || "Security check failed.");
       }
 
       const { redirectTo } = await loginWithEmail(email, password);
       router.push(redirectTo);
     } catch (err: any) {
-      setError(err.message || "Une erreur est survenue.");
+      setError(err.message || "An error occurred.");
       setLoading(false);
       setCaptchaResetKey(prev => prev + 1); // Reset Captcha on error
       setFailedAttempts(prev => {
         const next = prev + 1;
         if (next >= 5) {
           setLockoutTime(60);
-          setError("Trop de tentatives infructueuses. Formulaire verrouillé pour 60 secondes.");
+          setError("Too many failed attempts. Form locked for 60 seconds.");
           return 0;
         }
         return next;
@@ -145,7 +145,7 @@ function LoginForm() {
     const errorParam = searchParams.get("error");
     const reasonParam = searchParams.get("reason");
     if (errorParam || reasonParam) {
-      setError(reasonParam ? `Erreur d'authentification : ${reasonParam}` : "L'authentification Google a échoué. Veuillez réessayer.");
+      setError(reasonParam ? `Authentication error: ${reasonParam}` : "Google authentication failed. Please try again.");
     }
   }, [searchParams]);
 
@@ -161,14 +161,14 @@ function LoginForm() {
       });
       if (authErr) throw authErr;
     } catch (err: any) {
-      setError(err.message || "Une erreur est survenue avec Google Auth.");
+      setError(err.message || "An error occurred with Google Auth.");
       setGoogleLoading(false);
     }
   };
 
   const quickLogin = async (testEmail: string, testPassword: string) => {
     if (lockoutTime > 0) {
-      setError(`Trop de tentatives. Veuillez patienter ${lockoutTime} secondes.`);
+      setError(`Too many attempts. Please wait ${lockoutTime} seconds.`);
       return;
     }
     setError(null);
@@ -179,13 +179,13 @@ function LoginForm() {
       const { redirectTo } = await loginWithEmail(testEmail, testPassword);
       router.push(redirectTo);
     } catch (err: any) {
-      setError(err.message || "Une erreur est survenue.");
+      setError(err.message || "An error occurred.");
       setLoading(false);
       setFailedAttempts(prev => {
         const next = prev + 1;
         if (next >= 5) {
           setLockoutTime(60);
-          setError("Trop de tentatives infructueuses. Formulaire verrouillé pour 60 secondes.");
+          setError("Too many failed attempts. Form locked for 60 seconds.");
           return 0;
         }
         return next;
@@ -209,7 +209,7 @@ function LoginForm() {
             <Image src="/logo-dark.png" alt="ANSELLA Logo" width={160} height={48} className="object-contain h-10 w-auto hidden dark:block" priority />
           </Link>
           <Link href="/" className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-white transition-colors font-medium">
-            ← Accueil
+            ← Home
           </Link>
         </div>
 
@@ -217,18 +217,18 @@ function LoginForm() {
         <div className="z-10 max-w-md my-auto space-y-8">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-zinc-200/50 dark:bg-white/5 backdrop-blur-md border border-zinc-300/40 dark:border-white/10 rounded-full text-zinc-700 dark:text-zinc-300 text-xs font-bold">
             <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-            <span>LMS Premium de Nouvelle Génération</span>
+            <span>Next-Generation Premium LMS</span>
           </div>
 
           <div className="space-y-4">
             <h1 className="text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white leading-tight">
-              Gagnez de l'argent {" "}
+              Earn money doing{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-teal-500 to-emerald-500 dark:from-blue-400 dark:via-teal-400 dark:to-emerald-400">
-                en faisant ce que vous aimez
+                what you love
               </span>
             </h1>
             <p className="text-zinc-650 dark:text-zinc-400 text-base leading-relaxed font-medium">
-              Formez-vous avec les meilleurs experts mondiaux. Débloquez des parcours certifiants, passez des quiz d'évaluation et obtenez des certificats officiels et vérifiables en ligne.
+              Train with the world&apos;s best experts. Unlock certified learning paths, take assessment quizzes, and earn official, online-verifiable certificates.
             </p>
           </div>
 
@@ -238,26 +238,26 @@ function LoginForm() {
               <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
                 <Coins className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               </div>
-              <span>Formations de niveau professionnel</span>
+              <span>Professional-level training</span>
             </div>
             <div className="flex items-center space-x-3 text-sm text-zinc-700 dark:text-zinc-350 font-semibold">
               <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shrink-0">
                 <Cpu className="w-4 h-4 text-purple-600 dark:text-purple-400" />
               </div>
-              <span>Outils et agents d'Intelligence Artificielle appliqués</span>
+              <span>Applied Artificial Intelligence tools and agents</span>
             </div>
             <div className="flex items-center space-x-3 text-sm text-zinc-700 dark:text-zinc-350 font-semibold">
               <div className="w-8 h-8 rounded-lg bg-teal-500/10 border border-teal-500/20 flex items-center justify-center shrink-0">
                 <ShieldCheck className="w-4 h-4 text-teal-600 dark:text-teal-400" />
               </div>
-              <span>Certificats d'études officiels et vérifiables</span>
+              <span>Official and verifiable academic certificates</span>
             </div>
           </div>
         </div>
 
         {/* Footer Brand Info */}
         <div className="z-10 text-xs text-zinc-450 dark:text-zinc-500">
-          © {new Date().getFullYear()} Ansella Inc. Tous droits réservés.
+          © {new Date().getFullYear()} Ansella Inc. All rights reserved.
         </div>
       </div>
 
@@ -326,7 +326,7 @@ function LoginForm() {
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="vous@exemple.com"
+                placeholder="you@example.com"
                 className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white"
               />
             </div>

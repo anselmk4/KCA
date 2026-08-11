@@ -9,12 +9,12 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "ANSELLA | Plateforme LMS Mondiale pour tous les Formateurs | Partagez votre savoir",
-  description: "Créez, hébergez et vendez vos formations en ligne dans le monde entier. ANSELLA est une plateforme LMS de classe mondiale permettant d'évaluer vos apprenants, de délivrer des certificats et d'encaisser vos gains facilement.",
+  title: "ANSELLA | Global LMS Platform for Instructors & Learners | Share Your Knowledge",
+  description: "Create, host, and sell your online courses worldwide. ANSELLA is a world-class LMS platform to assess learners, issue certificates, and monetize your expertise easily.",
   keywords: [
-    "ANSELLA", "SaaS LMS", "E-learning", "Formations en ligne", 
-    "Vendre des cours", "Stripe", "PayPal", "Mobile Money",
-    "Blockchain", "Intelligence Artificielle", "Monétisation", "Formateurs"
+    "ANSELLA", "SaaS LMS", "E-learning", "Online Courses", 
+    "Sell Courses", "Stripe", "PayPal", "Mobile Money",
+    "Blockchain", "Artificial Intelligence", "Monetization", "Instructors"
   ],
   authors: [{ name: "ANSELLA Team", url: "https://ansella.app" }],
   creator: "ANSELLA",
@@ -33,25 +33,25 @@ export const metadata: Metadata = {
   },
   manifest: "/manifest.json",
   openGraph: {
-    title: "ANSELLA | Plateforme LMS Mondiale pour tous les Formateurs",
-    description: "Créez et vendez vos formations en ligne partout dans le monde. Encaissez vos revenus facilement.",
+    title: "ANSELLA | Global LMS Platform for Instructors & Learners",
+    description: "Create and sell online courses worldwide. Collect payments easily via Mobile Money and cards.",
     url: "https://ansella.app",
     siteName: "ANSELLA",
-    locale: "fr_FR",
+    locale: "en_US",
     type: "website",
     images: [
       {
         url: "/og-image-final.png",
         width: 1200,
         height: 630,
-        alt: "ANSELLA - Plateforme LMS Mondiale",
+        alt: "ANSELLA - Global LMS Platform",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "ANSELLA | Plateforme LMS Mondiale pour tous les Formateurs",
-    description: "Créez et vendez vos formations en ligne partout dans le monde. Encaissez vos revenus facilement.",
+    title: "ANSELLA | Global LMS Platform for Instructors & Learners",
+    description: "Create and sell online courses worldwide. Collect payments easily via Mobile Money and cards.",
     images: ["/og-image-final.png"],
   },
   robots: {
@@ -74,7 +74,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="fr"
+      lang="en"
       suppressHydrationWarning
     >
       <body className={`${inter.className} min-h-full flex flex-col antialiased bg-white dark:bg-black text-black dark:text-white`}>

@@ -87,12 +87,12 @@ async function fixRoleForAuthenticatedUser(userId: string, intendedRole: string)
 function resolveRedirect(role: string): { href: string; label: string } {
   const r = (role || "STUDENT").toUpperCase();
   if (["SUPER_ADMIN", "ADMIN", "FINANCE_ADMIN", "ACADEMIC_ADMIN", "SUPPORT_AGENT"].includes(r)) {
-    return { href: "/admin", label: "Accéder au Panneau Admin" };
+    return { href: "/admin", label: "Go to Admin Panel" };
   }
   if (r === "INSTRUCTOR" || r === "TEACHING_ASSISTANT") {
-    return { href: "/instructor", label: "Accéder à mon Espace Formateur" };
+    return { href: "/instructor", label: "Go to my Instructor Space" };
   }
-  return { href: "/dashboard", label: "Accéder à mon Espace Apprenant" };
+  return { href: "/dashboard", label: "Go to my Learning Space" };
 }
 
 function ConfirmedContent() {
@@ -100,9 +100,9 @@ function ConfirmedContent() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [dashboardHref, setDashboardHref] = useState("/login");
-  const [dashboardLabel, setDashboardLabel] = useState("Se connecter à mon Espace");
+  const [dashboardLabel, setDashboardLabel] = useState("Log in to my Space");
   const [countdown, setCountdown] = useState(4);
-  const [statusText, setStatusText] = useState("Vérification de votre session...");
+  const [statusText, setStatusText] = useState("Verifying your session...");
   const [hasSession, setHasSession] = useState(false);
 
   useEffect(() => {
@@ -112,7 +112,7 @@ function ConfirmedContent() {
         const savedRegRole = typeof window !== "undefined" ? localStorage.getItem("kuettu_registration_role") : null;
         const roleParam = (searchParams.get("role") || savedRegRole || "STUDENT").toUpperCase();
 
-        setStatusText("Vérification de votre session...");
+        setStatusText("Verifying your session...");
 
         // Client-side fallback: if PKCE code is in searchParams, attempt client exchange
         const codeParam = searchParams.get("code");
@@ -139,11 +139,11 @@ function ConfirmedContent() {
 
           // Fix roles only for non-student registrations
           if (intendedRole !== "STUDENT") {
-            setStatusText("Activation de votre rôle...");
+            setStatusText("Activating your role...");
             await fixRoleForAuthenticatedUser(user.id, intendedRole);
           }
 
-          setStatusText("Chargement de votre profil...");
+          setStatusText("Loading your profile...");
           const profile = await fetchUserProfile(user.id);
 
           let finalRole = intendedRole;
@@ -186,7 +186,7 @@ function ConfirmedContent() {
             // Simulated session fallback even if DB profile is slow to propagate
             setSimulatedSession({
               userId: user.id,
-              name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Formateur",
+              name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Instructor",
               email: user.email || "",
               role: finalRole as any,
               status: "ACTIVE",
@@ -250,7 +250,7 @@ function ConfirmedContent() {
           <Image src="/logo-dark.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto hidden dark:block" priority />
         </Link>
         <Link href="/" className="text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
-          ← Retour à l&apos;accueil
+          ← Back to home
         </Link>
       </header>
 
@@ -266,15 +266,15 @@ function ConfirmedContent() {
 
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-700 dark:text-emerald-400 text-xs font-bold mb-4 uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Compte Validé avec succès</span>
+            <span>Account Successfully Verified</span>
           </div>
 
           <h1 className="text-2xl font-black text-zinc-900 dark:text-white mb-3 tracking-tight">
-            Félicitations !
+            Congratulations!
           </h1>
 
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-8 leading-relaxed max-w-sm">
-            Votre adresse email a été vérifiée avec succès. Votre compte est maintenant activé et prêt à être utilisé sur la plateforme ANSELLA.
+            Your email address has been successfully verified. Your account is now activated and ready to use on the ANSELLA platform.
           </p>
 
           {loading ? (
@@ -287,14 +287,14 @@ function ConfirmedContent() {
               href="/login"
               className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] duration-200 cursor-pointer text-sm"
             >
-              <span>Se connecter à mon Espace</span>
+              <span>Log in to my Space</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           ) : hasSession ? (
             <div className="w-full space-y-3">
               <div className="w-full py-3 px-6 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-zinc-500 dark:text-zinc-400 text-sm">
                 <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                <span>Redirection dans <strong className="text-zinc-900 dark:text-white">{countdown}s</strong>…</span>
+                <span>Redirecting in <strong className="text-zinc-900 dark:text-white">{countdown}s</strong>…</span>
               </div>
               <Link
                 href={dashboardHref}
@@ -317,14 +317,14 @@ function ConfirmedContent() {
 
           <div className="mt-6 flex items-center gap-2 text-xxs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span>Plateforme Sécurisée ANSELLA</span>
+            <span>ANSELLA Secure Platform</span>
           </div>
 
         </div>
       </main>
 
       <footer className="z-10 w-full text-center py-6 text-xs text-zinc-450 dark:text-zinc-500">
-        © {new Date().getFullYear()} Ansella Inc. Tous droits réservés.
+        © {new Date().getFullYear()} Ansella Inc. All rights reserved.
       </footer>
     </div>
   );
