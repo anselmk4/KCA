@@ -95,6 +95,7 @@ export function Footer() {
               {language === "en" ? "Resources & Blog" : "Ressources & Blog"}
             </h3>
             <ul className="space-y-2 text-xs text-muted-foreground">
+              <li><Link href="/docs" className="hover:text-teal-600 transition-colors font-bold text-teal-600 dark:text-teal-400">📖 {language === "en" ? "Documentation & Guides" : "Documentation Formateurs"}</Link></li>
               <li><Link href="/blog" className="hover:text-teal-600 transition-colors font-semibold">📚 {language === "en" ? "All Guides & Articles" : "Tous les articles"}</Link></li>
               <li><Link href="/courses" className="hover:text-teal-600 transition-colors">{language === "en" ? "Explore Courses" : "Catalogue de formations"}</Link></li>
               <li><Link href="/instructors" className="hover:text-teal-600 transition-colors">{language === "en" ? "Our Instructors" : "Nos Formateurs"}</Link></li>

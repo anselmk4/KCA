@@ -66,6 +66,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
     { icon: MessageSquare, label: language === "en" ? "Messages" : "Messages", href: "/instructor/messages" },
     { icon: Bell, label: t("instructor.sidebar.notifications"), href: "/instructor/notifications" },
     { icon: Users2, label: language === "en" ? "Community" : "Communauté", href: "/instructor/community" },
+    { icon: HelpCircle, label: language === "en" ? "Documentation & Guide" : "Documentation & Guide", href: "/docs" },
     { icon: Settings, label: t("instructor.sidebar.settings"), href: "/instructor/settings" },
   ];
   const [academyName, setAcademyName] = useState<string>("");

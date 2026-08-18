@@ -75,6 +75,9 @@ export function Navbar() {
           <Link href="/blog" className="transition-colors hover:text-foreground/80 text-foreground/60">
             Blog
           </Link>
+          <Link href="/docs" className="transition-colors hover:text-foreground/80 text-foreground/60">
+            {language === "en" ? "Documentation" : "Documentation"}
+          </Link>
           <Link href="/pricing" className="transition-colors hover:text-foreground/80 text-foreground/60">
             {t("nav.pricing")}
           </Link>

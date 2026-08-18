@@ -78,6 +78,9 @@ export function MobileMenu() {
             <Link href="/blog" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
               📚 Blog & Guides
             </Link>
+            <Link href="/docs" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
+              📖 Documentation Formateurs
+            </Link>
             <Link href="/templates" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
               {language === "en" ? "Academy Models" : "Modèle d'académie"}
             </Link>

@@ -163,6 +163,7 @@ export default function CourseDetailPage() {
     title: "",
     category_id: "",
     level: "Débutant",
+    language: "fr",
     description: "",
   });
   const [benefits, setBenefits] = useState("");
@@ -249,14 +250,18 @@ export default function CourseDetailPage() {
       const ids = collabData.map((c: any) => c.collaborator_id);
       const { data: profilesData } = await supabase
         .from("profiles")
-        .select("id, full_name, email")
+        .select("id, full_name, email, avatar_url, role")
         .in("id", ids);
 
-      const profilesMap = new Map(profilesData?.map((p: any) => [p.id, p]));
       const mapped = collabData.map((c: any) => ({
         id: c.id,
         collaborator_id: c.collaborator_id,
-        profiles: profilesMap.get(c.collaborator_id) || null
+        profile: profilesData?.find((p) => p.id === c.collaborator_id) || {
+          full_name: "Collaborateur inconnu",
+          email: "—",
+          avatar_url: null,
+          role: "INSTRUCTOR",
+        },
       }));
 
       setCollaborators(mapped);
@@ -326,6 +331,7 @@ export default function CourseDetailPage() {
         title: courseData.title || "",
         category_id: courseData.category_id || "",
         level: levelMap[courseData.level || ''] || courseData.level || "Débutant",
+        language: (cd.language as string) || "fr",
         description: courseData.description || "",
       });
       setBenefits((cd.benefits as string) || "");
@@ -921,6 +927,7 @@ export default function CourseDetailPage() {
         slug,
         category_id: descForm.category_id || null,
         level: mappedLevel as "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "EXPERT",
+        language: descForm.language || "fr",
         description: descForm.description,
         benefits: benefits || null,
         thumbnail_url: thumbnailUrl || null,
@@ -932,17 +939,16 @@ export default function CourseDetailPage() {
         .update(updatePayload)
         .eq("id", courseId);
 
-      // Graceful fallback if benefits column is missing in Supabase
-      if (error && (error.message?.includes("benefits") || error.code === "PGRST205" || error.code === "PGRST211")) {
-        console.warn("La colonne 'benefits' semble manquante dans Supabase. Tentative de sauvegarde sans ce champ...");
+      // Graceful fallback if benefits or language column is missing in Supabase schema cache
+      if (error && (error.message?.includes("benefits") || error.message?.includes("language") || error.code === "PGRST205" || error.code === "PGRST211")) {
         delete updatePayload.benefits;
+        delete updatePayload.language;
         const retryResult = await (supabase as any)
           .from("courses")
           .update(updatePayload)
           .eq("id", courseId);
         
         if (!retryResult.error) {
-          alert("Sauvegarde réussie, mais les 'Bénéfices' n'ont pas pu être enregistrés car la base de données n'est pas à jour. Veuillez exécuter le script de migration (node scratch/run-migrations.js <mot_de_passe>).");
           error = null;
         } else {
           error = retryResult.error;
@@ -954,6 +960,7 @@ export default function CourseDetailPage() {
         title: descForm.title,
         category_id: descForm.category_id,
         level: descForm.level,
+        language: descForm.language || "fr",
         description: descForm.description,
       });
       setDescSavedMessage(true);
@@ -2086,6 +2093,25 @@ export default function CourseDetailPage() {
                     <option value="Avancé">Avancé</option>
                     <option value="Expert">Expert</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Langue de dispensation du cours</label>
+                  <select
+                    value={descForm.language || "fr"}
+                    onChange={(e) => setDescForm((p) => ({ ...p, language: e.target.value }))}
+                    className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white font-medium"
+                  >
+                    <option value="fr">🇫🇷 Français (Langue par défaut)</option>
+                    <option value="en">🇬🇧 English (Anglais)</option>
+                    <option value="es">🇪🇸 Español (Espagnol)</option>
+                    <option value="pt">🇵🇹 Português (Portugais)</option>
+                    <option value="ar">🇸🇦 العربية (Arabe)</option>
+                    <option value="sw">🇰🇪 Kiswahili (Swahili)</option>
+                  </select>
+                  <p className="text-[11px] text-zinc-400 mt-1">Permet aux apprenants de filtrer les cours par langue sur le catalogue public.</p>
                 </div>
               </div>
 

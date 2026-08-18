@@ -251,6 +251,7 @@ export default function InstructorCoursesPage() {
     description: string;
     shortDescription: string;
     category: string;
+    language: string;
     price: number;
     isPaid: boolean;
     installmentsEnabled: boolean;
@@ -298,6 +299,7 @@ export default function InstructorCoursesPage() {
             description: courseData.description,
             price: courseData.price,
             level: courseData.level.includes("Intermédiaire") ? "INTERMEDIATE" : courseData.level.includes("Avancé") ? "ADVANCED" : "BEGINNER",
+            language: courseData.language || "fr",
             thumbnail_url: courseData.thumbnailUrl,
             instructor_id: activeUserId,
             status: "DRAFT",
@@ -305,7 +307,7 @@ export default function InstructorCoursesPage() {
             allow_installments: allowInstallments,
           });
 
-        if (directErr && (directErr.message?.toLowerCase().includes("type") || directErr.message?.toLowerCase().includes("schema cache"))) {
+        if (directErr && (directErr.message?.toLowerCase().includes("type") || directErr.message?.toLowerCase().includes("language") || directErr.message?.toLowerCase().includes("schema cache"))) {
           const { error: retryErr } = await (supabase as any)
             .from("courses")
             .insert({
@@ -317,13 +319,10 @@ export default function InstructorCoursesPage() {
               thumbnail_url: courseData.thumbnailUrl,
               instructor_id: activeUserId,
               status: "DRAFT",
-              allow_installments: allowInstallments,
             });
-          directErr = retryErr;
-        }
-
-        if (directErr) {
-          throw new Error(directErr.message);
+          if (retryErr) throw retryErr;
+        } else if (directErr) {
+          throw directErr;
         }
       }
 

@@ -21,16 +21,28 @@ interface Course {
   description: string;
   image: string;
   category: string;
+  language: string;
   price: number;
   weeks: number;
   hours: number;
   level: string;
 }
 
+export const COURSE_LANGUAGES_CATALOG = [
+  { code: "all", label: "Toutes les langues", flag: "🌐" },
+  { code: "fr", label: "Français", flag: "🇫🇷" },
+  { code: "en", label: "English", flag: "🇬🇧" },
+  { code: "es", label: "Español", flag: "🇪🇸" },
+  { code: "pt", label: "Português", flag: "🇵🇹" },
+  { code: "ar", label: "العربية", flag: "🇸🇦" },
+  { code: "sw", label: "Kiswahili", flag: "🇰🇪" },
+];
+
 export default function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
+  const [activeLanguage, setActiveLanguage] = useState("all");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,10 +50,40 @@ export default function CoursesPage() {
       try {
         const { data, error } = await supabase
           .from("courses")
-          .select("id, title, description, short_description, price, level, thumbnail_url, category_id, categories(name)")
+          .select("id, title, description, short_description, price, level, thumbnail_url, category_id, categories(name), language")
           .eq("status", "PUBLISHED");
 
-        if (error) throw error;
+        if (error) {
+          // Retry without language column if schema is not refreshed
+          const { data: retryData } = await supabase
+            .from("courses")
+            .select("id, title, description, short_description, price, level, thumbnail_url, category_id, categories(name)")
+            .eq("status", "PUBLISHED");
+
+          if (retryData) {
+            const mapped: Course[] = retryData.map((item: any) => {
+              let level = "Beginner";
+              if (item.level === "INTERMEDIATE") level = "Intermediate";
+              else if (item.level === "ADVANCED") level = "Advanced";
+              else if (item.level === "EXPERT") level = "Expert";
+
+              return {
+                id: item.id,
+                title: item.title,
+                description: stripHtml(item.short_description || item.description || ""),
+                image: item.thumbnail_url || "",
+                category: item.categories?.name || "General",
+                language: "fr",
+                price: item.price || 0,
+                weeks: 8,
+                hours: 45,
+                level,
+              };
+            });
+            setCourses(mapped);
+          }
+          return;
+        }
 
         if (data) {
           const mapped: Course[] = data.map((item: any) => {
@@ -56,6 +98,7 @@ export default function CoursesPage() {
               description: stripHtml(item.short_description || item.description || ""),
               image: item.thumbnail_url || "",
               category: item.categories?.name || "General",
+              language: (item.language || "fr").toLowerCase(),
               price: item.price || 0,
               weeks: 8,
               hours: 45,
@@ -86,6 +129,9 @@ export default function CoursesPage() {
     if (activeCategory !== "all") {
       result = result.filter((c) => c.category === activeCategory);
     }
+    if (activeLanguage !== "all") {
+      result = result.filter((c) => (c.language || "fr").toLowerCase() === activeLanguage.toLowerCase());
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -96,7 +142,7 @@ export default function CoursesPage() {
       );
     }
     return result;
-  }, [search, activeCategory, courses]);
+  }, [search, activeCategory, activeLanguage, courses]);
 
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
@@ -170,21 +216,45 @@ export default function CoursesPage() {
                 />
               </div>
 
-              {/* Category selector */}
-              <div className="flex flex-wrap gap-2 justify-center md:justify-end w-full md:w-auto">
-                {categories.map((cat) => (
-                  <button
-                    key={cat.value}
-                    onClick={() => setActiveCategory(cat.value)}
-                    className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-                      activeCategory === cat.value
-                        ? "bg-teal-500 text-zinc-950 font-black shadow-md shadow-teal-500/10"
-                        : "bg-zinc-100 dark:bg-zinc-950/40 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-700"
-                    }`}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
+              {/* Category & Language selectors */}
+              <div className="flex flex-col gap-3 w-full md:w-auto">
+                {/* Categories */}
+                <div className="flex flex-wrap gap-1.5 justify-center md:justify-end">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.value}
+                      onClick={() => setActiveCategory(cat.value)}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        activeCategory === cat.value
+                          ? "bg-teal-500 text-zinc-950 font-black shadow-md shadow-teal-500/10"
+                          : "bg-zinc-100 dark:bg-zinc-950/40 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-700"
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Language filter pills */}
+                <div className="flex flex-wrap gap-1.5 justify-center md:justify-end items-center text-xs">
+                  <span className="text-[11px] font-bold text-zinc-400 mr-1 flex items-center gap-1">
+                    Langue :
+                  </span>
+                  {COURSE_LANGUAGES_CATALOG.map((lang) => (
+                    <button
+                      key={lang.code}
+                      onClick={() => setActiveLanguage(lang.code)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                        activeLanguage === lang.code
+                          ? "bg-indigo-600 text-white shadow-xs"
+                          : "bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800"
+                      }`}
+                    >
+                      <span>{lang.flag}</span>
+                      <span>{lang.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -205,7 +275,7 @@ export default function CoursesPage() {
                   No courses match your search criteria.
                 </p>
                 <button 
-                  onClick={() => { setSearch(""); setActiveCategory("all"); }}
+                  onClick={() => { setSearch(""); setActiveCategory("all"); setActiveLanguage("all"); }}
                   className="mt-4 text-xs font-bold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer"
                 >
                   Reset filters
@@ -251,6 +321,25 @@ function CourseCard({ course }: { course: Course }) {
     }
   };
 
+  const getLanguageDisplay = (code: string) => {
+    switch ((code || "fr").toLowerCase()) {
+      case "en":
+        return { flag: "🇬🇧", label: "EN" };
+      case "es":
+        return { flag: "🇪🇸", label: "ES" };
+      case "pt":
+        return { flag: "🇵🇹", label: "PT" };
+      case "ar":
+        return { flag: "🇸🇦", label: "AR" };
+      case "sw":
+        return { flag: "🇰🇪", label: "SW" };
+      default:
+        return { flag: "🇫🇷", label: "FR" };
+    }
+  };
+
+  const langInfo = getLanguageDisplay(course.language);
+
   return (
     <div className="group bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800/80 rounded-3xl overflow-hidden shadow-sm hover:border-teal-500/30 hover:shadow-[0_10px_30px_rgba(20,184,166,0.04)] transition-all duration-300 flex flex-col h-full">
       
@@ -279,10 +368,16 @@ function CourseCard({ course }: { course: Course }) {
           {course.category}
         </span>
 
-        {/* Level badge */}
-        <span className={`absolute top-4 right-4 z-20 px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider ${getLevelColor(course.level)}`}>
-          {course.level}
-        </span>
+        {/* Level & Language badges */}
+        <div className="absolute top-4 right-4 z-20 flex items-center gap-1.5">
+          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-black/60 backdrop-blur-sm text-white border border-white/20 flex items-center gap-1">
+            <span>{langInfo.flag}</span>
+            <span>{langInfo.label}</span>
+          </span>
+          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider ${getLevelColor(course.level)}`}>
+            {course.level}
+          </span>
+        </div>
       </div>
 
       {/* Details content */}

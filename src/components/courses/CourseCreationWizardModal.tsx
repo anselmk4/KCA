@@ -30,6 +30,7 @@ interface CourseCreationWizardModalProps {
     description: string;
     shortDescription: string;
     category: string;
+    language: string;
     price: number;
     isPaid: boolean;
     installmentsEnabled: boolean;
@@ -41,6 +42,15 @@ interface CourseCreationWizardModalProps {
   }) => Promise<void>;
   creating: boolean;
 }
+
+export const COURSE_LANGUAGES = [
+  { code: "fr", label: "Français (Défaut)", flag: "🇫🇷" },
+  { code: "en", label: "English (Anglais)", flag: "🇬🇧" },
+  { code: "es", label: "Español (Espagnol)", flag: "🇪🇸" },
+  { code: "pt", label: "Português (Portugais)", flag: "🇵🇹" },
+  { code: "ar", label: "العربية (Arabe)", flag: "🇸🇦" },
+  { code: "sw", label: "Kiswahili (Swahili)", flag: "🇰🇪" },
+];
 
 const CATEGORIES = [
   "Intelligence Artificielle & Data",
@@ -98,6 +108,7 @@ export function CourseCreationWizardModal({
   const [title, setTitle] = useState("");
   const [type, setType] = useState<"academic" | "self_paced">("academic");
   const [category, setCategory] = useState("Intelligence Artificielle & Data");
+  const [language, setLanguage] = useState("fr");
   const [shortDescription, setShortDescription] = useState("");
   const [description, setDescription] = useState("");
 
@@ -184,6 +195,7 @@ export function CourseCreationWizardModal({
       description: description.trim() || shortDescription.trim() || "Nouveau cours en préparation.",
       shortDescription: shortDescription.trim() || "Aperçu du cours.",
       category,
+      language: language.toLowerCase() || "fr",
       price: currentPriceNumber,
       isPaid,
       installmentsEnabled: type === "academic" && isPaid && installmentsEnabled,
@@ -361,7 +373,7 @@ export function CourseCreationWizardModal({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
                     Domaine / Catégorie
@@ -392,6 +404,23 @@ export function CourseCreationWizardModal({
                     <option value="Débutant">Débutant</option>
                     <option value="Intermédiaire">Intermédiaire</option>
                     <option value="Avancé / Expert">Avancé / Expert</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
+                    Langue du cours
+                  </label>
+                  <select
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-semibold transition-all"
+                  >
+                    {COURSE_LANGUAGES.map((l) => (
+                      <option key={l.code} value={l.code}>
+                        {l.flag} {l.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>

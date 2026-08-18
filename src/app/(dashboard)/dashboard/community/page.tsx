@@ -18,7 +18,7 @@ import { PostCard, PostItem, CommentItem } from "@/components/community/PostCard
 import { CommunitySkeleton } from "@/components/community/CommunitySkeleton";
 import { ReactionType } from "@/components/community/ReactionPicker";
 
-export type PostCategoryFilter = "ALL" | "REFLECTIONS" | "ANALYSIS" | "RESOURCES" | "ANNOUNCEMENTS";
+export type PostCategoryFilter = "ALL" | "FOLLOWING" | "REFLECTIONS" | "ANALYSIS" | "RESOURCES" | "ANNOUNCEMENTS";
 
 interface LeaderboardUser {
   id: string;
@@ -32,12 +32,21 @@ interface LeaderboardUser {
   rank: number;
 }
 
+interface SuggestedInstructor {
+  id: string;
+  name: string;
+  avatar: string | null;
+  specialty: string;
+  isFollowing: boolean;
+}
+
 const CATEGORY_CONFIG: Record<PostCategoryFilter, { label: string; icon: any; color: string }> = {
-  ALL: { label: "Toutes les publications", icon: Sparkles, color: "text-zinc-600 dark:text-zinc-300" },
-  REFLECTIONS: { label: "💡 Réflexions & Débats", icon: Lightbulb, color: "text-amber-500" },
-  ANALYSIS: { label: "📈 Analyses & Stratégies", icon: BarChart2, color: "text-indigo-500" },
-  RESOURCES: { label: "📚 Ressources & Guides", icon: BookOpen, color: "text-emerald-500" },
-  ANNOUNCEMENTS: { label: "📢 Annonces Officieuses", icon: Megaphone, color: "text-purple-500" },
+  ALL: { label: "🔥 Fil d'actualité", icon: Sparkles, color: "text-zinc-600 dark:text-zinc-300" },
+  FOLLOWING: { label: "⭐ Mes Abonnements", icon: Users, color: "text-teal-500" },
+  REFLECTIONS: { label: "💡 Questions & Réflexions", icon: Lightbulb, color: "text-amber-500" },
+  ANALYSIS: { label: "📈 Analyses & Projets", icon: BarChart2, color: "text-indigo-500" },
+  RESOURCES: { label: "📚 Guides & Ressources", icon: BookOpen, color: "text-emerald-500" },
+  ANNOUNCEMENTS: { label: "📢 Annonces Officielles", icon: Megaphone, color: "text-purple-500" },
 };
 
 export default function CommunityPage() {
@@ -50,6 +59,9 @@ export default function CommunityPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
+  const [followingIds, setFollowingIds] = useState<string[]>([]);
+  const [suggestedInstructors, setSuggestedInstructors] = useState<SuggestedInstructor[]>([]);
+  const [followLoading, setFollowLoading] = useState<Record<string, boolean>>({});
 
   // ─── Fetch Community Feed ──────────────────────────────────
   const loadCommunityData = useCallback(async () => {
@@ -70,6 +82,18 @@ export default function CommunityPage() {
       // Fetch leaderboard
       loadLeaderboardData();
 
+      // Fetch follow data
+      try {
+        const followRes = await fetch("/api/community/follow");
+        if (followRes.ok) {
+          const followData = await followRes.json();
+          setFollowingIds(followData.followingIds || []);
+          setSuggestedInstructors(followData.suggestedInstructors || []);
+        }
+      } catch (fErr) {
+        console.warn("[Community] Follow fetch note:", fErr);
+      }
+
       // Fetch posts from API
       const res = await fetch("/api/community/posts");
       if (res.ok) {
@@ -84,6 +108,38 @@ export default function CommunityPage() {
       setLoading(false);
     }
   }, []);
+
+  const handleToggleFollow = async (targetUserId: string) => {
+    if (!currentUser) {
+      alert("Veuillez vous connecter pour vous abonner aux formateurs.");
+      return;
+    }
+
+    const isCurrentlyFollowing = followingIds.includes(targetUserId);
+    const nextFollowingIds = isCurrentlyFollowing
+      ? followingIds.filter((id) => id !== targetUserId)
+      : [...followingIds, targetUserId];
+
+    setFollowingIds(nextFollowingIds);
+    setSuggestedInstructors((prev) =>
+      prev.map((inst) =>
+        inst.id === targetUserId ? { ...inst, isFollowing: !isCurrentlyFollowing } : inst
+      )
+    );
+
+    setFollowLoading((p) => ({ ...p, [targetUserId]: true }));
+    try {
+      await fetch("/api/community/follow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetUserId }),
+      });
+    } catch (err) {
+      console.error("Error toggling follow:", err);
+    } finally {
+      setFollowLoading((p) => ({ ...p, [targetUserId]: false }));
+    }
+  };
 
   const loadLeaderboardData = async () => {
     try {
@@ -273,7 +329,6 @@ export default function CommunityPage() {
 
     try {
       await fetch(`/api/community/posts?id=${postId}`, { method: "DELETE" });
-    } catch (err) {
       console.error("Error deleting post from DB:", err);
     }
   };
@@ -297,7 +352,12 @@ export default function CommunityPage() {
   // ─── Filtered Posts ────────────────────────────────────────
   const filteredPosts = useMemo(() => {
     return posts.filter((p) => {
-      const matchesCategory = selectedCategory === "ALL" || p.category === selectedCategory;
+      let matchesCategory = true;
+      if (selectedCategory === "FOLLOWING") {
+        matchesCategory = followingIds.includes(p.user_id) || ["INSTRUCTOR", "ADMIN", "SUPER_ADMIN"].includes(p.author_role);
+      } else if (selectedCategory !== "ALL") {
+        matchesCategory = p.category === selectedCategory;
+      }
       const normalizedQuery = searchQuery.toLowerCase();
       const matchesSearch =
         !searchQuery ||
@@ -307,7 +367,7 @@ export default function CommunityPage() {
 
       return matchesCategory && matchesSearch;
     });
-  }, [posts, selectedCategory, searchQuery]);
+  }, [posts, selectedCategory, searchQuery, followingIds]);
 
   const filteredLeaderboard = useMemo(() => {
     if (leaderboardTab === "INSTRUCTORS") {
@@ -327,13 +387,13 @@ export default function CommunityPage() {
         <div className="relative z-10 space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 text-xs font-bold border border-teal-500/30">
             <Users className="w-3.5 h-3.5" />
-            <span>Réseau Social & Échanges Professionnels</span>
+            <span>Réseau Social & Échanges Pédagogiques</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Communauté Ansella
+            Communauté & Réseau Ansella
           </h1>
           <p className="text-xs sm:text-sm text-zinc-300 max-w-2xl leading-relaxed">
-            Partagez vos analyses, échangez sur les stratégies Crypto & IA, et collaborez directement avec les formateurs et les membres certifiés.
+            Échangez avec les formateurs certifiés, suivez vos créateurs favoris, posez vos questions et partagez vos analyses Crypto & IA.
           </p>
         </div>
 
@@ -355,36 +415,45 @@ export default function CommunityPage() {
         <div className="lg:col-span-8 space-y-6">
           
           {/* Post Composer */}
-          <PostComposer onSubmit={handleCreatePost} currentUserProfile={currentUserProfile} />
+          <PostComposer
+            currentUserAvatar={currentUserProfile?.avatar_url}
+            currentUserName={currentUserProfile?.full_name || currentUser?.email?.split("@")[0] || "Membre"}
+            currentUserRole={currentUserProfile?.role || "STUDENT"}
+            onSubmit={handleCreatePost}
+          />
 
-          {/* Search & Category Filter Bar */}
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-3xl p-4 shadow-sm space-y-3">
+          {/* Search & Category Filter Navigation */}
+          <div className="space-y-3">
             <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
               <input
                 type="text"
-                placeholder="Rechercher par mot-clé, hashtag (#crypto) ou membre..."
+                placeholder="Rechercher par mot-clé, sujet ou auteur..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-teal-500/30 text-zinc-900 dark:text-white"
+                className="w-full pl-11 pr-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all shadow-xs"
               />
             </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            {/* Category Pills */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
               {(Object.keys(CATEGORY_CONFIG) as PostCategoryFilter[]).map((cat) => {
-                const cfg = CATEGORY_CONFIG[cat];
+                const conf = CATEGORY_CONFIG[cat];
+                const Icon = conf.icon;
                 const isSelected = selectedCategory === cat;
+
                 return (
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                       isSelected
-                        ? "bg-teal-500 text-white shadow-sm scale-105"
-                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200"
+                        ? "bg-teal-600 text-white shadow-xs"
+                        : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800"
                     }`}
                   >
-                    {cfg.label}
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{conf.label}</span>
                   </button>
                 );
               })}
@@ -398,10 +467,14 @@ export default function CommunityPage() {
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-12 text-center space-y-3">
               <Sparkles className="w-10 h-10 text-zinc-300 dark:text-zinc-600 mx-auto" />
               <h3 className="font-extrabold text-sm text-zinc-700 dark:text-zinc-300">
-                Aucune publication dans cette catégorie
+                {selectedCategory === "FOLLOWING"
+                  ? "Aucune publication de vos abonnements"
+                  : "Aucune publication dans cette catégorie"}
               </h3>
               <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                Soyez le premier à publier un message ci-dessus !
+                {selectedCategory === "FOLLOWING"
+                  ? "Abonnez-vous à des formateurs ci-contre pour voir leurs publications exclusives !"
+                  : "Soyez le premier à publier un message ci-dessus !"}
               </p>
             </div>
           ) : (
@@ -421,8 +494,68 @@ export default function CommunityPage() {
           )}
         </div>
 
-        {/* Sidebar Leaderboard (4 cols) */}
+        {/* Sidebar Widgets (4 cols) */}
         <div className="lg:col-span-4 space-y-6">
+          {/* Suggested Instructors Widget */}
+          {suggestedInstructors.length > 0 && (
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-teal-500" />
+                  <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white">
+                    Formateurs à Suivre
+                  </h3>
+                </div>
+                <span className="text-[10px] font-bold text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
+                  {followingIds.length} suivi{followingIds.length > 1 ? "s" : ""}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {suggestedInstructors.slice(0, 5).map((inst) => {
+                  const isF = followingIds.includes(inst.id);
+                  const isBusy = followLoading[inst.id];
+
+                  return (
+                    <div
+                      key={inst.id}
+                      className="p-3 bg-zinc-50 dark:bg-zinc-850/60 border border-zinc-100 dark:border-zinc-800 rounded-2xl flex items-center justify-between gap-3 hover:border-teal-500/30 transition-all"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {inst.avatar ? (
+                          <img src={inst.avatar} alt={inst.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-teal-500 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                            {inst.name.charAt(0)}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <h4 className="font-extrabold text-xs text-zinc-900 dark:text-white leading-tight truncate">
+                            {inst.name}
+                          </h4>
+                          <p className="text-[10px] text-zinc-400 truncate">{inst.specialty}</p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleToggleFollow(inst.id)}
+                        disabled={isBusy}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                          isF
+                            ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                            : "bg-teal-600 hover:bg-teal-500 text-white shadow-xs"
+                        }`}
+                      >
+                        {isBusy ? "..." : isF ? "Abonné" : "+ Suivre"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Leaderboard Widget */}
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-5 sticky top-6">
             <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-4">
               <div className="flex items-center gap-2">
@@ -458,7 +591,7 @@ export default function CommunityPage() {
             </div>
 
             {/* Leaderboard List */}
-            <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+            <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
               {filteredLeaderboard.slice(0, 5).map((user, idx) => (
                 <div
                   key={user.id || idx}

@@ -118,6 +118,7 @@ export async function POST(req: NextRequest) {
       slug: uniqueSlug,
       description: description || null,
       level: mappedLevel,
+      language: (body.language || 'fr').toLowerCase(),
       price: price ? parseFloat(price) : 0,
       status: 'DRAFT',
       type: type === 'self_paced' ? 'self_paced' : 'academic',
@@ -135,8 +136,9 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
 
-    if (error && (error.message?.toLowerCase().includes("type") || error.message?.toLowerCase().includes("schema cache"))) {
+    if (error && (error.message?.toLowerCase().includes("type") || error.message?.toLowerCase().includes("language") || error.message?.toLowerCase().includes("schema cache"))) {
       delete coursePayload.type;
+      delete coursePayload.language;
       const retryRes = await dbClient
         .from('courses')
         .insert(coursePayload as any)
