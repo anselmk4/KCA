@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { supabase } from "@/lib/supabase/client";
 import {
   Users,
   Loader2,
@@ -44,14 +45,59 @@ export default function InstructorsPage() {
     async function loadInstructors() {
       try {
         setLoading(true);
-        // Call the server API which uses supabaseAdmin to safely retrieve all real instructors without RLS filtering
-        const res = await fetch("/api/instructors");
-        if (res.ok) {
-          const data = await res.json();
-          setInstructors(data.instructors || []);
-        } else {
-          setInstructors([]);
+
+        // 1. Try fetching via API route
+        let fetchedList: Instructor[] = [];
+        try {
+          const res = await fetch("/api/instructors", { cache: "no-store" });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data.instructors) && data.instructors.length > 0) {
+              fetchedList = data.instructors;
+            }
+          }
+        } catch (apiErr) {
+          console.warn("[InstructorsPage] API fetch error:", apiErr);
         }
+
+        // 2. Direct Supabase Client fallback if API returned 0
+        if (fetchedList.length === 0) {
+          const { data: profilesData } = await supabase
+            .from("profiles")
+            .select("id, full_name, email, bio, specialty, avatar_url, academy_name, nationality, website")
+            .order("created_at", { ascending: false });
+
+          if (profilesData && profilesData.length > 0) {
+            // Count courses for each
+            const { data: coursesData } = await supabase
+              .from("courses")
+              .select("id, instructor_id");
+
+            const counts: Record<string, number> = {};
+            (coursesData || []).forEach((c: any) => {
+              if (c.instructor_id) {
+                counts[c.instructor_id] = (counts[c.instructor_id] || 0) + 1;
+              }
+            });
+
+            fetchedList = profilesData
+              .filter((p: any) => p.full_name)
+              .map((p: any) => ({
+                id: p.id,
+                full_name: p.full_name,
+                email: p.email,
+                bio: p.bio || null,
+                specialty: p.specialty || p.academy_name || "Formateur ANSELLA",
+                avatar_url: p.avatar_url || null,
+                academy_name: p.academy_name || null,
+                nationality: p.nationality || null,
+                website: p.website || null,
+                courseCount: counts[p.id] || 0,
+              }));
+          }
+        }
+
+        setInstructors(fetchedList);
       } catch (err) {
         console.error("Error loading instructors list:", err);
         setInstructors([]);
@@ -141,7 +187,7 @@ export default function InstructorsPage() {
             </h1>
             <p className="text-sm md:text-base text-zinc-500 dark:text-zinc-400 leading-relaxed">
               {language === "en"
-                ? "Discover all certified educators and creators teaching on ANSELLA."
+                ? "Discover all educators, academy directors, and creators teaching on ANSELLA."
                 : "Découvrez l'ensemble des formateurs, directeurs d'académie et enseignants enregistrés sur la plateforme ANSELLA."}
             </p>
           </div>

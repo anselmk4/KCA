@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -18,96 +19,142 @@ export interface RealInstructor {
 
 export async function GET(req: NextRequest) {
   try {
-    // 1. Fetch courses to calculate course count per instructor
-    const { data: coursesData } = await supabaseAdmin
-      .from("courses")
-      .select("id, instructor_id, status");
-
-    const courseCountsByInstructor: Record<string, number> = {};
-    const instructorIdsFromCourses = new Set<string>();
-
-    (coursesData || []).forEach((c: any) => {
-      if (c.instructor_id) {
-        instructorIdsFromCourses.add(c.instructor_id);
-        courseCountsByInstructor[c.instructor_id] =
-          (courseCountsByInstructor[c.instructor_id] || 0) + 1;
-      }
-    });
-
-    // 2. Fetch role IDs for INSTRUCTOR, TEACHING_ASSISTANT, ADMIN, SUPER_ADMIN
-    const { data: roleRows } = await supabaseAdmin
-      .from("roles")
-      .select("id, name")
-      .in("name", ["INSTRUCTOR", "TEACHING_ASSISTANT", "ADMIN", "SUPER_ADMIN"]);
-
-    const roleIds = (roleRows || []).map((r) => r.id);
-    const instructorUserIds = new Set<string>(instructorIdsFromCourses);
-
-    if (roleIds.length > 0) {
-      const { data: userRolesData } = await supabaseAdmin
-        .from("user_roles")
-        .select("user_id")
-        .in("role_id", roleIds);
-
-      (userRolesData || []).forEach((ur: any) => {
-        if (ur.user_id) instructorUserIds.add(ur.user_id);
-      });
+    // 1. Fetch all profiles
+    let profiles: any[] = [];
+    try {
+      const { data, error } = await supabaseAdmin
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (!error && data) profiles = data;
+    } catch (e) {
+      console.warn("[/api/instructors] supabaseAdmin profiles error:", e);
     }
 
-    // 3. Fetch course collaborators
+    if (profiles.length === 0) {
+      try {
+        const supabase = await createClient();
+        const { data } = await supabase.from("profiles").select("*");
+        if (data) profiles = data;
+      } catch {}
+    }
+
+    // 2. Fetch courses to calculate course count per instructor
+    const courseCountsByInstructor: Record<string, number> = {};
+    const courseAuthorIds = new Set<string>();
+
+    try {
+      const { data: coursesData } = await supabaseAdmin
+        .from("courses")
+        .select("id, instructor_id, title, status");
+
+      (coursesData || []).forEach((c: any) => {
+        if (c.instructor_id) {
+          courseAuthorIds.add(c.instructor_id);
+          courseCountsByInstructor[c.instructor_id] =
+            (courseCountsByInstructor[c.instructor_id] || 0) + 1;
+        }
+      });
+    } catch (e) {
+      console.warn("[/api/instructors] courses query error:", e);
+    }
+
+    // 3. Fetch user roles
+    const roleMap = new Map<string, string[]>();
+    try {
+      const { data: allUserRoles } = await supabaseAdmin
+        .from("user_roles")
+        .select("user_id, role_id, roles(name)");
+
+      (allUserRoles || []).forEach((ur: any) => {
+        const name = ur.roles?.name;
+        if (name && ur.user_id) {
+          const list = roleMap.get(ur.user_id) || [];
+          list.push(name);
+          roleMap.set(ur.user_id, list);
+        }
+      });
+    } catch (e) {
+      console.warn("[/api/instructors] user_roles query error:", e);
+    }
+
+    // 4. Fetch course collaborators
+    const collaboratorIds = new Set<string>();
     try {
       const { data: collabData } = await (supabaseAdmin as any)
         .from("course_collaborators")
         .select("collaborator_id");
 
       (collabData || []).forEach((c: any) => {
-        if (c.collaborator_id) instructorUserIds.add(c.collaborator_id);
+        if (c.collaborator_id) collaboratorIds.add(c.collaborator_id);
       });
     } catch {}
 
-    // 4. Fetch profiles for all identified instructors + any profile that has academy_name or specialty
-    let query = supabaseAdmin
-      .from("profiles")
-      .select("id, full_name, email, bio, specialty, avatar_url, academy_name, nationality, website, role")
-      .order("full_name", { ascending: true });
-
-    const { data: allProfiles, error: profileErr } = await query;
-
-    if (profileErr) {
-      console.error("[/api/instructors] Error fetching profiles:", profileErr.message);
-      return NextResponse.json({ instructors: [] }, { status: 500 });
-    }
-
-    const profilesList = (allProfiles || []) as any[];
-
-    const realInstructors: RealInstructor[] = [];
+    // 5. Identify instructors from the profiles
+    const instructorsList: RealInstructor[] = [];
     const seenIds = new Set<string>();
 
-    profilesList.forEach((prof) => {
-      const isExplicitInstructor = instructorUserIds.has(prof.id);
-      const hasAcademyOrSpecialty = Boolean(prof.academy_name || prof.specialty);
-      const isInstructorRole = ["INSTRUCTOR", "ADMIN", "SUPER_ADMIN"].includes(prof.role);
+    // Pass 1: Explicit instructors, course authors, admins, collaborators
+    profiles.forEach((p) => {
+      const userRoles = roleMap.get(p.id) || [];
+      const hasInstructorRole =
+        userRoles.includes("INSTRUCTOR") ||
+        userRoles.includes("TEACHING_ASSISTANT") ||
+        userRoles.includes("ADMIN") ||
+        userRoles.includes("SUPER_ADMIN") ||
+        ["INSTRUCTOR", "ADMIN", "SUPER_ADMIN"].includes(p.role);
 
-      if ((isExplicitInstructor || hasAcademyOrSpecialty || isInstructorRole) && !seenIds.has(prof.id) && prof.full_name) {
-        seenIds.add(prof.id);
-        realInstructors.push({
-          id: prof.id,
-          full_name: prof.full_name,
-          email: prof.email,
-          bio: prof.bio || null,
-          specialty: prof.specialty || (courseCountsByInstructor[prof.id] ? "Formateur Certifié ANSELLA" : "Formateur"),
-          avatar_url: prof.avatar_url || null,
-          academy_name: prof.academy_name || null,
-          nationality: prof.nationality || null,
-          website: prof.website || null,
-          courseCount: courseCountsByInstructor[prof.id] || 0,
+      const hasCreatedCourses = courseAuthorIds.has(p.id);
+      const isCollaborator = collaboratorIds.has(p.id);
+      const hasAcademyDetails = Boolean(p.academy_name || p.specialty);
+
+      if ((hasInstructorRole || hasCreatedCourses || isCollaborator || hasAcademyDetails) && !seenIds.has(p.id) && p.full_name) {
+        seenIds.add(p.id);
+        instructorsList.push({
+          id: p.id,
+          full_name: p.full_name,
+          email: p.email,
+          bio: p.bio || null,
+          specialty:
+            p.specialty ||
+            (hasCreatedCourses
+              ? `Formateur (${courseCountsByInstructor[p.id] || 1} formation${(courseCountsByInstructor[p.id] || 1) > 1 ? "s" : ""})`
+              : p.academy_name
+              ? `Formateur · ${p.academy_name}`
+              : "Formateur Certifié"),
+          avatar_url: p.avatar_url || null,
+          academy_name: p.academy_name || null,
+          nationality: p.nationality || null,
+          website: p.website || null,
+          courseCount: courseCountsByInstructor[p.id] || 0,
         });
       }
     });
 
-    return NextResponse.json({ instructors: realInstructors });
+    // Pass 2: If no explicit instructor was found with strict flags, include all non-empty profiles from the database
+    if (instructorsList.length === 0 && profiles.length > 0) {
+      profiles.forEach((p) => {
+        if (!seenIds.has(p.id) && p.full_name) {
+          seenIds.add(p.id);
+          instructorsList.push({
+            id: p.id,
+            full_name: p.full_name,
+            email: p.email,
+            bio: p.bio || null,
+            specialty: p.specialty || p.academy_name || "Formateur & Expert",
+            avatar_url: p.avatar_url || null,
+            academy_name: p.academy_name || null,
+            nationality: p.nationality || null,
+            website: p.website || null,
+            courseCount: courseCountsByInstructor[p.id] || 0,
+          });
+        }
+      });
+    }
+
+    return NextResponse.json({ instructors: instructorsList, count: instructorsList.length });
   } catch (err: any) {
-    console.error("[/api/instructors] Unexpected error:", err);
-    return NextResponse.json({ error: err.message || "Erreur interne" }, { status: 500 });
+    console.error("[/api/instructors] Server error:", err);
+    return NextResponse.json({ instructors: [], error: err.message }, { status: 500 });
   }
 }
