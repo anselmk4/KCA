@@ -34,63 +34,97 @@ export function Footer() {
   return (
     <footer className="border-t bg-slate-50 dark:bg-zinc-950">
       <div className="container mx-auto px-4 md:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div className="col-span-1 md:col-span-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-8">
+          <div className="sm:col-span-2 md:col-span-1">
             <Link href="/" className="flex items-center mb-4">
               <Image src="/logo.png" alt="ANSELLA" width={180} height={52} className="object-contain h-12 w-auto dark:hidden" />
               <Image src="/logo-dark.png" alt="ANSELLA" width={180} height={52} className="object-contain h-12 w-auto hidden dark:block" />
             </Link>
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
               {language === "en" 
-                ? "Certification training and learning tools for African entrepreneurs." 
-                : "Formations certifiantes et outils d'apprentissage pour entrepreneurs africains."}
+                ? "Next-Gen LMS platform for African and global creators. Sell courses with Mobile Money, Cards, and Crypto." 
+                : "Plateforme LMS nouvelle génération pour formateurs en Afrique et dans le monde. Vendez avec Mobile Money, Cartes et Cryptos."}
             </p>
             <div className="flex space-x-3">
               <Link href="#" className="text-muted-foreground hover:text-blue-600 transition-colors">
-                <FacebookIcon className="w-5 h-5" />
+                <FacebookIcon className="w-4 h-4" />
               </Link>
               <Link href="#" className="text-muted-foreground hover:text-zinc-900 dark:hover:text-white transition-colors">
-                <XIcon className="w-5 h-5" />
+                <XIcon className="w-4 h-4" />
               </Link>
               <Link href="#" className="text-muted-foreground hover:text-pink-600 transition-colors">
-                <InstagramIcon className="w-5 h-5" />
+                <InstagramIcon className="w-4 h-4" />
               </Link>
               <Link href="#" className="text-muted-foreground hover:text-blue-700 transition-colors">
-                <LinkedInIcon className="w-5 h-5" />
+                <LinkedInIcon className="w-4 h-4" />
               </Link>
             </div>
           </div>
           
           <div>
-            <h3 className="font-semibold mb-4">{language === "en" ? "Quick Links" : "Liens Rapides"}</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link href="/about" className="hover:text-foreground transition-colors">{language === "en" ? "About Us" : "À propos de nous"}</Link></li>
-              <li><Link href="/courses" className="hover:text-foreground transition-colors">{language === "en" ? "Our Courses" : "Nos formations"}</Link></li>
-              <li><Link href="/#pricing" className="hover:text-foreground transition-colors">{language === "en" ? "Pricing" : "Tarifs"}</Link></li>
-              <li><Link href="/login" className="hover:text-foreground transition-colors">{language === "en" ? "Log In" : "Se connecter"}</Link></li>
-            </ul>
-          </div>
-          
-          <div>
-            <h3 className="font-semibold mb-4">{language === "en" ? "Legal" : "Légal"}</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link href="/terms" className="hover:text-foreground transition-colors">{language === "en" ? "Terms of Service" : "Conditions d'utilisation"}</Link></li>
-              <li><Link href="/privacy" className="hover:text-foreground transition-colors">{language === "en" ? "Privacy Policy" : "Politique de confidentialité"}</Link></li>
+            <h3 className="text-xs font-bold uppercase tracking-wider mb-4 text-zinc-900 dark:text-white">
+              {language === "en" ? "LMS Africa" : "LMS Afrique"}
+            </h3>
+            <ul className="space-y-2 text-xs text-muted-foreground">
+              <li><Link href="/lms-afrique" className="hover:text-teal-600 transition-colors font-semibold">🌍 {language === "en" ? "Africa Hub" : "Hub Panafricain"}</Link></li>
+              <li><Link href="/lms-afrique/rdc" className="hover:text-teal-600 transition-colors">🇨🇩 RDC (Kinshasa/Goma)</Link></li>
+              <li><Link href="/lms-afrique/cote-divoire" className="hover:text-teal-600 transition-colors">🇨🇮 Côte d'Ivoire (Abidjan)</Link></li>
+              <li><Link href="/lms-afrique/senegal" className="hover:text-teal-600 transition-colors">🇸🇳 Sénégal (Dakar)</Link></li>
+              <li><Link href="/lms-afrique/cameroun" className="hover:text-teal-600 transition-colors">🇨🇲 Cameroun (Douala)</Link></li>
+              <li><Link href="/lms-afrique/nigeria" className="hover:text-teal-600 transition-colors">🇳🇬 Nigeria (Lagos)</Link></li>
+              <li><Link href="/lms-afrique/kenya" className="hover:text-teal-600 transition-colors">🇰🇪 Kenya (Nairobi)</Link></li>
             </ul>
           </div>
 
           <div>
-            <h3 className="font-semibold mb-4">Contact</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>Email: info@ansella.app</li>
-              <li>Téléphone: +243990387237</li>
-              <li>{language === "en" ? "Bukavu, DRC (International Office)" : "Bukavu, RDC (Bureau International)"}</li>
+            <h3 className="text-xs font-bold uppercase tracking-wider mb-4 text-zinc-900 dark:text-white">
+              {language === "en" ? "Comparisons" : "Comparatifs LMS"}
+            </h3>
+            <ul className="space-y-2 text-xs text-muted-foreground">
+              <li><Link href="/vs" className="hover:text-teal-600 transition-colors font-semibold">⚖️ {language === "en" ? "All Comparisons" : "Tous les comparatifs"}</Link></li>
+              <li><Link href="/vs/teachable" className="hover:text-teal-600 transition-colors">ANSELLA vs Teachable</Link></li>
+              <li><Link href="/vs/udemy" className="hover:text-teal-600 transition-colors">ANSELLA vs Udemy</Link></li>
+              <li><Link href="/vs/kajabi" className="hover:text-teal-600 transition-colors">ANSELLA vs Kajabi</Link></li>
+              <li><Link href="/vs/moodle" className="hover:text-teal-600 transition-colors">ANSELLA vs Moodle</Link></li>
+              <li><Link href="/vs/thinkific" className="hover:text-teal-600 transition-colors">ANSELLA vs Thinkific</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider mb-4 text-zinc-900 dark:text-white">
+              {language === "en" ? "Resources & Blog" : "Ressources & Blog"}
+            </h3>
+            <ul className="space-y-2 text-xs text-muted-foreground">
+              <li><Link href="/blog" className="hover:text-teal-600 transition-colors font-semibold">📚 {language === "en" ? "All Guides & Articles" : "Tous les articles"}</Link></li>
+              <li><Link href="/courses" className="hover:text-teal-600 transition-colors">{language === "en" ? "Explore Courses" : "Catalogue de formations"}</Link></li>
+              <li><Link href="/instructors" className="hover:text-teal-600 transition-colors">{language === "en" ? "Our Instructors" : "Nos Formateurs"}</Link></li>
+              <li><Link href="/templates" className="hover:text-teal-600 transition-colors">{language === "en" ? "Academy Models" : "Modèles d'académie"}</Link></li>
+              <li><Link href="/pricing" className="hover:text-teal-600 transition-colors">{language === "en" ? "Pricing & Plans" : "Tarifs & Formules"}</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wider mb-4 text-zinc-900 dark:text-white">
+              {language === "en" ? "Legal & Trust" : "Légal & Confiance"}
+            </h3>
+            <ul className="space-y-2 text-xs text-muted-foreground">
+              <li><Link href="/terms" className="hover:text-teal-600 transition-colors">{language === "en" ? "Terms of Service" : "Conditions d'utilisation"}</Link></li>
+              <li><Link href="/privacy" className="hover:text-teal-600 transition-colors">{language === "en" ? "Privacy Policy" : "Politique de confidentialité"}</Link></li>
+              <li className="pt-2 text-[11px] text-zinc-400">
+                <span>📍 Bukavu, RDC (Bureau International)</span>
+              </li>
+              <li className="text-[11px] text-zinc-400">
+                <span>✉️ info@ansella.app</span>
+              </li>
             </ul>
           </div>
         </div>
         
-        <div className="mt-12 pt-8 border-t text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} ANSELLA. {language === "en" ? "All rights reserved." : "Tous droits réservés."}</p>
+        <div className="mt-12 pt-6 border-t text-center text-xs text-muted-foreground flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p>&copy; {new Date().getFullYear()} ANSELLA Inc. {language === "en" ? "All rights reserved." : "Tous droits réservés."}</p>
+          <p className="text-[11px] text-zinc-400">
+            {language === "en" ? "High-performance African & Global EdTech Infrastructure" : "Infrastructure EdTech Haute Performance Afrique & Monde"}
+          </p>
         </div>
       </div>
     </footer>

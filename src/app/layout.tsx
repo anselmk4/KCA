@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageProvider } from "@/context/LanguageContext";
+import { OrganizationJsonLd } from "@/components/seo/JsonLd";
 import "./globals.css";
 
 const inter = Inter({
@@ -9,19 +10,24 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "ANSELLA | Global LMS Platform for Instructors & Learners | Share Your Knowledge",
-  description: "Create, host, and sell your online courses worldwide. ANSELLA is a world-class LMS platform to assess learners, issue certificates, and monetize your expertise easily.",
+  title: "ANSELLA | Plateforme LMS Mondiale & E-Learning | Vendez vos Formations",
+  description: "Créez, hébergez et vendez vos cours en ligne en Afrique et dans le monde. Plateforme LMS complète avec paiements Mobile Money (M-Pesa, Wave, MTN, Orange), cartes bancaires, cryptos, IA et certificats vérifiables.",
   keywords: [
-    "ANSELLA", "SaaS LMS", "E-learning", "Online Courses", 
-    "Sell Courses", "Stripe", "PayPal", "Mobile Money",
-    "Blockchain", "Artificial Intelligence", "Monetization", "Instructors"
+    "ANSELLA", "LMS Afrique", "Plateforme LMS", "Vendre des formations en ligne", 
+    "Mobile Money LMS", "M-Pesa", "Wave", "Orange Money", "MTN MoMo",
+    "E-learning Afrique", "Blockchain", "Intelligence Artificielle", "Certificats vérifiables en ligne",
+    "EdTech Afrique", "LMS Software", "Sell online courses", "Academy builder"
   ],
-  authors: [{ name: "ANSELLA Team", url: "https://ansella.app" }],
-  creator: "ANSELLA",
+  authors: [{ name: "ANSELLA EdTech", url: "https://ansella.app" }],
+  creator: "ANSELLA Inc.",
   publisher: "ANSELLA",
   metadataBase: new URL("https://ansella.app"),
   alternates: {
     canonical: "/",
+    languages: {
+      "fr-FR": "https://ansella.app",
+      "en-US": "https://ansella.app",
+    },
   },
   icons: {
     icon: [
@@ -33,25 +39,26 @@ export const metadata: Metadata = {
   },
   manifest: "/manifest.json",
   openGraph: {
-    title: "ANSELLA | Global LMS Platform for Instructors & Learners",
-    description: "Create and sell online courses worldwide. Collect payments easily via Mobile Money and cards.",
+    title: "ANSELLA | Plateforme LMS & E-Learning Nouvelle Génération",
+    description: "Créez votre académie en ligne. Encaissez facilement avec Mobile Money, Cartes et Cryptos. Diplômes sécurisés.",
     url: "https://ansella.app",
     siteName: "ANSELLA",
-    locale: "en_US",
+    locale: "fr_FR",
+    alternateLocale: ["en_US"],
     type: "website",
     images: [
       {
         url: "/og-image-final.png",
         width: 1200,
         height: 630,
-        alt: "ANSELLA - Global LMS Platform",
+        alt: "ANSELLA - Global LMS & E-Learning Platform",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "ANSELLA | Global LMS Platform for Instructors & Learners",
-    description: "Create and sell online courses worldwide. Collect payments easily via Mobile Money and cards.",
+    title: "ANSELLA | Plateforme LMS pour Créateurs de Formations",
+    description: "Vendez vos cours en ligne avec Mobile Money et cartes bancaires. Solution LMS certifiée et sécurisée.",
     images: ["/og-image-final.png"],
   },
   robots: {
@@ -74,9 +81,12 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="fr"
       suppressHydrationWarning
     >
+      <head>
+        <OrganizationJsonLd />
+      </head>
       <body className={`${inter.className} min-h-full flex flex-col antialiased bg-white dark:bg-black text-black dark:text-white`}>
         <ThemeProvider
           attribute="class"

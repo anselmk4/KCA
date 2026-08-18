@@ -137,15 +137,51 @@ export default function VerifyClient({ code }: { code: string }) {
               </div>
             </div>
 
-            {/* CTA */}
-            <div className="text-center">
-              <Link
-                href="/"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors text-sm"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Discover ANSELLA
-              </Link>
+            {/* Social Proof & Backlink CTAs */}
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {(() => {
+                const issueDateObj = result.certificate.issuedAt ? new Date(result.certificate.issuedAt) : new Date();
+                const certUrl = typeof window !== 'undefined' ? window.location.href : `https://ansella.app/verify/${result.certificate.code}`;
+                const linkedinUrl = `https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&name=${encodeURIComponent(result.certificate.courseTitle)}&organizationName=${encodeURIComponent(result.certificate.academyName || "ANSELLA")}&issueYear=${issueDateObj.getFullYear()}&issueMonth=${issueDateObj.getMonth() + 1}&certUrl=${encodeURIComponent(certUrl)}&certId=${encodeURIComponent(result.certificate.code)}`;
+                const twitterText = encodeURIComponent(`I am proud to share my verified certificate in "${result.certificate.courseTitle}" from ANSELLA! 🎓 Check it out: ${certUrl}`);
+                const twitterUrl = `https://twitter.com/intent/tweet?text=${twitterText}`;
+
+                return (
+                  <>
+                    <a
+                      href={linkedinUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-5 py-3 bg-[#0A66C2] hover:bg-[#004182] text-white font-bold rounded-xl transition-all text-xs shadow-lg shadow-blue-900/20"
+                    >
+                      <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                      </svg>
+                      <span>Add to LinkedIn Profile</span>
+                    </a>
+
+                    <a
+                      href={twitterUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-5 py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-semibold rounded-xl border border-zinc-700 transition-all text-xs"
+                    >
+                      <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                        <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z" />
+                      </svg>
+                      <span>Share on X</span>
+                    </a>
+
+                    <Link
+                      href="/"
+                      className="inline-flex items-center gap-2 px-5 py-3 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-xl transition-colors text-xs"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Discover ANSELLA</span>
+                    </Link>
+                  </>
+                );
+              })()}
             </div>
           </div>
         )}

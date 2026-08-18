@@ -69,17 +69,17 @@ export function MobileMenu() {
             <Link href="/features" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
               {t("nav.features")}
             </Link>
+            <Link href="/lms-afrique" onClick={() => setOpen(false)} className="text-lg font-bold py-2 border-b border-zinc-100 dark:border-zinc-800 text-teal-600 dark:text-teal-400">
+              🌍 {language === "en" ? "LMS Africa" : "LMS Afrique"}
+            </Link>
+            <Link href="/vs" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
+              ⚖️ {language === "en" ? "Comparisons" : "Comparatifs LMS"}
+            </Link>
+            <Link href="/blog" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
+              📚 Blog & Guides
+            </Link>
             <Link href="/templates" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
               {language === "en" ? "Academy Models" : "Modèle d'académie"}
-            </Link>
-            <Link href="/services" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
-              Services
-            </Link>
-            <Link href="/cases" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
-              {language === "en" ? "Use Cases" : "Cas d'utilisation"}
-            </Link>
-            <Link href="/partners" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
-              {language === "en" ? "Partners" : "Partenaires"}
             </Link>
             <Link href="/pricing" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
               {t("nav.pricing")}

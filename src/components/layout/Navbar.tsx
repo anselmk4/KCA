@@ -66,17 +66,14 @@ export function Navbar() {
           <Link href="/features" className="transition-colors hover:text-foreground/80 text-foreground/60">
             {t("nav.features")}
           </Link>
+          <Link href="/lms-afrique" className="transition-colors hover:text-teal-600 text-teal-600 dark:text-teal-400 font-semibold">
+            {language === "en" ? "LMS Africa" : "LMS Afrique"}
+          </Link>
           <Link href="/templates" className="transition-colors hover:text-foreground/80 text-foreground/60">
             {language === "en" ? "Academy Models" : "Modèle d'académie"}
           </Link>
-          <Link href="/services" className="transition-colors hover:text-foreground/80 text-foreground/60">
-            Services
-          </Link>
-          <Link href="/cases" className="transition-colors hover:text-foreground/80 text-foreground/60">
-            {language === "en" ? "Use Cases" : "Cas d'utilisation"}
-          </Link>
-          <Link href="/partners" className="transition-colors hover:text-foreground/80 text-foreground/60">
-            {language === "en" ? "Partners" : "Partenaires"}
+          <Link href="/blog" className="transition-colors hover:text-foreground/80 text-foreground/60">
+            Blog
           </Link>
           <Link href="/pricing" className="transition-colors hover:text-foreground/80 text-foreground/60">
             {t("nav.pricing")}
