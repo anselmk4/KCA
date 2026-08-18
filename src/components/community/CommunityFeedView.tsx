@@ -355,7 +355,9 @@ export function CommunityFeedView() {
     return posts.filter((p) => {
       let matchesCategory = true;
       if (selectedCategory === "FOLLOWING") {
-        matchesCategory = followingIds.includes(p.user_id) || ["INSTRUCTOR", "ADMIN", "SUPER_ADMIN"].includes(p.author_role);
+        matchesCategory =
+          followingIds.includes(p.user_id) ||
+          Boolean(p.author_role && ["INSTRUCTOR", "ADMIN", "SUPER_ADMIN"].includes(p.author_role));
       } else if (selectedCategory !== "ALL") {
         matchesCategory = p.category === selectedCategory;
       }
