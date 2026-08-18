@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { getSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
-import { ShieldAlert, TrendingUp } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import Link from "next/link";
-import BaseCommunityPage from "@/app/(dashboard)/dashboard/community/page";
+import { CommunityFeedView } from "@/components/community/CommunityFeedView";
 
 export default function InstructorCommunityPage() {
   const [currentPlan, setCurrentPlan] = useState<string>("FREE");
@@ -72,7 +72,7 @@ export default function InstructorCommunityPage() {
 
       {/* Main Content Area (greyed out if Free plan) */}
       <div className={`transition-all duration-300 ${isFreePlan ? "opacity-35 pointer-events-none select-none filter blur-[0.5px]" : ""}`}>
-        <BaseCommunityPage />
+        <CommunityFeedView />
       </div>
     </div>
   );
