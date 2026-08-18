@@ -34,6 +34,7 @@ import {
   Share2,
   UserCheck,
   Calendar,
+  HelpCircle,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { getSimulatedSession, setSimulatedSession, clearSimulatedSession } from "@/lib/rbac";
