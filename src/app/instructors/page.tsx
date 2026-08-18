@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase/client";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import {
@@ -16,7 +15,6 @@ import {
   BookOpen,
   Search,
   CheckCircle2,
-  Award,
   Filter,
 } from "lucide-react";
 import { motion, Variants } from "framer-motion";
@@ -25,6 +23,7 @@ import { useLanguage } from "@/context/LanguageContext";
 interface Instructor {
   id: string;
   full_name: string;
+  email?: string;
   bio: string | null;
   specialty: string | null;
   avatar_url: string | null;
@@ -32,91 +31,7 @@ interface Instructor {
   nationality: string | null;
   website: string | null;
   courseCount?: number;
-  studentCount?: number;
-  featured?: boolean;
 }
-
-// Fallback curated showcase instructors when platform is growing
-const SHOWCASE_INSTRUCTORS: Instructor[] = [
-  {
-    id: "showcase-1",
-    full_name: "Dr. Anselme K.",
-    specialty: "Blockchain Architect & Smart Contracts",
-    academy_name: "Ansella Blockchain Institute",
-    bio: "Pionnier des technologies décentralisées et du développement Web3 en Afrique francophone. Auteur de plusieurs cours de référence sur Ethereum, Solidity et DeFi.",
-    nationality: "RDC 🇨🇩",
-    website: "https://ansella.org",
-    avatar_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
-    courseCount: 4,
-    studentCount: 380,
-    featured: true,
-  },
-  {
-    id: "showcase-2",
-    full_name: "Pr. Marc-André Diallo",
-    specialty: "Intelligence Artificielle & Machine Learning",
-    academy_name: "African AI Lab",
-    bio: "Chercheur en Deep Learning et vision par ordinateur. Formateur certifié en Prompt Engineering et modèles de langage avancés.",
-    nationality: "Sénégal 🇸🇳",
-    website: "https://african-ai.org",
-    avatar_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80",
-    courseCount: 3,
-    studentCount: 290,
-    featured: true,
-  },
-  {
-    id: "showcase-3",
-    full_name: "Nathalie Kouassi",
-    specialty: "Fintech & Mobile Money API Engineering",
-    academy_name: "Abidjan Tech Hub",
-    bio: "Ingénieure logicielle spécialisée dans l'intégration des passerelles de paiement panafricaines (Wave, Orange Money, MTN MoMo).",
-    nationality: "Côte d'Ivoire 🇨🇮",
-    website: "https://fintech-abidjan.ci",
-    avatar_url: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80",
-    courseCount: 2,
-    studentCount: 215,
-    featured: true,
-  },
-  {
-    id: "showcase-4",
-    full_name: "Eng. Emmanuel Nwachukwu",
-    specialty: "Full-Stack Next.js & Cloud Computing",
-    academy_name: "Lagos Code Academy",
-    bio: "Senior Cloud Architect & Devops. Accompagne les étudiants dans la création d'applications SaaS modernes et scalables.",
-    nationality: "Nigeria 🇳🇬",
-    website: "https://lagoscode.io",
-    avatar_url: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80",
-    courseCount: 5,
-    studentCount: 450,
-    featured: true,
-  },
-  {
-    id: "showcase-5",
-    full_name: "Carine Mbarga",
-    specialty: "Cyber-Sécurité & Gouvernance des Données",
-    academy_name: "Douala Cyber Guard",
-    bio: "Consultante ISO 27001 et auditrice en sécurité informatique. Formatrice sur la protection des infrastructures cloud et la résilience cyber.",
-    nationality: "Cameroun 🇨🇲",
-    website: "https://cyberguard.cm",
-    avatar_url: "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=400&q=80",
-    courseCount: 2,
-    studentCount: 160,
-    featured: true,
-  },
-  {
-    id: "showcase-6",
-    full_name: "Dr. David Kiprop",
-    specialty: "Cryptomonnaies & Trading Algorithmique",
-    academy_name: "Nairobi Crypto Institute",
-    bio: "Analyste financier et développeur Python pour bots de trading crypto quantitatifs et analyse de marché on-chain.",
-    nationality: "Kenya 🇰🇪",
-    website: "https://nairobi-crypto.ke",
-    avatar_url: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=400&q=80",
-    courseCount: 3,
-    studentCount: 310,
-    featured: true,
-  },
-];
 
 export default function InstructorsPage() {
   const [instructors, setInstructors] = useState<Instructor[]>([]);
@@ -128,99 +43,18 @@ export default function InstructorsPage() {
   useEffect(() => {
     async function loadInstructors() {
       try {
-        // 1. Fetch all distinct instructor IDs from courses
-        const { data: coursesData } = await supabase
-          .from("courses")
-          .select("id, instructor_id, status");
-
-        const courseAuthors = new Set<string>();
-        const courseCountsByInstructor: Record<string, number> = {};
-
-        (coursesData || []).forEach((c) => {
-          if (c.instructor_id) {
-            courseAuthors.add(c.instructor_id);
-            courseCountsByInstructor[c.instructor_id] =
-              (courseCountsByInstructor[c.instructor_id] || 0) + 1;
-          }
-        });
-
-        // 2. Fetch instructors from roles & user_roles
-        const { data: roleData } = await supabase
-          .from("roles")
-          .select("id, name")
-          .in("name", ["INSTRUCTOR", "SUPER_ADMIN", "ADMIN", "TEACHING_ASSISTANT"]);
-
-        const roleIds = (roleData || []).map((r) => r.id);
-        const roleUsers = new Set<string>();
-
-        if (roleIds.length > 0) {
-          const { data: userRoles } = await supabase
-            .from("user_roles")
-            .select("user_id")
-            .in("role_id", roleIds);
-
-          (userRoles || []).forEach((ur) => roleUsers.add(ur.user_id));
+        setLoading(true);
+        // Call the server API which uses supabaseAdmin to safely retrieve all real instructors without RLS filtering
+        const res = await fetch("/api/instructors");
+        if (res.ok) {
+          const data = await res.json();
+          setInstructors(data.instructors || []);
+        } else {
+          setInstructors([]);
         }
-
-        // 3. Fetch collaborators
-        const { data: collabData } = await (supabase as any)
-          .from("course_collaborators")
-          .select("collaborator_id");
-        (collabData || []).forEach((collab: any) => {
-          if (collab.collaborator_id) roleUsers.add(collab.collaborator_id);
-        });
-
-        // 4. Fetch all profiles from Supabase
-        const { data: allProfiles } = await supabase
-          .from("profiles")
-          .select("id, full_name, email, bio, specialty, avatar_url, academy_name, nationality, website, role")
-          .order("full_name", { ascending: true });
-
-        const profilesList = (allProfiles || []) as any[];
-
-        // Combine all instructors:
-        // - In courseAuthors
-        // - In roleUsers
-        // - Has role === 'INSTRUCTOR' or academy_name or specialty
-        // - Or has a full_name that is non-empty
-        const realInstructors: Instructor[] = [];
-        const seenIds = new Set<string>();
-
-        profilesList.forEach((prof) => {
-          const isCourseAuthor = courseAuthors.has(prof.id);
-          const hasRole = roleUsers.has(prof.id) || ["INSTRUCTOR", "ADMIN", "SUPER_ADMIN"].includes(prof.role);
-          const hasInstructorDetails = Boolean(prof.academy_name || prof.specialty || prof.bio);
-
-          if ((isCourseAuthor || hasRole || hasInstructorDetails) && !seenIds.has(prof.id) && prof.full_name) {
-            seenIds.add(prof.id);
-            realInstructors.push({
-              id: prof.id,
-              full_name: prof.full_name,
-              bio: prof.bio || null,
-              specialty: prof.specialty || (isCourseAuthor ? "Formateur Agréé ANSELLA" : "Expert Formateur"),
-              avatar_url: prof.avatar_url || null,
-              academy_name: prof.academy_name || null,
-              nationality: prof.nationality || null,
-              website: prof.website || null,
-              courseCount: courseCountsByInstructor[prof.id] || (isCourseAuthor ? 1 : 0),
-              studentCount: (courseCountsByInstructor[prof.id] || 1) * 45,
-              featured: isCourseAuthor,
-            });
-          }
-        });
-
-        // If very few instructors exist in local DB, complement with showcase experts to create a vibrant directory
-        const combined = [...realInstructors];
-        SHOWCASE_INSTRUCTORS.forEach((sc) => {
-          if (!seenIds.has(sc.id) && !combined.some(i => i.full_name?.toLowerCase() === sc.full_name.toLowerCase())) {
-            combined.push(sc);
-          }
-        });
-
-        setInstructors(combined);
       } catch (err) {
         console.error("Error loading instructors list:", err);
-        setInstructors(SHOWCASE_INSTRUCTORS);
+        setInstructors([]);
       } finally {
         setLoading(false);
       }
@@ -229,7 +63,12 @@ export default function InstructorsPage() {
   }, []);
 
   const initials = (name?: string | null) =>
-    (name || "AN").split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+    (name || "AN")
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
 
   const specialties = [
     { id: "ALL", label: language === "en" ? "All Specialties" : "Toutes les spécialités" },
@@ -255,11 +94,16 @@ export default function InstructorsPage() {
 
       if (selectedSpecialty === "ALL") return true;
       const text = `${inst.specialty || ""} ${inst.bio || ""} ${inst.academy_name || ""}`.toLowerCase();
-      if (selectedSpecialty === "BLOCKCHAIN") return text.includes("blockchain") || text.includes("crypto") || text.includes("web3") || text.includes("smart contract");
-      if (selectedSpecialty === "AI") return text.includes("ia") || text.includes("intelligence") || text.includes("machine learning") || text.includes("deep learning");
-      if (selectedSpecialty === "FINTECH") return text.includes("fintech") || text.includes("money") || text.includes("finance") || text.includes("paiement");
-      if (selectedSpecialty === "DEV") return text.includes("dev") || text.includes("next.js") || text.includes("code") || text.includes("cloud") || text.includes("logiciel");
-      if (selectedSpecialty === "CYBER") return text.includes("cyber") || text.includes("sécurité") || text.includes("security") || text.includes("iso");
+      if (selectedSpecialty === "BLOCKCHAIN")
+        return text.includes("blockchain") || text.includes("crypto") || text.includes("web3") || text.includes("smart contract");
+      if (selectedSpecialty === "AI")
+        return text.includes("ia") || text.includes("intelligence") || text.includes("machine learning") || text.includes("deep learning");
+      if (selectedSpecialty === "FINTECH")
+        return text.includes("fintech") || text.includes("money") || text.includes("finance") || text.includes("paiement");
+      if (selectedSpecialty === "DEV")
+        return text.includes("dev") || text.includes("next.js") || text.includes("code") || text.includes("cloud") || text.includes("logiciel");
+      if (selectedSpecialty === "CYBER")
+        return text.includes("cyber") || text.includes("sécurité") || text.includes("security") || text.includes("iso");
       return true;
     });
   }, [instructors, searchQuery, selectedSpecialty]);
@@ -287,18 +131,18 @@ export default function InstructorsPage() {
           <div className="text-center max-w-3xl mx-auto space-y-5">
             <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase bg-teal-500/10 dark:bg-teal-500/5 border border-teal-500/20 text-teal-600 dark:text-teal-400 mx-auto">
               <Sparkles className="w-3.5 h-3.5" />
-              {language === "en" ? "Faculty & Certified Instructors" : "Corps Professoral & Formateurs Agréés"}
+              {language === "en" ? "Faculty & Instructors" : "Corps Professoral & Formateurs"}
             </span>
             <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight text-zinc-900 dark:text-white">
-              {language === "en" ? "Learn from Africa's" : "Apprenez auprès des"}{" "}
+              {language === "en" ? "Learn from" : "Apprenez auprès des"}{" "}
               <span className="bg-gradient-to-r from-teal-500 via-emerald-500 to-indigo-500 bg-clip-text text-transparent">
-                {language === "en" ? "top industry experts." : "meilleurs experts."}
+                {language === "en" ? "our platform instructors." : "formateurs de la plateforme."}
               </span>
             </h1>
             <p className="text-sm md:text-base text-zinc-500 dark:text-zinc-400 leading-relaxed">
               {language === "en"
-                ? "Discover all certified educators, academy directors, and practitioners sharing high-impact knowledge on ANSELLA."
-                : "Découvrez tous les formateurs, directeurs d'académie et professionnels de l'industrie qui transmettent leurs compétences sur la plateforme ANSELLA."}
+                ? "Discover all certified educators and creators teaching on ANSELLA."
+                : "Découvrez l'ensemble des formateurs, directeurs d'académie et enseignants enregistrés sur la plateforme ANSELLA."}
             </p>
           </div>
 
@@ -310,7 +154,11 @@ export default function InstructorsPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={language === "en" ? "Search by name, specialty, country, academy..." : "Rechercher un formateur par nom, spécialité, pays, académie..."}
+                placeholder={
+                  language === "en"
+                    ? "Search instructor by name, specialty, country, academy..."
+                    : "Rechercher un formateur par nom, spécialité, pays, académie..."
+                }
                 className="w-full pl-11 pr-4 py-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
               />
             </div>
@@ -348,7 +196,9 @@ export default function InstructorsPage() {
               <Users className="w-10 h-10 text-zinc-400 mx-auto" />
               <h3 className="text-base font-bold text-zinc-900 dark:text-white">Aucun formateur trouvé</h3>
               <p className="text-xs text-zinc-500">
-                Essayez d'ajuster votre recherche ou vos filtres pour voir d'autres résultats.
+                {instructors.length === 0
+                  ? "Aucun compte formateur n'est encore enregistré sur la plateforme."
+                  : "Aucun formateur ne correspond à vos critères de recherche."}
               </p>
             </div>
           ) : (
@@ -394,7 +244,7 @@ export default function InstructorsPage() {
                         </div>
 
                         <p className="text-xs font-semibold text-teal-600 dark:text-teal-400 line-clamp-1">
-                          {inst.specialty}
+                          {inst.specialty || "Formateur ANSELLA"}
                         </p>
 
                         {inst.academy_name && (
@@ -407,9 +257,11 @@ export default function InstructorsPage() {
                     </div>
 
                     {/* Bio */}
-                    <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed line-clamp-3">
-                      {inst.bio || "Formateur certifié sur la plateforme ANSELLA, partageant son expertise à travers des formations pratiques et interactives."}
-                    </p>
+                    {inst.bio && (
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed line-clamp-3">
+                        {inst.bio}
+                      </p>
+                    )}
 
                     {/* Meta stats & country */}
                     <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-500">
@@ -422,7 +274,7 @@ export default function InstructorsPage() {
                         )}
                         <span className="flex items-center gap-1 font-semibold text-zinc-700 dark:text-zinc-300">
                           <BookOpen className="w-3 h-3 text-teal-500" />
-                          {inst.courseCount || 1} cours
+                          {inst.courseCount || 0} {inst.courseCount && inst.courseCount > 1 ? "cours" : "cours"}
                         </span>
                       </div>
 
@@ -432,7 +284,6 @@ export default function InstructorsPage() {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-1 text-zinc-400 hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
-                          title="Site web de l'instructeur"
                         >
                           <Globe className="w-3 h-3" />
                         </a>
@@ -443,10 +294,10 @@ export default function InstructorsPage() {
                   {/* Profile Action CTA */}
                   <div className="mt-5 pt-3 border-t border-zinc-100 dark:border-zinc-800/80">
                     <Link
-                      href={inst.id.startsWith("showcase-") ? `/courses` : `/profile/${inst.id}`}
+                      href={`/profile/${inst.id}`}
                       className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-zinc-100 hover:bg-teal-50 dark:bg-zinc-850 dark:hover:bg-teal-950/30 text-zinc-900 dark:text-zinc-200 hover:text-teal-600 dark:hover:text-teal-400 font-bold text-xs transition-all cursor-pointer group/btn"
                     >
-                      <span>{language === "en" ? "View Courses & Profile" : "Voir les formations"}</span>
+                      <span>{language === "en" ? "View Profile & Courses" : "Consulter le profil"}</span>
                       <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover/btn:translate-x-0.5" />
                     </Link>
                   </div>
