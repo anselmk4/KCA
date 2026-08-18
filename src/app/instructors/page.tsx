@@ -388,7 +388,9 @@ export default function InstructorsPage() {
                           <h3 className="font-extrabold text-base text-zinc-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors truncate">
                             {inst.full_name}
                           </h3>
-                          <CheckCircle2 className="w-4 h-4 text-teal-500 shrink-0" title="Formateur Vérifié" />
+                          <span title="Formateur Vérifié" className="inline-flex">
+                            <CheckCircle2 className="w-4 h-4 text-teal-500 shrink-0" />
+                          </span>
                         </div>
 
                         <p className="text-xs font-semibold text-teal-600 dark:text-teal-400 line-clamp-1">
