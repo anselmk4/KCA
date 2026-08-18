@@ -27,6 +27,9 @@ interface PostComposerProps {
     mediaUrls?: string[];
   }) => Promise<void>;
   currentUserProfile?: any;
+  currentUserAvatar?: string | null;
+  currentUserName?: string;
+  currentUserRole?: string;
 }
 
 const CATEGORY_OPTIONS: { id: PostCategory; label: string; icon: any; color: string }[] = [
@@ -38,7 +41,13 @@ const CATEGORY_OPTIONS: { id: PostCategory; label: string; icon: any; color: str
 
 const SUGGESTED_HASHTAGS = ["#crypto", "#blockchain", "#ia", "#trading", "#web3", "#defi", "#ansella"];
 
-export function PostComposer({ onSubmit, currentUserProfile }: PostComposerProps) {
+export function PostComposer({
+  onSubmit,
+  currentUserProfile,
+  currentUserAvatar,
+  currentUserName,
+  currentUserRole,
+}: PostComposerProps) {
   const [category, setCategory] = useState<PostCategory>("REFLECTIONS");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
