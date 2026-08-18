@@ -31,6 +31,7 @@ import {
   Share2,
   Shapes,
   Eye,
+  Edit3,
 } from "lucide-react";
 import RichEditor from "./RichEditor";
 import { extractYouTubeId, extractVimeoId, extractDailymotionId } from "@/lib/video";
