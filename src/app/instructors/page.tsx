@@ -163,7 +163,7 @@ export default function InstructorsPage() {
         }
 
         // 3. Fetch collaborators
-        const { data: collabData } = await supabase
+        const { data: collabData } = await (supabase as any)
           .from("course_collaborators")
           .select("collaborator_id");
         (collabData || []).forEach((collab: any) => {
