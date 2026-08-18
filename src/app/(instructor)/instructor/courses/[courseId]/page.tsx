@@ -248,7 +248,7 @@ export default function CourseDetailPage() {
       }
 
       const ids = collabData.map((c: any) => c.collaborator_id);
-      const { data: profilesData } = await supabase
+      const { data: profilesData } = await (supabase as any)
         .from("profiles")
         .select("id, full_name, email, avatar_url, role")
         .in("id", ids);
@@ -256,7 +256,7 @@ export default function CourseDetailPage() {
       const mapped = collabData.map((c: any) => ({
         id: c.id,
         collaborator_id: c.collaborator_id,
-        profile: profilesData?.find((p) => p.id === c.collaborator_id) || {
+        profile: (profilesData as any[])?.find((p: any) => p.id === c.collaborator_id) || {
           full_name: "Collaborateur inconnu",
           email: "—",
           avatar_url: null,
