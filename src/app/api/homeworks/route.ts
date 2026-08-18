@@ -63,14 +63,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "courseId, sectionId et title sont requis" }, { status: 400 });
     }
 
-    // Check course ownership
+    // Check course ownership or collaboration
     const { data: course } = await (supabase as any)
       .from("courses")
       .select("instructor_id")
       .eq("id", courseId)
       .maybeSingle();
 
-    if (!course || (course.instructor_id !== user.id && !roles.some(r => ["SUPER_ADMIN", "ADMIN"].includes(r)))) {
+    let isCollab = false;
+    if (course && course.instructor_id !== user.id) {
+      const { data: collab } = await (supabase
+        .from('course_collaborators' as any)
+        .select('id')
+        .eq('course_id', courseId)
+        .eq('collaborator_id', user.id)
+        .maybeSingle() as any);
+      isCollab = !!collab;
+    }
+
+    if (!course || (course.instructor_id !== user.id && !isCollab && !roles.some(r => ["SUPER_ADMIN", "ADMIN"].includes(r)))) {
       return NextResponse.json({ error: "Non autorisé à gérer ce cours" }, { status: 403 });
     }
 
@@ -141,7 +152,18 @@ export async function PUT(req: NextRequest) {
       .eq("user_id", user.id);
     const roles = userRoles?.map((ur: any) => ur.roles?.name) || [];
 
-    if (!course || (course.instructor_id !== user.id && !roles.some(r => ["SUPER_ADMIN", "ADMIN"].includes(r)))) {
+    let isCollab = false;
+    if (course && course.instructor_id !== user.id) {
+      const { data: collab } = await (supabase
+        .from('course_collaborators' as any)
+        .select('id')
+        .eq('course_id', homework.course_id)
+        .eq('collaborator_id', user.id)
+        .maybeSingle() as any);
+      isCollab = !!collab;
+    }
+
+    if (!course || (course.instructor_id !== user.id && !isCollab && !roles.some(r => ["SUPER_ADMIN", "ADMIN"].includes(r)))) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 

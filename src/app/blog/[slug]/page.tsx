@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { BLOG_POSTS_SEO } from '@/data/blog-posts';
+import { getBlogPosts, getBlogPostBySlug } from '@/data/blog-posts';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { BreadcrumbsJsonLd } from '@/components/seo/JsonLd';
@@ -17,8 +17,11 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+
 export async function generateStaticParams() {
-  return BLOG_POSTS_SEO.map((p) => ({
+  const posts = await getBlogPosts();
+  return posts.map((p) => ({
     slug: p.slug,
   }));
 }
@@ -29,7 +32,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const post = BLOG_POSTS_SEO.find((p) => p.slug === slug);
+  const post = await getBlogPostBySlug(slug);
   if (!post) return {};
 
   return {
@@ -55,7 +58,7 @@ export default async function BlogPostDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const post = BLOG_POSTS_SEO.find((p) => p.slug === slug);
+  const post = await getBlogPostBySlug(slug);
 
   if (!post) {
     notFound();

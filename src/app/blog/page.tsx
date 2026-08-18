@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
-import { BLOG_POSTS_SEO } from '@/data/blog-posts';
+import { getBlogPosts } from '@/data/blog-posts';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { BreadcrumbsJsonLd } from '@/components/seo/JsonLd';
@@ -13,6 +13,8 @@ import {
   TrendingUp,
   Share2,
 } from 'lucide-react';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: "Blog & Guides E-Learning : Créer, Vendre et Certifier ses Cours en Ligne | ANSELLA",
@@ -27,7 +29,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function BlogHubPage() {
+export default async function BlogHubPage() {
+  const posts = await getBlogPosts();
   return (
     <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-950 font-sans">
       <Navbar />
@@ -64,7 +67,7 @@ export default function BlogHubPage() {
         {/* Blog Posts Grid */}
         <section className="py-16 px-6 md:px-12 max-w-5xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {BLOG_POSTS_SEO.map((post) => (
+            {posts.map((post) => (
               <article
                 key={post.slug}
                 className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 shadow-sm flex flex-col justify-between space-y-6 hover:border-teal-500/50 hover:shadow-xl transition-all"

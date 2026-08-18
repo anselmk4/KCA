@@ -154,9 +154,32 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Section introuvable' }, { status: 404 });
     }
 
-    const canEdit = await canUserEditCourse(user.id, section.course_id);
-    if (!canEdit) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
+    const { data: course } = await supabaseAdmin
+      .from('courses')
+      .select('instructor_id')
+      .eq('id', section.course_id)
+      .maybeSingle();
+
+    if (!course) {
+      return NextResponse.json({ error: 'Cours introuvable' }, { status: 404 });
+    }
+
+    // Check if user is admin
+    let isAdmin = false;
+    try {
+      const { data: userRoles } = await supabaseAdmin
+        .from('user_roles')
+        .select('roles!inner(name)')
+        .eq('user_id', user.id) as any;
+      const roleNames: string[] = (userRoles || []).map((ur: any) => ur.roles?.name).filter(Boolean);
+      isAdmin = roleNames.some(r => ['SUPER_ADMIN', 'ADMIN', 'ACADEMIC_ADMIN'].includes(r));
+    } catch {}
+
+    // ONLY the course owner or admin can delete sections (collaborators CANNOT delete)
+    if (course.instructor_id !== user.id && !isAdmin) {
+      return NextResponse.json({ 
+        error: 'Action non autorisée : seuls le propriétaire du cours et les administrateurs peuvent supprimer des sections.' 
+      }, { status: 403 });
     }
 
     // Delete all lessons inside this section first

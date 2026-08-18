@@ -143,3 +143,78 @@ export const BLOG_POSTS_SEO: BlogPostSeo[] = [
     `,
   }
 ];
+
+export async function getBlogPosts(): Promise<BlogPostSeo[]> {
+  try {
+    const { supabaseAdmin } = await import('@/lib/supabase/admin');
+    const { data: dbPosts, error } = await (supabaseAdmin as any)
+      .from('blog_posts')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && dbPosts && dbPosts.length > 0) {
+      const formatted: BlogPostSeo[] = dbPosts.map((p: any) => ({
+        slug: p.slug,
+        title: p.title,
+        metaTitle: p.meta_title || p.title,
+        metaDesc: p.meta_desc || p.excerpt,
+        excerpt: p.excerpt || '',
+        publishedAt: p.published_at ? p.published_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        readTimeMinutes: p.read_time_minutes || 5,
+        category: p.category || 'Général',
+        author: {
+          name: p.author_name || 'Équipe ANSELLA',
+          role: p.author_role || 'Rédaction',
+          avatarUrl: p.author_avatar || undefined,
+        },
+        contentHtml: p.content_html || '',
+        tags: p.tags || [],
+      }));
+
+      // Merge with default initial posts if not in DB
+      const dbSlugs = new Set(formatted.map(p => p.slug));
+      const missingDefaults = BLOG_POSTS_SEO.filter(p => !dbSlugs.has(p.slug));
+      return [...formatted, ...missingDefaults];
+    }
+  } catch (err) {
+    console.warn('[getBlogPosts] Database read fallback:', err);
+  }
+
+  return BLOG_POSTS_SEO;
+}
+
+export async function getBlogPostBySlug(slug: string): Promise<BlogPostSeo | null> {
+  try {
+    const { supabaseAdmin } = await import('@/lib/supabase/admin');
+    const { data: p, error } = await (supabaseAdmin as any)
+      .from('blog_posts')
+      .select('*')
+      .eq('slug', slug)
+      .maybeSingle();
+
+    if (!error && p) {
+      return {
+        slug: p.slug,
+        title: p.title,
+        metaTitle: p.meta_title || p.title,
+        metaDesc: p.meta_desc || p.excerpt,
+        excerpt: p.excerpt || '',
+        publishedAt: p.published_at ? p.published_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        readTimeMinutes: p.read_time_minutes || 5,
+        category: p.category || 'Général',
+        author: {
+          name: p.author_name || 'Équipe ANSELLA',
+          role: p.author_role || 'Rédaction',
+          avatarUrl: p.author_avatar || undefined,
+        },
+        contentHtml: p.content_html || '',
+        tags: p.tags || [],
+      };
+    }
+  } catch (err) {
+    console.warn('[getBlogPostBySlug] Database read fallback:', err);
+  }
+
+  return BLOG_POSTS_SEO.find((p) => p.slug === slug) || null;
+}
+

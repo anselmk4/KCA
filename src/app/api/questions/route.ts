@@ -37,7 +37,29 @@ export async function POST(req: NextRequest) {
       .eq('id', quiz.course_id)
       .maybeSingle();
 
-    if (courseError || !course || course.instructor_id !== user.id) {
+    if (courseError || !course) {
+      return NextResponse.json({ error: 'Cours introuvable' }, { status: 404 });
+    }
+
+    const { data: userRoles } = await supabase
+      .from("user_roles")
+      .select("roles(name)")
+      .eq("user_id", user.id);
+    const roles = userRoles?.map((ur: any) => ur.roles?.name) || [];
+    const isAdmin = roles.some(r => ["SUPER_ADMIN", "ADMIN", "ACADEMIC_ADMIN"].includes(r));
+
+    let isCollab = false;
+    if (course.instructor_id !== user.id) {
+      const { data: collab } = await (supabase
+        .from('course_collaborators' as any)
+        .select('id')
+        .eq('course_id', quiz.course_id)
+        .eq('collaborator_id', user.id)
+        .maybeSingle() as any);
+      isCollab = !!collab;
+    }
+
+    if (course.instructor_id !== user.id && !isCollab && !isAdmin) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
     }
 
@@ -108,8 +130,18 @@ export async function DELETE(req: NextRequest) {
       .eq('id', quiz.course_id)
       .maybeSingle();
 
-    if (courseError || !course || course.instructor_id !== user.id) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
+    const { data: userRoles } = await supabase
+      .from("user_roles")
+      .select("roles(name)")
+      .eq("user_id", user.id);
+    const roles = userRoles?.map((ur: any) => ur.roles?.name) || [];
+    const isAdmin = roles.some(r => ["SUPER_ADMIN", "ADMIN", "ACADEMIC_ADMIN"].includes(r));
+
+    // ONLY course owner or admin can delete questions
+    if (courseError || !course || (course.instructor_id !== user.id && !isAdmin)) {
+      return NextResponse.json({ 
+        error: 'Action non autorisée : seuls le propriétaire du cours et les administrateurs peuvent supprimer des questions.' 
+      }, { status: 403 });
     }
 
     const { error } = await supabase.from('questions').delete().eq('id', id);

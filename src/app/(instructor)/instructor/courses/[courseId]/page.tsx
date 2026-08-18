@@ -522,6 +522,10 @@ export default function CourseDetailPage() {
 
   const handleDeleteSection = async (sectId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isCollaborator) {
+      alert("Action non autorisée : les co-gestionnaires peuvent créer et modifier du contenu, mais seul le formateur propriétaire peut supprimer des sections.");
+      return;
+    }
     if (!confirm("Supprimer cette section et toutes ses leçons ? Action irréversible.")) return;
     setSaving(true);
     try {
@@ -690,6 +694,10 @@ export default function CourseDetailPage() {
 
   const handleDeleteLesson = async (lessonId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isCollaborator) {
+      alert("Action non autorisée : les co-gestionnaires peuvent créer et modifier des leçons, mais seul le formateur propriétaire peut les supprimer.");
+      return;
+    }
     if (!confirm("Supprimer cette leçon ? Action définitive.")) return;
     setSaving(true);
     try {
@@ -827,6 +835,10 @@ export default function CourseDetailPage() {
   };
 
   const handleDeleteQuiz = async (quizId: string) => {
+    if (isCollaborator) {
+      alert("Action non autorisée : les co-gestionnaires peuvent créer et modifier des quiz, mais seul le formateur propriétaire peut les supprimer.");
+      return;
+    }
     if (!confirm("Supprimer ce quiz et toutes ses questions ?")) return;
     setSaving(true);
     try {
@@ -876,6 +888,10 @@ export default function CourseDetailPage() {
   };
 
   const handleDeleteQuestion = async (questionId: string) => {
+    if (isCollaborator) {
+      alert("Action non autorisée : les co-gestionnaires peuvent créer et modifier des questions, mais seul le formateur propriétaire peut les supprimer.");
+      return;
+    }
     if (!confirm("Supprimer cette question ?")) return;
     setSaving(true);
     try {
@@ -1414,9 +1430,11 @@ export default function CourseDetailPage() {
                             <button onClick={(e) => moveSectionOrder(section.id, "down", e)} disabled={idx === sections.length - 1} className="p-1 text-zinc-400 hover:text-zinc-800 dark:hover:text-white hover:bg-white dark:hover:bg-zinc-800 rounded-md disabled:opacity-20">
                               <ChevronDown className="w-3 h-3" />
                             </button>
-                            <button onClick={(e) => handleDeleteSection(section.id, e)} className="p-1 text-zinc-400 hover:text-red-500 hover:bg-white dark:hover:bg-zinc-850 rounded-md transition-colors" title="Supprimer">
-                              <Trash2 className="w-3 h-3" />
-                            </button>
+                            {!isCollaborator && (
+                              <button onClick={(e) => handleDeleteSection(section.id, e)} className="p-1 text-zinc-400 hover:text-red-500 hover:bg-white dark:hover:bg-zinc-850 rounded-md transition-colors" title="Supprimer">
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -1453,9 +1471,11 @@ export default function CourseDetailPage() {
                                     <button onClick={() => moveLessonOrder(lesson.id, "down", section.id)} disabled={lessonIdx === sectionLessons.length - 1} className="p-0.5 text-zinc-450 hover:text-zinc-700 dark:hover:text-white disabled:opacity-20">
                                       <ChevronDown className="w-3 h-3" />
                                     </button>
-                                    <button onClick={(e) => handleDeleteLesson(lesson.id, e)} className="p-0.5 text-zinc-400 hover:text-red-500 transition-colors">
-                                      <Trash2 className="w-3 h-3" />
-                                    </button>
+                                    {!isCollaborator && (
+                                      <button onClick={(e) => handleDeleteLesson(lesson.id, e)} className="p-0.5 text-zinc-400 hover:text-red-500 transition-colors" title="Supprimer la leçon">
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               );
@@ -1500,26 +1520,29 @@ export default function CourseDetailPage() {
                                   <FileText className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                                   <span className="text-xs truncate text-zinc-650 dark:text-zinc-350">Devoir : {hw.title}</span>
                                 </div>
-                                <button
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    if (!confirm("Supprimer ce devoir ?")) return;
-                                    setSaving(true);
-                                    try {
-                                      const res = await fetch(`/api/homeworks?id=${hw.id}`, { method: "DELETE" });
-                                      if (res.ok) {
-                                        if (selectedHomeworkId === hw.id) setSelectedHomeworkId(null);
-                                        await loadData(true);
-                                      } else {
-                                        const err = await res.json();
-                                        alert("Erreur : " + err.error);
-                                      }
-                                    } finally { setSaving(false); }
-                                  }}
-                                  className="p-0.5 text-zinc-400 hover:text-red-500 transition-colors shrink-0"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
+                                {!isCollaborator && (
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      if (!confirm("Supprimer ce devoir ?")) return;
+                                      setSaving(true);
+                                      try {
+                                        const res = await fetch(`/api/homeworks?id=${hw.id}`, { method: "DELETE" });
+                                        if (res.ok) {
+                                          if (selectedHomeworkId === hw.id) setSelectedHomeworkId(null);
+                                          await loadData(true);
+                                        } else {
+                                          const err = await res.json();
+                                          alert("Erreur : " + err.error);
+                                        }
+                                      } finally { setSaving(false); }
+                                    }}
+                                    className="p-0.5 text-zinc-400 hover:text-red-500 transition-colors shrink-0"
+                                    title="Supprimer le devoir"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                )}
                               </div>
                             ))}
 
@@ -2188,9 +2211,11 @@ export default function CourseDetailPage() {
                               </p>
                               {quiz.section_id && <span className="text-[9px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 px-1.5 py-0.5 rounded mt-1 inline-block">Lié à une section</span>}
                             </div>
-                            <button onClick={(e) => { e.stopPropagation(); handleDeleteQuiz(quiz.id); }} className="p-1 text-zinc-400 hover:text-red-500 hover:bg-white dark:hover:bg-zinc-800 rounded transition-colors">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {!isCollaborator && (
+                              <button onClick={(e) => { e.stopPropagation(); handleDeleteQuiz(quiz.id); }} className="p-1 text-zinc-400 hover:text-red-500 hover:bg-white dark:hover:bg-zinc-800 rounded transition-colors" title="Supprimer le quiz">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
@@ -2228,9 +2253,11 @@ export default function CourseDetailPage() {
                           <div key={qn.id} className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-850/40 border border-zinc-150 dark:border-zinc-800/80">
                             <div className="flex justify-between items-start mb-3">
                               <span className="text-xs font-extrabold text-teal-600 dark:text-teal-400">Question {qnIdx + 1}</span>
-                              <button onClick={() => handleDeleteQuestion(qn.id)} className="text-zinc-400 hover:text-red-500 p-1 rounded hover:bg-white dark:hover:bg-zinc-800 transition-colors">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {!isCollaborator && (
+                                <button onClick={() => handleDeleteQuestion(qn.id)} className="text-zinc-400 hover:text-red-500 p-1 rounded hover:bg-white dark:hover:bg-zinc-800 transition-colors" title="Supprimer la question">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                             <p className="text-xs font-bold text-zinc-850 dark:text-zinc-250 mb-3">{qn.text}</p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">

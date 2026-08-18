@@ -102,6 +102,7 @@ export interface AdminSidebarItem {
 
 export const ALL_ADMIN_SIDEBAR_ITEMS: AdminSidebarItem[] = [
   { key: "overview",     label: "Vue d'ensemble",       href: "/admin",                 icon: "LayoutDashboard",  requiredPermission: "platform:settings:read" },
+  { key: "blog",         label: "Articles & Blog",       href: "/admin/blog",            icon: "Newspaper",        requiredPermission: "course:moderate" },
   { key: "team",         label: "Équipe Admin",          href: "/admin/team",            icon: "Users2",           requiredPermission: "admin:manageTeam" },
   { key: "users",        label: "Utilisateurs",          href: "/admin/users",           icon: "Users",            requiredPermission: "user:read" },
   { key: "courses",      label: "Validation Cours",      href: "/admin/courses",         icon: "BookOpen",         requiredPermission: "course:moderate" },

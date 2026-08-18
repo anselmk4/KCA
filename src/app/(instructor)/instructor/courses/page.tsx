@@ -206,6 +206,11 @@ export default function InstructorCoursesPage() {
   }, [loadDashboardData]);
 
   const handleDelete = async (courseId: string) => {
+    const target = myCourses.find((c: any) => c.id === courseId);
+    if (target && target.instructor_id !== session?.userId) {
+      alert("Action non autorisée : seuls les formateurs propriétaires peuvent supprimer un cours. Les co-gestionnaires ne peuvent pas supprimer de cours.");
+      return;
+    }
     if (confirm("Êtes‑vous sûr de vouloir supprimer ce cours ? Cette action est irréversible et supprimera tout son contenu (sections, leçons, quiz).")) {
       const { error } = await supabase
         .from("courses")
@@ -573,13 +578,15 @@ export default function InstructorCoursesPage() {
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </Link>
-                      <button
-                        onClick={() => handleDelete(course.id)}
-                        className="p-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 rounded-lg text-xs hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
-                        title={t("student.payment.applyCoupon", "Supprimer le cours").toLowerCase().includes("appliqu") ? "Delete Course" : "Supprimer le cours"}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {course.instructor_id === session?.userId && (
+                        <button
+                          onClick={() => handleDelete(course.id)}
+                          className="p-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 rounded-lg text-xs hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                          title={t("student.payment.applyCoupon", "Supprimer le cours").toLowerCase().includes("appliqu") ? "Delete Course" : "Supprimer le cours"}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

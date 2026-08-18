@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'courseId et title sont requis' }, { status: 400 });
     }
 
-    // Verify course ownership
+    // Verify course ownership or collaboration
     const { data: course, error: courseError } = await supabase
       .from('courses')
       .select('instructor_id')
@@ -28,7 +28,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Cours introuvable' }, { status: 404 });
     }
 
+    const { data: userRoles } = await supabase
+      .from("user_roles")
+      .select("roles(name)")
+      .eq("user_id", user.id);
+    const roles = userRoles?.map((ur: any) => ur.roles?.name) || [];
+    const isAdmin = roles.some(r => ["SUPER_ADMIN", "ADMIN", "ACADEMIC_ADMIN"].includes(r));
+
+    let isCollab = false;
     if (course.instructor_id !== user.id) {
+      const { data: collab } = await (supabase
+        .from('course_collaborators' as any)
+        .select('id')
+        .eq('course_id', courseId)
+        .eq('collaborator_id', user.id)
+        .maybeSingle() as any);
+      isCollab = !!collab;
+    }
+
+    if (course.instructor_id !== user.id && !isCollab && !isAdmin) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
     }
 
@@ -89,8 +107,18 @@ export async function DELETE(req: NextRequest) {
       .eq('id', quiz.course_id)
       .maybeSingle();
 
-    if (courseError || !course || course.instructor_id !== user.id) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
+    const { data: userRoles } = await supabase
+      .from("user_roles")
+      .select("roles(name)")
+      .eq("user_id", user.id);
+    const roles = userRoles?.map((ur: any) => ur.roles?.name) || [];
+    const isAdmin = roles.some(r => ["SUPER_ADMIN", "ADMIN", "ACADEMIC_ADMIN"].includes(r));
+
+    // ONLY the course owner or admin can delete quizzes (collaborators CANNOT delete)
+    if (courseError || !course || (course.instructor_id !== user.id && !isAdmin)) {
+      return NextResponse.json({ 
+        error: 'Action non autorisée : seuls le propriétaire du cours et les administrateurs peuvent supprimer des quiz.' 
+      }, { status: 403 });
     }
 
     // Delete questions first (cascade safety)
