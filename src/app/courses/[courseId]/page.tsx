@@ -1,6 +1,7 @@
 "use client";
 
-import { use, useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -72,9 +73,9 @@ function CourseHeroIcon({ category }: { category: string }) {
   return <Code2 className={cls} />;
 }
 
-export default function CourseDetailPage({ params }: { params: Promise<{ courseId: string }> }) {
-  const resolvedParams = use(params);
-  const courseId = resolvedParams.courseId;
+export default function CourseDetailPage() {
+  const params = useParams();
+  const courseId = params?.courseId as string;
 
   const [course, setCourse] = useState<CourseDetail | null>(null);
   const [sections, setSections] = useState<Section[]>([]);
