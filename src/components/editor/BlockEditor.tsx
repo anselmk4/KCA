@@ -31,9 +31,9 @@ import {
   Share2,
   Shapes,
   Eye,
-  Edit3
 } from "lucide-react";
 import RichEditor from "./RichEditor";
+import { extractYouTubeId, extractVimeoId, extractDailymotionId } from "@/lib/video";
 
 // ─── Block Types ──────────────────────────────────────────
 export type BlockType =
@@ -311,31 +311,34 @@ export function serializeBlocksToHtml(blocks: Block[]): string {
         }
         case "video": {
           const vType = block.value.type || "youtube";
-          const url = block.value.url || "";
+          const url = (block.value.url || "").trim();
           let embedSrc = url;
 
           if (vType === "youtube") {
-            const ytReg = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
-            const match = url.match(ytReg);
-            if (match && match[1]) {
-              embedSrc = `https://www.youtube.com/embed/${match[1]}?modestbranding=1&rel=0`;
+            const ytId = extractYouTubeId(url);
+            if (ytId) {
+              embedSrc = `https://www.youtube.com/embed/${ytId}`;
             }
           } else if (vType === "dailymotion") {
-            const dmReg = /dailymotion\.com\/(?:video|embed\/video)\/([a-zA-Z0-9]+)/i;
-            const match = url.match(dmReg);
-            if (match && match[1]) {
-              embedSrc = `https://www.dailymotion.com/embed/video/${match[1]}?ui-logo=0&ui-start-screen-info=0`;
+            const dmId = extractDailymotionId(url);
+            if (dmId) {
+              embedSrc = `https://www.dailymotion.com/embed/video/${dmId}`;
+            }
+          } else if (vType === "vimeo") {
+            const vimeoId = extractVimeoId(url);
+            if (vimeoId) {
+              embedSrc = `https://player.vimeo.com/video/${vimeoId}`;
             }
           }
 
           if (vType === "uploaded") {
-            return `<div data-block-type="video" data-video-type="uploaded" data-url="${url}" class="my-6 aspect-video rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-black">
+            return `<div data-block-type="video" data-video-type="uploaded" data-url="${url}" class="my-6 aspect-video rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-850 bg-black">
               <video src="${url}" controls class="w-full h-full"></video>
             </div>`;
           }
 
-          return `<div data-block-type="video" data-video-type="${vType}" data-url="${url}" class="my-6 aspect-video rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
-            <iframe src="${embedSrc}" class="w-full h-full" frameborder="0" allowfullscreen></iframe>
+          return `<div data-block-type="video" data-video-type="${vType}" data-url="${url}" class="my-6 aspect-video rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-850">
+            <iframe src="${embedSrc}" class="w-full h-full" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
           </div>`;
         }
         case "pdf": {

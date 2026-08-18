@@ -17,8 +17,9 @@ export function escapeHtml(str: string | number | null | undefined): string {
 }
 
 /**
- * Robust HTML sanitizer for rich text content (Tiptap course content, descriptions, markdown outputs).
- * Removes script tags, iframes (except allowed safe video embeds), event handlers, and javascript: URIs.
+ * Robust HTML sanitizer for rich text content (course content, descriptions, markdown outputs).
+ * Removes script tags, unsafe iframes, event handlers, and javascript: URIs while preserving
+ * safe video/document embeds (YouTube, Vimeo, Dailymotion, Google Docs).
  */
 export function sanitizeHtml(html: string | null | undefined): string {
   if (!html || typeof html !== "string") return "";
@@ -28,7 +29,24 @@ export function sanitizeHtml(html: string | null | undefined): string {
   // 1. Remove script tags and contents
   clean = clean.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
 
-  // 2. Remove dangerous tags
+  // 2. Preserve safe iframes by temporary tokenization
+  const safeIframeMatches: { token: string; tag: string }[] = [];
+  let iframeTokenIdx = 0;
+
+  clean = clean.replace(/<iframe\b([^>]*?)(\/?>[\s\S]*?<\/iframe>|\/?>)/gi, (match, attrs) => {
+    const srcMatch = attrs.match(/src=["']([^"']+)["']/i);
+    const src = srcMatch ? srcMatch[1] : "";
+    const isSafeSrc = /^(https?:)?\/\/(www\.|m\.|music\.)?(youtube\.com|youtube-nocookie\.com|youtu\.be|player\.vimeo\.com|vimeo\.com|dailymotion\.com|dai\.ly|docs\.google\.com|drive\.google\.com)\//i.test(src);
+
+    if (isSafeSrc) {
+      const token = `__SAFE_IFRAME_${iframeTokenIdx++}__`;
+      safeIframeMatches.push({ token, tag: match });
+      return token;
+    }
+    return "";
+  });
+
+  // 3. Remove dangerous tags
   const forbiddenTags = ["iframe", "object", "embed", "applet", "meta", "link", "base", "form", "svg"];
   for (const tag of forbiddenTags) {
     const reg = new RegExp(`<${tag}\\b[^<]*(?:(?!<\\/${tag}>)<[^<]*)*<\\/${tag}>`, "gi");
@@ -36,11 +54,16 @@ export function sanitizeHtml(html: string | null | undefined): string {
     clean = clean.replace(new RegExp(`<${tag}[^>]*>`, "gi"), "");
   }
 
-  // 3. Remove all inline event handlers (onerror, onload, onclick, onmouseover, etc.)
+  // 4. Remove all inline event handlers (onerror, onload, onclick, onmouseover, etc.)
   clean = clean.replace(/\s+on[a-zA-Z]+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, "");
 
-  // 4. Remove javascript: or data: URIs in href or src
+  // 5. Remove javascript: or data: URIs in href or src
   clean = clean.replace(/(href|src)\s*=\s*["']?\s*(?:javascript:|data:(?!image\/)):?[^"'>\s]*/gi, '$1="#"');
+
+  // 6. Restore safe iframes
+  for (const item of safeIframeMatches) {
+    clean = clean.replace(item.token, item.tag);
+  }
 
   return clean;
 }
