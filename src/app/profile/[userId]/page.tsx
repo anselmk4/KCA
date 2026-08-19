@@ -136,18 +136,56 @@ export default function UserProfilePage() {
       const s = getSimulatedSession();
       if (s) setCurrentUserRole(s.role);
 
-      // Load profile
-      const { data: profileData } = await supabase
+      // 1. Try fetching from robust API route first
+      try {
+        const res = await fetch(`/api/profile/${userId}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.profile) {
+            setProfile(json.profile);
+            setIsInstructor(Boolean(json.isInstructor));
+            setCourses(json.courses || []);
+            setPaidCourses(json.paidCourses || []);
+            setIsOwn(Boolean(json.isOwn || (user && user.id === json.profile.id)));
+            await loadPosts(user?.id);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (apiErr) {
+        console.warn("[ProfilePage] API fetch note:", apiErr);
+      }
+
+      // 2. Client-side fallback if API is unreachable
+      const { data: profileData } = await (supabase as any)
         .from("profiles")
         .select("*")
         .eq("id", userId)
-        .single();
+        .maybeSingle();
 
-      if (!profileData) { setLoading(false); return; }
+      if (!profileData) {
+        // If current user viewing own profile
+        if (user && user.id === userId) {
+          const selfProfile = {
+            id: user.id,
+            full_name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Mon Profil",
+            email: user.email || "",
+            bio: "Bienvenue sur mon profil Ansella.",
+            avatar_url: user.user_metadata?.avatar_url || null,
+          };
+          setProfile(selfProfile as any);
+          setIsOwn(true);
+        } else {
+          setProfile(null);
+        }
+        setLoading(false);
+        return;
+      }
+
       setProfile(profileData as any);
 
       // Detect role
-      const { data: roles } = await supabase
+      const { data: roles } = await (supabase as any)
         .from("user_roles")
         .select("roles(name)")
         .eq("user_id", userId);
@@ -157,28 +195,28 @@ export default function UserProfilePage() {
       setIsInstructor(instructor);
 
       if (instructor) {
-        const { data: coursesData } = await supabase
+        const { data: coursesData } = await (supabase as any)
           .from("courses")
           .select("id, title, price, status, thumbnail_url, level, short_description")
           .eq("instructor_id", userId)
           .eq("status", "PUBLISHED");
 
         if (coursesData && coursesData.length > 0) {
-          const courseIds = coursesData.map((c) => c.id);
-          const { data: enrollData } = await supabase
+          const courseIds = coursesData.map((c: any) => c.id);
+          const { data: enrollData } = await (supabase as any)
             .from("enrollments")
             .select("course_id")
             .in("course_id", courseIds);
 
           const countMap: Record<string, number> = {};
-          enrollData?.forEach((e) => {
+          (enrollData || [])?.forEach((e: any) => {
             countMap[e.course_id] = (countMap[e.course_id] || 0) + 1;
           });
 
-          setCourses(coursesData.map((c) => ({ ...c, enrollmentCount: countMap[c.id] || 0 })));
+          setCourses(coursesData.map((c: any) => ({ ...c, enrollmentCount: countMap[c.id] || 0 })));
         }
       } else {
-        const { data: enrollData } = await supabase
+        const { data: enrollData } = await (supabase as any)
           .from("enrollments")
           .select("course_id, courses(id, title, price, thumbnail_url)")
           .eq("student_id", userId);

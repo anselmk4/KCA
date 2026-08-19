@@ -25,9 +25,22 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await dbClient
       .from("profiles")
-      .select("*")
+      .select("full_name, avatar_url, role")
       .eq("id", user.id)
       .maybeSingle();
+
+    let cleanFullName = profile?.full_name?.trim();
+    if (!cleanFullName || cleanFullName === "Membre Ansella" || cleanFullName === "Membre" || cleanFullName.includes("@")) {
+      cleanFullName =
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.email
+          ?.split("@")[0]
+          ?.split(/[._-]/)
+          ?.map((part: string) => part.charAt(0).toUpperCase() + part.slice(1))
+          ?.join(" ") ||
+        "Membre Certifié";
+    }
 
     const newComment = {
       id: crypto.randomUUID(),
@@ -35,8 +48,8 @@ export async function POST(req: NextRequest) {
       user_id: user.id,
       parent_id: parentId || null,
       content: content.trim(),
-      author_name: profile?.full_name || user.email?.split("@")[0] || "Membre",
-      author_avatar: profile?.avatar_url || null,
+      author_name: cleanFullName,
+      author_avatar: profile?.avatar_url || user.user_metadata?.avatar_url || null,
       author_role: profile?.role || "STUDENT",
       created_at: new Date().toISOString(),
     };

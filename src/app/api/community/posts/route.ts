@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
     }
 
     const postIds = posts.map((p: any) => p.id);
+    const postUserIds = posts.map((p: any) => p.user_id).filter(Boolean);
 
     // 2. Fetch comments for all loaded posts
     const { data: comments } = await dbClient
@@ -38,12 +39,58 @@ export async function GET(req: NextRequest) {
       .in("post_id", postIds)
       .order("created_at", { ascending: true });
 
+    const commentUserIds = (comments || []).map((c: any) => c.user_id).filter(Boolean);
+    const allUserIds = Array.from(new Set([...postUserIds, ...commentUserIds]));
+
+    // 3. Batch fetch real profiles from profiles table
+    let profileMap: Record<string, { full_name?: string; avatar_url?: string | null; role?: string }> = {};
+    if (allUserIds.length > 0) {
+      const { data: profilesList } = await dbClient
+        .from("profiles")
+        .select("id, full_name, avatar_url, role")
+        .in("id", allUserIds);
+
+      (profilesList || []).forEach((prof: any) => {
+        if (prof.id) {
+          profileMap[prof.id] = {
+            full_name: prof.full_name,
+            avatar_url: prof.avatar_url,
+            role: prof.role,
+          };
+        }
+      });
+    }
+
+    const resolveDisplayName = (userId: string, currentAuthorName?: string | null): string => {
+      const p = profileMap[userId];
+      if (p?.full_name && p.full_name.trim() && p.full_name !== "Membre Ansella" && !p.full_name.includes("@")) {
+        return p.full_name.trim();
+      }
+      if (currentAuthorName && currentAuthorName.trim() && currentAuthorName !== "Membre Ansella" && !currentAuthorName.includes("@")) {
+        return currentAuthorName.trim();
+      }
+      if (currentAuthorName && currentAuthorName.includes("@")) {
+        const prefix = currentAuthorName.split("@")[0];
+        return prefix
+          .split(/[._-]/)
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(" ");
+      }
+      return "Membre Certifié";
+    };
+
     // Group comments by post_id and organize parent/replies
     const commentsByPost: Record<string, any[]> = {};
     (comments || []).forEach((c: any) => {
       if (!commentsByPost[c.post_id]) {
         commentsByPost[c.post_id] = [];
       }
+
+      const pInfo = profileMap[c.user_id];
+      const authorName = resolveDisplayName(c.user_id, c.author_name);
+      const authorAvatar = pInfo?.avatar_url || c.author_avatar || null;
+      const authorRole = pInfo?.role || c.author_role || "STUDENT";
+
       commentsByPost[c.post_id].push({
         id: c.id,
         post_id: c.post_id,
@@ -51,9 +98,9 @@ export async function GET(req: NextRequest) {
         parent_id: c.parent_id || null,
         content: c.content,
         created_at: c.created_at,
-        author_name: c.author_name || "Membre",
-        author_avatar: c.author_avatar || null,
-        author_role: c.author_role || "STUDENT",
+        author_name: authorName,
+        author_avatar: authorAvatar,
+        author_role: authorRole,
         replies: [],
       });
     });
@@ -80,7 +127,7 @@ export async function GET(req: NextRequest) {
       commentsByPost[pId] = parentList;
     });
 
-    // 3. Fetch user reactions if logged in
+    // 4. Fetch user reactions if logged in
     let userReactionsMap: Record<string, string> = {};
     if (user) {
       const { data: reactions } = await dbClient
@@ -94,24 +141,31 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // 4. Format final posts response
-    const formattedPosts = posts.map((p: any) => ({
-      id: p.id,
-      user_id: p.user_id,
-      category: p.category || "REFLECTIONS",
-      title: p.title || null,
-      content: p.content,
-      resource_url: p.resource_url || null,
-      media_urls: p.media_urls || null,
-      likes_count: p.likes_count || 0,
-      reactions_count: p.reactions_count || { LIKE: p.likes_count || 0, BRAVO: 0, INTERESTING: 0, GENIUS: 0, LOVE: 0 },
-      user_reaction: userReactionsMap[p.id] || null,
-      created_at: p.created_at,
-      author_name: p.author_name || "Membre Ansella",
-      author_avatar: p.author_avatar || null,
-      author_role: p.author_role || "STUDENT",
-      comments: commentsByPost[p.id] || [],
-    }));
+    // 5. Format final posts response with real author names
+    const formattedPosts = posts.map((p: any) => {
+      const pInfo = profileMap[p.user_id];
+      const authorName = resolveDisplayName(p.user_id, p.author_name);
+      const authorAvatar = pInfo?.avatar_url || p.author_avatar || null;
+      const authorRole = pInfo?.role || p.author_role || "STUDENT";
+
+      return {
+        id: p.id,
+        user_id: p.user_id,
+        category: p.category || "REFLECTIONS",
+        title: p.title || null,
+        content: p.content,
+        resource_url: p.resource_url || null,
+        media_urls: p.media_urls || null,
+        likes_count: p.likes_count || 0,
+        reactions_count: p.reactions_count || { LIKE: p.likes_count || 0, BRAVO: 0, INTERESTING: 0, GENIUS: 0, LOVE: 0 },
+        user_reaction: userReactionsMap[p.id] || null,
+        created_at: p.created_at,
+        author_name: authorName,
+        author_avatar: authorAvatar,
+        author_role: authorRole,
+        comments: commentsByPost[p.id] || [],
+      };
+    });
 
     return NextResponse.json({ posts: formattedPosts }, { status: 200 });
 
@@ -123,7 +177,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/community/posts
- * Creates a new community post in PostgreSQL DB.
+ * Creates a new community post in PostgreSQL DB with true full name.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -143,12 +197,26 @@ export async function POST(req: NextRequest) {
 
     const dbClient = (process.env.SUPABASE_SERVICE_ROLE_KEY ? supabaseAdmin : supabase) as any;
 
-    // Fetch user profile for display name and avatar
+    // Fetch user profile for real full name and avatar
     const { data: profile } = await dbClient
       .from("profiles")
       .select("full_name, avatar_url, role")
       .eq("id", user.id)
       .maybeSingle();
+
+    // Determine clean full name
+    let cleanFullName = profile?.full_name?.trim();
+    if (!cleanFullName || cleanFullName === "Membre Ansella" || cleanFullName.includes("@")) {
+      cleanFullName =
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.email
+          ?.split("@")[0]
+          ?.split(/[._-]/)
+          ?.map((part: string) => part.charAt(0).toUpperCase() + part.slice(1))
+          ?.join(" ") ||
+        "Membre Certifié";
+    }
 
     const newPost = {
       id: crypto.randomUUID(),
@@ -160,8 +228,8 @@ export async function POST(req: NextRequest) {
       media_urls: Array.isArray(mediaUrls) && mediaUrls.length > 0 ? mediaUrls : null,
       likes_count: 0,
       reactions_count: { LIKE: 0, BRAVO: 0, INTERESTING: 0, GENIUS: 0, LOVE: 0 },
-      author_name: profile?.full_name || user.email?.split("@")[0] || "Membre Ansella",
-      author_avatar: profile?.avatar_url || null,
+      author_name: cleanFullName,
+      author_avatar: profile?.avatar_url || user.user_metadata?.avatar_url || null,
       author_role: profile?.role || "STUDENT",
       created_at: new Date().toISOString(),
     };
