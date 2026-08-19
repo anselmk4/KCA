@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   MessageCircle,
   Share2,
@@ -184,11 +185,11 @@ export function PostCard({
       {/* 1. Header Author Section */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="relative">
+          <Link href={`/profile/${post.user_id}`} className="relative shrink-0 group">
             {post.author_avatar ? (
-              <img src={post.author_avatar} alt={post.author_name || "User"} className="w-11 h-11 rounded-full object-cover border-2 border-zinc-200 dark:border-zinc-700" />
+              <img src={post.author_avatar} alt={post.author_name || "User"} className="w-11 h-11 rounded-full object-cover border-2 border-zinc-200 dark:border-zinc-700 group-hover:border-teal-500 transition-colors" />
             ) : (
-              <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-500 text-white flex items-center justify-center font-extrabold text-sm shadow-sm">
+              <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-500 text-white flex items-center justify-center font-extrabold text-sm shadow-sm group-hover:scale-105 transition-transform">
                 {(post.author_name || "A").charAt(0).toUpperCase()}
               </div>
             )}
@@ -197,13 +198,13 @@ export function PostCard({
                 <Sparkles className="w-3 h-3" />
               </div>
             )}
-          </div>
+          </Link>
 
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="font-extrabold text-sm text-zinc-900 dark:text-white leading-tight">
+              <Link href={`/profile/${post.user_id}`} className="font-extrabold text-sm text-zinc-900 dark:text-white leading-tight hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
                 {post.author_name || "Membre Ansella"}
-              </h4>
+              </Link>
               <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
                 isAdmin
                   ? "bg-purple-100 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800"

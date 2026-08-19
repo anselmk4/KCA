@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import {
   Users,
@@ -595,49 +596,67 @@ export function CommunityFeedView() {
 
             {/* Leaderboard List */}
             <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
-              {filteredLeaderboard.slice(0, 5).map((user, idx) => (
-                <div
-                  key={user.id || idx}
-                  className="p-3 bg-zinc-50 dark:bg-zinc-850 border border-zinc-100 dark:border-zinc-800 rounded-2xl flex items-center justify-between gap-3 hover:border-teal-500/30 transition-all"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${
-                      idx === 0
-                        ? "bg-amber-500 text-white shadow-md shadow-amber-500/30"
-                        : idx === 1
-                        ? "bg-zinc-300 text-zinc-900 font-bold"
-                        : idx === 2
-                        ? "bg-amber-700 text-white"
-                        : "bg-zinc-200 dark:bg-zinc-800 text-zinc-500"
-                    }`}>
-                      {idx + 1}
-                    </span>
+              {filteredLeaderboard.slice(0, 8).map((user, idx) => {
+                const isF = followingIds.includes(user.id);
+                const isBusy = followLoading[user.id];
 
-                    <div className="relative">
-                      {user.avatar ? (
-                        <img src={user.avatar} alt={user.name} className="w-9 h-9 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-teal-500 text-white flex items-center justify-center font-bold text-xs">
-                          {user.name.charAt(0)}
-                        </div>
-                      )}
+                return (
+                  <div
+                    key={user.id || idx}
+                    className="p-3 bg-zinc-50 dark:bg-zinc-850 border border-zinc-100 dark:border-zinc-800 rounded-2xl flex items-center justify-between gap-2.5 hover:border-teal-500/30 transition-all"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
+                        idx === 0
+                          ? "bg-amber-500 text-white shadow-md shadow-amber-500/30"
+                          : idx === 1
+                          ? "bg-zinc-300 text-zinc-900 font-bold"
+                          : idx === 2
+                          ? "bg-amber-700 text-white"
+                          : "bg-zinc-200 dark:bg-zinc-800 text-zinc-500"
+                      }`}>
+                        {idx + 1}
+                      </span>
+
+                      <Link href={`/profile/${user.id}`} className="relative shrink-0 group">
+                        {user.avatar ? (
+                          <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full object-cover group-hover:scale-105 transition-transform" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-teal-500 text-white flex items-center justify-center font-bold text-xs group-hover:scale-105 transition-transform">
+                            {user.name.charAt(0)}
+                          </div>
+                        )}
+                      </Link>
+
+                      <div className="min-w-0">
+                        <Link href={`/profile/${user.id}`} className="font-extrabold text-xs text-zinc-900 dark:text-white leading-tight truncate block hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
+                          {user.name}
+                        </Link>
+                        <p className="text-[10px] text-zinc-400 font-semibold truncate">
+                          {user.role === "INSTRUCTOR" ? "🎓 Formateur" : "⭐ Membre"} • {user.points || (100 - idx * 15)} pts
+                        </p>
+                      </div>
                     </div>
 
-                    <div>
-                      <h4 className="font-extrabold text-xs text-zinc-900 dark:text-white leading-tight">
-                        {user.name}
-                      </h4>
-                      <p className="text-[10px] text-zinc-400 font-semibold">{user.plan || "Standard"}</p>
-                    </div>
+                    {user.id !== currentUser?.id && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleFollow(user.id);
+                        }}
+                        disabled={isBusy}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all shrink-0 cursor-pointer ${
+                          isF
+                            ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/30"
+                            : "bg-teal-600 hover:bg-teal-500 text-white shadow-xs"
+                        }`}
+                      >
+                        {isBusy ? "..." : isF ? "Abonné" : "+ Suivre"}
+                      </button>
+                    )}
                   </div>
-
-                  <div className="text-right">
-                    <span className="font-black text-xs text-teal-600 dark:text-teal-400">
-                      {user.points || (100 - idx * 15)} pts
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
