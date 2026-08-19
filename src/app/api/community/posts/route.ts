@@ -174,7 +174,7 @@ export async function GET(req: NextRequest) {
       }
 
       const pInfo = profileMap[c.user_id];
-      const authorName = resolveDisplayName(c.user_id, c.author_name, c.content);
+      const authorName = resolveDisplayName(c.user_id, c.author_name);
       const authorAvatar = pInfo?.avatar_url || c.author_avatar || null;
       const authorRole = resolveAuthorRole(c.user_id, c.author_role);
 
@@ -231,13 +231,9 @@ export async function GET(req: NextRequest) {
     // 5. Format final posts response with real author names and roles
     const formattedPosts = posts.map((p: any) => {
       const pInfo = profileMap[p.user_id];
-      const authorName = resolveDisplayName(p.user_id, p.author_name, p.content);
+      const authorName = resolveDisplayName(p.user_id, p.author_name);
       const authorAvatar = pInfo?.avatar_url || p.author_avatar || null;
       let authorRole = resolveAuthorRole(p.user_id, p.author_role);
-
-      if (p.content && p.content.toLowerCase().includes("official accounnt of ansella academy")) {
-        authorRole = "ADMIN";
-      }
 
       return {
         id: p.id,
@@ -251,9 +247,6 @@ export async function GET(req: NextRequest) {
         reactions_count: p.reactions_count || { LIKE: p.likes_count || 0, BRAVO: 0, INTERESTING: 0, GENIUS: 0, LOVE: 0 },
         user_reaction: userReactionsMap[p.id] || null,
         created_at: p.created_at,
-        author_name: authorName,
-        author_avatar: authorAvatar,
-        author_role: authorRole,
         comments: commentsByPost[p.id] || [],
       };
     });
