@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     const allUserIds = Array.from(new Set([...postUserIds, ...commentUserIds]));
 
     // 3. Batch fetch profiles, user_roles, and courses to compute accurate roles & names
-    let profileMap: Record<string, { full_name?: string; avatar_url?: string | null; role?: string; academy_name?: string }> = {};
+    let profileMap: Record<string, { full_name?: string; avatar_url?: string | null; role?: string; academy_name?: string; email?: string }> = {};
     let instructorIdsSet = new Set<string>();
     let adminIdsSet = new Set<string>();
 
@@ -62,6 +62,7 @@ export async function GET(req: NextRequest) {
               avatar_url: prof.avatar_url,
               role: prof.role,
               academy_name: prof.academy_name,
+              email: prof.email,
             };
             if (prof.role === "INSTRUCTOR") instructorIdsSet.add(prof.id);
             if (prof.role === "ADMIN" || prof.role === "SUPER_ADMIN") adminIdsSet.add(prof.id);
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest) {
         console.warn("[GET /api/community/posts] Profiles fetch note:", pErr);
       }
 
-      // 3b. Courses instructors
+      // 3b. Courses instructors (if user created any course, they are an INSTRUCTOR)
       try {
         const { data: coursesList } = await dbClient
           .from("courses")
@@ -85,7 +86,7 @@ export async function GET(req: NextRequest) {
         console.warn("[GET /api/community/posts] Courses instructor note:", cErr);
       }
 
-      // 3c. User roles
+      // 3c. User roles from user_roles table
       try {
         const { data: rolesList } = await dbClient
           .from("user_roles")
@@ -97,12 +98,35 @@ export async function GET(req: NextRequest) {
           if (rName === "INSTRUCTOR" || rName === "TEACHING_ASSISTANT") {
             instructorIdsSet.add(ur.user_id);
           }
-          if (rName === "ADMIN" || rName === "SUPER_ADMIN") {
+          if (rName === "ADMIN" || rName === "SUPER_ADMIN" || rName === "ACADEMIC_ADMIN") {
             adminIdsSet.add(ur.user_id);
           }
         });
       } catch (rErr) {
         console.warn("[GET /api/community/posts] Roles query note:", rErr);
+      }
+
+      // 3d. Fetch auth.users metadata for any user with missing profile name
+      for (const uId of allUserIds) {
+        if (!profileMap[uId]?.full_name || profileMap[uId]?.full_name?.includes("@") || profileMap[uId]?.full_name === "Membre Ansella") {
+          try {
+            const { data: authData } = await supabaseAdmin.auth.admin.getUserById(uId);
+            if (authData?.user) {
+              const metaName =
+                authData.user.user_metadata?.full_name ||
+                authData.user.user_metadata?.name ||
+                authData.user.user_metadata?.fullName;
+
+              if (metaName && metaName.trim()) {
+                if (!profileMap[uId]) profileMap[uId] = {};
+                profileMap[uId].full_name = metaName.trim();
+                if (authData.user.user_metadata?.avatar_url && !profileMap[uId].avatar_url) {
+                  profileMap[uId].avatar_url = authData.user.user_metadata.avatar_url;
+                }
+              }
+            }
+          } catch {}
+        }
       }
     }
 
@@ -112,39 +136,34 @@ export async function GET(req: NextRequest) {
       return currentRole || "STUDENT";
     };
 
-    const resolveDisplayName = (userId: string, currentAuthorName?: string | null, content?: string): string => {
+    const resolveDisplayName = (userId: string, currentAuthorName?: string | null): string => {
       const p = profileMap[userId];
 
-      // If post mentions official account
-      if (content && content.toLowerCase().includes("official accounnt of ansella academy")) {
-        return "Ansella Academy (Officiel)";
-      }
-
-      // Specific known platform authors
-      if (currentAuthorName?.toLowerCase().includes("anselmk4") || p?.full_name?.toLowerCase().includes("anselmk4")) {
-        return "Anselme K. (Formateur)";
-      }
-      if (currentAuthorName?.toLowerCase().includes("vente") || p?.full_name?.toLowerCase().includes("vente")) {
-        return "Support & Équipe Ansella";
-      }
-
+      // 1. Profile full_name if clean and valid
       if (p?.full_name && p.full_name.trim() && p.full_name !== "Membre Ansella" && !p.full_name.includes("@")) {
         return p.full_name.trim();
       }
-      if (p?.academy_name && p.academy_name.trim()) {
+
+      // 2. Profile academy_name if instructor
+      if (p?.academy_name && p.academy_name.trim() && p.academy_name !== "Mon Académie") {
         return p.academy_name.trim();
       }
+
+      // 3. Current author_name if stored and clean
       if (currentAuthorName && currentAuthorName.trim() && currentAuthorName !== "Membre Ansella" && !currentAuthorName.includes("@")) {
         return currentAuthorName.trim();
       }
-      if (currentAuthorName && currentAuthorName.includes("@")) {
-        const prefix = currentAuthorName.split("@")[0];
-        return prefix
+
+      // 4. Clean up email prefix if name contains @ or was derived from email
+      const rawHandle = (currentAuthorName?.includes("@") ? currentAuthorName.split("@")[0] : p?.email?.split("@")[0]) || currentAuthorName || "";
+      if (rawHandle.trim()) {
+        return rawHandle
           .split(/[._-]/)
           .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
           .join(" ");
       }
-      return instructorIdsSet.has(userId) ? "Formateur Ansella" : "Membre Certifié";
+
+      return instructorIdsSet.has(userId) ? "Formateur" : "Membre";
     };
 
     // Group comments by post_id and organize parent/replies
@@ -290,6 +309,29 @@ export async function POST(req: NextRequest) {
         "Membre Certifié";
     }
 
+    // Determine real role
+    let userRole = profile?.role || "STUDENT";
+    if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+      const { data: coursesCheck } = await dbClient
+        .from("courses")
+        .select("id")
+        .eq("instructor_id", user.id)
+        .limit(1);
+
+      if (coursesCheck && coursesCheck.length > 0) {
+        userRole = "INSTRUCTOR";
+      } else {
+        const { data: userRoleCheck } = await dbClient
+          .from("user_roles")
+          .select("roles(name)")
+          .eq("user_id", user.id);
+        const rName = (userRoleCheck as any)?.[0]?.roles?.name?.toUpperCase();
+        if (rName === "INSTRUCTOR" || rName === "ADMIN" || rName === "SUPER_ADMIN") {
+          userRole = rName === "INSTRUCTOR" ? "INSTRUCTOR" : "ADMIN";
+        }
+      }
+    }
+
     const newPost = {
       id: crypto.randomUUID(),
       user_id: user.id,
@@ -302,7 +344,7 @@ export async function POST(req: NextRequest) {
       reactions_count: { LIKE: 0, BRAVO: 0, INTERESTING: 0, GENIUS: 0, LOVE: 0 },
       author_name: cleanFullName,
       author_avatar: profile?.avatar_url || user.user_metadata?.avatar_url || null,
-      author_role: profile?.role || "STUDENT",
+      author_role: userRole,
       created_at: new Date().toISOString(),
     };
 

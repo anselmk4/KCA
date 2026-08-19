@@ -73,9 +73,17 @@ export async function GET(req: NextRequest) {
       const rawRole = roleMap[p.id] || p.role;
       const determinedRole = rawRole || (cCount > 0 || (p.plan && p.plan !== "FREE") ? "INSTRUCTOR" : "STUDENT");
 
+      let cleanName = p.full_name?.trim();
+      if (!cleanName || cleanName === "Membre Ansella" || cleanName.includes("@")) {
+        const raw = (cleanName?.includes("@") ? cleanName.split("@")[0] : p.email?.split("@")[0]) || "";
+        cleanName = raw
+          ? raw.split(/[._-]/).map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(" ")
+          : p.academy_name || "Membre";
+      }
+
       return {
         id: p.id,
-        name: p.full_name || p.email?.split("@")[0] || "Membre Ansella",
+        name: cleanName,
         avatar: p.avatar_url || null,
         role: determinedRole,
         plan: p.plan || "FREE",

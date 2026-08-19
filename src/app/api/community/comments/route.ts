@@ -42,6 +42,29 @@ export async function POST(req: NextRequest) {
         "Membre Certifié";
     }
 
+    // Determine real role
+    let userRole = profile?.role || "STUDENT";
+    if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
+      const { data: coursesCheck } = await dbClient
+        .from("courses")
+        .select("id")
+        .eq("instructor_id", user.id)
+        .limit(1);
+
+      if (coursesCheck && coursesCheck.length > 0) {
+        userRole = "INSTRUCTOR";
+      } else {
+        const { data: userRoleCheck } = await dbClient
+          .from("user_roles")
+          .select("roles(name)")
+          .eq("user_id", user.id);
+        const rName = (userRoleCheck as any)?.[0]?.roles?.name?.toUpperCase();
+        if (rName === "INSTRUCTOR" || rName === "ADMIN" || rName === "SUPER_ADMIN") {
+          userRole = rName === "INSTRUCTOR" ? "INSTRUCTOR" : "ADMIN";
+        }
+      }
+    }
+
     const newComment = {
       id: crypto.randomUUID(),
       post_id: postId,
@@ -50,7 +73,7 @@ export async function POST(req: NextRequest) {
       content: content.trim(),
       author_name: cleanFullName,
       author_avatar: profile?.avatar_url || user.user_metadata?.avatar_url || null,
-      author_role: profile?.role || "STUDENT",
+      author_role: userRole,
       created_at: new Date().toISOString(),
     };
 
