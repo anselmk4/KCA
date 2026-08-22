@@ -680,27 +680,45 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ value, onChange }) => 
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 25 * 1024 * 1024) {
-      alert("Le fichier est trop volumineux (max 25 Mo).");
+    if (file.size > 50 * 1024 * 1024) {
+      alert("Le fichier est trop volumineux (max 50 Mo).");
       return;
     }
 
     setFileUploadingBlockId(id);
     try {
-      const base64 = await fileToBase64(file);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", type);
+
+      const res = await fetch("/api/upload/file", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Échec de l'upload.");
+      }
+
+      const data = await res.json();
+      const fileUrl = data.url;
+      const fileTitle = file.name.replace(/\.[^/.]+$/, "");
+
       if (type === "image") {
-        updateBlockValue(id, { url: base64, caption: file.name.split(".")[0] });
+        updateBlockValue(id, { url: fileUrl, caption: fileTitle });
       } else if (type === "pdf") {
-        updateBlockValue(id, { url: base64, title: file.name.split(".")[0] });
+        updateBlockValue(id, { url: fileUrl, title: fileTitle });
       } else if (type === "video") {
-        updateBlockValue(id, { url: base64, type: "uploaded" });
+        updateBlockValue(id, { url: fileUrl, type: "uploaded" });
       } else if (type === "audio") {
-        updateBlockValue(id, { url: base64, title: file.name.split(".")[0] });
+        updateBlockValue(id, { url: fileUrl, title: fileTitle });
       }
     } catch (err: any) {
-      alert("Erreur de lecture du fichier : " + err.message);
+      alert("Erreur d'enregistrement du fichier : " + err.message);
     } finally {
       setFileUploadingBlockId(null);
+      e.target.value = "";
     }
   };
 
