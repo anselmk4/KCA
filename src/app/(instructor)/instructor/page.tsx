@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { getSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
@@ -14,8 +14,22 @@ import {
   Clock,
   ArrowUpRight,
   Loader2,
+  BarChart3,
+  Calendar,
+  Sparkles,
+  ShoppingBag,
 } from "lucide-react";
 import Link from "next/link";
+
+type TimeRange = "7D" | "30D" | "12M";
+
+interface ChartBucket {
+  key: string;
+  label: string;
+  subLabel?: string;
+  amount: number;
+  count: number;
+}
 
 export default function InstructorDashboardPage() {
   const { t, language } = useLanguage();
@@ -30,6 +44,8 @@ export default function InstructorDashboardPage() {
   const [myEnrollments, setMyEnrollments] = useState<any[]>([]);
   const [recentEnrollments, setRecentEnrollments] = useState<any[]>([]);
   const [courseStats, setCourseStats] = useState<Record<string, { enrollCount: number; revenue: number }>>({});
+  const [salesTransactions, setSalesTransactions] = useState<any[]>([]);
+  const [chartTimeRange, setChartTimeRange] = useState<TimeRange>("30D");
 
   useEffect(() => {
     const activeSession = getSimulatedSession();
@@ -44,7 +60,6 @@ export default function InstructorDashboardPage() {
     async function loadDashboardData() {
       setLoading(true);
       try {
-
         // 0. Fetch academy name from Supabase profile
         const { data: profileData } = await supabase
           .from("profiles")
@@ -77,7 +92,6 @@ export default function InstructorDashboardPage() {
         }
 
         const { data: coursesData } = await query;
-
         const coursesList = coursesData || [];
         setMyCourses(coursesList);
 
@@ -97,6 +111,7 @@ export default function InstructorDashboardPage() {
             course_id, 
             progress_percent, 
             enrolled_at, 
+            created_at,
             profiles(id, full_name, email, avatar_url)
           `)
           .in("course_id", courseIds);
@@ -115,16 +130,17 @@ export default function InstructorDashboardPage() {
 
         // 3. Fetch transactions/payments via RLS-bypassing API
         const earningsRes = await fetch("/api/instructor/earnings");
-        if (!earningsRes.ok) {
-          throw new Error("Erreur de chargement des transactions");
+        let paymentsList: any[] = [];
+        if (earningsRes.ok) {
+          const earningsData = await earningsRes.json();
+          paymentsList = earningsData.transactions || [];
         }
-        const earningsData = await earningsRes.json();
-        const paymentsList = earningsData.transactions || [];
+
+        setSalesTransactions(paymentsList);
 
         const revenueSum = paymentsList
-          .filter((p: any) => p.status === "PAID")
+          .filter((p: any) => p.status === "PAID" || p.status === "COMPLETED")
           .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
-        setTotalRevenue(revenueSum);
 
         // 4. Fetch pending payouts
         const { data: payoutsData } = await supabase
@@ -183,6 +199,121 @@ export default function InstructorDashboardPage() {
     loadDashboardData();
   }, []);
 
+  // Determine if this instructor has paying learners or sales
+  const hasPaidSales = useMemo(() => {
+    return totalRevenue > 0 || salesTransactions.some(t => t.status === "PAID" || t.status === "COMPLETED");
+  }, [totalRevenue, salesTransactions]);
+
+  // Compute sales chart data dynamically based on timeRange
+  const chartData = useMemo<ChartBucket[]>(() => {
+    if (!hasPaidSales) return [];
+
+    const now = new Date();
+    const buckets: ChartBucket[] = [];
+
+    // Synthesize transaction items with timestamps
+    const items: Array<{ date: Date; amount: number }> = [];
+
+    salesTransactions.forEach((tx: any) => {
+      if (tx.status === "PAID" || tx.status === "COMPLETED") {
+        const d = new Date(tx.createdAt || tx.date || tx.created_at || Date.now());
+        items.push({ date: d, amount: Number(tx.amount) || 0 });
+      }
+    });
+
+    // If transactions list is empty but enrollments exist on paid courses, map enrollments
+    if (items.length === 0 && myEnrollments.length > 0) {
+      myEnrollments.forEach((enr: any) => {
+        const course = myCourses.find(c => c.id === enr.course_id);
+        const price = Number(course?.price) || 0;
+        if (price > 0) {
+          const d = new Date(enr.enrolled_at || enr.created_at || Date.now());
+          items.push({ date: d, amount: price });
+        }
+      });
+    }
+
+    if (chartTimeRange === "7D") {
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(now.getDate() - i);
+        d.setHours(0, 0, 0, 0);
+        const nextD = new Date(d);
+        nextD.setDate(d.getDate() + 1);
+
+        const dayName = d.toLocaleDateString("fr-FR", { weekday: "short" });
+        const dayNum = d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+
+        const inBucket = items.filter(item => item.date >= d && item.date < nextD);
+        const amount = inBucket.reduce((sum, item) => sum + item.amount, 0);
+
+        buckets.push({
+          key: d.toISOString(),
+          label: `${dayName} ${d.getDate()}`,
+          subLabel: dayNum,
+          amount,
+          count: inBucket.length,
+        });
+      }
+    } else if (chartTimeRange === "30D") {
+      // 6 segments of 5 days
+      for (let i = 5; i >= 0; i--) {
+        const start = new Date();
+        start.setDate(now.getDate() - (i * 5 + 4));
+        start.setHours(0, 0, 0, 0);
+        const end = new Date();
+        end.setDate(now.getDate() - (i * 5));
+        end.setHours(23, 59, 59, 999);
+
+        const label = `${start.getDate()}-${end.getDate()} ${end.toLocaleDateString("fr-FR", { month: "short" })}`;
+
+        const inBucket = items.filter(item => item.date >= start && item.date <= end);
+        const amount = inBucket.reduce((sum, item) => sum + item.amount, 0);
+
+        buckets.push({
+          key: `${start.toISOString()}_${end.toISOString()}`,
+          label,
+          amount,
+          count: inBucket.length,
+        });
+      }
+    } else {
+      // 12 Months
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const nextM = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+
+        const monthName = d.toLocaleDateString("fr-FR", { month: "short" });
+
+        const inBucket = items.filter(item => item.date >= d && item.date < nextM);
+        const amount = inBucket.reduce((sum, item) => sum + item.amount, 0);
+
+        buckets.push({
+          key: d.toISOString(),
+          label: monthName,
+          subLabel: d.getFullYear().toString(),
+          amount,
+          count: inBucket.length,
+        });
+      }
+    }
+
+    return buckets;
+  }, [hasPaidSales, chartTimeRange, salesTransactions, myEnrollments, myCourses]);
+
+  const maxChartVal = useMemo(() => {
+    const maxAmount = Math.max(...chartData.map(d => d.amount), 50);
+    return maxAmount * 1.15;
+  }, [chartData]);
+
+  const totalPeriodRevenue = useMemo(() => {
+    return chartData.reduce((sum, d) => sum + d.amount, 0);
+  }, [chartData]);
+
+  const totalPeriodSales = useMemo(() => {
+    return chartData.reduce((sum, d) => sum + d.count, 0);
+  }, [chartData]);
+
   if (loading || !session) {
     return (
       <div className="max-w-6xl mx-auto space-y-6">
@@ -206,10 +337,10 @@ export default function InstructorDashboardPage() {
       <div className="text-left flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-1">
-            {language === "en" ? `Hello, ${instructorName} 👋` : `Bonjour, {instructorName} 👋`.replace('{instructorName}', instructorName)}
+            {language === "en" ? `Hello, ${instructorName} 👋` : `Bonjour, ${instructorName} 👋`}
           </h1>
-          <p className="text-zinc-500 dark:text-zinc-400">
-            {language === "en" ? "Here is an overview of your teaching activity." : "Voici un aperçu de votre activité d'enseignement."}
+          <p className="text-zinc-500 dark:text-zinc-400 text-sm">
+            {language === "en" ? "Here is an overview of your teaching activity." : "Voici un aperçu de votre activité d'enseignement et de vos performances."}
           </p>
         </div>
         <div className="bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-800/40 rounded-2xl px-5 py-3 text-left md:text-right">
@@ -321,6 +452,144 @@ export default function InstructorDashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* ── CONDITIONAL SALES & PURCHASES TIMELINE GRAPH ── */}
+      {/* Only rendered when the instructor has paying students / sales */}
+      {hasPaidSales && (
+        <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200/90 dark:border-zinc-800 p-6 md:p-8 shadow-sm space-y-6 text-left relative overflow-hidden transition-all duration-300">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400">
+                  <BarChart3 className="w-5 h-5" />
+                </div>
+                <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
+                  Évolution des Achats de Formations
+                </h2>
+              </div>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                Suivi chronologique des ventes et des inscriptions générées par vos cours.
+              </p>
+            </div>
+
+            {/* Time Filter Pills */}
+            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl shrink-0 self-start sm:self-auto">
+              {(["7D", "30D", "12M"] as TimeRange[]).map((range) => {
+                const label = range === "7D" ? "7 Jours" : range === "30D" ? "30 Jours" : "12 Mois";
+                const active = chartTimeRange === range;
+                return (
+                  <button
+                    key={range}
+                    onClick={() => setChartTimeRange(range)}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                      active
+                        ? "bg-white dark:bg-zinc-700 text-teal-600 dark:text-teal-400 shadow-sm font-bold"
+                        : "text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Quick Metrics Bar for Period */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-1 pb-2 border-b border-zinc-100 dark:border-zinc-800/60">
+            <div>
+              <span className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider block">
+                Total Période
+              </span>
+              <span className="text-lg font-extrabold text-zinc-900 dark:text-white">
+                {totalPeriodRevenue.toLocaleString()}$
+              </span>
+            </div>
+            <div>
+              <span className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider block">
+                Achats enregistrés
+              </span>
+              <span className="text-lg font-extrabold text-teal-600 dark:text-teal-400">
+                {totalPeriodSales} {totalPeriodSales > 1 ? "inscriptions" : "inscription"}
+              </span>
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <span className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider block">
+                Panier Moyen
+              </span>
+              <span className="text-lg font-extrabold text-indigo-600 dark:text-indigo-400">
+                {totalPeriodSales > 0 ? (totalPeriodRevenue / totalPeriodSales).toFixed(2) : "0.00"}$
+              </span>
+            </div>
+          </div>
+
+          {/* Dynamic SVG Bar Chart */}
+          <div className="h-64 relative w-full flex items-end pt-6 pb-2 select-none">
+            {chartData.length === 0 ? (
+              <div className="absolute inset-0 flex items-center justify-center text-zinc-400 text-xs">
+                Aucune vente enregistrée sur cette période.
+              </div>
+            ) : (
+              <div className="w-full h-full flex justify-between items-end gap-2 md:gap-4 px-1">
+                {chartData.map((d, index) => {
+                  const revenueHeight = (d.amount / maxChartVal) * 100;
+                  const isPeak = d.amount > 0 && d.amount === Math.max(...chartData.map(x => x.amount));
+
+                  return (
+                    <div key={index} className="flex-1 flex flex-col items-center group relative h-full justify-end">
+                      {/* Interactive Hover Tooltip */}
+                      <div className="absolute bottom-full mb-3 bg-zinc-900 dark:bg-zinc-800 text-white text-xs font-medium p-2.5 rounded-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-30 shadow-xl border border-white/10 flex flex-col gap-1 whitespace-nowrap -translate-y-1 group-hover:translate-y-0">
+                        <div className="flex items-center gap-1.5 text-zinc-400 text-[10px] uppercase font-bold tracking-wider">
+                          <Calendar className="w-3 h-3 text-teal-400" />
+                          <span>{d.label}</span>
+                        </div>
+                        <div className="text-sm font-bold text-teal-400">
+                          {d.amount.toFixed(2)}$
+                        </div>
+                        <div className="text-[11px] text-zinc-300 flex items-center gap-1">
+                          <ShoppingBag className="w-3 h-3 text-indigo-400" />
+                          <span>{d.count} vente{d.count > 1 ? "s" : ""}</span>
+                        </div>
+                      </div>
+
+                      {/* Bar & Peak Indicator */}
+                      <div className="w-full flex flex-col items-center justify-end h-[85%]">
+                        {isPeak && d.amount > 0 && (
+                          <div className="mb-1 text-[10px] font-bold text-amber-500 flex items-center gap-0.5 animate-bounce">
+                            <Sparkles className="w-3 h-3" />
+                          </div>
+                        )}
+                        <div
+                          style={{ height: `${Math.max(revenueHeight, 4)}%` }}
+                          className={`w-full max-w-[36px] rounded-t-lg transition-all duration-500 ${
+                            d.amount > 0
+                              ? "bg-gradient-to-t from-teal-600 via-teal-500 to-emerald-400 group-hover:from-teal-500 group-hover:to-emerald-300 shadow-md shadow-teal-500/20 group-hover:scale-105"
+                              : "bg-zinc-200/70 dark:bg-zinc-800/70"
+                          }`}
+                        />
+                      </div>
+
+                      {/* Axis Label */}
+                      <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-semibold mt-3 truncate w-full text-center group-hover:text-zinc-900 dark:group-hover:text-white transition-colors">
+                        {d.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between text-xxs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider pt-2">
+            <span>● Barres : Volume des ventes en dollar ($)</span>
+            <Link
+              href="/instructor/earnings"
+              className="text-teal-600 hover:text-teal-700 dark:text-teal-400 font-bold flex items-center gap-1 normal-case text-xs"
+            >
+              Historique complet des transactions →
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Invite to create first course banner if they don't have any courses yet */}
       {myCourses.length === 0 && (
