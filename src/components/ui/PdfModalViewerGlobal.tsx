@@ -10,10 +10,8 @@ import {
   ZoomOut,
   RotateCw,
   Printer,
-  ChevronLeft,
-  ChevronRight,
-  Maximize2,
   AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 
 interface PdfData {
@@ -27,6 +25,13 @@ declare global {
   }
 }
 
+const CDN_SOURCES = [
+  "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",
+  "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js",
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js",
+];
+
 export function PdfModalViewerGlobal() {
   const [pdfData, setPdfData] = useState<PdfData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,35 +43,40 @@ export function PdfModalViewerGlobal() {
   const containerRef = useRef<HTMLDivElement>(null);
   const pdfDocRef = useRef<any>(null);
 
-  // Load PDF.js dynamically
-  const loadPdfJs = useCallback((): Promise<any> => {
-    return new Promise((resolve, reject) => {
-      if (window.pdfjsLib) {
-        resolve(window.pdfjsLib);
-        return;
+  // Load PDF.js with multi-CDN fallback
+  const loadPdfJs = useCallback(async (): Promise<any> => {
+    if (window.pdfjsLib) {
+      if (window.pdfjsLib.GlobalWorkerOptions) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = "";
       }
-      const existing = document.getElementById("pdfjs-script");
-      if (existing) {
-        existing.addEventListener("load", () => resolve(window.pdfjsLib));
-        existing.addEventListener("error", () => reject(new Error("Erreur de chargement de PDF.js")));
-        return;
-      }
-      const script = document.createElement("script");
-      script.id = "pdfjs-script";
-      script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-      script.async = true;
-      script.onload = () => {
+      return window.pdfjsLib;
+    }
+
+    for (const src of CDN_SOURCES) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = src;
+          script.crossOrigin = "anonymous";
+          script.onload = () => resolve();
+          script.onerror = () => {
+            script.remove();
+            reject(new Error(`Failed to load ${src}`));
+          };
+          document.head.appendChild(script);
+        });
+
         if (window.pdfjsLib) {
-          window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-          resolve(window.pdfjsLib);
-        } else {
-          reject(new Error("Bibliothèque PDF.js introuvable"));
+          if (window.pdfjsLib.GlobalWorkerOptions) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+          }
+          return window.pdfjsLib;
         }
-      };
-      script.onerror = () => reject(new Error("Impossible de charger PDF.js"));
-      document.head.appendChild(script);
-    });
+      } catch {
+        // Try next mirror
+      }
+    }
+    throw new Error("Impossible de charger la bibliothèque de rendu PDF.");
   }, []);
 
   // Render all pages to canvas
@@ -89,7 +99,7 @@ export function PdfModalViewerGlobal() {
           const context = canvas.getContext("2d", { willReadFrequently: true });
           if (!context) continue;
 
-          // HiDPI support for ultra-crisp text
+          // HiDPI support for crisp text
           const outputScale = window.devicePixelRatio || 1;
           canvas.width = Math.floor(viewport.width * outputScale);
           canvas.height = Math.floor(viewport.height * outputScale);
@@ -148,9 +158,9 @@ export function PdfModalViewerGlobal() {
           for (let i = 0; i < len; i++) {
             bytes[i] = binaryString.charCodeAt(i);
           }
-          loadingTask = pdfjs.getDocument({ data: bytes });
+          loadingTask = pdfjs.getDocument({ data: bytes, disableWorker: true });
         } else {
-          loadingTask = pdfjs.getDocument({ url: pdfData.url, withCredentials: false });
+          loadingTask = pdfjs.getDocument({ url: pdfData.url, disableWorker: true, withCredentials: false });
         }
 
         const doc = await loadingTask.promise;
@@ -379,7 +389,7 @@ export function PdfModalViewerGlobal() {
               <button
                 type="button"
                 onClick={handleDownload}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition-all shadow-xs"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
               >
                 <FileDown className="w-4 h-4" />
                 <span>Télécharger le PDF</span>
