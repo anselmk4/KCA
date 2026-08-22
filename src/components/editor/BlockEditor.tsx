@@ -346,13 +346,9 @@ export function serializeBlocksToHtml(blocks: Block[]): string {
           const rawTitle = block.value.title || "Document PDF";
           const pdfTitleSafe = (rawTitle || "Document PDF").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#039;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
           const pdfUrl = block.value.url || "";
-          const isWebUrl = pdfUrl.startsWith("http://") || pdfUrl.startsWith("https://");
-          const viewerEmbedUrl = isWebUrl
-            ? `https://docs.google.com/viewer?url=${encodeURIComponent(pdfUrl)}&embedded=true`
-            : pdfUrl;
 
-          return `<div data-block-type="pdf" data-url="${pdfUrl}" data-title="${pdfTitleSafe}" class="my-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm overflow-hidden transition-all hover:border-zinc-300 dark:hover:border-zinc-700">
-            <div class="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-50/90 dark:bg-zinc-900/90 border-b border-zinc-200/80 dark:border-zinc-800/80">
+          return `<div data-block-type="pdf" data-url="${pdfUrl}" data-title="${pdfTitleSafe}" class="my-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden transition-all hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md">
+            <div class="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-50/90 dark:bg-zinc-900/90">
               <div class="flex items-center gap-3.5 min-w-0">
                 <div class="w-12 h-14 bg-red-500/10 border border-red-500/20 rounded-xl flex flex-col items-center justify-between p-1.5 shrink-0 shadow-xs">
                   <span class="text-[9px] font-black tracking-widest text-red-600 dark:text-red-400 uppercase bg-red-100 dark:bg-red-950/60 px-1 py-0.5 rounded">PDF</span>
@@ -383,13 +379,6 @@ export function serializeBlocksToHtml(blocks: Block[]): string {
                 ` : `<span class="text-xs text-zinc-400">Aucun PDF sélectionné</span>`}
               </div>
             </div>
-            ${pdfUrl ? `
-              <div class="bg-zinc-100/60 dark:bg-zinc-900/60">
-                <div class="w-full h-[520px] sm:h-[600px] relative">
-                  <iframe src="${viewerEmbedUrl}" class="w-full h-full border-0" allow="fullscreen" loading="lazy"></iframe>
-                </div>
-              </div>
-            ` : ""}
           </div>`;
         }
         case "separator": {
