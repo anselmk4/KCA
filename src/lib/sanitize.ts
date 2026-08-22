@@ -19,7 +19,7 @@ export function escapeHtml(str: string | number | null | undefined): string {
 /**
  * Robust HTML sanitizer for rich text content (course content, descriptions, markdown outputs).
  * Removes script tags, unsafe iframes, event handlers, and javascript: URIs while preserving
- * safe video/document embeds (YouTube, Vimeo, Dailymotion, Google Docs).
+ * safe video/document embeds (YouTube, Vimeo, Dailymotion, Google Docs, PDF embeds).
  */
 export function sanitizeHtml(html: string | null | undefined): string {
   if (!html || typeof html !== "string") return "";
@@ -36,7 +36,13 @@ export function sanitizeHtml(html: string | null | undefined): string {
   clean = clean.replace(/<iframe\b([^>]*?)(\/?>[\s\S]*?<\/iframe>|\/?>)/gi, (match, attrs) => {
     const srcMatch = attrs.match(/src=["']([^"']+)["']/i);
     const src = srcMatch ? srcMatch[1] : "";
-    const isSafeSrc = /^(https?:)?\/\/(www\.|m\.|music\.)?(youtube\.com|youtube-nocookie\.com|youtu\.be|player\.vimeo\.com|vimeo\.com|dailymotion\.com|dai\.ly|docs\.google\.com|drive\.google\.com)\//i.test(src);
+    const isSafeSrc =
+      /^(https?:)?\/\/(www\.|m\.|music\.)?(youtube\.com|youtube-nocookie\.com|youtu\.be|player\.vimeo\.com|vimeo\.com|dailymotion\.com|dai\.ly|docs\.google\.com|drive\.google\.com)\//i.test(src) ||
+      src.startsWith("data:application/pdf") ||
+      src.startsWith("blob:") ||
+      src.includes("docs.google.com/viewer") ||
+      src.endsWith(".pdf") ||
+      src.includes(".pdf?");
 
     if (isSafeSrc) {
       const token = `__SAFE_IFRAME_${iframeTokenIdx++}__`;
@@ -46,8 +52,8 @@ export function sanitizeHtml(html: string | null | undefined): string {
     return "";
   });
 
-  // 3. Remove dangerous tags
-  const forbiddenTags = ["iframe", "object", "embed", "applet", "meta", "link", "base", "form", "svg"];
+  // 3. Remove dangerous tags (allow safe markup and svg icons)
+  const forbiddenTags = ["iframe", "object", "embed", "applet", "meta", "link", "base", "form"];
   for (const tag of forbiddenTags) {
     const reg = new RegExp(`<${tag}\\b[^<]*(?:(?!<\\/${tag}>)<[^<]*)*<\\/${tag}>`, "gi");
     clean = clean.replace(reg, "");
@@ -57,8 +63,8 @@ export function sanitizeHtml(html: string | null | undefined): string {
   // 4. Remove all inline event handlers (onerror, onload, onclick, onmouseover, etc.)
   clean = clean.replace(/\s+on[a-zA-Z]+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, "");
 
-  // 5. Remove javascript: or data: URIs in href or src
-  clean = clean.replace(/(href|src)\s*=\s*["']?\s*(?:javascript:|data:(?!image\/)):?[^"'>\s]*/gi, '$1="#"');
+  // 5. Remove dangerous javascript: or non-safe data: URIs in href or src (allow image/* and application/pdf)
+  clean = clean.replace(/(href|src)\s*=\s*["']?\s*(?:javascript:|data:(?!(?:image\/|application\/pdf))):?[^"'>\s]*/gi, '$1="#"');
 
   // 6. Restore safe iframes
   for (const item of safeIframeMatches) {

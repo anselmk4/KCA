@@ -343,20 +343,53 @@ export function serializeBlocksToHtml(blocks: Block[]): string {
           </div>`;
         }
         case "pdf": {
-          const pdfTitle = block.value.title || "Document PDF";
+          const rawTitle = block.value.title || "Document PDF";
+          const pdfTitleSafe = (rawTitle || "Document PDF").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#039;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
           const pdfUrl = block.value.url || "";
-          return `<div data-block-type="pdf" data-url="${pdfUrl}" data-title="${pdfTitle}" class="my-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-950 shadow-sm space-y-3">
-            <div class="p-4 bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div class="p-2.5 bg-red-500/10 text-red-500 rounded-xl font-bold">📄</div>
-                <div>
-                  <p class="font-bold text-sm text-zinc-900 dark:text-white">${pdfTitle}</p>
-                  <p class="text-[10px] text-zinc-400">Document PDF</p>
+          const isWebUrl = pdfUrl.startsWith("http://") || pdfUrl.startsWith("https://");
+          const viewerEmbedUrl = isWebUrl
+            ? `https://docs.google.com/viewer?url=${encodeURIComponent(pdfUrl)}&embedded=true`
+            : pdfUrl;
+
+          return `<div data-block-type="pdf" data-url="${pdfUrl}" data-title="${pdfTitleSafe}" class="my-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm overflow-hidden transition-all hover:border-zinc-300 dark:hover:border-zinc-700">
+            <div class="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-50/90 dark:bg-zinc-900/90 border-b border-zinc-200/80 dark:border-zinc-800/80">
+              <div class="flex items-center gap-3.5 min-w-0">
+                <div class="w-12 h-14 bg-red-500/10 border border-red-500/20 rounded-xl flex flex-col items-center justify-between p-1.5 shrink-0 shadow-xs">
+                  <span class="text-[9px] font-black tracking-widest text-red-600 dark:text-red-400 uppercase bg-red-100 dark:bg-red-950/60 px-1 py-0.5 rounded">PDF</span>
+                  <div class="w-full space-y-0.5 px-0.5">
+                    <div class="h-0.5 w-full bg-red-400/40 rounded-full"></div>
+                    <div class="h-0.5 w-3/4 bg-red-400/30 rounded-full"></div>
+                    <div class="h-0.5 w-1/2 bg-red-400/30 rounded-full"></div>
+                  </div>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <h4 class="font-bold text-sm sm:text-base text-zinc-900 dark:text-white truncate" title="${pdfTitleSafe}">${pdfTitleSafe}</h4>
+                  <p class="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 mt-0.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                    <span>Document PDF attaché</span>
+                  </p>
                 </div>
               </div>
-              ${pdfUrl ? `<a href="${pdfUrl}" download class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs transition-all">Télécharger</a>` : ""}
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                ${pdfUrl ? `
+                  <a href="${pdfUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 font-bold text-xs transition-all shadow-xs cursor-pointer" title="Visionner dans un nouvel onglet">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                    <span>Visionner</span>
+                  </a>
+                  <a href="${pdfUrl}" download="${pdfTitleSafe}.pdf" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition-all shadow-xs cursor-pointer" title="Télécharger le fichier PDF">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    <span>Télécharger</span>
+                  </a>
+                ` : `<span class="text-xs text-zinc-400">Aucun PDF sélectionné</span>`}
+              </div>
             </div>
-            ${pdfUrl ? `<div class="w-full h-[550px]"><iframe src="${pdfUrl}" class="w-full h-full" frameborder="0"></iframe></div>` : `<div class="p-8 text-center text-xs text-zinc-400">Aucun PDF sélectionné.</div>`}
+            ${pdfUrl ? `
+              <div class="bg-zinc-100/60 dark:bg-zinc-900/60">
+                <div class="w-full h-[520px] sm:h-[600px] relative">
+                  <iframe src="${viewerEmbedUrl}" class="w-full h-full border-0" allow="fullscreen" loading="lazy"></iframe>
+                </div>
+              </div>
+            ` : ""}
           </div>`;
         }
         case "separator": {
@@ -496,6 +529,7 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ value, onChange }) => 
   const [aiPrompt, setAiPrompt] = useState("");
   const [generatingAi, setGeneratingAi] = useState(false);
   const [fileUploadingBlockId, setFileUploadingBlockId] = useState<string | null>(null);
+  const [previewPdfModal, setPreviewPdfModal] = useState<{ url: string; title: string } | null>(null);
 
   const lastEmittedRef = useRef<string>("");
 
@@ -911,12 +945,62 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ value, onChange }) => 
                       type="button"
                       disabled={fileUploadingBlockId === block.id}
                       onClick={() => document.getElementById(`pdf-up-${block.id}`)?.click()}
-                      className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors border border-zinc-200 dark:border-zinc-700"
+                      className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors border border-zinc-200 dark:border-zinc-700 cursor-pointer"
                     >
                       {fileUploadingBlockId === block.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                       Uploader un fichier PDF
                     </button>
                   </div>
+
+                  {/* Live Gmail-style Thumbnail Preview */}
+                  {block.value.url && (
+                    <div className="mt-3 p-3.5 bg-zinc-50 dark:bg-zinc-800/60 rounded-2xl border border-zinc-200 dark:border-zinc-700/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-12 bg-red-500/10 border border-red-500/20 rounded-xl flex flex-col items-center justify-between p-1 shrink-0">
+                          <span className="text-[8px] font-black text-red-600 dark:text-red-400">PDF</span>
+                          <div className="w-full space-y-0.5 px-0.5">
+                            <div className="h-0.5 w-full bg-red-400/40 rounded-full"></div>
+                            <div className="h-0.5 w-2/3 bg-red-400/30 rounded-full"></div>
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-xs text-zinc-900 dark:text-white truncate">
+                            {block.value.title || "Document PDF"}
+                          </p>
+                          <p className="text-[10px] text-zinc-400 flex items-center gap-1 mt-0.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            Fichier prêt pour aperçu et téléchargement
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewPdfModal({ url: block.value.url, title: block.value.title || "Document PDF" })}
+                          className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-[11px] font-bold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Visionner</span>
+                        </button>
+                        <a
+                          href={block.value.url}
+                          download={`${block.value.title || "document"}.pdf`}
+                          className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-[11px] font-bold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                        >
+                          <FileDown className="w-3.5 h-3.5" />
+                          <span>Télécharger</span>
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => updateBlockValue(block.id, { url: "", title: "" })}
+                          className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
+                          title="Retirer le fichier"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1536,6 +1620,72 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ value, onChange }) => 
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Interactive PDF Preview Modal */}
+      {previewPdfModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-4 sm:px-6 py-3.5 bg-zinc-50 dark:bg-zinc-900/90 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-center text-red-600 shrink-0 font-black text-xs">
+                  PDF
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-white truncate">
+                    {previewPdfModal.title}
+                  </h3>
+                  <p className="text-[11px] text-zinc-400">Visionneuse de document</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={previewPdfModal.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-semibold rounded-xl transition-colors border border-zinc-200 dark:border-zinc-700 cursor-pointer"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Nouvel onglet</span>
+                </a>
+                <a
+                  href={previewPdfModal.url}
+                  download={`${previewPdfModal.title}.pdf`}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
+                >
+                  <FileDown className="w-3.5 h-3.5" />
+                  <span>Télécharger</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPreviewPdfModal(null)}
+                  className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body / Viewer */}
+            <div className="flex-1 min-h-[400px] h-[70vh] bg-zinc-950/5 relative overflow-hidden flex flex-col items-center justify-center">
+              {previewPdfModal.url ? (
+                <iframe
+                  src={
+                    previewPdfModal.url.startsWith("http://") || previewPdfModal.url.startsWith("https://")
+                      ? `https://docs.google.com/viewer?url=${encodeURIComponent(previewPdfModal.url)}&embedded=true`
+                      : previewPdfModal.url
+                  }
+                  className="w-full h-full border-0"
+                  title={previewPdfModal.title}
+                />
+              ) : (
+                <div className="p-8 text-center text-zinc-400 text-xs">
+                  Aucun aperçu disponible pour ce fichier.
+                </div>
+              )}
             </div>
           </div>
         </div>
