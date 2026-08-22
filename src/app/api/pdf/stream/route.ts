@@ -80,6 +80,7 @@ export async function GET(req: NextRequest) {
         headers: {
           "Content-Type": "application/pdf",
           "Content-Disposition": `inline; filename="${cached.filename}"`,
+          "X-Frame-Options": "SAMEORIGIN",
           "Cache-Control": "public, max-age=1800",
           "X-Content-Type-Options": "nosniff",
         },
@@ -111,6 +112,7 @@ export async function GET(req: NextRequest) {
         headers: {
           "Content-Type": "application/pdf",
           "Content-Disposition": `inline; filename="${filename}"`,
+          "X-Frame-Options": "SAMEORIGIN",
           "Cache-Control": "public, max-age=3600",
           "X-Content-Type-Options": "nosniff",
         },

@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'X-Frame-Options',
-            value: 'DENY',
+            value: 'SAMEORIGIN',
           },
           {
             key: 'X-Content-Type-Options',
@@ -32,7 +32,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.supabase.co https://*.supabase.in https://challenges.cloudflare.com https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com https://*.jit.si https://*.jitsi.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com https://quickchart.io https://api.qrserver.com https://img.youtube.com https://*.ytimg.com https://*.googleusercontent.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.supabase.in wss://*.supabase.in https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com https://*.jit.si https://*.jitsi.net https://mempool.space https://blockstream.info https://api.mainnet-beta.solana.com; frame-src 'self' https://www.youtube.com https://youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://vimeo.com https://www.dailymotion.com https://dailymotion.com https://docs.google.com https://drive.google.com https://challenges.cloudflare.com https://www.paypal.com https://*.paypal.com https://*.jit.si https://*.jitsi.net; media-src 'self' data: blob: https://*.supabase.co https://*.supabase.in;",
+            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.supabase.co https://*.supabase.in https://challenges.cloudflare.com https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com https://*.jit.si https://*.jitsi.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com https://quickchart.io https://api.qrserver.com https://img.youtube.com https://*.ytimg.com https://*.googleusercontent.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.supabase.in wss://*.supabase.in https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com https://*.jit.si https://*.jitsi.net https://mempool.space https://blockstream.info https://api.mainnet-beta.solana.com; frame-src 'self' data: blob: https://www.youtube.com https://youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://vimeo.com https://www.dailymotion.com https://dailymotion.com https://docs.google.com https://drive.google.com https://challenges.cloudflare.com https://www.paypal.com https://*.paypal.com https://*.jit.si https://*.jitsi.net; frame-ancestors 'self'; media-src 'self' data: blob: https://*.supabase.co https://*.supabase.in;",
           },
         ],
       },
