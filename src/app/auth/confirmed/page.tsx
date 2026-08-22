@@ -38,11 +38,13 @@ async function waitForSession(): Promise<Session | null> {
 
 /**
  * Fix role assignments using the authenticated user's own session.
+ * Strictly limited to INSTRUCTOR / TEACHING_ASSISTANT registrations.
+ * Admin roles can NEVER be assigned via this client function.
  */
 async function fixRoleForAuthenticatedUser(userId: string, intendedRole: string): Promise<void> {
   try {
     const role = intendedRole.toUpperCase();
-    if (role === "STUDENT") return;
+    if (role !== "INSTRUCTOR" && role !== "TEACHING_ASSISTANT") return;
 
     const { data: targetRoleRow, error: targetErr } = await supabase
       .from("roles")
@@ -123,9 +125,10 @@ function ConfirmedContent() {
           }
         }
 
-        // 2. Role lookup
+        // 2. Role lookup from URL or registration tracking (never trust old localStorage session)
         const savedRegRole = typeof window !== "undefined" ? localStorage.getItem("kuettu_registration_role") : null;
         const roleParam = (searchParams.get("role") || savedRegRole || "STUDENT").toUpperCase();
+        const safeRegistrationRole = (roleParam === "INSTRUCTOR" || roleParam === "TEACHING_ASSISTANT") ? roleParam : "STUDENT";
 
         setStatusText("Vérification de votre session...");
 
@@ -145,23 +148,22 @@ function ConfirmedContent() {
         if (session?.user) {
           setHasSession(true);
           const user = session.user;
-          const localSession = getSimulatedSession();
           const intendedRole = (
             (user.user_metadata?.role as string) ||
-            localSession?.role ||
-            roleParam
+            safeRegistrationRole
           ).toUpperCase();
 
-          // Fix roles only for non-student registrations
-          if (intendedRole !== "STUDENT") {
-            setStatusText("Activation de votre rôle...");
-            await fixRoleForAuthenticatedUser(user.id, intendedRole);
+          const sanitizedRole = (intendedRole === "INSTRUCTOR" || intendedRole === "TEACHING_ASSISTANT") ? intendedRole : "STUDENT";
+
+          // Fix roles only for Instructor registrations
+          if (sanitizedRole === "INSTRUCTOR" || sanitizedRole === "TEACHING_ASSISTANT") {
+            setStatusText("Activation de votre rôle Formateur...");
+            await fixRoleForAuthenticatedUser(user.id, sanitizedRole);
           }
 
           setStatusText("Chargement de votre profil...");
           const profile = await fetchUserProfile(user.id);
 
-          let finalRole = intendedRole;
           // Update profile status in database to ACTIVE
           try {
             await supabase
@@ -172,22 +174,27 @@ function ConfirmedContent() {
             console.warn("[confirmed] Could not update profile status to ACTIVE:", stErr);
           }
 
-          if (profile) {
-            finalRole = intendedRole !== "STUDENT" ? intendedRole : (profile.role || "STUDENT");
+          let finalRole = profile?.role || sanitizedRole;
 
-            if (typeof window !== "undefined") {
-              localStorage.removeItem("kuettu_registration_role");
-            }
+          // Extra security: if user has SUPER_ADMIN but is not authorized owner, demote to INSTRUCTOR/STUDENT
+          const { isAuthorizedSuperAdmin } = await import("@/lib/rbac");
+          if (finalRole === "SUPER_ADMIN" && !isAuthorizedSuperAdmin(user.email)) {
+            finalRole = sanitizedRole;
+          }
 
-            setSimulatedSession({
-              userId: profile.id,
-              name: profile.full_name,
-              email: profile.email,
-              role: finalRole as any,
-              status: "ACTIVE",
-              plan: profile.plan,
-            });
-            localStorage.setItem("kuettu_unconfirmed_email", "false");
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("kuettu_registration_role");
+          }
+
+          setSimulatedSession({
+            userId: profile?.id || user.id,
+            name: profile?.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "Utilisateur",
+            email: profile?.email || user.email || "",
+            role: finalRole as any,
+            status: "ACTIVE",
+            plan: profile?.plan || "FREE",
+          });
+          localStorage.setItem("kuettu_unconfirmed_email", "false");
           } else {
             setSimulatedSession({
               userId: user.id,

@@ -146,6 +146,19 @@ export const ROLE_META: Record<string, RoleMeta> = {
 
 export const ADMIN_ROLES: Role[] = ["SUPER_ADMIN", "ADMIN", "MODERATOR", "ACADEMIC_ADMIN", "FINANCE_ADMIN", "SUPPORT_AGENT"];
 
+export const AUTHORIZED_SUPER_ADMIN_EMAILS = [
+  "anselmk4@gmail.com",
+  (process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL || "").toLowerCase(),
+  (process.env.SUPER_ADMIN_EMAIL || "").toLowerCase(),
+  ...(process.env.SUPER_ADMIN_EMAILS || "").toLowerCase().split(",").map(e => e.trim()),
+].filter(Boolean);
+
+export function isAuthorizedSuperAdmin(email?: string | null): boolean {
+  if (!email) return false;
+  const cleanEmail = email.toLowerCase().trim();
+  return AUTHORIZED_SUPER_ADMIN_EMAILS.includes(cleanEmail);
+}
+
 export type CourseStatus = "DRAFT" | "REVIEW" | "PUBLISHED" | "ARCHIVED";
 export type PaymentStatus = "PENDING" | "PROCESSING" | "PAID" | "FAILED" | "REFUNDED" | "PARTIALLY_REFUNDED" | "CANCELLED";
 export type StudentStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED" | "COMPLETED" | "AT_RISK";

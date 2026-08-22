@@ -25,6 +25,26 @@ export async function GET(req: NextRequest) {
       if (names.includes(p)) { resolvedRole = p; break; }
     }
 
+    // Security Gate: strictly restrict SUPER_ADMIN to whitelisted owner emails
+    const { isAuthorizedSuperAdmin } = await import("@/lib/rbac");
+    if (resolvedRole === "SUPER_ADMIN" && !isAuthorizedSuperAdmin(user.email)) {
+      console.warn(`[SECURITY] Unauthorized SUPER_ADMIN access blocked for ${user.email}. Demoting.`);
+      // Remove rogue SUPER_ADMIN role assignment in DB
+      const { data: superAdminRole } = await supabaseAdmin.from("roles").select("id").eq("name", "SUPER_ADMIN").single();
+      if (superAdminRole) {
+        await supabaseAdmin.from("user_roles").delete().eq("user_id", user.id).eq("role_id", superAdminRole.id);
+      }
+      
+      // Determine if they are INSTRUCTOR or STUDENT
+      if (names.includes("INSTRUCTOR")) {
+        resolvedRole = "INSTRUCTOR";
+      } else if (names.includes("ADMIN")) {
+        resolvedRole = "ADMIN";
+      } else {
+        resolvedRole = "STUDENT";
+      }
+    }
+
     // Also fetch admin_permissions overrides
     const { data: perms } = await (supabaseAdmin
       .from("admin_permissions" as any)

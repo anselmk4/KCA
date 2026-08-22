@@ -110,9 +110,12 @@ async function bootstrapUserAndGetRole(user: any): Promise<string> {
   const existingRoleNames: string[] =
     existingUserRoles?.map((ur: any) => ur.roles?.name).filter(Boolean) || [];
 
+  const { isAuthorizedSuperAdmin } = await import('@/lib/rbac');
+  const isSuperAdminAllowed = isAuthorizedSuperAdmin(user.email);
+
   let targetRole = 'STUDENT';
   if (existingRoleNames.length > 0) {
-    if (existingRoleNames.includes('SUPER_ADMIN')) targetRole = 'SUPER_ADMIN';
+    if (existingRoleNames.includes('SUPER_ADMIN') && isSuperAdminAllowed) targetRole = 'SUPER_ADMIN';
     else if (existingRoleNames.includes('ADMIN')) targetRole = 'ADMIN';
     else if (existingRoleNames.includes('FINANCE_ADMIN')) targetRole = 'FINANCE_ADMIN';
     else if (existingRoleNames.includes('ACADEMIC_ADMIN')) targetRole = 'ACADEMIC_ADMIN';
@@ -120,6 +123,15 @@ async function bootstrapUserAndGetRole(user: any): Promise<string> {
     else if (existingRoleNames.includes('INSTRUCTOR')) targetRole = 'INSTRUCTOR';
     else if (existingRoleNames.includes('TEACHING_ASSISTANT')) targetRole = 'TEACHING_ASSISTANT';
     else targetRole = 'STUDENT';
+
+    // If unauthorized user had SUPER_ADMIN in DB, remove it immediately
+    if (existingRoleNames.includes('SUPER_ADMIN') && !isSuperAdminAllowed) {
+      console.warn(`[callback] Stripping unauthorized SUPER_ADMIN role from ${user.email}`);
+      const { data: superAdminRole } = await supabaseAdmin.from('roles').select('id').eq('name', 'SUPER_ADMIN').single();
+      if (superAdminRole) {
+        await supabaseAdmin.from('user_roles').delete().eq('user_id', user.id).eq('role_id', superAdminRole.id);
+      }
+    }
   } else {
     const rawRole = (user.user_metadata?.role || 'STUDENT').toUpperCase();
     targetRole = (rawRole === 'INSTRUCTOR' || rawRole === 'TEACHING_ASSISTANT') ? rawRole : 'STUDENT';
