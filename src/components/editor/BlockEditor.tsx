@@ -424,14 +424,50 @@ export function serializeBlocksToHtml(blocks: Block[]): string {
           const rawUrl = block.value.url || "";
           const embedUrl = formatGoogleEmbedUrl(rawUrl);
 
-          return `<div data-block-type="google_docs" data-doc-type="${docType}" data-url="${rawUrl}" class="my-6 w-full rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-md bg-white dark:bg-zinc-950">
-            <div class="px-4 py-2.5 bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs">
-              <span class="font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-2">
-                <span>📄</span> Document Google (${docType.toUpperCase()})
-              </span>
-              ${rawUrl ? `<a href="${rawUrl}" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 font-bold hover:underline">Ouvrir dans Google Docs ↗</a>` : ""}
+          const docTypeName =
+            docType === "sheet"
+              ? "Feuille de calcul Google Sheets"
+              : docType === "slide"
+              ? "Présentation Google Slides"
+              : docType === "form"
+              ? "Formulaire Google Forms"
+              : "Document Google Docs";
+
+          const badgeConfig = {
+            doc: { label: "DOCS", bg: "bg-blue-500/10 text-blue-600 border-blue-500/20", line1: "bg-blue-400/40", line2: "bg-blue-400/30", dot: "bg-blue-500", btn: "bg-blue-600 hover:bg-blue-500" },
+            sheet: { label: "SHEET", bg: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20", line1: "bg-emerald-400/40", line2: "bg-emerald-400/30", dot: "bg-emerald-500", btn: "bg-emerald-600 hover:bg-emerald-500" },
+            slide: { label: "SLIDE", bg: "bg-amber-500/10 text-amber-600 border-amber-500/20", line1: "bg-amber-400/40", line2: "bg-amber-400/30", dot: "bg-amber-500", btn: "bg-amber-600 hover:bg-amber-500" },
+            form: { label: "FORM", bg: "bg-purple-500/10 text-purple-600 border-purple-500/20", line1: "bg-purple-400/40", line2: "bg-purple-400/30", dot: "bg-purple-500", btn: "bg-purple-600 hover:bg-purple-500" },
+          }[docType as "doc" | "sheet" | "slide" | "form"] || { label: "DOCS", bg: "bg-blue-500/10 text-blue-600 border-blue-500/20", line1: "bg-blue-400/40", line2: "bg-blue-400/30", dot: "bg-blue-500", btn: "bg-blue-600 hover:bg-blue-500" };
+
+          return `<div data-block-type="google_docs" data-doc-type="${docType}" data-url="${rawUrl}" data-embed-url="${embedUrl}" class="my-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden transition-all hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md">
+            <div class="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-50/90 dark:bg-zinc-900/90">
+              <div class="flex items-center gap-3.5 min-w-0">
+                <div class="w-12 h-14 ${badgeConfig.bg} border rounded-xl flex flex-col items-center justify-between p-1.5 shrink-0 shadow-xs">
+                  <span class="text-[8px] font-black tracking-widest uppercase bg-white/80 dark:bg-zinc-950/60 px-1 py-0.5 rounded">${badgeConfig.label}</span>
+                  <div class="w-full space-y-0.5 px-0.5">
+                    <div class="h-0.5 w-full ${badgeConfig.line1} rounded-full"></div>
+                    <div class="h-0.5 w-3/4 ${badgeConfig.line2} rounded-full"></div>
+                    <div class="h-0.5 w-1/2 ${badgeConfig.line2} rounded-full"></div>
+                  </div>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <h4 class="font-bold text-sm sm:text-base text-zinc-900 dark:text-white truncate" title="${docTypeName}">${docTypeName}</h4>
+                  <p class="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 mt-0.5">
+                    <span class="w-1.5 h-1.5 rounded-full ${badgeConfig.dot}"></span>
+                    <span>Document interactif Google attaché</span>
+                  </p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                ${rawUrl ? `
+                  <button type="button" data-action="view-doc" data-doc-url="${embedUrl}" data-raw-url="${rawUrl}" data-doc-title="${docTypeName}" data-doc-type="${docType}" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl ${badgeConfig.btn} text-white font-bold text-xs transition-all shadow-xs cursor-pointer" title="Visionner le document Google">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                    <span>Visionner</span>
+                  </button>
+                ` : `<span class="text-xs text-zinc-400">Lien Google Docs non renseigné</span>`}
+              </div>
             </div>
-            ${embedUrl ? `<div class="w-full h-[600px]"><iframe src="${embedUrl}" class="w-full h-full" frameborder="0" allowfullscreen></iframe></div>` : `<div class="p-8 text-center text-xs text-zinc-400 font-bold">Veuillez renseigner le lien du document Google.</div>`}
           </div>`;
         }
         case "table": {
@@ -1036,13 +1072,47 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ value, onChange }) => 
                     </div>
                   </div>
                   {block.value.url && (
-                    <div className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs">
-                      <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5">
-                        ✓ Lien formaté automatiquement pour l'intégration responsive
-                      </span>
-                      <a href={block.value.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline font-bold">
-                        Aperçu externe ↗
-                      </a>
+                    <div className="mt-3 p-3.5 bg-zinc-50 dark:bg-zinc-800/60 rounded-2xl border border-zinc-200 dark:border-zinc-700/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-12 bg-blue-500/10 border border-blue-500/20 rounded-xl flex flex-col items-center justify-between p-1 shrink-0">
+                          <span className="text-[8px] font-black text-blue-600 dark:text-blue-400">DOCS</span>
+                          <div className="w-full space-y-0.5 px-0.5">
+                            <div className="h-0.5 w-full bg-blue-400/40 rounded-full"></div>
+                            <div className="h-0.5 w-2/3 bg-blue-400/30 rounded-full"></div>
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-xs text-zinc-900 dark:text-white truncate">
+                            Document Google ({(block.value.type || "doc").toUpperCase()})
+                          </p>
+                          <p className="text-[10px] text-zinc-400 flex items-center gap-1 mt-0.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            Document prêt pour le visionnage interactif
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          data-action="view-doc"
+                          data-doc-url={block.value.url}
+                          data-raw-url={block.value.url}
+                          data-doc-title={`Document Google (${(block.value.type || "doc").toUpperCase()})`}
+                          data-doc-type={block.value.type || "doc"}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                        >
+                          <Eye className="w-4 h-4" />
+                          <span>Visionner</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateBlockValue(block.id, { url: "" })}
+                          className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl transition-colors cursor-pointer"
+                          title="Retirer le lien"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   )}
 
