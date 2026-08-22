@@ -535,7 +535,6 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ value, onChange }) => 
   const [aiPrompt, setAiPrompt] = useState("");
   const [generatingAi, setGeneratingAi] = useState(false);
   const [fileUploadingBlockId, setFileUploadingBlockId] = useState<string | null>(null);
-  const [previewPdfModal, setPreviewPdfModal] = useState<{ url: string; title: string } | null>(null);
 
   const lastEmittedRef = useRef<string>("");
 
@@ -982,7 +981,9 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ value, onChange }) => 
                       <div className="flex items-center gap-2 shrink-0">
                         <button
                           type="button"
-                          onClick={() => setPreviewPdfModal({ url: block.value.url, title: block.value.title || "Document PDF" })}
+                          data-action="view-pdf"
+                          data-pdf-url={block.value.url}
+                          data-pdf-title={block.value.title || "Document PDF"}
                           className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                         >
                           <Eye className="w-4 h-4" />
@@ -1618,78 +1619,6 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ value, onChange }) => 
                   </>
                 )}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Interactive PDF Preview Modal */}
-      {previewPdfModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* Modal Header */}
-            <div className="p-4 sm:px-6 py-3.5 bg-zinc-50 dark:bg-zinc-900/90 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-9 h-9 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-center text-red-600 shrink-0 font-black text-xs">
-                  PDF
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-white truncate">
-                    {previewPdfModal.title}
-                  </h3>
-                  <p className="text-[11px] text-zinc-400">Visionneuse de document</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <a
-                  href={previewPdfModal.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-semibold rounded-xl transition-colors border border-zinc-200 dark:border-zinc-700 cursor-pointer"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Nouvel onglet</span>
-                </a>
-                <a
-                  href={previewPdfModal.url}
-                  download={`${previewPdfModal.title}.pdf`}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
-                >
-                  <FileDown className="w-3.5 h-3.5" />
-                  <span>Télécharger</span>
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setPreviewPdfModal(null)}
-                  className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Body / Viewer */}
-            <div className="flex-1 min-h-[400px] h-[75vh] bg-zinc-950/5 relative overflow-hidden flex flex-col items-center justify-center">
-              {previewPdfModal.url ? (
-                <object
-                  data={`${base64ToBlobUrl(previewPdfModal.url)}#toolbar=1&navpanes=1`}
-                  type="application/pdf"
-                  className="w-full h-full border-0"
-                >
-                  <iframe
-                    src={
-                      previewPdfModal.url.startsWith("http://") || previewPdfModal.url.startsWith("https://")
-                        ? `https://docs.google.com/viewer?url=${encodeURIComponent(previewPdfModal.url)}&embedded=true`
-                        : base64ToBlobUrl(previewPdfModal.url)
-                    }
-                    className="w-full h-full border-0"
-                    title={previewPdfModal.title}
-                  />
-                </object>
-              ) : (
-                <div className="p-8 text-center text-zinc-400 text-xs">
-                  Aucun aperçu disponible pour ce fichier.
-                </div>
-              )}
             </div>
           </div>
         </div>
