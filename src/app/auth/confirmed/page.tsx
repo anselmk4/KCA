@@ -195,17 +195,6 @@ function ConfirmedContent() {
             plan: profile?.plan || "FREE",
           });
           localStorage.setItem("kuettu_unconfirmed_email", "false");
-          } else {
-            setSimulatedSession({
-              userId: user.id,
-              name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Utilisateur",
-              email: user.email || "",
-              role: finalRole as any,
-              status: "ACTIVE",
-              plan: "FREE",
-            });
-            localStorage.setItem("kuettu_unconfirmed_email", "false");
-          }
 
           const { href, label } = resolveRedirect(finalRole);
           setDashboardHref(href);
