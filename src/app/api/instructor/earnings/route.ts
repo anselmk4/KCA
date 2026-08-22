@@ -126,38 +126,45 @@ export async function GET(req: NextRequest) {
     }
 
     // 5. Build manual cash / direct payment transactions from enrollments
+    // Strictly exclude free / scholarship / accès offert (FREE_SCHOLARSHIP / FREE / 0$)
     const manualTransactions: any[] = [];
     enrollmentsList.forEach((enr: any) => {
       const userCourseKey = `${enr.student_id}_${enr.course_id}`;
       // Skip if this enrollment was already counted in online payments
       if (onlinePaidUserCourseKeys.has(userCourseKey)) return;
 
+      const manualStatus = enr.manual_payment_status;
+      const rawManualAmt = Number(enr.manual_amount_paid) || 0;
+
+      // Accès offert / Bourse / Gratuit -> DO NOT count in revenue!
+      if (manualStatus === "FREE_SCHOLARSHIP" || manualStatus === "FREE" || manualStatus === "BOURSE") {
+        return;
+      }
+
       const course = courseMap.get(enr.course_id);
       const coursePrice = Number(course?.price) || 0;
       const studentName = enr.profiles?.full_name || "Apprenant (Paiement direct)";
-      const manualStatus = enr.manual_payment_status || "FREE_SCHOLARSHIP";
-      
-      let manualAmount = Number(enr.manual_amount_paid) || 0;
-      if (manualAmount === 0 && manualStatus === "CASH_FULL") {
-        manualAmount = coursePrice;
+
+      let finalPaidAmount = 0;
+      if (manualStatus === "CASH_FULL") {
+        finalPaidAmount = rawManualAmt > 0 ? rawManualAmt : coursePrice;
+      } else if (manualStatus === "CASH_INSTALLMENT" || rawManualAmt > 0) {
+        finalPaidAmount = rawManualAmt;
       }
 
-      if (manualAmount > 0 || manualStatus === "CASH_FULL" || manualStatus === "CASH_INSTALLMENT" || enr.enrollment_type === "MANUAL_INSTRUCTOR") {
-        const finalAmount = manualAmount > 0 ? manualAmount : coursePrice;
-        if (finalAmount > 0) {
-          manualTransactions.push({
-            id: `MANUAL-${enr.id}`,
-            orderId: `MANUAL-${enr.id?.substring(0, 8) || "DIR"}`,
-            courseId: enr.course_id,
-            courseTitle: course?.title || "Formation",
-            userId: enr.student_id,
-            studentName,
-            amount: finalAmount,
-            status: "PAID",
-            date: enr.enrolled_at || enr.created_at || new Date().toISOString(),
-            method: "PAIEMENT_MANUEL_DIRECT"
-          });
-        }
+      if (finalPaidAmount > 0) {
+        manualTransactions.push({
+          id: `MANUAL-${enr.id}`,
+          orderId: `MANUAL-${enr.id?.substring(0, 8) || "DIR"}`,
+          courseId: enr.course_id,
+          courseTitle: course?.title || "Formation",
+          userId: enr.student_id,
+          studentName,
+          amount: finalPaidAmount,
+          status: "PAID",
+          date: enr.enrolled_at || enr.created_at || new Date().toISOString(),
+          method: "PAIEMENT_MANUEL_DIRECT"
+        });
       }
     });
 

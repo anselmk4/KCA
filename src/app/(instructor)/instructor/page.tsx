@@ -180,12 +180,18 @@ export default function InstructorDashboardPage() {
             .filter((p: any) => (p.courseId === c.id || (p.notes || "").includes(c.id)) && (p.status === "PAID" || p.status === "COMPLETED"))
             .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
-          // If no payments list entry, compute manual cash from enrollment fields
+          // If no payments list entry, compute manual cash strictly from paid manual enrollments (exclude FREE_SCHOLARSHIP / Accès Offert)
           if (courseRevenueSum === 0 && courseEnrolls.length > 0) {
             courseEnrolls.forEach((enr: any) => {
               const manualStatus = enr.manual_payment_status;
               const manualAmt = Number(enr.manual_amount_paid) || 0;
               const coursePrice = Number(c.price) || 0;
+
+              // Accès offert / Bourse / Gratuit -> Stricly ignore from revenue
+              if (manualStatus === "FREE_SCHOLARSHIP" || manualStatus === "FREE" || manualStatus === "BOURSE") {
+                return;
+              }
+
               if (manualAmt > 0) {
                 courseRevenueSum += manualAmt;
                 manualSum += manualAmt;
@@ -214,14 +220,21 @@ export default function InstructorDashboardPage() {
         const sortedEnrolls = [...enrollList]
           .sort((a: any, b: any) => new Date(b.enrolled_at || b.created_at || 0).getTime() - new Date(a.enrolled_at || a.created_at || 0).getTime())
           .slice(0, 5)
-          .map((enr: any) => ({
-            id: enr.id,
-            studentName: enr.profiles?.full_name || "Étudiant",
-            studentInit: enr.profiles?.full_name?.charAt(0) || "?",
-            courseTitle: coursesList.find((c: any) => c.id === enr.course_id)?.title || "Cours",
-            isManualPaid: enr.manual_payment_status === "CASH_FULL" || (Number(enr.manual_amount_paid) || 0) > 0,
-            joinedAt: enr.enrolled_at || enr.created_at
-          }));
+          .map((enr: any) => {
+            const manualStatus = enr.manual_payment_status;
+            const isFree = manualStatus === "FREE_SCHOLARSHIP" || manualStatus === "FREE" || manualStatus === "BOURSE";
+            const isCash = !isFree && (manualStatus === "CASH_FULL" || (Number(enr.manual_amount_paid) || 0) > 0);
+
+            return {
+              id: enr.id,
+              studentName: enr.profiles?.full_name || "Étudiant",
+              studentInit: enr.profiles?.full_name?.charAt(0) || "?",
+              courseTitle: coursesList.find((c: any) => c.id === enr.course_id)?.title || "Cours",
+              isManualPaid: isCash,
+              isFreeAccess: isFree,
+              joinedAt: enr.enrolled_at || enr.created_at
+            };
+          });
         setRecentEnrollments(sortedEnrolls);
 
       } catch (err) {
@@ -234,14 +247,17 @@ export default function InstructorDashboardPage() {
     loadDashboardData();
   }, []);
 
-  // Determine if this instructor has paying learners or sales (online or manual)
+  // Determine if this instructor has paying learners or sales (online or manual) - Exclude FREE_SCHOLARSHIP
   const hasPaidSales = useMemo(() => {
     return totalRevenue > 0 || 
            salesTransactions.some(t => t.status === "PAID" || t.status === "COMPLETED") ||
-           myEnrollments.some(e => e.manual_payment_status === "CASH_FULL" || (Number(e.manual_amount_paid) || 0) > 0);
+           myEnrollments.some(e => {
+             const st = e.manual_payment_status;
+             return st !== "FREE_SCHOLARSHIP" && st !== "FREE" && st !== "BOURSE" && (st === "CASH_FULL" || (Number(e.manual_amount_paid) || 0) > 0);
+           });
   }, [totalRevenue, salesTransactions, myEnrollments]);
 
-  // Compute sales chart data dynamically based on timeRange (Online + Manual payments)
+  // Compute sales chart data dynamically based on timeRange (Online + Manual payments, excluding FREE)
   const chartData = useMemo<ChartBucket[]>(() => {
     if (!hasPaidSales) return [];
 
@@ -259,10 +275,14 @@ export default function InstructorDashboardPage() {
       }
     });
 
-    // Also include manual enrollments if they weren't in salesTransactions
+    // Also include manual enrollments if they weren't in salesTransactions (strictly excluding free)
     if (myEnrollments.length > 0) {
       myEnrollments.forEach((enr: any) => {
         const manualStatus = enr.manual_payment_status;
+        if (manualStatus === "FREE_SCHOLARSHIP" || manualStatus === "FREE" || manualStatus === "BOURSE") {
+          return; // Skip free / scholarship
+        }
+
         const manualAmt = Number(enr.manual_amount_paid) || 0;
         const course = myCourses.find(c => c.id === enr.course_id);
         const coursePrice = Number(course?.price) || 0;
@@ -841,8 +861,13 @@ export default function InstructorDashboardPage() {
                     <div className="flex items-center gap-2">
                       <p className="text-xs text-zinc-500 truncate">{enr.courseTitle}</p>
                       {enr.isManualPaid && (
-                        <span className="text-[9px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-bold px-1.5 py-0.2 rounded">
+                        <span className="text-[9px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-bold px-1.5 py-0.5 rounded">
                           Cash/Direct
+                        </span>
+                      )}
+                      {enr.isFreeAccess && (
+                        <span className="text-[9px] bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-bold px-1.5 py-0.5 rounded">
+                          Accès Offert
                         </span>
                       )}
                     </div>
