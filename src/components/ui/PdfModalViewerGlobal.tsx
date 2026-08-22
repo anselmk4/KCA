@@ -1,15 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FileDown,
   ExternalLink,
   X,
   Loader2,
-  ZoomIn,
-  ZoomOut,
-  RotateCw,
-  Printer,
   AlertTriangle,
   RefreshCw,
 } from "lucide-react";
@@ -19,125 +15,17 @@ interface PdfData {
   title: string;
 }
 
-declare global {
-  interface Window {
-    pdfjsLib?: any;
-  }
-}
-
-const CDN_SOURCES = [
-  "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js",
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",
-  "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js",
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js",
-];
-
 export function PdfModalViewerGlobal() {
   const [pdfData, setPdfData] = useState<PdfData | null>(null);
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [numPages, setNumPages] = useState<number>(0);
-  const [scale, setScale] = useState<number>(1.2);
-  const [rotation, setRotation] = useState<number>(0);
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  const pdfDocRef = useRef<any>(null);
-
-  // Load PDF.js with multi-CDN fallback
-  const loadPdfJs = useCallback(async (): Promise<any> => {
-    if (window.pdfjsLib) {
-      if (window.pdfjsLib.GlobalWorkerOptions) {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = "";
-      }
-      return window.pdfjsLib;
-    }
-
-    for (const src of CDN_SOURCES) {
-      try {
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement("script");
-          script.src = src;
-          script.crossOrigin = "anonymous";
-          script.onload = () => resolve();
-          script.onerror = () => {
-            script.remove();
-            reject(new Error(`Failed to load ${src}`));
-          };
-          document.head.appendChild(script);
-        });
-
-        if (window.pdfjsLib) {
-          if (window.pdfjsLib.GlobalWorkerOptions) {
-            window.pdfjsLib.GlobalWorkerOptions.workerSrc = "";
-          }
-          return window.pdfjsLib;
-        }
-      } catch {
-        // Try next mirror
-      }
-    }
-    throw new Error("Impossible de charger la bibliothèque de rendu PDF.");
-  }, []);
-
-  // Render all pages to canvas
-  const renderAllPages = useCallback(
-    async (pdfDoc: any, currentScale: number, currentRotation: number) => {
-      if (!containerRef.current || !pdfDoc) return;
-      const container = containerRef.current;
-      container.innerHTML = "";
-
-      for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
-        try {
-          const page = await pdfDoc.getPage(pageNum);
-          const viewport = page.getViewport({ scale: currentScale, rotation: currentRotation });
-
-          const pageWrapper = document.createElement("div");
-          pageWrapper.className =
-            "my-4 shadow-xl rounded-lg overflow-hidden bg-white border border-zinc-200/80 dark:border-zinc-700/80 transition-transform flex flex-col items-center";
-
-          const canvas = document.createElement("canvas");
-          const context = canvas.getContext("2d", { willReadFrequently: true });
-          if (!context) continue;
-
-          // HiDPI support for crisp text
-          const outputScale = window.devicePixelRatio || 1;
-          canvas.width = Math.floor(viewport.width * outputScale);
-          canvas.height = Math.floor(viewport.height * outputScale);
-          canvas.style.width = Math.floor(viewport.width) + "px";
-          canvas.style.height = Math.floor(viewport.height) + "px";
-
-          const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
-
-          const renderContext = {
-            canvasContext: context,
-            transform: transform,
-            viewport: viewport,
-          };
-
-          await page.render(renderContext).promise;
-
-          const pageNumberBadge = document.createElement("div");
-          pageNumberBadge.className =
-            "py-1 text-[11px] font-semibold text-zinc-400 dark:text-zinc-500 bg-zinc-50 dark:bg-zinc-800 w-full text-center border-t border-zinc-150 dark:border-zinc-700/50";
-          pageNumberBadge.innerText = `Page ${pageNum} sur ${pdfDoc.numPages}`;
-
-          pageWrapper.appendChild(canvas);
-          pageWrapper.appendChild(pageNumberBadge);
-          container.appendChild(pageWrapper);
-        } catch (pageErr) {
-          console.error(`Error rendering page ${pageNum}:`, pageErr);
-        }
-      }
-    },
-    []
-  );
-
-  // Load document when pdfData changes
   useEffect(() => {
     if (!pdfData) {
-      pdfDocRef.current = null;
-      setNumPages(0);
+      setStreamUrl(null);
       setError(null);
+      setLoading(false);
       return;
     }
 
@@ -145,44 +33,49 @@ export function PdfModalViewerGlobal() {
     setLoading(true);
     setError(null);
 
-    const loadAndRender = async () => {
+    const initStream = async () => {
       try {
-        const pdfjs = await loadPdfJs();
-        let loadingTask: any;
+        if (pdfData.url.startsWith("data:")) {
+          // Stream base64 PDF through same-origin endpoint
+          const res = await fetch("/api/pdf/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ data: pdfData.url, title: pdfData.title }),
+          });
 
-        if (pdfData.url.startsWith("data:application/pdf;base64,")) {
-          const base64Clean = pdfData.url.split(";base64,")[1];
-          const binaryString = atob(base64Clean);
-          const len = binaryString.length;
-          const bytes = new Uint8Array(len);
-          for (let i = 0; i < len; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
+          if (!res.ok) {
+            throw new Error("Erreur lors de la préparation du document.");
           }
-          loadingTask = pdfjs.getDocument({ data: bytes, disableWorker: true });
+
+          const data = await res.json();
+          if (isMounted && data.streamUrl) {
+            setStreamUrl(data.streamUrl);
+          }
+        } else if (
+          pdfData.url.startsWith("http://") ||
+          pdfData.url.startsWith("https://")
+        ) {
+          // Remote URL streamed through same-origin proxy
+          setStreamUrl(`/api/pdf/stream?url=${encodeURIComponent(pdfData.url)}`);
         } else {
-          loadingTask = pdfjs.getDocument({ url: pdfData.url, disableWorker: true, withCredentials: false });
+          setStreamUrl(pdfData.url);
         }
-
-        const doc = await loadingTask.promise;
-        if (!isMounted) return;
-
-        pdfDocRef.current = doc;
-        setNumPages(doc.numPages);
-        await renderAllPages(doc, scale, rotation);
       } catch (err: any) {
-        console.error("PDF.js render error:", err);
+        console.error("PDF stream initialization error:", err);
         if (isMounted) {
           setError(
             err.message ||
-              "Impossible de charger le document PDF. Vous pouvez toujours le télécharger directement."
+              "Impossible de charger la visionneuse. Vous pouvez télécharger le document directement."
           );
         }
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    loadAndRender();
+    initStream();
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setPdfData(null);
@@ -192,14 +85,7 @@ export function PdfModalViewerGlobal() {
       isMounted = false;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [pdfData, loadPdfJs]);
-
-  // Re-render when scale or rotation changes
-  useEffect(() => {
-    if (pdfDocRef.current && !loading) {
-      renderAllPages(pdfDocRef.current, scale, rotation);
-    }
-  }, [scale, rotation, renderAllPages, loading]);
+  }, [pdfData]);
 
   // Global click listener for [data-action="view-pdf"]
   useEffect(() => {
@@ -222,46 +108,22 @@ export function PdfModalViewerGlobal() {
     };
   }, []);
 
-  const handleZoomIn = () => setScale((s) => Math.min(s + 0.2, 2.6));
-  const handleZoomOut = () => setScale((s) => Math.max(s - 0.2, 0.6));
-  const handleResetZoom = () => setScale(1.2);
-  const handleRotate = () => setRotation((r) => (r + 90) % 360);
-
-  const handlePrint = () => {
-    if (!containerRef.current) return;
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>${pdfData?.title || "Impression Document"}</title>
-          <style>
-            body { margin: 0; padding: 0; background: white; text-align: center; }
-            canvas { max-width: 100%; height: auto; margin-bottom: 20px; page-break-after: always; }
-          </style>
-        </head>
-        <body>
-          ${containerRef.current.innerHTML}
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 500);
-  };
-
   const handleDownload = () => {
     if (!pdfData) return;
     const cleanFilename = (pdfData.title || "document").replace(/[^\w\s-]/gi, "") + ".pdf";
+    const downloadTarget = streamUrl || pdfData.url;
     const a = document.createElement("a");
-    a.href = pdfData.url;
+    a.href = downloadTarget;
     a.download = cleanFilename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+  };
+
+  const handleOpenNewTab = () => {
+    if (!pdfData) return;
+    const target = streamUrl || pdfData.url;
+    window.open(target, "_blank", "noopener,noreferrer");
   };
 
   if (!pdfData) return null;
@@ -272,11 +134,11 @@ export function PdfModalViewerGlobal() {
       onClick={() => setPdfData(null)}
     >
       <div
-        className="bg-zinc-100 dark:bg-zinc-900 rounded-2xl sm:rounded-3xl border border-zinc-300 dark:border-zinc-800 shadow-2xl w-full max-w-5xl h-[92vh] max-h-[96vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+        className="bg-white dark:bg-zinc-900 rounded-2xl sm:rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl w-full max-w-5xl h-[92vh] max-h-[96vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Toolbar */}
-        <div className="px-4 py-3 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-xs">
+        <div className="px-4 py-3 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3 shrink-0 shadow-xs">
           {/* Document Title */}
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-8 h-8 sm:w-9 sm:h-9 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-center text-red-600 shrink-0 font-black text-xs">
@@ -286,66 +148,21 @@ export function PdfModalViewerGlobal() {
               <h3 className="font-bold text-xs sm:text-sm md:text-base text-zinc-900 dark:text-white truncate max-w-[200px] sm:max-w-xs md:max-w-md">
                 {pdfData.title}
               </h3>
-              <p className="text-[10px] text-zinc-400 flex items-center gap-1.5">
-                <span>Visionneuse Canvas native</span>
-                {numPages > 0 && <span>• {numPages} page{numPages > 1 ? "s" : ""}</span>}
-              </p>
+              <p className="text-[10px] text-zinc-400">Visionneuse intégrée</p>
             </div>
           </div>
 
           {/* Action Controls */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Zoom Controls */}
-            <div className="hidden sm:flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-xl p-0.5 border border-zinc-200 dark:border-zinc-700">
-              <button
-                type="button"
-                onClick={handleZoomOut}
-                disabled={loading || scale <= 0.6}
-                className="p-1.5 text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white disabled:opacity-30 rounded-lg transition-colors cursor-pointer"
-                title="Zoom arrière"
-              >
-                <ZoomOut className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={handleResetZoom}
-                disabled={loading}
-                className="px-2 py-1 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
-                title="Réinitialiser le zoom"
-              >
-                {Math.round(scale * 100)}%
-              </button>
-              <button
-                type="button"
-                onClick={handleZoomIn}
-                disabled={loading || scale >= 2.6}
-                className="p-1.5 text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white disabled:opacity-30 rounded-lg transition-colors cursor-pointer"
-                title="Zoom avant"
-              >
-                <ZoomIn className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Rotate */}
+            {/* Open in new tab */}
             <button
               type="button"
-              onClick={handleRotate}
-              disabled={loading}
-              className="p-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl transition-colors border border-zinc-200 dark:border-zinc-700 cursor-pointer hidden md:flex"
-              title="Pivoter"
+              onClick={handleOpenNewTab}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-semibold rounded-xl transition-colors border border-zinc-200 dark:border-zinc-700 cursor-pointer"
+              title="Ouvrir dans un nouvel onglet"
             >
-              <RotateCw className="w-4 h-4" />
-            </button>
-
-            {/* Print */}
-            <button
-              type="button"
-              onClick={handlePrint}
-              disabled={loading}
-              className="p-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl transition-colors border border-zinc-200 dark:border-zinc-700 cursor-pointer hidden sm:flex"
-              title="Imprimer"
-            >
-              <Printer className="w-4 h-4" />
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Nouvel onglet</span>
             </button>
 
             {/* Download */}
@@ -356,7 +173,7 @@ export function PdfModalViewerGlobal() {
               title="Télécharger le fichier PDF"
             >
               <FileDown className="w-4 h-4" />
-              <span className="hidden xs:inline">Télécharger</span>
+              <span>Télécharger</span>
             </button>
 
             {/* Close */}
@@ -372,19 +189,18 @@ export function PdfModalViewerGlobal() {
         </div>
 
         {/* Viewer Content Area */}
-        <div className="flex-1 w-full overflow-y-auto overflow-x-auto bg-zinc-200/70 dark:bg-zinc-950 p-4 flex flex-col items-center relative">
+        <div className="flex-1 w-full h-full bg-zinc-950/5 relative overflow-hidden flex items-center justify-center">
           {loading && (
-            <div className="my-auto flex flex-col items-center justify-center gap-3 py-16 text-zinc-500 dark:text-zinc-400">
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-zinc-500 dark:text-zinc-400">
               <Loader2 className="w-10 h-10 animate-spin text-red-500" />
-              <p className="text-sm font-bold">Rendu haute fidélité du PDF en cours...</p>
-              <p className="text-xs text-zinc-400">Préparation des pages via Canvas</p>
+              <p className="text-sm font-bold">Chargement du document...</p>
             </div>
           )}
 
           {error && !loading && (
             <div className="my-auto max-w-md p-6 bg-white dark:bg-zinc-900 rounded-2xl border border-red-200 dark:border-red-900/50 shadow-md text-center space-y-3">
               <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" />
-              <h4 className="font-bold text-sm text-zinc-900 dark:text-white">Aperçu direct indisponible</h4>
+              <h4 className="font-bold text-sm text-zinc-900 dark:text-white">Aperçu indisponible</h4>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">{error}</p>
               <button
                 type="button"
@@ -397,13 +213,13 @@ export function PdfModalViewerGlobal() {
             </div>
           )}
 
-          {/* Canvas Pages Container */}
-          <div
-            ref={containerRef}
-            className={`w-full flex flex-col items-center transition-opacity duration-200 ${
-              loading ? "opacity-0 pointer-events-none" : "opacity-100"
-            }`}
-          />
+          {streamUrl && !loading && (
+            <iframe
+              src={`${streamUrl}#toolbar=1&navpanes=1`}
+              className="w-full h-full border-0 bg-white dark:bg-zinc-950"
+              title={pdfData.title}
+            />
+          )}
         </div>
       </div>
     </div>
