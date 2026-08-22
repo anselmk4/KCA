@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { OrganizationJsonLd } from "@/components/seo/JsonLd";
+import { PdfModalViewerGlobal } from "@/components/ui/PdfModalViewerGlobal";
 import "./globals.css";
 
 const inter = Inter({
@@ -96,6 +97,7 @@ export default function RootLayout({
         >
           <LanguageProvider>
             {children}
+            <PdfModalViewerGlobal />
           </LanguageProvider>
         </ThemeProvider>
       </body>

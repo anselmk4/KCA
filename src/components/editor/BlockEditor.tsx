@@ -78,6 +78,27 @@ const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
+const base64ToBlobUrl = (rawUrl: string): string => {
+  if (!rawUrl || !rawUrl.startsWith("data:application/pdf;base64,")) return rawUrl;
+  try {
+    const parts = rawUrl.split(";base64,");
+    const byteCharacters = atob(parts[1]);
+    const byteArrays = [];
+    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+      const slice = byteCharacters.slice(offset, offset + 512);
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+      byteArrays.push(new Uint8Array(byteNumbers));
+    }
+    const blob = new Blob(byteArrays, { type: "application/pdf" });
+    return URL.createObjectURL(blob);
+  } catch {
+    return rawUrl;
+  }
+};
+
 /**
  * Transforms any raw Google Docs/Sheets/Slides/Forms/Drive URL into a working embed/preview URL.
  */
@@ -368,14 +389,10 @@ export function serializeBlocksToHtml(blocks: Block[]): string {
               </div>
               <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
                 ${pdfUrl ? `
-                  <a href="${pdfUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 font-bold text-xs transition-all shadow-xs cursor-pointer" title="Visionner dans un nouvel onglet">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                  <button type="button" data-action="view-pdf" data-pdf-url="${pdfUrl}" data-pdf-title="${pdfTitleSafe}" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition-all shadow-xs cursor-pointer" title="Visionner le document PDF">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                     <span>Visionner</span>
-                  </a>
-                  <a href="${pdfUrl}" download="${pdfTitleSafe}.pdf" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition-all shadow-xs cursor-pointer" title="Télécharger le fichier PDF">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                    <span>Télécharger</span>
-                  </a>
+                  </button>
                 ` : `<span class="text-xs text-zinc-400">Aucun PDF sélectionné</span>`}
               </div>
             </div>
@@ -966,26 +983,18 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ value, onChange }) => 
                         <button
                           type="button"
                           onClick={() => setPreviewPdfModal({ url: block.value.url, title: block.value.title || "Document PDF" })}
-                          className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-[11px] font-bold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                          className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                         >
-                          <Eye className="w-3.5 h-3.5" />
+                          <Eye className="w-4 h-4" />
                           <span>Visionner</span>
                         </button>
-                        <a
-                          href={block.value.url}
-                          download={`${block.value.title || "document"}.pdf`}
-                          className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-[11px] font-bold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-                        >
-                          <FileDown className="w-3.5 h-3.5" />
-                          <span>Télécharger</span>
-                        </a>
                         <button
                           type="button"
                           onClick={() => updateBlockValue(block.id, { url: "", title: "" })}
-                          className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
+                          className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl transition-colors cursor-pointer"
                           title="Retirer le fichier"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
@@ -1659,17 +1668,23 @@ export const BlockEditor: React.FC<BlockEditorProps> = ({ value, onChange }) => 
             </div>
 
             {/* Modal Body / Viewer */}
-            <div className="flex-1 min-h-[400px] h-[70vh] bg-zinc-950/5 relative overflow-hidden flex flex-col items-center justify-center">
+            <div className="flex-1 min-h-[400px] h-[75vh] bg-zinc-950/5 relative overflow-hidden flex flex-col items-center justify-center">
               {previewPdfModal.url ? (
-                <iframe
-                  src={
-                    previewPdfModal.url.startsWith("http://") || previewPdfModal.url.startsWith("https://")
-                      ? `https://docs.google.com/viewer?url=${encodeURIComponent(previewPdfModal.url)}&embedded=true`
-                      : previewPdfModal.url
-                  }
+                <object
+                  data={`${base64ToBlobUrl(previewPdfModal.url)}#toolbar=1&navpanes=1`}
+                  type="application/pdf"
                   className="w-full h-full border-0"
-                  title={previewPdfModal.title}
-                />
+                >
+                  <iframe
+                    src={
+                      previewPdfModal.url.startsWith("http://") || previewPdfModal.url.startsWith("https://")
+                        ? `https://docs.google.com/viewer?url=${encodeURIComponent(previewPdfModal.url)}&embedded=true`
+                        : base64ToBlobUrl(previewPdfModal.url)
+                    }
+                    className="w-full h-full border-0"
+                    title={previewPdfModal.title}
+                  />
+                </object>
               ) : (
                 <div className="p-8 text-center text-zinc-400 text-xs">
                   Aucun aperçu disponible pour ce fichier.
