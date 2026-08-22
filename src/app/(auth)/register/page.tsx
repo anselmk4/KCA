@@ -368,17 +368,24 @@ function RegisterForm() {
 
       if (typeof window !== "undefined") {
         localStorage.setItem("kuettu_registration_role", selectedRole);
+        if (selectedRole === "INSTRUCTOR" && academyName) {
+          localStorage.setItem("kuettu_academy_name", academyName);
+        }
+        if (studentLevel) {
+          localStorage.setItem("kuettu_user_level", studentLevel);
+        }
+        if (interestCourse) {
+          localStorage.setItem("kuettu_active_module", interestCourse);
+        }
       }
 
       const { error: authErr } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=/auth/confirmed`,
+          redirectTo: `${window.location.origin}/auth/callback?role=${encodeURIComponent(selectedRole)}&next=/auth/confirmed`,
           queryParams: {
-            role: selectedRole,
-            academy_name: academyName || (selectedRole === "INSTRUCTOR" ? "Mon Académie" : ""),
-            student_level: studentLevel || "Débutant",
-            interest_course: interestCourse || "blockchain",
+            access_type: "offline",
+            prompt: "consent",
           },
         },
       });

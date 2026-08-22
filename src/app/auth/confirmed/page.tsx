@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CheckCircle2, ArrowRight, Sparkles, ShieldCheck, Loader2 } from "lucide-react";
+import { CheckCircle2, ArrowRight, Sparkles, ShieldCheck, Loader2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { fetchUserProfile } from "@/lib/supabase/auth-helpers";
 import { setSimulatedSession, getSimulatedSession } from "@/lib/rbac";
@@ -38,8 +38,6 @@ async function waitForSession(): Promise<Session | null> {
 
 /**
  * Fix role assignments using the authenticated user's own session.
- * Works without SUPABASE_SERVICE_ROLE_KEY because RLS allows
- * authenticated users to manage their own user_roles rows.
  */
 async function fixRoleForAuthenticatedUser(userId: string, intendedRole: string): Promise<void> {
   try {
@@ -87,32 +85,49 @@ async function fixRoleForAuthenticatedUser(userId: string, intendedRole: string)
 function resolveRedirect(role: string): { href: string; label: string } {
   const r = (role || "STUDENT").toUpperCase();
   if (["SUPER_ADMIN", "ADMIN", "FINANCE_ADMIN", "ACADEMIC_ADMIN", "SUPPORT_AGENT"].includes(r)) {
-    return { href: "/admin", label: "Go to Admin Panel" };
+    return { href: "/admin", label: "Accéder à l'Administration" };
   }
   if (r === "INSTRUCTOR" || r === "TEACHING_ASSISTANT") {
-    return { href: "/instructor", label: "Go to my Instructor Space" };
+    return { href: "/instructor", label: "Accéder à mon Espace Formateur" };
   }
-  return { href: "/dashboard", label: "Go to my Learning Space" };
+  return { href: "/dashboard", label: "Accéder à mon Espace Étudiant" };
 }
 
 function ConfirmedContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [dashboardHref, setDashboardHref] = useState("/login");
-  const [dashboardLabel, setDashboardLabel] = useState("Log in to my Space");
+  const [dashboardLabel, setDashboardLabel] = useState("Se connecter");
   const [countdown, setCountdown] = useState(4);
-  const [statusText, setStatusText] = useState("Verifying your session...");
+  const [statusText, setStatusText] = useState("Vérification de votre session en cours...");
   const [hasSession, setHasSession] = useState(false);
 
   useEffect(() => {
     async function run() {
       try {
-        // roleParam from URL — set by the server callback, reliable fallback
+        // 1. Check for error in hash fragment or query params
+        if (typeof window !== "undefined") {
+          const hash = window.location.hash.replace(/^#/, "");
+          const urlParams = new URLSearchParams(hash || window.location.search);
+          const errDesc = urlParams.get("error_description");
+          const errCode = urlParams.get("error") || searchParams.get("error");
+          
+          if (errCode || errDesc) {
+            const rawMsg = errDesc || errCode || "Échec d'authentification";
+            const cleanMsg = decodeURIComponent(rawMsg.replace(/\+/g, " "));
+            setAuthError(cleanMsg);
+            setLoading(false);
+            return;
+          }
+        }
+
+        // 2. Role lookup
         const savedRegRole = typeof window !== "undefined" ? localStorage.getItem("kuettu_registration_role") : null;
         const roleParam = (searchParams.get("role") || savedRegRole || "STUDENT").toUpperCase();
 
-        setStatusText("Verifying your session...");
+        setStatusText("Vérification de votre session...");
 
         // Client-side fallback: if PKCE code is in searchParams, attempt client exchange
         const codeParam = searchParams.get("code");
@@ -125,7 +140,7 @@ function ConfirmedContent() {
         }
 
         // Always wait for the session to be fully established client-side.
-        let session = await waitForSession();
+        const session = await waitForSession();
 
         if (session?.user) {
           setHasSession(true);
@@ -139,11 +154,11 @@ function ConfirmedContent() {
 
           // Fix roles only for non-student registrations
           if (intendedRole !== "STUDENT") {
-            setStatusText("Activating your role...");
+            setStatusText("Activation de votre rôle...");
             await fixRoleForAuthenticatedUser(user.id, intendedRole);
           }
 
-          setStatusText("Loading your profile...");
+          setStatusText("Chargement de votre profil...");
           const profile = await fetchUserProfile(user.id);
 
           let finalRole = intendedRole;
@@ -160,7 +175,6 @@ function ConfirmedContent() {
           if (profile) {
             finalRole = intendedRole !== "STUDENT" ? intendedRole : (profile.role || "STUDENT");
 
-            // Clean up the temporary registration role tracker
             if (typeof window !== "undefined") {
               localStorage.removeItem("kuettu_registration_role");
             }
@@ -169,24 +183,15 @@ function ConfirmedContent() {
               userId: profile.id,
               name: profile.full_name,
               email: profile.email,
-              role: finalRole as
-                | "STUDENT"
-                | "INSTRUCTOR"
-                | "TEACHING_ASSISTANT"
-                | "ADMIN"
-                | "SUPER_ADMIN"
-                | "FINANCE_ADMIN"
-                | "ACADEMIC_ADMIN"
-                | "SUPPORT_AGENT",
+              role: finalRole as any,
               status: "ACTIVE",
               plan: profile.plan,
             });
             localStorage.setItem("kuettu_unconfirmed_email", "false");
           } else {
-            // Simulated session fallback even if DB profile is slow to propagate
             setSimulatedSession({
               userId: user.id,
-              name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Instructor",
+              name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Utilisateur",
               email: user.email || "",
               role: finalRole as any,
               status: "ACTIVE",
@@ -199,14 +204,12 @@ function ConfirmedContent() {
           setDashboardHref(href);
           setDashboardLabel(label);
         } else {
-          // Session timed out (very rare) — use URL param but do NOT auto-redirect
-          // because the middleware would reject a sessionless request to /dashboard
           setHasSession(false);
           const { href, label } = resolveRedirect(roleParam);
           setDashboardHref(href);
           setDashboardLabel(label);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("[confirmed] bootstrap error:", err);
         const roleParam = searchParams.get("role") || "STUDENT";
         const { href, label } = resolveRedirect(roleParam);
@@ -222,7 +225,7 @@ function ConfirmedContent() {
 
   // Auto-redirect countdown — only when we have a confirmed session
   useEffect(() => {
-    if (loading || !hasSession || dashboardHref === "/login") return;
+    if (loading || !hasSession || authError || dashboardHref === "/login") return;
 
     let seconds = 4;
     setCountdown(seconds);
@@ -237,7 +240,7 @@ function ConfirmedContent() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [loading, hasSession, dashboardHref, router]);
+  }, [loading, hasSession, authError, dashboardHref, router]);
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-zinc-50 dark:bg-zinc-950 font-sans relative overflow-hidden">
@@ -250,81 +253,106 @@ function ConfirmedContent() {
           <Image src="/logo-dark.png" alt="ANSELLA Logo" width={140} height={42} className="object-contain h-9 w-auto hidden dark:block" priority />
         </Link>
         <Link href="/" className="text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
-          ← Back to home
+          ← Retour à l'accueil
         </Link>
       </header>
 
       <main className="z-10 flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-zinc-200/80 dark:border-white/10 p-8 md:p-10 relative overflow-hidden transition-all duration-300 flex flex-col items-center text-center">
 
-          <div className="relative mb-6">
-            <div className="absolute inset-0 rounded-full bg-emerald-500/20 blur-md scale-110 animate-pulse" />
-            <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 relative z-10">
-              <CheckCircle2 className="w-12 h-12 stroke-[2.5] animate-[bounce_1s_infinite_alternate]" />
-            </div>
-          </div>
-
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-700 dark:text-emerald-400 text-xs font-bold mb-4 uppercase tracking-wider">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Account Successfully Verified</span>
-          </div>
-
-          <h1 className="text-2xl font-black text-zinc-900 dark:text-white mb-3 tracking-tight">
-            Congratulations!
-          </h1>
-
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-8 leading-relaxed max-w-sm">
-            Your email address has been successfully verified. Your account is now activated and ready to use on the ANSELLA platform.
-          </p>
-
-          {loading ? (
-            <div className="w-full py-4 px-6 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-zinc-500 dark:text-zinc-400 text-sm">
-              <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-              <span>{statusText}</span>
-            </div>
-          ) : dashboardHref === "/login" ? (
-            <Link
-              href="/login"
-              className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] duration-200 cursor-pointer text-sm"
-            >
-              <span>Log in to my Space</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          ) : hasSession ? (
-            <div className="w-full space-y-3">
-              <div className="w-full py-3 px-6 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-zinc-500 dark:text-zinc-400 text-sm">
-                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                <span>Redirecting in <strong className="text-zinc-900 dark:text-white">{countdown}s</strong>…</span>
+          {authError ? (
+            <>
+              <div className="relative mb-6">
+                <div className="w-20 h-20 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-600 dark:text-red-400 relative z-10">
+                  <AlertTriangle className="w-10 h-10 stroke-[2]" />
+                </div>
               </div>
+
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-500/10 border border-red-500/20 rounded-full text-red-700 dark:text-red-400 text-xs font-bold mb-4 uppercase tracking-wider">
+                <span>Erreur d'authentification</span>
+              </div>
+
+              <h1 className="text-2xl font-black text-zinc-900 dark:text-white mb-3 tracking-tight">
+                Connexion non finalisée
+              </h1>
+
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-8 leading-relaxed max-w-sm">
+                {authError.includes("server_error") 
+                  ? "Une erreur serveur est survenue lors de la validation Google. Si votre compte a déjà été créé avec mot de passe, connectez-vous avec vos identifiants habituels."
+                  : authError}
+              </p>
+
               <Link
-                href={dashboardHref}
+                href="/login"
                 className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] duration-200 cursor-pointer text-sm"
               >
-                <span>{dashboardLabel}</span>
+                <span>Retourner à la page de connexion</span>
                 <ArrowRight className="w-4 h-4" />
               </Link>
-            </div>
+            </>
           ) : (
-            // Session timed out — manual action required
-            <Link
-              href={dashboardHref}
-              className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] duration-200 cursor-pointer text-sm"
-            >
-              <span>{dashboardLabel}</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            <>
+              <div className="relative mb-6">
+                <div className="absolute inset-0 rounded-full bg-emerald-500/20 blur-md scale-110 animate-pulse" />
+                <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 relative z-10">
+                  <CheckCircle2 className="w-12 h-12 stroke-[2.5] animate-[bounce_1s_infinite_alternate]" />
+                </div>
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-700 dark:text-emerald-400 text-xs font-bold mb-4 uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Compte vérifié avec succès</span>
+              </div>
+
+              <h1 className="text-2xl font-black text-zinc-900 dark:text-white mb-3 tracking-tight">
+                Félicitations !
+              </h1>
+
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-8 leading-relaxed max-w-sm">
+                Votre compte est activé et prêt à être utilisé sur la plateforme ANSELLA.
+              </p>
+
+              {loading ? (
+                <div className="w-full py-4 px-6 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-zinc-500 dark:text-zinc-400 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                  <span>{statusText}</span>
+                </div>
+              ) : hasSession ? (
+                <div className="w-full space-y-3">
+                  <div className="w-full py-3 px-6 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex items-center justify-center gap-2 text-zinc-500 dark:text-zinc-400 text-sm">
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                    <span>Redirection automatique dans <strong className="text-zinc-900 dark:text-white">{countdown}s</strong>…</span>
+                  </div>
+                  <Link
+                    href={dashboardHref}
+                    className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] duration-200 cursor-pointer text-sm"
+                  >
+                    <span>{dashboardLabel}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              ) : (
+                <Link
+                  href={dashboardHref}
+                  className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] duration-200 cursor-pointer text-sm"
+                >
+                  <span>{dashboardLabel}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              )}
+            </>
           )}
 
-          <div className="mt-6 flex items-center gap-2 text-xxs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+          <div className="mt-6 flex items-center gap-2 text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span>ANSELLA Secure Platform</span>
+            <span>Plateforme Sécurisée ANSELLA</span>
           </div>
 
         </div>
       </main>
 
       <footer className="z-10 w-full text-center py-6 text-xs text-zinc-450 dark:text-zinc-500">
-        © {new Date().getFullYear()} Ansella Inc. All rights reserved.
+        © {new Date().getFullYear()} Ansella Inc. Tous droits réservés.
       </footer>
     </div>
   );

@@ -157,6 +157,10 @@ function LoginForm() {
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback?next=/auth/confirmed`,
+          queryParams: {
+            access_type: "offline",
+            prompt: "select_account",
+          },
         },
       });
       if (authErr) throw authErr;
