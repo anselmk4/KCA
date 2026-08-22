@@ -60,21 +60,22 @@ export async function GET(req: NextRequest) {
     const courseIds = courses.map((c) => c.id);
     const courseMap = new Map(courses.map((c) => [c.id, c]));
 
-    // 3. Fetch enrollments for these courses
+    // 3. Fetch enrollments for these courses (including manual payments)
     const { data: enrollmentsData } = await (dbClient
       .from("enrollments")
-      .select("id, student_id, course_id, enrolled_at, manual_payment_status, manual_amount_paid, profiles(full_name)")
+      .select("id, student_id, course_id, enrolled_at, created_at, enrollment_type, manual_payment_status, manual_amount_paid, profiles(full_name)")
       .in("course_id", courseIds) as any);
 
     const enrollmentsList = enrollmentsData || [];
 
-    // 4. Fetch order items & payments
+    // 4. Fetch order items & online payments
     const { data: orderItems } = await dbClient
       .from("order_items")
       .select("order_id, course_id, final_price, unit_price")
       .in("course_id", courseIds);
 
-    let rawTransactions: any[] = [];
+    let onlineTransactions: any[] = [];
+    const onlinePaidUserCourseKeys = new Set<string>();
 
     if (orderItems && orderItems.length > 0) {
       const orderIds = orderItems.map((oi) => oi.order_id);
@@ -94,7 +95,7 @@ export async function GET(req: NextRequest) {
 
         const profileMap = new Map(studentProfiles?.map((p) => [p.id, p.full_name]) || []);
 
-        rawTransactions = payments.map((p) => {
+        onlineTransactions = payments.map((p) => {
           const courseId = orderItemMap.get(p.order_id) || "";
           const course = courseMap.get(courseId);
           const studentName = profileMap.get(p.user_id) || "Étudiant";
@@ -103,6 +104,7 @@ export async function GET(req: NextRequest) {
           let normalizedStatus = "PENDING";
           if (st === "PAID" || st === "COMPLETED" || st === "SUCCESS") {
             normalizedStatus = "PAID";
+            onlinePaidUserCourseKeys.add(`${p.user_id}_${courseId}`);
           } else if (st === "FAILED" || st === "CANCELLED" || st === "REFUNDED" || st === "REJECTED") {
             normalizedStatus = "FAILED";
           }
@@ -123,33 +125,46 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Fallback: If no online payment records found, construct transactions only from manual cash enrollments
-    if (rawTransactions.length === 0 && enrollmentsList.length > 0) {
-      rawTransactions = enrollmentsList.map((enr: any) => {
-        const course = courseMap.get(enr.course_id);
-        const coursePrice = Number(course?.price) || 0;
-        const studentName = enr.profiles?.full_name || "Étudiant inscrit";
-        const manualStatus = enr.manual_payment_status || "FREE_SCHOLARSHIP";
-        const manualAmount = Number(enr.manual_amount_paid) || (manualStatus === "CASH_FULL" ? coursePrice : 0);
+    // 5. Build manual cash / direct payment transactions from enrollments
+    const manualTransactions: any[] = [];
+    enrollmentsList.forEach((enr: any) => {
+      const userCourseKey = `${enr.student_id}_${enr.course_id}`;
+      // Skip if this enrollment was already counted in online payments
+      if (onlinePaidUserCourseKeys.has(userCourseKey)) return;
 
-        return {
-          id: enr.id || crypto.randomUUID(),
-          orderId: `ENR-${enr.id?.substring(0, 8) || "ACC"}`,
-          courseId: enr.course_id,
-          courseTitle: course?.title || "Formation",
-          userId: enr.student_id,
-          studentName,
-          amount: manualAmount,
-          status: manualAmount > 0 ? "PAID" : "FREE",
-          date: enr.enrolled_at || new Date().toISOString(),
-          method: manualAmount > 0 ? "CASH_FORMATEUR" : "BOURSE_GRATUIT"
-        };
-      });
-    }
+      const course = courseMap.get(enr.course_id);
+      const coursePrice = Number(course?.price) || 0;
+      const studentName = enr.profiles?.full_name || "Apprenant (Paiement direct)";
+      const manualStatus = enr.manual_payment_status || "FREE_SCHOLARSHIP";
+      
+      let manualAmount = Number(enr.manual_amount_paid) || 0;
+      if (manualAmount === 0 && manualStatus === "CASH_FULL") {
+        manualAmount = coursePrice;
+      }
 
-    // Clean transactions: Keep ONLY transactions that are "PAID" (validées/payées)
-    // Filter out all "FAILED" and "PENDING" transactions completely!
-    const cleanTransactions = rawTransactions.filter((t) => t.status === "PAID");
+      if (manualAmount > 0 || manualStatus === "CASH_FULL" || manualStatus === "CASH_INSTALLMENT" || enr.enrollment_type === "MANUAL_INSTRUCTOR") {
+        const finalAmount = manualAmount > 0 ? manualAmount : coursePrice;
+        if (finalAmount > 0) {
+          manualTransactions.push({
+            id: `MANUAL-${enr.id}`,
+            orderId: `MANUAL-${enr.id?.substring(0, 8) || "DIR"}`,
+            courseId: enr.course_id,
+            courseTitle: course?.title || "Formation",
+            userId: enr.student_id,
+            studentName,
+            amount: finalAmount,
+            status: "PAID",
+            date: enr.enrolled_at || enr.created_at || new Date().toISOString(),
+            method: "PAIEMENT_MANUEL_DIRECT"
+          });
+        }
+      }
+    });
+
+    const allTransactions = [...onlineTransactions, ...manualTransactions];
+
+    // Keep ONLY transactions that are "PAID"
+    const cleanTransactions = allTransactions.filter((t) => t.status === "PAID");
 
     const totalRevenue = cleanTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
     const uniqueStudentsCount = new Set(enrollmentsList.map((e: any) => e.student_id)).size;

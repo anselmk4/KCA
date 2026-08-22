@@ -18,6 +18,8 @@ import {
   Calendar,
   Sparkles,
   ShoppingBag,
+  CreditCard,
+  Banknote,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -29,6 +31,8 @@ interface ChartBucket {
   subLabel?: string;
   amount: number;
   count: number;
+  onlineAmount: number;
+  manualAmount: number;
 }
 
 export default function InstructorDashboardPage() {
@@ -39,6 +43,8 @@ export default function InstructorDashboardPage() {
   const [myCourses, setMyCourses] = useState<any[]>([]);
   const [totalStudents, setTotalStudents] = useState(0);
   const [totalRevenue, setTotalRevenue] = useState(0);
+  const [onlineRevenue, setOnlineRevenue] = useState(0);
+  const [manualRevenue, setManualRevenue] = useState(0);
   const [pendingPayouts, setPendingPayouts] = useState(0);
   const [avgProgress, setAvgProgress] = useState(0);
   const [myEnrollments, setMyEnrollments] = useState<any[]>([]);
@@ -102,7 +108,7 @@ export default function InstructorDashboardPage() {
 
         const courseIds = coursesList.map((c: any) => c.id);
 
-        // 2. Fetch enrollments for these courses, including student profiles
+        // 2. Fetch enrollments for these courses (including manual payments added by instructor)
         const { data: enrollData } = await (supabase as any)
           .from("enrollments")
           .select(`
@@ -112,6 +118,9 @@ export default function InstructorDashboardPage() {
             progress_percent, 
             enrolled_at, 
             created_at,
+            enrollment_type,
+            manual_payment_status,
+            manual_amount_paid,
             profiles(id, full_name, email, avatar_url)
           `)
           .in("course_id", courseIds);
@@ -128,7 +137,7 @@ export default function InstructorDashboardPage() {
         const avg = enrollList.length > 0 ? Math.round(totalProgress / enrollList.length) : 0;
         setAvgProgress(avg);
 
-        // 3. Fetch transactions/payments via RLS-bypassing API
+        // 3. Fetch transactions/payments via RLS-bypassing API (includes online + manual cash)
         const earningsRes = await fetch("/api/instructor/earnings");
         let paymentsList: any[] = [];
         if (earningsRes.ok) {
@@ -137,10 +146,6 @@ export default function InstructorDashboardPage() {
         }
 
         setSalesTransactions(paymentsList);
-
-        const revenueSum = paymentsList
-          .filter((p: any) => p.status === "PAID" || p.status === "COMPLETED")
-          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
         // 4. Fetch pending payouts
         const { data: payoutsData } = await supabase
@@ -152,17 +157,43 @@ export default function InstructorDashboardPage() {
         const pendingSum = (payoutsData || []).reduce((sum: number, p: any) => sum + p.amount, 0);
         setPendingPayouts(pendingSum);
 
-        // 5. Calculate per-course enrollments and revenue
+        // 5. Calculate per-course enrollments and revenue (Online + Direct/Manual Cash)
         let totalRevenueCalc = 0;
+        let onlineSum = 0;
+        let manualSum = 0;
+
+        paymentsList.forEach((p: any) => {
+          if (p.status === "PAID" || p.status === "COMPLETED") {
+            if (p.method === "PAIEMENT_MANUEL_DIRECT" || p.method === "CASH_FORMATEUR") {
+              manualSum += (p.amount || 0);
+            } else {
+              onlineSum += (p.amount || 0);
+            }
+          }
+        });
+
         const stats: Record<string, { enrollCount: number; revenue: number }> = {};
         coursesList.forEach((c: any) => {
           const courseEnrolls = enrollList.filter((e: any) => e.course_id === c.id);
+          
           let courseRevenueSum = paymentsList
             .filter((p: any) => (p.courseId === c.id || (p.notes || "").includes(c.id)) && (p.status === "PAID" || p.status === "COMPLETED"))
             .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
-          if (courseRevenueSum === 0 && courseEnrolls.length > 0 && (Number(c.price) || 0) > 0) {
-            courseRevenueSum = courseEnrolls.length * (Number(c.price) || 0);
+          // If no payments list entry, compute manual cash from enrollment fields
+          if (courseRevenueSum === 0 && courseEnrolls.length > 0) {
+            courseEnrolls.forEach((enr: any) => {
+              const manualStatus = enr.manual_payment_status;
+              const manualAmt = Number(enr.manual_amount_paid) || 0;
+              const coursePrice = Number(c.price) || 0;
+              if (manualAmt > 0) {
+                courseRevenueSum += manualAmt;
+                manualSum += manualAmt;
+              } else if (manualStatus === "CASH_FULL") {
+                courseRevenueSum += coursePrice;
+                manualSum += coursePrice;
+              }
+            });
           }
 
           totalRevenueCalc += courseRevenueSum;
@@ -173,7 +204,10 @@ export default function InstructorDashboardPage() {
           };
         });
 
-        setTotalRevenue(totalRevenueCalc > 0 ? totalRevenueCalc : revenueSum);
+        const finalTotal = totalRevenueCalc > 0 ? totalRevenueCalc : (onlineSum + manualSum);
+        setTotalRevenue(finalTotal);
+        setOnlineRevenue(onlineSum);
+        setManualRevenue(manualSum > 0 ? manualSum : (finalTotal - onlineSum));
         setCourseStats(stats);
 
         // 6. Map recent enrollments
@@ -185,6 +219,7 @@ export default function InstructorDashboardPage() {
             studentName: enr.profiles?.full_name || "Étudiant",
             studentInit: enr.profiles?.full_name?.charAt(0) || "?",
             courseTitle: coursesList.find((c: any) => c.id === enr.course_id)?.title || "Cours",
+            isManualPaid: enr.manual_payment_status === "CASH_FULL" || (Number(enr.manual_amount_paid) || 0) > 0,
             joinedAt: enr.enrolled_at || enr.created_at
           }));
         setRecentEnrollments(sortedEnrolls);
@@ -199,12 +234,14 @@ export default function InstructorDashboardPage() {
     loadDashboardData();
   }, []);
 
-  // Determine if this instructor has paying learners or sales
+  // Determine if this instructor has paying learners or sales (online or manual)
   const hasPaidSales = useMemo(() => {
-    return totalRevenue > 0 || salesTransactions.some(t => t.status === "PAID" || t.status === "COMPLETED");
-  }, [totalRevenue, salesTransactions]);
+    return totalRevenue > 0 || 
+           salesTransactions.some(t => t.status === "PAID" || t.status === "COMPLETED") ||
+           myEnrollments.some(e => e.manual_payment_status === "CASH_FULL" || (Number(e.manual_amount_paid) || 0) > 0);
+  }, [totalRevenue, salesTransactions, myEnrollments]);
 
-  // Compute sales chart data dynamically based on timeRange
+  // Compute sales chart data dynamically based on timeRange (Online + Manual payments)
   const chartData = useMemo<ChartBucket[]>(() => {
     if (!hasPaidSales) return [];
 
@@ -212,23 +249,30 @@ export default function InstructorDashboardPage() {
     const buckets: ChartBucket[] = [];
 
     // Synthesize transaction items with timestamps
-    const items: Array<{ date: Date; amount: number }> = [];
+    const items: Array<{ date: Date; amount: number; isManual: boolean }> = [];
 
     salesTransactions.forEach((tx: any) => {
       if (tx.status === "PAID" || tx.status === "COMPLETED") {
         const d = new Date(tx.createdAt || tx.date || tx.created_at || Date.now());
-        items.push({ date: d, amount: Number(tx.amount) || 0 });
+        const isManual = tx.method === "PAIEMENT_MANUEL_DIRECT" || tx.method === "CASH_FORMATEUR";
+        items.push({ date: d, amount: Number(tx.amount) || 0, isManual });
       }
     });
 
-    // If transactions list is empty but enrollments exist on paid courses, map enrollments
-    if (items.length === 0 && myEnrollments.length > 0) {
+    // Also include manual enrollments if they weren't in salesTransactions
+    if (myEnrollments.length > 0) {
       myEnrollments.forEach((enr: any) => {
+        const manualStatus = enr.manual_payment_status;
+        const manualAmt = Number(enr.manual_amount_paid) || 0;
         const course = myCourses.find(c => c.id === enr.course_id);
-        const price = Number(course?.price) || 0;
-        if (price > 0) {
+        const coursePrice = Number(course?.price) || 0;
+
+        const isCash = manualStatus === "CASH_FULL" || manualAmt > 0;
+        const paidAmount = manualAmt > 0 ? manualAmt : (manualStatus === "CASH_FULL" ? coursePrice : 0);
+
+        if (isCash && paidAmount > 0 && !items.some(it => it.amount === paidAmount && it.date.toISOString() === new Date(enr.enrolled_at || enr.created_at).toISOString())) {
           const d = new Date(enr.enrolled_at || enr.created_at || Date.now());
-          items.push({ date: d, amount: price });
+          items.push({ date: d, amount: paidAmount, isManual: true });
         }
       });
     }
@@ -246,12 +290,16 @@ export default function InstructorDashboardPage() {
 
         const inBucket = items.filter(item => item.date >= d && item.date < nextD);
         const amount = inBucket.reduce((sum, item) => sum + item.amount, 0);
+        const onlineAmount = inBucket.filter(i => !i.isManual).reduce((sum, i) => sum + i.amount, 0);
+        const manualAmount = inBucket.filter(i => i.isManual).reduce((sum, i) => sum + i.amount, 0);
 
         buckets.push({
           key: d.toISOString(),
           label: `${dayName} ${d.getDate()}`,
           subLabel: dayNum,
           amount,
+          onlineAmount,
+          manualAmount,
           count: inBucket.length,
         });
       }
@@ -269,11 +317,15 @@ export default function InstructorDashboardPage() {
 
         const inBucket = items.filter(item => item.date >= start && item.date <= end);
         const amount = inBucket.reduce((sum, item) => sum + item.amount, 0);
+        const onlineAmount = inBucket.filter(i => !i.isManual).reduce((sum, i) => sum + i.amount, 0);
+        const manualAmount = inBucket.filter(i => i.isManual).reduce((sum, i) => sum + i.amount, 0);
 
         buckets.push({
           key: `${start.toISOString()}_${end.toISOString()}`,
           label,
           amount,
+          onlineAmount,
+          manualAmount,
           count: inBucket.length,
         });
       }
@@ -287,12 +339,16 @@ export default function InstructorDashboardPage() {
 
         const inBucket = items.filter(item => item.date >= d && item.date < nextM);
         const amount = inBucket.reduce((sum, item) => sum + item.amount, 0);
+        const onlineAmount = inBucket.filter(i => !i.isManual).reduce((sum, i) => sum + i.amount, 0);
+        const manualAmount = inBucket.filter(i => i.isManual).reduce((sum, i) => sum + i.amount, 0);
 
         buckets.push({
           key: d.toISOString(),
           label: monthName,
           subLabel: d.getFullYear().toString(),
           amount,
+          onlineAmount,
+          manualAmount,
           count: inBucket.length,
         });
       }
@@ -340,7 +396,7 @@ export default function InstructorDashboardPage() {
             {language === "en" ? `Hello, ${instructorName} 👋` : `Bonjour, ${instructorName} 👋`}
           </h1>
           <p className="text-zinc-500 dark:text-zinc-400 text-sm">
-            {language === "en" ? "Here is an overview of your teaching activity." : "Voici un aperçu de votre activité d'enseignement et de vos performances."}
+            {language === "en" ? "Here is an overview of your teaching activity." : "Voici un aperçu complet de vos ventes (en ligne et directes) et de vos apprenants."}
           </p>
         </div>
         <div className="bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-800/40 rounded-2xl px-5 py-3 text-left md:text-right">
@@ -389,18 +445,23 @@ export default function InstructorDashboardPage() {
 
       {/* KPI Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Revenue */}
+        {/* Revenue Global */}
         <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center gap-4">
           <div className="p-4 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl text-emerald-600">
             <DollarSign className="w-8 h-8" />
           </div>
           <div className="text-left">
             <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-              {t("instructor.dashboard.statsRevenue")}
+              Revenus Totaux Perçus
             </p>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">
               {totalRevenue.toLocaleString()}$
             </h3>
+            {manualRevenue > 0 && (
+              <span className="text-[10px] text-zinc-400 font-semibold block mt-0.5">
+                Dont {manualRevenue.toLocaleString()}$ perçus en direct/cash
+              </span>
+            )}
           </div>
         </div>
 
@@ -414,6 +475,9 @@ export default function InstructorDashboardPage() {
               {t("instructor.dashboard.statsStudents")}
             </p>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">{totalStudents}</h3>
+            <span className="text-[10px] text-zinc-400 font-semibold block mt-0.5">
+              {myEnrollments.length} inscription{myEnrollments.length > 1 ? "s" : ""} au total
+            </span>
           </div>
         </div>
 
@@ -444,7 +508,7 @@ export default function InstructorDashboardPage() {
           </div>
           <div className="text-left">
             <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-              {language === "en" ? "Pending Payouts" : "Paiements en attente"}
+              {language === "en" ? "Pending Payouts" : "Retraits en attente"}
             </p>
             <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">
               {pendingPayouts.toLocaleString()}$
@@ -454,7 +518,7 @@ export default function InstructorDashboardPage() {
       </div>
 
       {/* ── CONDITIONAL SALES & PURCHASES TIMELINE GRAPH ── */}
-      {/* Only rendered when the instructor has paying students / sales */}
+      {/* Only rendered when the instructor has paying students / sales (online or direct/manual) */}
       {hasPaidSales && (
         <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200/90 dark:border-zinc-800 p-6 md:p-8 shadow-sm space-y-6 text-left relative overflow-hidden transition-all duration-300">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -464,11 +528,11 @@ export default function InstructorDashboardPage() {
                   <BarChart3 className="w-5 h-5" />
                 </div>
                 <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
-                  Évolution des Achats de Formations
+                  Évolution des Ventes & Achats de Formations
                 </h2>
               </div>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                Suivi chronologique des ventes et des inscriptions générées par vos cours.
+                Suivi chronologique des achats en ligne et des paiements directs/cash perçus.
               </p>
             </div>
 
@@ -494,8 +558,8 @@ export default function InstructorDashboardPage() {
             </div>
           </div>
 
-          {/* Quick Metrics Bar for Period */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-1 pb-2 border-b border-zinc-100 dark:border-zinc-800/60">
+          {/* Quick Metrics Bar for Period with Online / Direct Cash indicators */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-1 pb-3 border-b border-zinc-100 dark:border-zinc-800/60">
             <div>
               <span className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider block">
                 Total Période
@@ -509,15 +573,23 @@ export default function InstructorDashboardPage() {
                 Achats enregistrés
               </span>
               <span className="text-lg font-extrabold text-teal-600 dark:text-teal-400">
-                {totalPeriodSales} {totalPeriodSales > 1 ? "inscriptions" : "inscription"}
+                {totalPeriodSales} {totalPeriodSales > 1 ? "ventes" : "vente"}
               </span>
             </div>
-            <div className="col-span-2 sm:col-span-1">
-              <span className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider block">
-                Panier Moyen
+            <div>
+              <span className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                <CreditCard className="w-3 h-3 text-blue-500" /> En Ligne (Site)
               </span>
-              <span className="text-lg font-extrabold text-indigo-600 dark:text-indigo-400">
-                {totalPeriodSales > 0 ? (totalPeriodRevenue / totalPeriodSales).toFixed(2) : "0.00"}$
+              <span className="text-lg font-extrabold text-blue-600 dark:text-blue-400">
+                {chartData.reduce((sum, d) => sum + d.onlineAmount, 0).toLocaleString()}$
+              </span>
+            </div>
+            <div>
+              <span className="text-[11px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                <Banknote className="w-3 h-3 text-amber-500" /> Direct / Cash
+              </span>
+              <span className="text-lg font-extrabold text-amber-600 dark:text-amber-400">
+                {chartData.reduce((sum, d) => sum + d.manualAmount, 0).toLocaleString()}$
               </span>
             </div>
           </div>
@@ -543,9 +615,19 @@ export default function InstructorDashboardPage() {
                           <span>{d.label}</span>
                         </div>
                         <div className="text-sm font-bold text-teal-400">
-                          {d.amount.toFixed(2)}$
+                          {d.amount.toFixed(2)}$ total
                         </div>
-                        <div className="text-[11px] text-zinc-300 flex items-center gap-1">
+                        {d.onlineAmount > 0 && (
+                          <div className="text-[10px] text-blue-300 flex items-center gap-1">
+                            <span>● En ligne : {d.onlineAmount.toFixed(2)}$</span>
+                          </div>
+                        )}
+                        {d.manualAmount > 0 && (
+                          <div className="text-[10px] text-amber-300 flex items-center gap-1">
+                            <span>● Direct / Cash : {d.manualAmount.toFixed(2)}$</span>
+                          </div>
+                        )}
+                        <div className="text-[11px] text-zinc-300 flex items-center gap-1 pt-0.5 border-t border-white/10 mt-0.5">
                           <ShoppingBag className="w-3 h-3 text-indigo-400" />
                           <span>{d.count} vente{d.count > 1 ? "s" : ""}</span>
                         </div>
@@ -579,13 +661,17 @@ export default function InstructorDashboardPage() {
             )}
           </div>
 
-          <div className="flex items-center justify-between text-xxs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider pt-2">
-            <span>● Barres : Volume des ventes en dollar ($)</span>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xxs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider pt-2">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-teal-500" /> Ventes Globales ($)</span>
+              <span className="flex items-center gap-1 text-blue-500"><CreditCard className="w-3 h-3" /> Paiements Site</span>
+              <span className="flex items-center gap-1 text-amber-500"><Banknote className="w-3 h-3" /> Paiements Directs / Cash</span>
+            </div>
             <Link
-              href="/instructor/earnings"
+              href="/instructor/students"
               className="text-teal-600 hover:text-teal-700 dark:text-teal-400 font-bold flex items-center gap-1 normal-case text-xs"
             >
-              Historique complet des transactions →
+              Gérer la liste complète des apprenants →
             </Link>
           </div>
         </div>
@@ -752,7 +838,14 @@ export default function InstructorDashboardPage() {
                     <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">
                       {enr.studentName}
                     </p>
-                    <p className="text-xs text-zinc-500 truncate">{enr.courseTitle}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-zinc-500 truncate">{enr.courseTitle}</p>
+                      {enr.isManualPaid && (
+                        <span className="text-[9px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-bold px-1.5 py-0.2 rounded">
+                          Cash/Direct
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <span className="text-xs text-zinc-400 shrink-0">
                     {new Date(enr.joinedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
