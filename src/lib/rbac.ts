@@ -147,6 +147,7 @@ export const ROLE_META: Record<string, RoleMeta> = {
 export const ADMIN_ROLES: Role[] = ["SUPER_ADMIN", "ADMIN", "MODERATOR", "ACADEMIC_ADMIN", "FINANCE_ADMIN", "SUPPORT_AGENT"];
 
 export const AUTHORIZED_SUPER_ADMIN_EMAILS = [
+  "ansel@kuettu.com",
   "anselmk4@gmail.com",
   (process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL || "").toLowerCase(),
   (process.env.SUPER_ADMIN_EMAIL || "").toLowerCase(),
