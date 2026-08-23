@@ -213,7 +213,7 @@ function PaymentContent() {
   }, [searchParams]);
 
   const cycleParam = searchParams.get("cycle")?.toUpperCase();
-  const isAnnual = cycleParam === "ANNUAL";
+  const isAnnual = cycleParam !== "MONTHLY";
 
   const rawPrices = {
     BASE: 19,
