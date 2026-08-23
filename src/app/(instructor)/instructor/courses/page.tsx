@@ -110,29 +110,23 @@ export default function InstructorCoursesPage() {
 
       const courseIds = coursesList.map((c: any) => c.id);
 
-      // 2. Fetch enrollments
-      const { data: enrollData } = await supabase
+      // 2. Fetch enrollments (including manual payment details)
+      const { data: enrollData } = await (supabase as any)
         .from("enrollments")
-        .select("id, course_id")
+        .select("id, course_id, manual_payment_status, manual_amount_paid")
         .in("course_id", courseIds);
       const enrollList = enrollData || [];
 
-      // 3. Fetch order items & payments
-      const { data: orderItems } = await (supabase as any)
-        .from("order_items")
-        .select("order_id, course_id")
-        .in("course_id", courseIds);
-      const orderItemList = orderItems || [];
-      const orderIds = orderItemList.map((oi: any) => oi.order_id);
-
-      let paymentsList: any[] = [];
-      if (orderIds.length > 0) {
-        const { data: paymentsData } = await supabase
-          .from("payments")
-          .select("amount, order_id")
-          .eq("status", "PAID")
-          .in("order_id", orderIds);
-        paymentsList = paymentsData || [];
+      // 3. Fetch instructor earnings transactions (matches main instructor dashboard)
+      let earningsTransactions: any[] = [];
+      try {
+        const earningsRes = await fetch("/api/instructor/earnings");
+        if (earningsRes.ok) {
+          const earningsData = await earningsRes.json();
+          earningsTransactions = earningsData.transactions || [];
+        }
+      } catch (e) {
+        console.warn("[InstructorCourses] Failed to fetch earnings:", e);
       }
 
       // 4. Fetch sections & lessons
@@ -159,23 +153,30 @@ export default function InstructorCoursesPage() {
       const lc: Record<string, number> = {};
 
       coursesList.forEach((c: any) => {
-        ec[c.id] = enrollList.filter((e: any) => e.course_id === c.id).length;
+        const courseEnrolls = enrollList.filter((e: any) => e.course_id === c.id);
+        ec[c.id] = courseEnrolls.length;
         
-        const courseOrderIds = orderItemList
-          .filter((oi: any) => oi.course_id === c.id)
-          .map((oi: any) => oi.order_id);
-        let courseRev = paymentsList
-          .filter((p: any) => courseOrderIds.includes(p.order_id))
-          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+        let courseRev = earningsTransactions
+          .filter((t: any) => (t.courseId === c.id || (t.courseTitle && t.courseTitle === c.title)) && (t.status === "PAID" || t.status === "COMPLETED"))
+          .reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
 
-        if (courseRev === 0 && courseOrderIds.length > 0) {
-          courseRev = orderItemList
-            .filter((oi: any) => oi.course_id === c.id)
-            .reduce((sum: number, oi: any) => sum + (Number(oi.final_price ?? oi.unit_price) || 0), 0);
-        }
+        // Fallback: compute strictly from actual paid manual enrollments (exclude FREE_SCHOLARSHIP / Bourse)
+        if (courseRev === 0 && courseEnrolls.length > 0) {
+          courseEnrolls.forEach((enr: any) => {
+            const manualStatus = enr.manual_payment_status;
+            const manualAmt = Number(enr.manual_amount_paid) || 0;
+            const coursePrice = Number(c.price) || 0;
 
-        if (courseRev === 0 && ec[c.id] > 0 && (Number(c.price) || 0) > 0) {
-          courseRev = ec[c.id] * (Number(c.price) || 0);
+            if (manualStatus === "FREE_SCHOLARSHIP" || manualStatus === "FREE" || manualStatus === "BOURSE") {
+              return;
+            }
+
+            if (manualAmt > 0) {
+              courseRev += manualAmt;
+            } else if (manualStatus === "CASH_FULL") {
+              courseRev += coursePrice;
+            }
+          });
         }
 
         rev[c.id] = courseRev;

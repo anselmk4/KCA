@@ -364,59 +364,44 @@ export default function CourseDetailPage() {
       setLessons((lessonsRes.data || []) as LessonData[]);
       setQuestions((questionsRes.data || []) as QuestionData[]);
 
-      // Asynchronous revenue calculation (accurate real payments & order_items)
+      // Asynchronous revenue calculation (exact match with Instructor Dashboard / earnings API)
       (async () => {
         let revSum = 0;
-        const { data: cOrderItems } = await supabase
-          .from("order_items")
-          .select("order_id, final_price, unit_price")
-          .eq("course_id", courseId);
-
-        const cOrderIds = (cOrderItems || []).map((oi) => oi.order_id).filter(Boolean);
-
-        if (cOrderIds.length > 0) {
-          const { data: cPayments } = await supabase
-            .from("payments")
-            .select("amount, status")
-            .in("order_id", cOrderIds);
-
-          if (cPayments && cPayments.length > 0) {
-            const valid = cPayments.filter((p) => {
-              const st = (p.status || "").toUpperCase();
-              return st === "PAID" || st === "COMPLETED" || st === "SUCCESS";
-            });
-            if (valid.length > 0) {
-              revSum = valid.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        try {
+          const earningsRes = await fetch("/api/instructor/earnings");
+          if (earningsRes.ok) {
+            const earningsData = await earningsRes.json();
+            const transactions = earningsData.transactions || [];
+            const courseTx = transactions.filter(
+              (t: any) =>
+                (t.courseId === courseId || (t.courseTitle && t.courseTitle === courseData.title)) &&
+                (t.status === "PAID" || t.status === "COMPLETED")
+            );
+            if (courseTx.length > 0) {
+              revSum = courseTx.reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
             }
           }
-
-          // Fallback: if no payment rows found, sum final_price / unit_price from order_items
-          if (revSum === 0 && cOrderItems && cOrderItems.length > 0) {
-            revSum = cOrderItems.reduce((sum, oi) => sum + (Number(oi.final_price ?? oi.unit_price) || 0), 0);
-          }
+        } catch (e) {
+          console.warn("[CourseBuilder] fetch earnings error, calculating from manual enrollments:", e);
         }
 
-        // Direct payments fallback
-        if (revSum === 0) {
-          const { data: directPayments } = await supabase
-            .from("payments")
-            .select("amount, status")
-            .like("method", `%${courseId}%`);
+        // Fallback: compute strictly from actual paid manual enrollments (exclude FREE_SCHOLARSHIP / Bourse)
+        if (revSum === 0 && enrList.length > 0) {
+          enrList.forEach((enr: any) => {
+            const manualStatus = enr.manual_payment_status;
+            const manualAmt = Number(enr.manual_amount_paid) || 0;
+            const coursePrice = Number(courseData.price) || 0;
 
-          if (directPayments && directPayments.length > 0) {
-            const validDirect = directPayments.filter((p) => {
-              const st = (p.status || "").toUpperCase();
-              return st === "PAID" || st === "COMPLETED" || st === "SUCCESS";
-            });
-            if (validDirect.length > 0) {
-              revSum = validDirect.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+            if (manualStatus === "FREE_SCHOLARSHIP" || manualStatus === "FREE" || manualStatus === "BOURSE") {
+              return;
             }
-          }
-        }
 
-        // Resilient fallback: if no payments/order_items recorded but students are enrolled in a paid course
-        if (revSum === 0 && enrList.length > 0 && (Number(courseData.price) || 0) > 0) {
-          revSum = enrList.length * (Number(courseData.price) || 0);
+            if (manualAmt > 0) {
+              revSum += manualAmt;
+            } else if (manualStatus === "CASH_FULL") {
+              revSum += coursePrice;
+            }
+          });
         }
 
         setTotalCourseRevenue(revSum);

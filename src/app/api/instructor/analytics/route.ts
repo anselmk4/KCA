@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
     if (courseIds.length > 0) {
       const { data: enrollData } = await dbClient
         .from('enrollments')
-        .select('student_id, course_id, progress_percent, status, enrolled_at')
+        .select('student_id, course_id, progress_percent, status, enrolled_at, manual_payment_status, manual_amount_paid')
         .in('course_id', courseIds);
       enrollments = enrollData || [];
     }
@@ -108,10 +108,31 @@ export async function GET(req: NextRequest) {
         totalRevenue = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
       }
 
-      // Resilient fallback: if no payments/order_items recorded but students are enrolled
-      if (totalRevenue === 0 && enrollments.length > 0) {
+      // Add manual paid cash (strictly excluding FREE_SCHOLARSHIP / FREE / BOURSE)
+      if (enrollments.length > 0) {
         const coursePriceMap = new Map(myCourses.map((c: any) => [c.id, Number(c.price) || 0]));
-        totalRevenue = enrollments.reduce((sum, e) => sum + (coursePriceMap.get(e.course_id) || 0), 0);
+        let manualRev = 0;
+        enrollments.forEach((e) => {
+          const manualStatus = e.manual_payment_status;
+          const manualAmt = Number(e.manual_amount_paid) || 0;
+          const cPrice = coursePriceMap.get(e.course_id) || 0;
+
+          if (manualStatus === "FREE_SCHOLARSHIP" || manualStatus === "FREE" || manualStatus === "BOURSE") {
+            return;
+          }
+
+          if (manualAmt > 0) {
+            manualRev += manualAmt;
+          } else if (manualStatus === "CASH_FULL") {
+            manualRev += cPrice;
+          }
+        });
+
+        if (totalRevenue === 0) {
+          totalRevenue = manualRev;
+        } else {
+          totalRevenue += manualRev;
+        }
       }
     }
 
