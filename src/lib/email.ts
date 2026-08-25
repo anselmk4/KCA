@@ -218,7 +218,7 @@ export async function sendEmail(to: string, subject: string, bodyContent: string
   // A. Resend API (Recommended for Next.js / Vercel)
   if (resendKey) {
     try {
-      const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM || "Ansella Academy <notifications@ansella.app>";
+      const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM || "Ansella Learning Platform <noreply@ansella.app>";
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
@@ -247,7 +247,7 @@ export async function sendEmail(to: string, subject: string, bodyContent: string
   // B. Brevo / Sendinblue API
   if (brevoKey) {
     try {
-      const fromEmail = process.env.EMAIL_FROM || "notifications@ansella.app";
+      const fromEmail = process.env.EMAIL_FROM || "noreply@ansella.app";
       const res = await fetch("https://api.brevo.com/v3/smtp/email", {
         method: "POST",
         headers: {
@@ -256,7 +256,7 @@ export async function sendEmail(to: string, subject: string, bodyContent: string
           "accept": "application/json",
         },
         body: JSON.stringify({
-          sender: { name: "Ansella Academy", email: fromEmail },
+          sender: { name: "Ansella Learning Platform", email: fromEmail },
           to: [{ email: to }],
           subject: subject,
           htmlContent: html,
@@ -277,7 +277,7 @@ export async function sendEmail(to: string, subject: string, bodyContent: string
   // C. SendGrid API
   if (sendgridKey) {
     try {
-      const fromEmail = process.env.EMAIL_FROM || "notifications@ansella.app";
+      const fromEmail = process.env.EMAIL_FROM || "noreply@ansella.app";
       const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
         method: "POST",
         headers: {
@@ -286,7 +286,7 @@ export async function sendEmail(to: string, subject: string, bodyContent: string
         },
         body: JSON.stringify({
           personalizations: [{ to: [{ email: to }] }],
-          from: { email: fromEmail, name: "Ansella Academy" },
+          from: { email: fromEmail, name: "Ansella Learning Platform" },
           subject: subject,
           content: [{ type: "text/html", value: html }],
         }),
