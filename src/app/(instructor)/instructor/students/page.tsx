@@ -6,11 +6,13 @@ import { useRouter } from "next/navigation";
 import {
   Users, Search, TrendingUp, BookOpen, Award, DollarSign,
   ArrowRight, Filter, ChevronDown, Loader2, UserCheck,
-  AlertCircle, Clock, CheckCircle2, Circle, Sparkles, Lock, Unlock
+  AlertCircle, Clock, CheckCircle2, Circle, Sparkles, Lock, Unlock,
+  Coins
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { getSimulatedSession } from "@/lib/rbac";
 import { useLanguage } from "@/context/LanguageContext";
+import { AddInstallmentModal } from "@/components/instructor/AddInstallmentModal";
 
 type StudentEnrollment = {
   studentId: string;
@@ -57,6 +59,19 @@ export default function StudentsPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPayment, setFilterPayment] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
+
+  // Installment Modal state
+  const [installmentTarget, setInstallmentTarget] = useState<{
+    studentId: string;
+    studentName: string;
+    studentEmail?: string;
+    courseId: string;
+    courseTitle: string;
+    coursePrice: number;
+    totalPaid: number;
+    remainingAmount: number;
+    isSuspended?: boolean;
+  } | null>(null);
 
   // AI Retention Guard state
   const [retentionStudent, setRetentionStudent] = useState<any | null>(null);
@@ -323,14 +338,41 @@ export default function StudentsPage() {
                         }
                       }
 
+                      const canAddInstallment = e.remainingAmount > 0 || manualStatus === "CASH_INSTALLMENT" || manualStatus === "FREE_SCHOLARSHIP";
+
                       return (
                         <div key={e.courseId} className="flex items-center justify-between text-xs bg-zinc-50 dark:bg-zinc-800/40 p-2 rounded-xl border border-zinc-100 dark:border-zinc-800 gap-2">
-                          <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate max-w-[150px]" title={e.courseTitle}>
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate max-w-[140px]" title={e.courseTitle}>
                             {e.courseTitle}
                           </span>
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${badgeStyle}`}>
-                            {badgeLabel}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${badgeStyle}`}>
+                              {badgeLabel}
+                            </span>
+                            {canAddInstallment && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setInstallmentTarget({
+                                    studentId: student.studentId,
+                                    studentName: student.studentName,
+                                    studentEmail: student.studentEmail,
+                                    courseId: e.courseId,
+                                    courseTitle: e.courseTitle,
+                                    coursePrice: e.coursePrice,
+                                    totalPaid: e.totalPaid || e.manualAmountPaid || 0,
+                                    remainingAmount: e.remainingAmount,
+                                    isSuspended: e.enrollmentStatus === "SUSPENDED",
+                                  })
+                                }
+                                className="px-2 py-0.5 bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/40 dark:hover:bg-teal-900/50 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800/60 rounded-lg text-[10px] font-extrabold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                                title="Enregistrer une tranche de paiement pour cet apprenant"
+                              >
+                                <Coins className="w-3 h-3" />
+                                <span>+ Tranche</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -381,6 +423,26 @@ export default function StudentsPage() {
             );
           })}
         </div>
+      )}
+
+      {/* Add Installment Modal */}
+      {installmentTarget && (
+        <AddInstallmentModal
+          isOpen={!!installmentTarget}
+          onClose={() => setInstallmentTarget(null)}
+          studentId={installmentTarget.studentId}
+          studentName={installmentTarget.studentName}
+          studentEmail={installmentTarget.studentEmail}
+          courseId={installmentTarget.courseId}
+          courseTitle={installmentTarget.courseTitle}
+          coursePrice={installmentTarget.coursePrice}
+          totalPaid={installmentTarget.totalPaid}
+          remainingAmount={installmentTarget.remainingAmount}
+          isSuspended={installmentTarget.isSuspended}
+          onSuccess={() => {
+            if (session?.userId) fetchStudents(session.userId);
+          }}
+        />
       )}
 
     </div>

@@ -6,10 +6,12 @@ import Link from "next/link";
 import {
   ArrowLeft, BookOpen, TrendingUp, DollarSign, Award, Clock,
   CheckCircle2, Circle, PlayCircle, AlertTriangle, Mail,
-  Calendar, BarChart3, ExternalLink, Loader2, User, Lock, Unlock
+  Calendar, BarChart3, ExternalLink, Loader2, User, Lock, Unlock,
+  Coins
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { getSimulatedSession } from "@/lib/rbac";
+import { AddInstallmentModal } from "@/components/instructor/AddInstallmentModal";
 
 type CourseDetail = {
   courseId: string;
@@ -90,6 +92,19 @@ export default function StudentDetailPage() {
   const [unlockingCertCourseId, setUnlockingCertCourseId] = useState<string | null>(null);
   const [revokingCourseId, setRevokingCourseId] = useState<string | null>(null);
   const [blockingCourseId, setBlockingCourseId] = useState<string | null>(null);
+
+  // Installment modal state
+  const [installmentTarget, setInstallmentTarget] = useState<{
+    studentId: string;
+    studentName: string;
+    studentEmail?: string;
+    courseId: string;
+    courseTitle: string;
+    coursePrice: number;
+    totalPaid: number;
+    remainingAmount: number;
+    isSuspended?: boolean;
+  } | null>(null);
 
   async function handleBlockAccess(courseId: string, currentStatus: string, courseTitle: string) {
     if (!student) return;
@@ -527,6 +542,28 @@ export default function StudentDetailPage() {
                             Dernier versement : {new Date(course.paymentDate).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
                           </p>
                         )}
+
+                        {/* Button: Add Installment */}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setInstallmentTarget({
+                              studentId: student.id,
+                              studentName: student.name,
+                              studentEmail: student.email,
+                              courseId: course.courseId,
+                              courseTitle: course.courseTitle,
+                              coursePrice: course.coursePrice,
+                              totalPaid: course.paymentAmount || course.totalPaid || 0,
+                              remainingAmount: course.remainingAmount || 0,
+                              isSuspended: course.enrollmentStatus === "SUSPENDED",
+                            })
+                          }
+                          className="w-full mt-2.5 py-2 px-3 bg-teal-50 dark:bg-teal-950/40 hover:bg-teal-100 dark:hover:bg-teal-900/50 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800/60 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                        >
+                          <Coins className="w-3.5 h-3.5" />
+                          <span>+ Ajouter / Enregistrer une tranche</span>
+                        </button>
                       </div>
                     </div>
 
@@ -880,6 +917,29 @@ export default function StudentDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Add Installment Modal */}
+      {installmentTarget && (
+        <AddInstallmentModal
+          isOpen={!!installmentTarget}
+          onClose={() => setInstallmentTarget(null)}
+          studentId={installmentTarget.studentId}
+          studentName={installmentTarget.studentName}
+          studentEmail={installmentTarget.studentEmail}
+          courseId={installmentTarget.courseId}
+          courseTitle={installmentTarget.courseTitle}
+          coursePrice={installmentTarget.coursePrice}
+          totalPaid={installmentTarget.totalPaid}
+          remainingAmount={installmentTarget.remainingAmount}
+          isSuspended={installmentTarget.isSuspended}
+          onSuccess={() => {
+            const session = getSimulatedSession();
+            if (session?.userId && studentId) {
+              fetchStudentDetail(session.userId, studentId);
+            }
+          }}
+        />
       )}
     </div>
   );
