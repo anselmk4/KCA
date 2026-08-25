@@ -111,6 +111,7 @@ export const ALL_ADMIN_SIDEBAR_ITEMS: AdminSidebarItem[] = [
   { key: "coupons",      label: "Coupons",               href: "/admin/coupons",         icon: "Ticket",           requiredPermission: "finance:write" },
   { key: "support",      label: "Tickets Support",       href: "/admin/support",         icon: "LifeBuoy",         requiredPermission: "support:manage" },
   { key: "messages",     label: "Messages du Site",      href: "/admin/messages",        icon: "Mail",             requiredPermission: "support:manage" },
+  { key: "emails",       label: "Centre d'Emails",       href: "/admin/emails",          icon: "Send",             requiredPermission: "platform:settings:read" },
   { key: "live",         label: "Surveillance Live",     href: "/admin/connected-users", icon: "Activity",         requiredPermission: "support:manage" },
   { key: "settings",     label: "Configuration",         href: "/admin/settings",        icon: "Settings",         requiredPermission: "admin:settings" },
 ];
