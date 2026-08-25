@@ -64,8 +64,11 @@ export async function GET(request: Request) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return redirectWithCookies(`${origin}/login?error=auth-failed`);
 
-    const role = await bootstrapUserAndGetRole(user, requestedRole);
-    return redirectWithCookies(`${origin}/auth/confirmed?role=${encodeURIComponent(role)}`);
+    const result = await bootstrapUserAndGetRole(user, requestedRole);
+    if (result.needsRole) {
+      return redirectWithCookies(`${origin}/auth/confirmed?needsRole=true`);
+    }
+    return redirectWithCookies(`${origin}/auth/confirmed?role=${encodeURIComponent(result.role)}`);
   }
 
   // ── Path 2: OAuth PKCE code flow (Google OAuth + older Supabase magic links)
@@ -76,29 +79,35 @@ export async function GET(request: Request) {
       console.warn('[callback] server exchangeCodeForSession warning:', exchangeError.message);
       // Pass code to client-side /auth/confirmed so client SDK can complete the exchange
       return redirectWithCookies(
-        `${origin}/auth/confirmed?code=${encodeURIComponent(code)}&role=${encodeURIComponent(requestedRole || 'STUDENT')}&next=${encodeURIComponent(next)}`
+        `${origin}/auth/confirmed?code=${encodeURIComponent(code)}&role=${encodeURIComponent(requestedRole || '')}&next=${encodeURIComponent(next)}`
       );
     }
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return redirectWithCookies(
-        `${origin}/auth/confirmed?code=${encodeURIComponent(code)}&role=${encodeURIComponent(requestedRole || 'STUDENT')}&next=${encodeURIComponent(next)}`
+        `${origin}/auth/confirmed?code=${encodeURIComponent(code)}&role=${encodeURIComponent(requestedRole || '')}&next=${encodeURIComponent(next)}`
       );
     }
 
-    const role = await bootstrapUserAndGetRole(user, requestedRole);
-    return redirectWithCookies(`${origin}/auth/confirmed?role=${encodeURIComponent(role)}&code=${encodeURIComponent(code)}`);
+    const result = await bootstrapUserAndGetRole(user, requestedRole);
+    if (result.needsRole) {
+      return redirectWithCookies(`${origin}/auth/confirmed?needsRole=true&code=${encodeURIComponent(code)}`);
+    }
+    return redirectWithCookies(`${origin}/auth/confirmed?role=${encodeURIComponent(result.role)}&code=${encodeURIComponent(code)}`);
   }
 
   // Neither token_hash nor code present: fallback to /auth/confirmed for client-side hash/session detection
-  return redirectWithCookies(`${origin}/auth/confirmed?role=${encodeURIComponent(requestedRole || 'STUDENT')}`);
+  return redirectWithCookies(`${origin}/auth/confirmed?role=${encodeURIComponent(requestedRole || '')}`);
 }
 
 /**
  * Bootstraps the user's profile and roles in the database using admin privileges and returns the resolved role name.
  */
-async function bootstrapUserAndGetRole(user: any, requestedRole?: string | null): Promise<string> {
+async function bootstrapUserAndGetRole(
+  user: any,
+  requestedRole?: string | null
+): Promise<{ role: string; needsRole: boolean }> {
   const fullName =
     user.user_metadata?.full_name || user.email?.split('@')[0] || 'Utilisateur';
 
@@ -114,7 +123,8 @@ async function bootstrapUserAndGetRole(user: any, requestedRole?: string | null)
   const existingRoleNames: string[] =
     existingUserRoles?.map((ur: any) => ur.roles?.name).filter(Boolean) || [];
 
-  let targetRole = 'STUDENT';
+  let targetRole: string | null = null;
+  let needsRoleSelection = false;
 
   if (isSuperAdminAllowed) {
     targetRole = 'SUPER_ADMIN';
@@ -129,14 +139,14 @@ async function bootstrapUserAndGetRole(user: any, requestedRole?: string | null)
     }
 
     // Role priority:
-    // 1. Explicit request from registration (role=INSTRUCTOR or role=STUDENT)
+    // 1. Explicit request from URL/registration parameter (e.g. role=INSTRUCTOR or role=STUDENT)
     const sanitizedReq = requestedRole?.toUpperCase();
     if (sanitizedReq === 'INSTRUCTOR' || sanitizedReq === 'TEACHING_ASSISTANT') {
       targetRole = sanitizedReq;
     } else if (sanitizedReq === 'STUDENT') {
       targetRole = 'STUDENT';
     } else if (existingRoleNames.length > 0) {
-      // 2. Returning user without param -> preserve existing DB role
+      // 2. Returning user without param -> preserve existing DB role without changing anything!
       if (existingRoleNames.includes('INSTRUCTOR')) targetRole = 'INSTRUCTOR';
       else if (existingRoleNames.includes('TEACHING_ASSISTANT')) targetRole = 'TEACHING_ASSISTANT';
       else if (existingRoleNames.includes('ADMIN')) targetRole = 'ADMIN';
@@ -145,18 +155,26 @@ async function bootstrapUserAndGetRole(user: any, requestedRole?: string | null)
       else if (existingRoleNames.includes('SUPPORT_AGENT')) targetRole = 'SUPPORT_AGENT';
       else targetRole = 'STUDENT';
     } else {
-      // 3. New user without param -> metadata or default STUDENT
-      const rawRole = (user.user_metadata?.role || 'STUDENT').toUpperCase();
-      targetRole = (rawRole === 'INSTRUCTOR' || rawRole === 'TEACHING_ASSISTANT') ? rawRole : 'STUDENT';
+      // 3. Brand new user with no existing role and no explicit requested role -> trigger role choice!
+      const metaRole = (user.user_metadata?.role || '').toUpperCase();
+      if (metaRole === 'INSTRUCTOR' || metaRole === 'TEACHING_ASSISTANT') {
+        targetRole = metaRole;
+      } else if (metaRole === 'STUDENT') {
+        targetRole = 'STUDENT';
+      } else {
+        // Needs role choice
+        needsRoleSelection = true;
+        targetRole = 'UNASSIGNED';
+      }
     }
   }
 
-  console.log(`[callback] bootstrapUserAndGetRole — targetRole=${targetRole}, userId=${user.id}`);
+  console.log(`[callback] bootstrapUserAndGetRole — targetRole=${targetRole}, needsRole=${needsRoleSelection}, userId=${user.id}`);
 
   // 1. Ensure profile exists and is activated if email confirmed
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('id, status')
+    .select('id, status, academy_name, full_name')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -178,6 +196,10 @@ async function bootstrapUserAndGetRole(user: any, requestedRole?: string | null)
       .from('profiles')
       .update({ status: 'ACTIVE' })
       .eq('id', user.id);
+  }
+
+  if (needsRoleSelection) {
+    return { role: 'UNASSIGNED', needsRole: true };
   }
 
   // 2. Enforce the correct role in user_roles table
@@ -229,14 +251,17 @@ async function bootstrapUserAndGetRole(user: any, requestedRole?: string | null)
     );
   }
 
-  // 3. Save role-specific profile fields
+  // 3. Save role-specific profile fields ONLY IF MISSING (Never overwrite existing academy_name!)
   if (targetRole === 'INSTRUCTOR') {
-    const academyName = user.user_metadata?.academy_name || 'Mon Académie';
-    const bio = user.user_metadata?.bio || '';
-    await supabaseAdmin
-      .from('profiles')
-      .update({ plan: 'FREE', academy_name: academyName, bio })
-      .eq('id', user.id);
+    const currentAcademy = profile?.academy_name;
+    if (!currentAcademy || currentAcademy.trim() === '') {
+      const defaultAcademy = user.user_metadata?.academy_name || `Académie de ${fullName}`;
+      const bio = user.user_metadata?.bio || '';
+      await supabaseAdmin
+        .from('profiles')
+        .update({ plan: 'FREE', academy_name: defaultAcademy, bio })
+        .eq('id', user.id);
+    }
   } else if (targetRole === 'STUDENT') {
     const studentLevel = user.user_metadata?.student_level || 'Débutant';
     const interestCourse = user.user_metadata?.interest_course || 'blockchain';
@@ -249,25 +274,7 @@ async function bootstrapUserAndGetRole(user: any, requestedRole?: string | null)
       .from('profiles')
       .update({ level: levelMap[studentLevel] || 'BEGINNER' })
       .eq('id', user.id);
-
-    const COURSE_MAP: Record<string, string> = {
-      blockchain: '10000000-0000-0000-0000-000000000001',
-      trading: '10000000-0000-0000-0000-000000000002',
-      ai: '10000000-0000-0000-0000-000000000003',
-      web3: '10000000-0000-0000-0000-000000000004',
-    };
-    const courseId = COURSE_MAP[interestCourse] || interestCourse;
-    await supabaseAdmin.from('enrollments').upsert(
-      {
-        student_id: user.id,
-        course_id: courseId,
-        progress_percent: 0,
-        status: 'ACTIVE',
-        enrolled_at: new Date().toISOString(),
-      },
-      { onConflict: 'student_id,course_id', ignoreDuplicates: true }
-    );
   }
 
-  return targetRole;
+  return { role: targetRole || 'STUDENT', needsRole: false };
 }
