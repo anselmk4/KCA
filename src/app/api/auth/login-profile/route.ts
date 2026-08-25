@@ -55,25 +55,6 @@ export async function POST(req: NextRequest) {
         profile = newProfile;
       }
       
-      // Ensure STUDENT role exists in user_roles if no role exists
-      const { data: existingRoles } = await supabaseAdmin
-        .from('user_roles')
-        .select('role_id')
-        .eq('user_id', userId);
-
-      if (!existingRoles || existingRoles.length === 0) {
-        const { data: studentRole } = await supabaseAdmin
-          .from('roles')
-          .select('id')
-          .eq('name', 'STUDENT')
-          .single();
-
-        if (studentRole) {
-          await supabaseAdmin
-            .from('user_roles')
-            .insert({ user_id: userId, role_id: studentRole.id });
-        }
-      }
     }
 
     if (!profile) {
@@ -86,7 +67,8 @@ export async function POST(req: NextRequest) {
       .select('role_id, roles(name)')
       .eq('user_id', userId);
 
-    let role = 'STUDENT';
+    let role = 'UNASSIGNED';
+    let needsRole = false;
     const roleNames: string[] = [];
     userRoles?.forEach((ur: any) => {
       const name = ur.roles?.name;
@@ -100,6 +82,11 @@ export async function POST(req: NextRequest) {
     else if (roleNames.includes('SUPPORT_AGENT')) role = 'SUPPORT_AGENT';
     else if (roleNames.includes('INSTRUCTOR')) role = 'INSTRUCTOR';
     else if (roleNames.includes('TEACHING_ASSISTANT')) role = 'TEACHING_ASSISTANT';
+    else if (roleNames.includes('STUDENT')) role = 'STUDENT';
+    else {
+      role = 'UNASSIGNED';
+      needsRole = true;
+    }
 
     return NextResponse.json({
       profile: {
@@ -107,6 +94,7 @@ export async function POST(req: NextRequest) {
         email: profile.email || email || '',
         full_name: profile.full_name,
         role,
+        needsRole,
         plan: profile.plan || 'FREE',
         status: profile.status || 'ACTIVE',
       }

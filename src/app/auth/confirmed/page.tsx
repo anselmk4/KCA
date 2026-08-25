@@ -110,13 +110,18 @@ function ConfirmedContent() {
 
           const roleNames = (userRoles || []).map((ur: any) => ur.roles?.name).filter(Boolean);
 
-          if (needsRoleParam || (roleNames.length === 0 && !profile?.role)) {
+          if (needsRoleParam || roleNames.length === 0 || (profile?.role as string) === "UNASSIGNED") {
             setNeedsRoleSelection(true);
             setLoading(false);
             return;
           }
 
-          let finalRole = roleNames[0] || profile?.role || "STUDENT";
+          let finalRole = roleNames[0] || (profile?.role as string);
+          if (!finalRole || finalRole === "UNASSIGNED") {
+            setNeedsRoleSelection(true);
+            setLoading(false);
+            return;
+          }
 
           setSimulatedSession({
             userId: profile?.id || user.id,

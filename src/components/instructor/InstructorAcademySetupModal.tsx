@@ -52,6 +52,12 @@ export function InstructorAcademySetupModal({ onCompleted }: InstructorAcademySe
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Check if setup already marked completed in localStorage
+      if (localStorage.getItem(`ansella_academy_setup_completed_${user.id}`) === "true") {
+        setIsOpen(false);
+        return;
+      }
+
       // Check if onboarding tour is still active
       const isTourCompleted = localStorage.getItem(
         `ansella_onboarding_completed_${user.id}_INSTRUCTOR`
@@ -84,53 +90,52 @@ export function InstructorAcademySetupModal({ onCompleted }: InstructorAcademySe
       if (error || !profile) return;
 
       const rawAcademy = (profile.academy_name || "").trim();
-      const isDefaultOrEmptyAcademy =
-        !rawAcademy ||
-        rawAcademy.toLowerCase() === "mon académie" ||
-        rawAcademy.toLowerCase() === "mon academie";
+      const hasCustomAcademy =
+        rawAcademy &&
+        rawAcademy.toLowerCase() !== "mon académie" &&
+        rawAcademy.toLowerCase() !== "mon academie";
 
-      const isMissingCountry = !profile.nationality || profile.nationality.trim() === "";
-      const isMissingGender = !profile.gender || profile.gender.trim() === "";
-      const isMissingPhone = !profile.phone || profile.phone.trim() === "";
-
-      if (isDefaultOrEmptyAcademy || isMissingCountry || isMissingGender || isMissingPhone) {
-        // Prepopulate available values
-        let initialCountryCode = profile.nationality || "CI";
-        const foundCountry =
-          COUNTRIES.find(
-            (c) =>
-              c.code.toLowerCase() === initialCountryCode.toLowerCase() ||
-              c.name.toLowerCase() === initialCountryCode.toLowerCase()
-          ) || COUNTRIES[0];
-
-        setSelectedCountry(foundCountry);
-
-        let initialGender = "MALE";
-        if (profile.gender) {
-          const g = profile.gender.toUpperCase();
-          if (g === "FEMALE" || g === "FEMME" || g === "F") initialGender = "FEMALE";
-          else if (g === "OTHER" || g === "AUTRE") initialGender = "OTHER";
-          else initialGender = "MALE";
-        }
-
-        let defaultName = "";
-        if (!isDefaultOrEmptyAcademy) {
-          defaultName = rawAcademy;
-        } else if (profile.full_name) {
-          defaultName = `Académie de ${profile.full_name}`;
-        }
-
-        setForm({
-          academyName: defaultName,
-          country: foundCountry.code,
-          gender: initialGender,
-          phone: profile.phone || "",
-        });
-
-        setIsOpen(true);
-      } else {
+      // If academy is already set and not default placeholder, it is already completed!
+      if (hasCustomAcademy) {
+        localStorage.setItem(`ansella_academy_setup_completed_${user.id}`, "true");
         setIsOpen(false);
+        return;
       }
+
+      // Prepopulate available values
+      let initialCountryCode = profile.nationality || "CI";
+      const foundCountry =
+        COUNTRIES.find(
+          (c) =>
+            c.code.toLowerCase() === initialCountryCode.toLowerCase() ||
+            c.name.toLowerCase() === initialCountryCode.toLowerCase()
+        ) || COUNTRIES[0];
+
+      setSelectedCountry(foundCountry);
+
+      let initialGender = "MALE";
+      if (profile.gender) {
+        const g = profile.gender.toUpperCase();
+        if (g === "FEMALE" || g === "FEMME" || g === "F") initialGender = "FEMALE";
+        else if (g === "OTHER" || g === "AUTRE") initialGender = "OTHER";
+        else initialGender = "MALE";
+      }
+
+      let defaultName = "";
+      if (hasCustomAcademy) {
+        defaultName = rawAcademy;
+      } else if (profile.full_name) {
+        defaultName = `Académie de ${profile.full_name}`;
+      }
+
+      setForm({
+        academyName: defaultName,
+        country: foundCountry.code,
+        gender: initialGender,
+        phone: profile.phone || "",
+      });
+
+      setIsOpen(true);
     } catch (err) {
       console.error("[InstructorAcademySetupModal] Error checking completeness:", err);
     }
@@ -219,6 +224,10 @@ export function InstructorAcademySetupModal({ onCompleted }: InstructorAcademySe
 
       // Notify parent & listeners
       if (typeof window !== "undefined") {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          localStorage.setItem(`ansella_academy_setup_completed_${currentUser.id}`, "true");
+        }
         localStorage.setItem("kuettu_academy_name", trimmedName);
         window.dispatchEvent(
           new CustomEvent("kuettu_profile_updated", {

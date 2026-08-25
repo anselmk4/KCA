@@ -58,7 +58,7 @@ export async function fetchUserProfile(userId: string): Promise<AuthProfile | nu
       .eq('user_id', userId);
 
     // Determine primary role (priority order)
-    let role: AuthProfile['role'] = 'STUDENT';
+    let role: any = 'UNASSIGNED';
     const roleNames: string[] = [];
     userRoles?.forEach((ur: any) => {
       const name = ur.roles?.name;
@@ -72,6 +72,8 @@ export async function fetchUserProfile(userId: string): Promise<AuthProfile | nu
     else if (roleNames.includes('SUPPORT_AGENT')) role = 'SUPPORT_AGENT';
     else if (roleNames.includes('INSTRUCTOR')) role = 'INSTRUCTOR';
     else if (roleNames.includes('TEACHING_ASSISTANT')) role = 'TEACHING_ASSISTANT';
+    else if (roleNames.includes('STUDENT')) role = 'STUDENT';
+    else role = 'UNASSIGNED';
 
     return {
       id: profile.id,
