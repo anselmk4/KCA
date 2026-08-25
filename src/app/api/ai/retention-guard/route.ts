@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { callGeminiApi } from "@/lib/gemini";
 
 export const dynamic = "force-dynamic";
 
@@ -114,14 +115,12 @@ ${instructorProfile?.full_name || "Votre Formateur"}`,
     };
 
     // Call Gemini API if API key is set
-    const geminiKey = process.env.GEMINI_API_KEY;
-    if (geminiKey) {
-      try {
-        const systemPrompt = `Tu es un expert en ingénierie pédagogique et psychologie de l'apprentissage sur la plateforme Ansella.
+    try {
+      const systemPrompt = `Tu es un expert en ingénierie pédagogique et psychologie de l'apprentissage sur la plateforme Ansella.
 Ta mission est d'analyser le risque de décrochage d'un étudiant et de rédiger un message de relance réconfortant, motivant et personnalisé.
 Réponds STRICTEMENT sous forme d'objet JSON en français avec les propriétés demandées.`;
 
-        const userPrompt = `Analyse le risque d'abandon de l'étudiant suivant :
+      const userPrompt = `Analyse le risque d'abandon de l'étudiant suivant :
 - Nom : ${studentName}
 - Cours : "${courseTitle}"
 - Progression actuelle : ${progressPercent}%
@@ -134,48 +133,37 @@ Génère une réponse JSON comprenant :
 4. aiReactivationMessage: Un message de relance chaleureux, bienveillant, stimulant et prêt à l'envoi adressé à ${studentName}.
 5. recommendedActions: Un tableau de 2 à 3 conseils pratiques pour le formateur.`;
 
-        const aiResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${geminiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: userPrompt }] }],
-              systemInstruction: { parts: [{ text: systemPrompt }] },
-              generationConfig: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                  type: "OBJECT",
-                  properties: {
-                    riskScore: { type: "INTEGER", description: "Score de risque de 0 à 100" },
-                    riskLevel: { type: "STRING", description: "Niveau : ÉLEVÉ, MODÉRÉ ou FAIBLE" },
-                    riskFactors: { type: "ARRAY", items: { type: "STRING" } },
-                    aiReactivationMessage: { type: "STRING", description: "Message de relance bienveillant rédigé pour l'élève" },
-                    recommendedActions: { type: "ARRAY", items: { type: "STRING" } }
-                  },
-                  required: ["riskScore", "riskLevel", "riskFactors", "aiReactivationMessage", "recommendedActions"]
-                },
-                temperature: 0.3
-              }
-            })
-          }
-        );
+      const responseSchema = {
+        type: "OBJECT",
+        properties: {
+          riskScore: { type: "INTEGER", description: "Score de risque de 0 à 100" },
+          riskLevel: { type: "STRING", description: "Niveau : ÉLEVÉ, MODÉRÉ ou FAIBLE" },
+          riskFactors: { type: "ARRAY", items: { type: "STRING" } },
+          aiReactivationMessage: { type: "STRING", description: "Message de relance bienveillant rédigé pour l'élève" },
+          recommendedActions: { type: "ARRAY", items: { type: "STRING" } }
+        },
+        required: ["riskScore", "riskLevel", "riskFactors", "aiReactivationMessage", "recommendedActions"]
+      };
 
-        if (aiResponse.ok) {
-          const resData = await aiResponse.json();
-          let rawText = resData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          rawText = rawText.trim();
-          if (rawText.startsWith("```")) {
-            rawText = rawText.replace(/^```(?:json)?\s*/i, "").replace(/```$/m, "").trim();
-          }
-          const parsed = JSON.parse(rawText);
-          if (parsed && typeof parsed.riskScore === "number") {
-            evaluation = parsed;
-          }
+      const rawAiText = await callGeminiApi({
+        systemInstruction: systemPrompt,
+        userPrompt,
+        responseSchema,
+        temperature: 0.3,
+      });
+
+      if (rawAiText) {
+        let cleanText = rawAiText.trim();
+        if (cleanText.startsWith("```")) {
+          cleanText = cleanText.replace(/^```(?:json)?\s*/i, "").replace(/```$/m, "").trim();
         }
-      } catch (aiErr) {
-        console.warn("[/api/ai/retention-guard] AI evaluation warning, using fallback:", aiErr);
+        const parsed = JSON.parse(cleanText);
+        if (parsed && typeof parsed.riskScore === "number") {
+          evaluation = parsed;
+        }
       }
+    } catch (aiErr) {
+      console.warn("[/api/ai/retention-guard] Gemini fallback active:", aiErr);
     }
 
     return NextResponse.json({

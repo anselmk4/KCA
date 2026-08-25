@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { callGeminiApi, generateSmartQuiz } from "@/lib/gemini";
 
 export const dynamic = "force-dynamic";
 
@@ -29,66 +30,51 @@ export async function POST(req: NextRequest) {
       .eq("user_id", user.id);
 
     const roles = userRoles?.map((ur: any) => ur.roles?.name) || [];
-    const isAuthorized = roles.some((r: string) => ["SUPER_ADMIN", "ADMIN", "INSTRUCTOR"].includes(r));
+
+    // Check course ownership if courseId provided
+    let isCourseOwner = false;
+    let targetTopic = topic || "Évaluation de connaissances";
+    let targetCourseId = courseId || null;
+
+    if (courseId) {
+      const { data: course } = await (dbClient as any)
+        .from("courses")
+        .select("id, title, description, instructor_id")
+        .eq("id", courseId)
+        .maybeSingle();
+
+      if (course) {
+        if (course.instructor_id === user.id) {
+          isCourseOwner = true;
+        }
+        if (!topic) {
+          targetTopic = `${course.title} - ${course.description || ""}`.trim();
+        }
+      }
+    }
+
+    const isAuthorized =
+      isCourseOwner ||
+      roles.some((r: string) =>
+        ["SUPER_ADMIN", "ADMIN", "FINANCE_ADMIN", "ACADEMIC_ADMIN", "INSTRUCTOR", "TEACHING_ASSISTANT"].includes(r)
+      );
 
     if (!isAuthorized) {
       return NextResponse.json({ error: "Non autorisé. Rôle instructeur requis." }, { status: 403 });
     }
 
-    // Determine target course topic
-    let targetTopic = topic || "Évaluation de connaissances";
-    let targetCourseId = courseId || null;
-
-    if (courseId && !topic) {
-      const { data: course } = await (dbClient as any)
-        .from("courses")
-        .select("title, description")
-        .eq("id", courseId)
-        .maybeSingle();
-      if (course) {
-        targetTopic = `${course.title} - ${course.description || ''}`;
-      }
-    }
-
     const count = Math.min(Math.max(1, parseInt(numQuestions as any) || 5), 15);
 
-    // Fallback Quiz structure
-    let generatedQuiz = {
-      quizTitle: `Quiz d'Évaluation : ${targetTopic.slice(0, 40)}`,
-      passPercentage: 70,
-      questions: [
-        {
-          questionText: `Quel est l'objectif principal abordé dans "${targetTopic.slice(0, 30)}..." ?`,
-          explanation: "Cette notion est fondamentale pour maîtriser l'ensemble du module.",
-          options: [
-            { text: "Comprendre les principes théoriques et pratiques de base", isCorrect: true, explanation: "Exact ! C'est le fondement de la leçon." },
-            { text: "Ignorer les étapes de validation initiale", isCorrect: false, explanation: "Incorrect. La validation est indispensable." },
-            { text: "Remplacer l'apprentissage par de la simple théorie sans application", isCorrect: false, explanation: "Incorrect." },
-            { text: "Aucune de ces réponses", isCorrect: false, explanation: "La première option est correcte." }
-          ]
-        },
-        {
-          questionText: "Quelle est la meilleure pratique recommandée pour réussir ce chapitre ?",
-          explanation: "La régularité et la mise en pratique sont clés.",
-          options: [
-            { text: "Appliquer chaque concept avec des exercices pratiques", isCorrect: true, explanation: "Excellente réponse !" },
-            { text: "Sauter les leçons fondamentales", isCorrect: false, explanation: "Non recommandé." },
-            { text: "Ne jamais réviser les notions précédentes", isCorrect: false, explanation: "Incorrect." },
-            { text: "Attendre la fin de la formation pour pratiquer", isCorrect: false, explanation: "Il vaut mieux pratiquer au fur et à mesure." }
-          ]
-        }
-      ]
-    };
+    // Initial smart fallback quiz
+    let generatedQuiz = generateSmartQuiz(targetTopic, count, difficulty);
 
-    // Call Gemini API if Key is present
-    const geminiKey = process.env.GEMINI_API_KEY;
-    if (geminiKey) {
-      try {
-        const systemPrompt = `Tu es un concepteur pédagogique expert spécialisé dans la création d'évaluations et de quizz en français pour Ansella.
+    // Call Gemini API
+    try {
+      const systemPrompt = `Tu es un concepteur pédagogique expert spécialisé dans la création d'évaluations et de quizz en français pour Ansella.
 Ta mission est de générer une série de questions à choix multiples (QCM) pertinentes, claires et éducatives sur le sujet demandé.
 Réponds STRICTEMENT sous forme d'un objet JSON en français avec la structure demandée.`;
 
-        const userPrompt = `Génère un quiz d'évaluation complet :
+      const userPrompt = `Génère un quiz d'évaluation complet :
 - Sujet : "${targetTopic}"
 - Niveau de difficulté : ${difficulty}
 - Nombre de questions : ${count}
@@ -105,68 +91,57 @@ Structure JSON globale :
   "questions": [ ... ]
 }`;
 
-        const aiResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${geminiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: userPrompt }] }],
-              systemInstruction: { parts: [{ text: systemPrompt }] },
-              generationConfig: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                  type: "OBJECT",
-                  properties: {
-                    quizTitle: { type: "STRING", description: "Titre du Quiz" },
-                    passPercentage: { type: "INTEGER", description: "Seuil de réussite recommandé (%)" },
-                    questions: {
-                      type: "ARRAY",
-                      items: {
-                        type: "OBJECT",
-                        properties: {
-                          questionText: { type: "STRING", description: "Libellé de la question" },
-                          explanation: { type: "STRING", description: "Explication pédagogique globale" },
-                          options: {
-                            type: "ARRAY",
-                            items: {
-                              type: "OBJECT",
-                              properties: {
-                                text: { type: "STRING", description: "Libellé de l'option" },
-                                isCorrect: { type: "BOOLEAN", description: "Vrai si c'est la bonne réponse" },
-                                explanation: { type: "STRING", description: "Pourquoi ce choix est vrai/faux" }
-                              },
-                              required: ["text", "isCorrect", "explanation"]
-                            }
-                          }
-                        },
-                        required: ["questionText", "explanation", "options"]
-                      }
-                    }
+      const responseSchema = {
+        type: "OBJECT",
+        properties: {
+          quizTitle: { type: "STRING", description: "Titre du Quiz" },
+          passPercentage: { type: "INTEGER", description: "Seuil de réussite recommandé (%)" },
+          questions: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                questionText: { type: "STRING", description: "Libellé de la question" },
+                explanation: { type: "STRING", description: "Explication pédagogique globale" },
+                options: {
+                  type: "ARRAY",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      text: { type: "STRING", description: "Libellé de l'option" },
+                      isCorrect: { type: "BOOLEAN", description: "Vrai si c'est la bonne réponse" },
+                      explanation: { type: "STRING", description: "Pourquoi ce choix est vrai/faux" },
+                    },
+                    required: ["text", "isCorrect", "explanation"],
                   },
-                  required: ["quizTitle", "passPercentage", "questions"]
                 },
-                temperature: 0.3
-              }
-            })
-          }
-        );
+              },
+              required: ["questionText", "explanation", "options"],
+            },
+          },
+        },
+        required: ["quizTitle", "passPercentage", "questions"],
+      };
 
-        if (aiResponse.ok) {
-          const resData = await aiResponse.json();
-          let rawText = resData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          rawText = rawText.trim();
-          if (rawText.startsWith("```")) {
-            rawText = rawText.replace(/^```(?:json)?\s*/i, "").replace(/```$/m, "").trim();
-          }
-          const parsed = JSON.parse(rawText);
-          if (parsed && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
-            generatedQuiz = parsed;
-          }
+      const rawAiText = await callGeminiApi({
+        systemInstruction: systemPrompt,
+        userPrompt,
+        responseSchema,
+        temperature: 0.3,
+      });
+
+      if (rawAiText) {
+        let cleanText = rawAiText.trim();
+        if (cleanText.startsWith("```")) {
+          cleanText = cleanText.replace(/^```(?:json)?\s*/i, "").replace(/```$/m, "").trim();
         }
-      } catch (aiErr) {
-        console.warn("[/api/ai/generate-quiz] AI generation warning, using fallback evaluator:", aiErr);
+        const parsed = JSON.parse(cleanText);
+        if (parsed && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
+          generatedQuiz = parsed;
+        }
       }
+    } catch (aiErr) {
+      console.warn("[/api/ai/generate-quiz] Gemini AI fallback active:", aiErr);
     }
 
     // Save to DB if saveToDb is true and targetCourseId is provided
@@ -179,20 +154,23 @@ Structure JSON globale :
           section_id: sectionId || null,
           title: generatedQuiz.quizTitle || `Quiz - ${targetTopic.slice(0, 30)}`,
           pass_percentage: generatedQuiz.passPercentage || 70,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
         })
         .select()
         .single();
 
       if (quizInsertErr) {
         console.error("[/api/ai/generate-quiz] quizInsertErr:", quizInsertErr);
-        return NextResponse.json({ error: "Erreur lors de la création du Quiz dans la base de données: " + quizInsertErr.message }, { status: 400 });
+        return NextResponse.json(
+          { error: "Erreur lors de la création du Quiz dans la base de données: " + quizInsertErr.message },
+          { status: 400 }
+        );
       }
 
       if (newQuiz && newQuiz.id) {
         createdQuizId = newQuiz.id;
 
-        // Insert questions using exact DB schema columns: quiz_id, text, choices (string[]), correct_index (number)
+        // Insert questions using exact DB schema columns
         for (const q of generatedQuiz.questions) {
           const choices: string[] = Array.isArray(q.options)
             ? q.options.map((opt: any) => (typeof opt === "string" ? opt : (opt.text || opt.label || "")))
@@ -210,7 +188,7 @@ Structure JSON globale :
             quiz_id: newQuiz.id,
             text: questionText,
             choices,
-            correct_index: correctIndex
+            correct_index: correctIndex,
           });
 
           if (qErr) {
@@ -223,10 +201,13 @@ Structure JSON globale :
     return NextResponse.json({
       success: true,
       quiz: generatedQuiz,
-      savedQuizId: createdQuizId
+      savedQuizId: createdQuizId,
     });
   } catch (err: any) {
     console.error("[/api/ai/generate-quiz] Error:", err);
-    return NextResponse.json({ error: err.message || "Erreur lors de la génération du quiz par l'IA." }, { status: 500 });
+    return NextResponse.json(
+      { error: err.message || "Erreur lors de la génération du quiz par l'IA." },
+      { status: 500 }
+    );
   }
 }

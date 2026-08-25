@@ -1,9 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
+import { callGeminiApi } from "@/lib/gemini";
 
 // Simple in-memory IP rate limiter: max 20 requests per minute per IP
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_MAX = 20;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+
+const systemInstructionText = `
+Tu es "Ansella Guide IA", l'assistant virtuel et guide officiel de la plateforme Ansella Learning Platform.
+Ton but est d'aider, d'orienter et de répondre aux questions des utilisateurs concernant l'utilisation de l'application.
+Tu dois répondre en français, de manière chaleureuse, polie, claire et concise.
+
+La plateforme comprend trois espaces principaux :
+1. L'ESPACE APPRENANT (Student) :
+   - Catalogue de cours : Découvrir des cours de Blockchain, Cryptomonnaies, Trading et Intelligence Artificielle.
+   - Achat de cours : Paiements par Carte Bancaire, Mobile Money, PayPal et Cryptomonnaie.
+   - Suivi d'apprentissage : Suivre les leçons (vidéos/textes), faire des quiz, soumettre des devoirs et suivre sa progression.
+   - Certification : Une fois le cours terminé avec succès, l'apprenant obtient un certificat officiel exportable en PDF avec QR code.
+
+2. L'ESPACE FORMATEUR (Instructor) :
+   - Création de cours : Créer des formations, structurer des modules, générer des leçons et des quiz par IA.
+   - Suivi des revenus : Voir les ventes de cours, gérer les tranches de paiement manuel et demander des retraits.
+   - Gestion des élèves : Suivre la progression des étudiants et gérer leurs accès.
+
+3. L'ESPACE ADMIN (Admin) :
+   - Gestion globale des utilisateurs, cours, commissions, paiements et centre d'emails.
+`;
 
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
@@ -44,88 +66,22 @@ export async function POST(req: NextRequest) {
     // Limit history length to prevent huge token consumption
     const cappedMessages = messages.slice(-10);
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.warn("Gemini API key is not configured, using rule-based guide fallback");
-      const lastUserMsg = cappedMessages[cappedMessages.length - 1]?.content || "";
-      const text = getRuleBasedResponse(lastUserMsg);
-      return NextResponse.json({ text });
-    }
-
-    // System instruction defining chatbot guide behavior for Kuettu Crypto Academy
-    const systemInstructionText = `
-Tu es "Kuettu Guide IA", l'assistant virtuel et guide officiel de la plateforme Kuettu Crypto Academy.
-Ton but est d'aider, d'orienter et de répondre aux questions des utilisateurs concernant l'utilisation de l'application.
-Tu dois répondre en français, de manière chaleureuse, polie, claire et concise.
-
-La plateforme comprend deux espaces principaux :
-1. L'ESPACE APPRENANT (Student) :
-   - Catalogue de cours : Découvrir des cours de Blockchain, Cryptomonnaies et Intelligence Artificielle.
-   - Achat de cours : Paiements par Paypal, Carte Bancaire et Cryptomonnaie.
-   - Suivi d'apprentissage : Suivre les leçons (vidéos/textes), faire des quiz, soumettre des devoirs et suivre sa progression.
-   - Certification : Une fois le cours terminé avec succès, l'apprenant obtient un certificat officiel exportable en PDF, muni d'un code QR unique pour vérification en ligne.
-   - Profil : Personnaliser ses informations, langue préférée et mot de passe.
-
-2. L'ESPACE FORMATEUR (Instructor) :
-   - Création de cours : Créer des formations, structurer des chapitres/modules (sections), ajouter des leçons et des quiz.
-   - Proposition de valeur gratuite : Tout nouvel instructeur peut publier son premier cours gratuitement sans frais d'abonnement.
-   - Abonnements/Plans : Les formateurs peuvent souscrire à des plans payants (BASE, PRO, MAX) dans l'onglet Facturation pour débloquer des avantages.
-   - Suivi des revenus : Voir les ventes de cours sous forme de graphiques, exporter les revenus au format CSV.
-   - Demandes de retrait (Payouts) : Retirer ses fonds nets par Mobile Money.
-   - Analytique : Suivre les performances d'inscriptions et l'engagement des étudiants en temps réel.
-
-Directives de conversation :
-- Reste toujours dans ton rôle de guide applicatif. Ne réponds pas à des questions hors de ce cadre.
-- Si l'utilisateur demande comment faire quelque chose, donne-lui le chemin d'accès précis dans l'interface.
-- Ne partage jamais de données techniques internes ou de clés secrètes.
-    `;
-
-    // Map history to Gemini contents format
-    const contents = cappedMessages.map((m: any) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: String(m.content || "").slice(0, 1000) }]
-    }));
-
-    let response;
-    let fallbackNeeded = false;
+    const lastUserMsg = cappedMessages[cappedMessages.length - 1]?.content || "";
+    let assistantText: string | null = null;
 
     try {
-      response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents,
-            systemInstruction: {
-              parts: [{ text: systemInstructionText }]
-            },
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 600
-            }
-          })
-        }
-      );
-
-      if (!response.ok) {
-        const errText = await response.text();
-        console.warn("Gemini API access denied or error:", errText);
-        fallbackNeeded = true;
-      }
-    } catch (fetchErr) {
-      console.warn("Gemini fetch error, activating local guide fallback:", fetchErr);
-      fallbackNeeded = true;
+      assistantText = await callGeminiApi({
+        systemInstruction: systemInstructionText,
+        userPrompt: cappedMessages.map((m: any) => `${m.role === "assistant" ? "Assistant" : "Utilisateur"}: ${m.content}`).join("\n\n"),
+        temperature: 0.7,
+      });
+    } catch (aiErr) {
+      console.warn("[/api/chat] Gemini API error, using rule-based response:", aiErr);
     }
 
-    if (fallbackNeeded || !response) {
-      const lastUserMsg = cappedMessages[cappedMessages.length - 1]?.content || "";
-      const text = getRuleBasedResponse(lastUserMsg);
-      return NextResponse.json({ text });
+    if (!assistantText) {
+      assistantText = getRuleBasedResponse(lastUserMsg);
     }
-
-    const resData = await response.json();
-    const assistantText = resData.candidates?.[0]?.content?.parts?.[0]?.text || "Je n'ai pas pu générer de réponse.";
 
     return NextResponse.json({ text: assistantText });
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { callGeminiApi } from "@/lib/gemini";
 
 export const dynamic = "force-dynamic";
 
@@ -114,15 +115,12 @@ export async function POST(req: NextRequest) {
       ]
     };
 
-    // Call Gemini API if key is available
-    const geminiKey = process.env.GEMINI_API_KEY;
-    if (geminiKey) {
-      try {
-        const systemPrompt = `Tu es un professeur agrégé et expert pédagogique sur la plateforme d'apprentissage Ansella. 
+    try {
+      const systemPrompt = `Tu es un professeur agrégé et expert pédagogique sur la plateforme d'apprentissage Ansella. 
 Ta mission est d'évaluer de manière équitable, constructive et professionnelle le devoir soumis par un étudiant.
 Tu dois répondre STRICTEMENT sous forme d'un objet JSON en français avec la structure demandée.`;
 
-        const userPrompt = `Évalue le devoir suivant :
+      const userPrompt = `Évalue le devoir suivant :
 - Cours : "${course.title || 'Formation'}"
 - Consignes du Devoir : "${homeworkTitle}" (${homeworkDesc})
 - Étudiant : ${studentName}
@@ -135,68 +133,57 @@ Génère une évaluation détaillée comprenant :
 4. improvements: Un tableau de 1 à 3 axes d'amélioration recommandés.
 5. rubricBreakdown: Un tableau de 3 critères d'évaluation avec pour chacun "criterion" (nom du critère), "score" (sur 100), et "comment" (commentaire court).`;
 
-        const aiResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${geminiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: userPrompt }] }],
-              systemInstruction: { parts: [{ text: systemPrompt }] },
-              generationConfig: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                  type: "OBJECT",
-                  properties: {
-                    suggestedGrade: { type: "INTEGER", description: "Note globale recommandée sur 100" },
-                    summaryFeedback: { type: "STRING", description: "Feedback général constructif pour l'étudiant" },
-                    strengths: {
-                      type: "ARRAY",
-                      items: { type: "STRING" },
-                      description: "Liste des points forts de la soumission"
-                    },
-                    improvements: {
-                      type: "ARRAY",
-                      items: { type: "STRING" },
-                      description: "Axes d'amélioration suggérés"
-                    },
-                    rubricBreakdown: {
-                      type: "ARRAY",
-                      items: {
-                        type: "OBJECT",
-                        properties: {
-                          criterion: { type: "STRING", description: "Nom du critère" },
-                          score: { type: "INTEGER", description: "Note sur 100 pour ce critère" },
-                          comment: { type: "STRING", description: "Commentaire spécifique" }
-                        },
-                        required: ["criterion", "score", "comment"]
-                      },
-                      description: "Détail des critères d'évaluation"
-                    }
-                  },
-                  required: ["suggestedGrade", "summaryFeedback", "strengths", "improvements", "rubricBreakdown"]
-                },
-                temperature: 0.2
-              }
-            })
+      const responseSchema = {
+        type: "OBJECT",
+        properties: {
+          suggestedGrade: { type: "INTEGER", description: "Note globale recommandée sur 100" },
+          summaryFeedback: { type: "STRING", description: "Feedback général constructif pour l'étudiant" },
+          strengths: {
+            type: "ARRAY",
+            items: { type: "STRING" },
+            description: "Liste des points forts de la soumission"
+          },
+          improvements: {
+            type: "ARRAY",
+            items: { type: "STRING" },
+            description: "Axes d'amélioration suggérés"
+          },
+          rubricBreakdown: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                criterion: { type: "STRING", description: "Nom du critère" },
+                score: { type: "INTEGER", description: "Note sur 100 pour ce critère" },
+                comment: { type: "STRING", description: "Commentaire spécifique" }
+              },
+              required: ["criterion", "score", "comment"]
+            },
+            description: "Détail des critères d'évaluation"
           }
-        );
+        },
+        required: ["suggestedGrade", "summaryFeedback", "strengths", "improvements", "rubricBreakdown"]
+      };
 
-        if (aiResponse.ok) {
-          const resData = await aiResponse.json();
-          let rawText = resData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          rawText = rawText.trim();
-          if (rawText.startsWith("```")) {
-            rawText = rawText.replace(/^```(?:json)?\s*/i, "").replace(/```$/m, "").trim();
-          }
-          const parsed = JSON.parse(rawText);
-          if (parsed && typeof parsed.suggestedGrade === "number") {
-            evaluation = parsed;
-          }
+      const rawAiText = await callGeminiApi({
+        systemInstruction: systemPrompt,
+        userPrompt,
+        responseSchema,
+        temperature: 0.2,
+      });
+
+      if (rawAiText) {
+        let cleanText = rawAiText.trim();
+        if (cleanText.startsWith("```")) {
+          cleanText = cleanText.replace(/^```(?:json)?\s*/i, "").replace(/```$/m, "").trim();
         }
-      } catch (aiErr) {
-        console.warn("[/api/ai/grade-homework] AI generation warning, using fallback evaluator:", aiErr);
+        const parsed = JSON.parse(cleanText);
+        if (parsed && typeof parsed.suggestedGrade === "number") {
+          evaluation = parsed;
+        }
       }
+    } catch (aiErr) {
+      console.warn("[/api/ai/grade-homework] Gemini fallback active:", aiErr);
     }
 
     return NextResponse.json({
