@@ -10,34 +10,35 @@ function getEmailTemplate(title: string, bodyContent: string): string {
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${title}</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background-color: #f3f4f6;
+      background-color: #f8fafc;
       margin: 0;
       padding: 0;
       -webkit-font-smoothing: antialiased;
     }
     .wrapper {
-      background-color: #f3f4f6;
-      padding: 40px 20px;
+      background-color: #f8fafc;
+      padding: 40px 16px;
     }
     .container {
       max-width: 580px;
       margin: 0 auto;
       background-color: #ffffff;
-      border-radius: 20px;
+      border-radius: 16px;
       overflow: hidden;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
-      border: 1px solid #e5e7eb;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+      border: 1px solid #e2e8f0;
     }
     .top-bar {
-      height: 6px;
-      background: linear-gradient(90deg, #4f46e5 0%, #6366f1 50%, #818cf8 100%);
+      height: 4px;
+      background: #4f46e5;
     }
     .logo-container {
-      padding: 32px 36px 16px 36px;
+      padding: 36px 36px 12px 36px;
     }
     .content {
       padding: 0 36px 32px 36px;
@@ -47,19 +48,34 @@ function getEmailTemplate(title: string, bodyContent: string): string {
     }
     .content h2 {
       color: #111827;
-      font-size: 24px;
+      font-size: 22px;
       font-weight: 800;
       letter-spacing: -0.025em;
-      margin-top: 10px;
-      margin-bottom: 16px;
+      margin-top: 16px;
+      margin-bottom: 18px;
     }
     .content p {
       margin: 0 0 16px 0;
       color: #4b5563;
+      font-size: 15px;
+      line-height: 1.65;
+    }
+    .btn {
+      display: inline-block;
+      padding: 14px 28px;
+      background-color: #4f46e5;
+      color: #ffffff !important;
+      text-decoration: none;
+      font-weight: 700;
+      border-radius: 10px;
+      margin: 16px 0 12px 0;
+      text-align: center;
+      font-size: 15px;
+      box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
     }
     .card-footer {
       background-color: #f8fafc;
-      padding: 22px 36px;
+      padding: 20px 36px;
       border-top: 1px solid #f1f5f9;
       font-size: 13px;
       color: #64748b;
@@ -75,20 +91,6 @@ function getEmailTemplate(title: string, bodyContent: string): string {
     }
     .outer-footer strong {
       color: #64748b;
-    }
-    .btn {
-      display: inline-block;
-      padding: 13px 30px;
-      background-color: #4f46e5;
-      color: #ffffff !important;
-      text-decoration: none;
-      font-weight: 700;
-      border-radius: 12px;
-      margin: 20px 0 10px 0;
-      text-align: center;
-      font-size: 15px;
-      box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
-      transition: all 0.2s ease;
     }
     .invoice-table {
       width: 100%;
@@ -117,6 +119,22 @@ function getEmailTemplate(title: string, bodyContent: string): string {
       border-bottom: none;
       color: #1e1b4b;
     }
+    .divider {
+      border: none;
+      border-top: 1px solid #f1f5f9;
+      margin: 24px 0 20px 0;
+    }
+    .fallback-link {
+      font-size: 13px;
+      color: #64748b;
+      word-break: break-all;
+      margin-top: 16px;
+      line-height: 1.5;
+    }
+    .fallback-link a {
+      color: #4f46e5;
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -128,10 +146,7 @@ function getEmailTemplate(title: string, bodyContent: string): string {
         <table border="0" cellpadding="0" cellspacing="0">
           <tr>
             <td style="vertical-align: middle;">
-              <span style="font-family: serif; font-size: 30px; font-weight: bold; color: #b8860b; line-height: 1;">A</span>
-            </td>
-            <td style="vertical-align: middle; padding-left: 8px;">
-              <span style="font-size: 16px; font-weight: 700; color: #1e293b; letter-spacing: 0.25em;">ANSELLA</span>
+              <img src="https://ansella.app/logo.png" alt="ANSELLA" height="34" style="height: 34px; width: auto; display: block; border: 0;" />
             </td>
           </tr>
         </table>
@@ -147,13 +162,12 @@ function getEmailTemplate(title: string, bodyContent: string): string {
     </div>
 
     <div class="outer-footer">
-      <div style="margin-bottom: 6px;">
-        <span style="font-family: serif; font-size: 18px; font-weight: bold; color: #b8860b;">A</span>
-        <span style="font-size: 11px; font-weight: 700; color: #475569; letter-spacing: 0.25em; margin-left: 4px;">ANSELLA</span>
+      <div style="margin-bottom: 8px;">
+        <img src="https://ansella.app/logo.png" alt="ANSELLA" height="22" style="height: 22px; width: auto; display: inline-block; opacity: 0.85; border: 0;" />
       </div>
       <div><strong>Ansella App.</strong></div>
       <div>© ${new Date().getFullYear()} Kuettu Corporation SARL. Tous droits réservés.</div>
-      <div style="margin-top: 4px;">Vous recevez cet e-mail car vous êtes inscrit sur <a href="https://ansella.app" style="color: #6366f1; text-decoration: none;">https://ansella.app</a></div>
+      <div style="margin-top: 4px;">Vous recevez cet e-mail car vous êtes inscrit sur <a href="https://ansella.app" style="color: #4f46e5; text-decoration: none; font-weight: 500;">https://ansella.app</a></div>
     </div>
   </div>
 </body>
