@@ -88,8 +88,8 @@ export async function POST(req: NextRequest) {
       updatePayload.status = "ACTIVE";
     }
 
-    const { error: updateErr } = await supabaseAdmin
-      .from("enrollments")
+    const { error: updateErr } = await (supabaseAdmin
+      .from("enrollments" as any) as any)
       .update(updatePayload)
       .eq("id", enrollment.id);
 
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
     const orderNumber = `MAN-TR-${Date.now()}`;
 
     try {
-      await (supabaseAdmin.from("orders") as any).insert({
+      await (supabaseAdmin.from("orders" as any) as any).insert({
         id: orderId,
         user_id: studentId,
         order_number: orderNumber,
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
         created_at: new Date().toISOString(),
       });
 
-      await supabaseAdmin.from("order_items").insert({
+      await (supabaseAdmin.from("order_items" as any) as any).insert({
         id: crypto.randomUUID(),
         order_id: orderId,
         course_id: courseId,
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
         final_price: installmentAmount,
       });
 
-      await supabaseAdmin.from("payments").insert({
+      await (supabaseAdmin.from("payments" as any) as any).insert({
         id: crypto.randomUUID(),
         order_id: orderId,
         user_id: studentId,
@@ -154,8 +154,9 @@ export async function POST(req: NextRequest) {
         userId: studentId,
         title: "Nouvelle tranche validée ! 💳",
         message: `Votre formateur a validé un versement de $${installmentAmount.toFixed(2)} USD pour le cours "${course.title}". Total versé : $${newTotalPaid.toFixed(2)} / $${coursePrice.toFixed(2)}.`,
-        type: "PAYMENT",
+        type: "SUCCESS",
         link: `/dashboard/courses/${courseId}`,
+        sendEmailCopy: false,
       });
     } catch (notifErr) {
       console.warn("[add-installment] Could not create in-app notification:", notifErr);
