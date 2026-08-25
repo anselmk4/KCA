@@ -41,6 +41,7 @@ import { getSimulatedSession, setSimulatedSession, clearSimulatedSession } from 
 import { getConversationsForUser } from "@/lib/chat";
 import { supabase } from "@/lib/supabase/client";
 import { OnboardingTour } from "@/components/layout/OnboardingTour";
+import { InstructorAcademySetupModal } from "@/components/instructor/InstructorAcademySetupModal";
 import Chatbot from "@/components/Chatbot";
 import { useLanguage } from "@/context/LanguageContext";
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
@@ -190,8 +191,18 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
     const handleStorage = () => {
       setSession(getSimulatedSession());
     };
+    const handleProfileUpdated = (e: any) => {
+      if (e.detail?.academy_name) {
+        setAcademyName(e.detail.academy_name);
+      }
+    };
+
     window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    window.addEventListener("kuettu_profile_updated", handleProfileUpdated);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("kuettu_profile_updated", handleProfileUpdated);
+    };
   }, [router]);
 
   // Close dropdowns on outside click
@@ -718,6 +729,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
         </div>
       )}
       <OnboardingTour />
+      <InstructorAcademySetupModal onCompleted={(data) => setAcademyName(data.academy_name)} />
       <Chatbot />
     </div>
   );

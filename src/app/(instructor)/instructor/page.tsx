@@ -245,6 +245,16 @@ export default function InstructorDashboardPage() {
     }
 
     loadDashboardData();
+
+    const handleProfileUpdated = (e: any) => {
+      if (e.detail?.academy_name) {
+        setAcademyName(e.detail.academy_name);
+      }
+    };
+    window.addEventListener("kuettu_profile_updated", handleProfileUpdated);
+    return () => {
+      window.removeEventListener("kuettu_profile_updated", handleProfileUpdated);
+    };
   }, []);
 
   // Determine if this instructor has paying learners or sales (online or manual) - Exclude FREE_SCHOLARSHIP

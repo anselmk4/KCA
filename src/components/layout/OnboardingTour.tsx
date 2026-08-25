@@ -17,7 +17,11 @@ interface TourStep {
   icon: React.ReactNode;
 }
 
-export function OnboardingTour() {
+interface OnboardingTourProps {
+  onComplete?: () => void;
+}
+
+export function OnboardingTour({ onComplete }: OnboardingTourProps = {}) {
   const [isOpen, setIsOpen] = useState(false);
   const [role, setRole] = useState<"STUDENT" | "INSTRUCTOR" | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -187,6 +191,10 @@ export function OnboardingTour() {
       localStorage.setItem(`ansella_onboarding_completed_${userId}_${role}`, "true");
     }
     setIsOpen(false);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("ansella_onboarding_finished", { detail: { userId, role } }));
+    }
+    onComplete?.();
   };
 
   const handleNext = () => {
