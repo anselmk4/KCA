@@ -25,6 +25,7 @@ import { setSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
 import { ensureProfile, fetchUserProfile } from "@/lib/supabase/auth-helpers";
 import { Captcha } from "@/components/ui/Captcha";
+import { useLanguage } from "@/context/LanguageContext";
 import { COUNTRIES } from "@/lib/countries";
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
