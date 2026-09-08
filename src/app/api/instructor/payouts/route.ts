@@ -115,6 +115,7 @@ export async function POST(req: NextRequest) {
         id: crypto.randomUUID(),
         instructor_id: user.id,
         amount: amount,
+        currency: resolvedCurrency,
         status: 'PENDING',
         payment_method: paymentMethod,
         payment_reference: paymentRef,
@@ -270,6 +271,7 @@ export async function PUT(req: NextRequest) {
     const { data: updatedPayout, error: updateErr } = await dbClient
       .from('payouts')
       .update({
+        currency: resolvedCurrency,
         payment_reference: paymentRef,
         notes: `Coordonnées modifiées par l'instructeur le ${new Date().toLocaleDateString('fr-FR')} (Wallet ${resolvedCurrency}).`,
         updated_at: new Date().toISOString()

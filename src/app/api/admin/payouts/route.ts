@@ -94,10 +94,10 @@ export async function POST(req: NextRequest) {
           id: freshPayoutTxId,
           instructor_id: targetInstructorId,
           amount: numAmount,
-          currency: "USD",
+          currency: resolveResult.currency,
           status: pStatus,
           payment_method: "MOBILE_MONEY",
-          payment_reference: `${carrier}: +${targetPhone}`,
+          payment_reference: `${carrier} (${resolveResult.currency}): +${targetPhone}`,
           notes: pNote,
           processed_by: user.id,
           processed_at: isSuccess ? new Date().toISOString() : null,
@@ -238,7 +238,17 @@ export async function POST(req: NextRequest) {
       const carrier = separatorIndex !== -1 ? ref.substring(0, separatorIndex).trim() : "MOBILE_MONEY";
       const phoneNumber = separatorIndex !== -1 ? ref.substring(separatorIndex + 1).trim() : ref.trim();
 
-      const resolveResult = resolvePawaPayCorrespondent(carrier, phoneNumber);
+      // Resolve currency from payout.currency, or from payment_reference / notes
+      let detectedCurrency = payout.currency;
+      if (!detectedCurrency) {
+        if (ref.toUpperCase().includes("CDF") || payout.notes?.toUpperCase().includes("CDF") || payout.notes?.toUpperCase().includes("WALLET CDF")) {
+          detectedCurrency = "CDF";
+        } else if (ref.toUpperCase().includes("USD") || payout.notes?.toUpperCase().includes("USD") || payout.notes?.toUpperCase().includes("WALLET USD")) {
+          detectedCurrency = "USD";
+        }
+      }
+
+      const resolveResult = resolvePawaPayCorrespondent(carrier, phoneNumber, undefined, detectedCurrency);
       const amountLocal = payout.amount * resolveResult.exchangeRate;
 
       let pawapayRef = `MANUAL-${Date.now()}`;
@@ -280,14 +290,19 @@ export async function POST(req: NextRequest) {
         pawapayRef = payoutResponse.payoutId;
       }
 
+      const formattedAmountText = resolveResult.currency === "USD" 
+        ? `${payout.amount}$ USD` 
+        : `${Math.round(amountLocal).toLocaleString('fr-FR')} CDF (${payout.amount}$ USD)`;
+
       // Success or Manual Validation: update payout record status to PAID
       const { error: updateErr } = await supabaseAdmin
         .from("payouts")
         .update({
           status: "PAID",
+          currency: resolveResult.currency,
           notes: action === "manual_accept" 
-            ? `Versement validé manuellement par l'administrateur (${user.email}). Réf : ${ref}` 
-            : `Reversement réussi de ${Math.round(amountLocal)} ${resolveResult.currency} via PawaPay (${resolveResult.correspondent}). Réf transaction: ${pawapayRef}`,
+            ? `Versement de ${formattedAmountText} validé manuellement par l'administrateur (${user.email}). Réf : ${ref}` 
+            : `Reversement réussi de ${formattedAmountText} via PawaPay (${resolveResult.correspondent}). Réf transaction: ${pawapayRef}`,
           processed_by: user.id,
           processed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()

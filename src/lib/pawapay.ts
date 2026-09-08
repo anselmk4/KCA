@@ -758,10 +758,13 @@ export function resolvePawaPayCorrespondent(
   const formattedPhone = formatPawaPayPhoneNumber(cleanPhone, countryConfig.phonePrefix);
 
   // Parse USD / CDF choice from currencyOverride or carrier string
-  const isUSD = (currencyOverride && currencyOverride.toUpperCase() === 'USD') || carrier.toUpperCase().includes("USD");
-  const isCDF = (currencyOverride && currencyOverride.toUpperCase() === 'CDF') || carrier.toUpperCase().includes("CDF");
+  const carrierUpper = carrier.toUpperCase();
+  const overrideUpper = currencyOverride ? currencyOverride.toUpperCase() : "";
 
-  const cleanCarrierName = carrier.replace(/\(.*\)/g, "").replace(/USD|CDF/gi, "").trim().toLowerCase();
+  const isCDF = overrideUpper === 'CDF' || carrierUpper.includes("CDF") || carrierUpper.includes("(CDF)") || carrierUpper.includes("FRANC");
+  const isUSD = !isCDF && (overrideUpper === 'USD' || carrierUpper.includes("USD") || carrierUpper.includes("(USD)") || carrierUpper.includes("DOLLAR"));
+
+  const cleanCarrierName = carrier.replace(/\(.*\)/g, "").replace(/USD|CDF|FRANC|DOLLAR/gi, "").trim().toLowerCase();
 
   // Find operator matching the carrier name
   const operator = countryConfig.operators.find(op => {
@@ -785,10 +788,13 @@ export function resolvePawaPayCorrespondent(
     if (isCDF) {
       currency = "CDF";
       exchangeRate = countryConfig.exchangeRate || 2800;
-    } else {
-      // Default to USD for DRC when USD is selected or not explicitly CDF
+    } else if (isUSD) {
       currency = "USD";
       exchangeRate = 1;
+    } else {
+      // Default to CDF if not explicitly USD
+      currency = "CDF";
+      exchangeRate = countryConfig.exchangeRate || 2800;
     }
   }
 

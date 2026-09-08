@@ -27,6 +27,7 @@ interface AdminPayoutItem {
   instructorId: string;
   instructorName: string;
   amount: number;
+  currency?: string;
   status: 'PENDING' | 'PAID' | 'FAILED' | 'CANCELLED';
   paymentReference?: string;
   createdAt: string;
@@ -61,7 +62,7 @@ export default function AdminPayoutsPage() {
   const [instructorsList, setInstructorsList] = useState<{ id: string; name: string }[]>([]);
   const [directCountry, setDirectCountry] = useState<string>("CD");
   const [directCarrier, setDirectCarrier] = useState<string>("VODACOM_MPESA_COD");
-  const [directCurrency, setDirectCurrency] = useState<"USD" | "CDF">("USD");
+  const [directCurrency, setDirectCurrency] = useState<"USD" | "CDF">("CDF");
   const [directPhone, setDirectPhone] = useState<string>("");
   const [directAmount, setDirectAmount] = useState<string>("");
   const [directDescription, setDirectDescription] = useState<string>("");
@@ -81,9 +82,6 @@ export default function AdminPayoutsPage() {
     if (cfg && cfg.operators.length > 0) {
       setDirectCarrier(cfg.operators[0].id);
     }
-    if (countryCode === "CD") {
-      setDirectCurrency("USD");
-    }
   };
 
   const handleDirectPayoutSubmit = async (e: React.FormEvent) => {
@@ -92,7 +90,7 @@ export default function AdminPayoutsPage() {
 
     const amountNum = parseFloat(directAmount);
     if (isNaN(amountNum) || amountNum <= 0) {
-      setDirectMessage({ type: "error", text: "Veuillez entrer un montant valide supérieur à 0 $." });
+      setDirectMessage({ type: "error", text: "Veuillez entrer un montant valide supérieur à 0." });
       return;
     }
 
@@ -111,7 +109,7 @@ export default function AdminPayoutsPage() {
           action: "direct_payout",
           country: directCountry,
           carrier: directCarrier,
-          currency: directCountry === "CD" ? directCurrency : undefined,
+          currency: directCountry === "CD" ? directCurrency : selectedCountryConfig.currency,
           phoneNumber: directPhone,
           amount: amountNum,
           statementDescription: directDescription || "Retrait Direct Admin PawaPay",
@@ -275,6 +273,7 @@ export default function AdminPayoutsPage() {
         instructorId: p.instructor_id,
         instructorName: profileMap.get(p.instructor_id) || 'Formateur Kuettu',
         amount: p.amount || 0,
+        currency: p.currency || (p.payment_reference?.includes("CDF") || p.notes?.includes("CDF") || p.notes?.includes("Wallet CDF") ? "CDF" : "USD"),
         status: p.status || 'PENDING',
         paymentReference: p.payment_reference || '',
         createdAt: p.created_at || new Date().toISOString(),
@@ -617,8 +616,8 @@ export default function AdminPayoutsPage() {
                     onChange={(e) => setDirectCurrency(e.target.value as "USD" | "CDF")}
                     className="w-full px-3.5 py-2.5 bg-zinc-800/90 border border-zinc-700 rounded-xl text-xs font-bold text-teal-400 focus:outline-none focus:border-teal-500 transition-colors"
                   >
-                    <option value="USD">USD ($) - Dollar Américain</option>
                     <option value="CDF">CDF (FC) - Franc Congolais</option>
+                    <option value="USD">USD ($) - Dollar Américain</option>
                   </select>
                 ) : (
                   <div className="w-full px-3.5 py-2.5 bg-zinc-800/60 border border-zinc-700/60 rounded-xl text-xs font-bold text-teal-400 select-none">
@@ -668,13 +667,15 @@ export default function AdminPayoutsPage() {
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
-                    <DollarSign className="w-3.5 h-3.5 text-teal-400" /> Montant ($ USD)
+                    <DollarSign className="w-3.5 h-3.5 text-teal-400" /> Montant ({directCountry === "CD" && directCurrency === "CDF" ? "Base USD → CDF" : "USD $"})
                   </label>
                   {(parseFloat(directAmount) || 0) > 0 && (
                     <span className="text-[10px] font-extrabold text-teal-400">
-                      {directCountry === "CD" && directCurrency === "USD"
-                        ? `= ${(parseFloat(directAmount) || 0).toFixed(2)}$ USD`
-                        : `≈ ${Math.round((parseFloat(directAmount) || 0) * selectedCountryConfig.exchangeRate).toLocaleString('fr-FR')} ${selectedCountryConfig.currency}`}
+                      {directCountry === "CD" && directCurrency === "CDF"
+                        ? `→ ${Math.round((parseFloat(directAmount) || 0) * 2800).toLocaleString('fr-FR')} CDF`
+                        : directCountry === "CD" && directCurrency === "USD"
+                        ? `→ ${(parseFloat(directAmount) || 0).toFixed(2)}$ USD`
+                        : `→ ${Math.round((parseFloat(directAmount) || 0) * selectedCountryConfig.exchangeRate).toLocaleString('fr-FR')} ${selectedCountryConfig.currency}`}
                     </span>
                   )}
                 </div>
@@ -821,9 +822,20 @@ export default function AdminPayoutsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="font-extrabold text-teal-600 dark:text-teal-400 text-xs bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-900/40 px-2.5 py-1 rounded-lg inline-block">
-                          {p.paymentReference || "—"}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-extrabold text-teal-600 dark:text-teal-400 text-xs bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-900/40 px-2.5 py-1 rounded-lg inline-block">
+                            {p.paymentReference || "—"}
+                          </span>
+                          {p.currency && (
+                            <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${
+                              p.currency === "CDF" 
+                                ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700" 
+                                : "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-700"
+                            }`}>
+                              {p.currency}
+                            </span>
+                          )}
+                        </div>
                         {p.notes && (
                           <div className="mt-1.5 text-[11px] leading-tight text-zinc-600 dark:text-zinc-400 max-w-xs bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 p-2 rounded-lg">
                             <span className="font-bold text-red-600 dark:text-red-400 block mb-0.5">Raison / Notes PawaPay :</span>
@@ -834,8 +846,19 @@ export default function AdminPayoutsPage() {
                       <td className="px-6 py-4 text-zinc-500 text-xs">
                         {new Date(p.createdAt).toLocaleDateString("fr-FR")} à {new Date(p.createdAt).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit' })}
                       </td>
-                      <td className="px-6 py-4 font-bold text-red-600">
-                        {p.amount}$
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-red-600 dark:text-red-400 text-sm">
+                          {p.amount}$ USD
+                        </div>
+                        {p.currency === "CDF" ? (
+                          <div className="text-[11px] font-extrabold text-teal-600 dark:text-teal-400">
+                            ≈ {Math.round(p.amount * 2800).toLocaleString('fr-FR')} CDF
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-zinc-400 font-medium">
+                            Wallet USD
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
