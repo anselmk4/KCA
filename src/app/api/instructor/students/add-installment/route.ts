@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createNotification } from "@/lib/supabase/notifications-helper";
-import { sendInvoiceEmail, sendEmail } from "@/lib/email";
+import { sendInvoiceEmail, sendStudentDebtFullySettledEmail, sendEmail } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -191,19 +191,30 @@ export async function POST(req: NextRequest) {
 
     // Send in-app notification to the student
     try {
-      await createNotification({
-        userId: studentId,
-        title: "Nouvelle tranche validée ! 💳",
-        message: `Votre formateur a validé un versement de $${installmentAmount.toFixed(2)} USD pour le cours "${course.title}". Total versé : $${newTotalPaid.toFixed(2)} / $${coursePrice.toFixed(2)}.`,
-        type: "SUCCESS",
-        link: `/dashboard/courses/${courseId}`,
-        sendEmailCopy: false,
-      });
+      if (isFullyPaidNow) {
+        await createNotification({
+          userId: studentId,
+          title: "Félicitations ! Formation 100% soldée 🎉",
+          message: `Vous avez soldé l'intégralité de vos tranches pour le cours "${course.title}". Vous n'avez plus aucune dette et votre accès est garanti !`,
+          type: "SUCCESS",
+          link: `/dashboard/courses/${courseId}`,
+          sendEmailCopy: false,
+        });
+      } else {
+        await createNotification({
+          userId: studentId,
+          title: "Nouvelle tranche validée ! 💳",
+          message: `Votre formateur a validé un versement de $${installmentAmount.toFixed(2)} USD pour le cours "${course.title}". Total versé : $${newTotalPaid.toFixed(2)} / $${coursePrice.toFixed(2)}.`,
+          type: "SUCCESS",
+          link: `/dashboard/courses/${courseId}`,
+          sendEmailCopy: false,
+        });
+      }
     } catch (notifErr) {
       console.warn("[add-installment] Could not create in-app notification:", notifErr);
     }
 
-    // Send receipt email to the student
+    // Send emails to the student: Receipt invoice + Congratulatory debt-free email if 100% completed
     if (studentEmail) {
       try {
         await sendInvoiceEmail(
@@ -214,8 +225,18 @@ export async function POST(req: NextRequest) {
           `${course.title} (Tranche de paiement)`,
           `Versement en mains propres enregistré par le formateur. Total réglé : $${newTotalPaid.toFixed(2)} / $${coursePrice.toFixed(2)} USD.${paymentNote ? ` Note: ${paymentNote}` : ""}`
         );
+
+        if (isFullyPaidNow) {
+          await sendStudentDebtFullySettledEmail(
+            studentEmail,
+            studentName,
+            course.title,
+            newTotalPaid,
+            courseId
+          );
+        }
       } catch (emailErr) {
-        console.warn("[add-installment] Could not send invoice email:", emailErr);
+        console.warn("[add-installment] Could not send email(s):", emailErr);
       }
     }
 

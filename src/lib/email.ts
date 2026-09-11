@@ -849,3 +849,39 @@ export async function sendInstructorCourseRejectedEmail(
   await sendEmail(instructorEmail, `Modifications requises pour le cours : ${courseTitle}`, body);
 }
 
+/**
+ * Email de félicitations envoyé à l'Apprenant lorsqu'il a soldé 100% de ses tranches (0 dette restante)
+ */
+export async function sendStudentDebtFullySettledEmail(
+  studentEmail: string,
+  studentName: string,
+  courseTitle: string,
+  totalAmountPaid: number,
+  courseId: string
+) {
+  const dateStr = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  const body = `
+    <h2>Félicitations ! Votre formation est 100% soldée 🎉</h2>
+    <p>Bonjour <strong>${studentName}</strong>,</p>
+    <p>Excellente nouvelle ! L'ensemble de vos tranches de paiement pour la formation <strong>« ${courseTitle} »</strong> a été validé avec succès. Vous êtes désormais en règle et n'avez plus <strong>aucune dette</strong> de formation.</p>
+
+    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px; padding: 22px; margin: 24px 0; border-left: 5px solid #16a34a;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+        <span style="font-size: 28px;">🏆</span>
+        <h3 style="margin: 0; color: #15803d; font-size: 17px;">Solde Intégralement Réglé (0$ restant)</h3>
+      </div>
+      <p style="margin: 0 0 6px 0; font-size: 14px; color: #166534;"><strong>Formation :</strong> ${courseTitle}</p>
+      <p style="margin: 0 0 6px 0; font-size: 14px; color: #166534;"><strong>Total versé :</strong> <span style="font-weight: 800; color: #15803d;">$${totalAmountPaid.toFixed(2)} USD</span></p>
+      <p style="margin: 0 0 6px 0; font-size: 13px; color: #166534;"><strong>Reste dû :</strong> <strong style="color: #15803d;">$0.00 USD (Soldé ✓)</strong></p>
+      <p style="margin: 0; font-size: 12px; color: #15803d;"><strong>Date de régularisation :</strong> ${dateStr}</p>
+    </div>
+
+    <p>Votre accès est entièrement actif et garanti. Vous pouvez continuer à suivre vos leçons, passer vos évaluations et obtenir votre <strong>certificat officiel de réussite</strong> sans aucune interruption.</p>
+
+    <div style="text-align: center; margin-top: 30px;">
+      <a href="https://ansella.app/dashboard/courses/${courseId}" class="btn" style="background-color: #16a34a;">Accéder à ma formation</a>
+    </div>
+  `;
+  await sendEmail(studentEmail, `🎉 Félicitations ! Votre formation "${courseTitle}" est 100% soldée`, body);
+}
+
