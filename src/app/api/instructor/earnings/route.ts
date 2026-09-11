@@ -68,14 +68,14 @@ export async function GET(req: NextRequest) {
 
     const enrollmentsList = enrollmentsData || [];
 
-    // 4. Fetch order items & online payments
+    // 4. Fetch order items & recorded payments
     const { data: orderItems } = await dbClient
       .from("order_items")
       .select("order_id, course_id, final_price, unit_price")
       .in("course_id", courseIds);
 
-    let onlineTransactions: any[] = [];
-    const onlinePaidUserCourseKeys = new Set<string>();
+    let recordedTransactions: any[] = [];
+    const recordedPaidSumByUserCourse = new Map<string, number>();
 
     if (orderItems && orderItems.length > 0) {
       const orderIds = orderItems.map((oi) => oi.order_id);
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
 
       const { data: payments } = await dbClient
         .from("payments")
-        .select("id, order_id, amount, status, paid_at, user_id, provider")
+        .select("id, order_id, amount, status, paid_at, created_at, user_id, provider, method")
         .in("order_id", orderIds);
 
       if (payments && payments.length > 0) {
@@ -95,8 +95,9 @@ export async function GET(req: NextRequest) {
 
         const profileMap = new Map(studentProfiles?.map((p) => [p.id, p.full_name]) || []);
 
-        onlineTransactions = payments.map((p) => {
-          const courseId = orderItemMap.get(p.order_id) || "";
+        recordedTransactions = payments.map((p) => {
+          const methodParts = (p.method || "").split("::");
+          const courseId = orderItemMap.get(p.order_id) || methodParts[2] || "";
           const course = courseMap.get(courseId);
           const studentName = profileMap.get(p.user_id) || "Étudiant";
           const st = (p.status || "").toUpperCase();
@@ -104,7 +105,11 @@ export async function GET(req: NextRequest) {
           let normalizedStatus = "PENDING";
           if (st === "PAID" || st === "COMPLETED" || st === "SUCCESS") {
             normalizedStatus = "PAID";
-            onlinePaidUserCourseKeys.add(`${p.user_id}_${courseId}`);
+            const userCourseKey = `${p.user_id}_${courseId}`;
+            recordedPaidSumByUserCourse.set(
+              userCourseKey,
+              (recordedPaidSumByUserCourse.get(userCourseKey) || 0) + (Number(p.amount) || 0)
+            );
           } else if (st === "FAILED" || st === "CANCELLED" || st === "REFUNDED" || st === "REJECTED") {
             normalizedStatus = "FAILED";
           }
@@ -118,7 +123,7 @@ export async function GET(req: NextRequest) {
             studentName,
             amount: Number(p.amount) || 0,
             status: normalizedStatus,
-            date: p.paid_at || new Date().toISOString(),
+            date: p.paid_at || p.created_at || new Date().toISOString(),
             method: p.provider || "CARTE"
           };
         });
@@ -130,9 +135,6 @@ export async function GET(req: NextRequest) {
     const manualTransactions: any[] = [];
     enrollmentsList.forEach((enr: any) => {
       const userCourseKey = `${enr.student_id}_${enr.course_id}`;
-      // Skip if this enrollment was already counted in online payments
-      if (onlinePaidUserCourseKeys.has(userCourseKey)) return;
-
       const manualStatus = enr.manual_payment_status;
       const rawManualAmt = Number(enr.manual_amount_paid) || 0;
 
@@ -152,7 +154,10 @@ export async function GET(req: NextRequest) {
         finalPaidAmount = rawManualAmt;
       }
 
-      if (finalPaidAmount > 0) {
+      const recordedSum = recordedPaidSumByUserCourse.get(userCourseKey) || 0;
+      const remainingUnrecorded = finalPaidAmount - recordedSum;
+
+      if (remainingUnrecorded > 0) {
         manualTransactions.push({
           id: `MANUAL-${enr.id}`,
           orderId: `MANUAL-${enr.id?.substring(0, 8) || "DIR"}`,
@@ -160,7 +165,7 @@ export async function GET(req: NextRequest) {
           courseTitle: course?.title || "Formation",
           userId: enr.student_id,
           studentName,
-          amount: finalPaidAmount,
+          amount: remainingUnrecorded,
           status: "PAID",
           date: enr.enrolled_at || enr.created_at || new Date().toISOString(),
           method: "PAIEMENT_MANUEL_DIRECT"
@@ -168,7 +173,7 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    const allTransactions = [...onlineTransactions, ...manualTransactions];
+    const allTransactions = [...recordedTransactions, ...manualTransactions];
 
     // Keep ONLY transactions that are "PAID"
     const cleanTransactions = allTransactions.filter((t) => t.status === "PAID");

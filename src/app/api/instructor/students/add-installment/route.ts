@@ -72,8 +72,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Inscription de l'étudiant introuvable pour ce cours." }, { status: 404 });
     }
 
-    // Calculate new amounts
-    const currentManualPaid = Number(enrollment.manual_amount_paid) || 0;
+    // Fetch any existing payments for this student & course to get exact baseline
+    const { data: existingCourseOrderItems } = await (supabaseAdmin
+      .from("order_items" as any) as any)
+      .select("order_id")
+      .eq("course_id", courseId);
+
+    const orderIdSet = new Set(existingCourseOrderItems?.map((oi: any) => oi.order_id) || []);
+
+    const { data: existingUserPayments } = await (supabaseAdmin
+      .from("payments" as any) as any)
+      .select("amount, method, order_id")
+      .eq("user_id", studentId)
+      .eq("status", "PAID");
+
+    let existingPaymentsSum = 0;
+    existingUserPayments?.forEach((p: any) => {
+      const methodParts = (p.method || "").split("::");
+      if (methodParts[2] === courseId || orderIdSet.has(p.order_id)) {
+        existingPaymentsSum += Number(p.amount) || 0;
+      }
+    });
+
+    // Calculate new amounts based on highest known paid baseline + this installment
+    const currentManualPaid = Math.max(Number(enrollment.manual_amount_paid) || 0, existingPaymentsSum);
     const newTotalPaid = currentManualPaid + installmentAmount;
     const isFullyPaidNow = newTotalPaid >= coursePrice && coursePrice > 0;
     const newManualStatus = isFullyPaidNow ? "CASH_FULL" : "CASH_INSTALLMENT";
@@ -81,6 +103,7 @@ export async function POST(req: NextRequest) {
     const updatePayload: Record<string, any> = {
       manual_amount_paid: newTotalPaid,
       manual_payment_status: newManualStatus,
+      enrollment_type: "MANUAL_INSTRUCTOR",
     };
 
     // If unblock requested or fully paid, set status to ACTIVE
@@ -98,31 +121,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: updateErr.message }, { status: 500 });
     }
 
-    // Create Order & Payment record for trace/invoice
+    // Create Order & Payment record for trace, dashboard, and invoice
     const orderId = crypto.randomUUID();
     const orderNumber = `MAN-TR-${Date.now()}`;
 
     try {
-      await (supabaseAdmin.from("orders" as any) as any).insert({
+      const { error: orderErr } = await (supabaseAdmin.from("orders" as any) as any).insert({
         id: orderId,
         user_id: studentId,
         order_number: orderNumber,
         subtotal: installmentAmount,
         total: installmentAmount,
-        total_amount: installmentAmount,
+        currency: "USD",
         status: "COMPLETED",
         created_at: new Date().toISOString(),
       });
 
-      await (supabaseAdmin.from("order_items" as any) as any).insert({
+      if (orderErr) {
+        console.error("[add-installment] Error inserting order:", orderErr);
+      }
+
+      const { error: itemErr } = await (supabaseAdmin.from("order_items" as any) as any).insert({
         id: crypto.randomUUID(),
         order_id: orderId,
         course_id: courseId,
         unit_price: coursePrice || installmentAmount,
         final_price: installmentAmount,
+        discount_amount: 0,
+        created_at: new Date().toISOString(),
       });
 
-      await (supabaseAdmin.from("payments" as any) as any).insert({
+      if (itemErr) {
+        console.error("[add-installment] Error inserting order_item:", itemErr);
+      }
+
+      const paymentMethodStr = isFullyPaidNow
+        ? `MANUAL::CASH_FULL::${courseId}`
+        : `MANUAL::CASH_INSTALLMENT::${courseId}`;
+
+      const { error: payErr } = await (supabaseAdmin.from("payments" as any) as any).insert({
         id: crypto.randomUUID(),
         order_id: orderId,
         user_id: studentId,
@@ -130,10 +167,14 @@ export async function POST(req: NextRequest) {
         currency: "USD",
         status: "PAID",
         provider: "MANUAL",
-        method: isFullyPaidNow ? "MANUAL::CASH_FULL" : "MANUAL::CASH_INSTALLMENT",
+        method: paymentMethodStr,
         paid_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
       });
+
+      if (payErr) {
+        console.error("[add-installment] Error inserting payment:", payErr);
+      }
     } catch (orderErr) {
       console.warn("[add-installment] Could not insert order/payment log:", orderErr);
     }

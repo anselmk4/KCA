@@ -165,42 +165,44 @@ export async function GET(req: NextRequest) {
         const certDate = certMap.get(e.course_id) || null;
 
         const rawPrice = parseFloat((course?.price as any) || 0);
-        const hasOnlinePayment = !!payInfo && payInfo.totalAmount > 0;
-        const isManual = (e as any).enrollment_type === 'MANUAL_INSTRUCTOR' || !hasOnlinePayment;
+        const onlinePaid = payInfo ? payInfo.totalAmount : 0;
+        const isManual = (e as any).enrollment_type === 'MANUAL_INSTRUCTOR' || onlinePaid === 0;
         const manualStatus = (e as any).manual_payment_status || (isManual ? 'FREE_SCHOLARSHIP' : 'NOT_APPLICABLE');
         const manualAmount = parseFloat((e as any).manual_amount_paid || 0);
 
         let totalPaid = 0;
         let paymentOrigin: "ONLINE" | "MANUAL" = "ONLINE";
 
-        if (hasOnlinePayment) {
-          totalPaid = payInfo.totalAmount;
-          paymentOrigin = "ONLINE";
-        } else if (isManual) {
+        if (manualStatus === "CASH_FULL") {
+          totalPaid = rawPrice > 0 ? rawPrice : Math.max(manualAmount, onlinePaid);
           paymentOrigin = "MANUAL";
-          if (manualStatus === "CASH_FULL") {
-            totalPaid = rawPrice;
-          } else if (manualStatus === "CASH_INSTALLMENT") {
-            totalPaid = manualAmount;
-          } else {
-            totalPaid = 0;
-          }
+        } else if (manualAmount > 0 && onlinePaid > 0) {
+          totalPaid = Math.max(manualAmount, onlinePaid);
+          paymentOrigin = manualAmount >= onlinePaid ? "MANUAL" : "ONLINE";
+        } else if (manualAmount > 0) {
+          totalPaid = manualAmount;
+          paymentOrigin = "MANUAL";
+        } else if (onlinePaid > 0) {
+          totalPaid = onlinePaid;
+          paymentOrigin = "ONLINE";
+        } else {
+          totalPaid = 0;
+          paymentOrigin = isManual ? "MANUAL" : "ONLINE";
         }
 
         const remainingAmount = Math.max(0, Math.round(rawPrice - totalPaid));
         const isInstallmentCourse = course?.allow_installments || false;
         const totalInstallments = isInstallmentCourse ? (course?.installments_count || 3) : 1;
-        const paidInstallmentsCount = hasOnlinePayment ? payInfo.count : (manualStatus === "CASH_FULL" ? 1 : (totalPaid > 0 ? 1 : 0));
+        const paidInstallmentsCount = (payInfo && payInfo.count > 0) ? payInfo.count : (manualStatus === "CASH_FULL" ? 1 : (totalPaid > 0 ? 1 : 0));
         const remainingInstallmentsCount = remainingAmount <= 0 ? 0 : Math.max(0, totalInstallments - paidInstallmentsCount);
 
         let pStatus = "none";
-        if (hasOnlinePayment) {
-          if (totalPaid >= rawPrice && rawPrice > 0) pStatus = "PAID";
-          else if (totalPaid > 0) pStatus = "PARTIAL";
-        } else if (isManual) {
-          if (manualStatus === "CASH_FULL") pStatus = "MANUAL_CASH_FULL";
-          else if (manualStatus === "CASH_INSTALLMENT") pStatus = "MANUAL_CASH_PARTIAL";
-          else pStatus = "FREE_SCHOLARSHIP";
+        if (manualStatus === "FREE_SCHOLARSHIP" && totalPaid === 0) {
+          pStatus = "FREE_SCHOLARSHIP";
+        } else if (totalPaid >= rawPrice && rawPrice > 0) {
+          pStatus = paymentOrigin === "MANUAL" ? "MANUAL_CASH_FULL" : "PAID";
+        } else if (totalPaid > 0) {
+          pStatus = paymentOrigin === "MANUAL" ? "MANUAL_CASH_PARTIAL" : "PARTIAL";
         }
 
         return {
@@ -306,42 +308,44 @@ export async function GET(req: NextRequest) {
       const payInfo = paymentMap.get(`${e.student_id}_${e.course_id}`);
 
       const rawPrice = parseFloat((course?.price as any) || 0);
-      const hasOnlinePayment = !!payInfo && payInfo.totalPaid > 0;
-      const isManual = (e as any).enrollment_type === 'MANUAL_INSTRUCTOR' || !hasOnlinePayment;
+      const onlinePaid = payInfo ? payInfo.totalPaid : 0;
+      const isManual = (e as any).enrollment_type === 'MANUAL_INSTRUCTOR' || onlinePaid === 0;
       const manualStatus = (e as any).manual_payment_status || (isManual ? 'FREE_SCHOLARSHIP' : 'NOT_APPLICABLE');
       const manualAmount = parseFloat((e as any).manual_amount_paid || 0);
 
       let totalPaid = 0;
       let paymentOrigin: "ONLINE" | "MANUAL" = "ONLINE";
 
-      if (hasOnlinePayment) {
-        totalPaid = payInfo.totalPaid;
-        paymentOrigin = "ONLINE";
-      } else if (isManual) {
+      if (manualStatus === "CASH_FULL") {
+        totalPaid = rawPrice > 0 ? rawPrice : Math.max(manualAmount, onlinePaid);
         paymentOrigin = "MANUAL";
-        if (manualStatus === "CASH_FULL") {
-          totalPaid = rawPrice;
-        } else if (manualStatus === "CASH_INSTALLMENT") {
-          totalPaid = manualAmount;
-        } else {
-          totalPaid = 0;
-        }
+      } else if (manualAmount > 0 && onlinePaid > 0) {
+        totalPaid = Math.max(manualAmount, onlinePaid);
+        paymentOrigin = manualAmount >= onlinePaid ? "MANUAL" : "ONLINE";
+      } else if (manualAmount > 0) {
+        totalPaid = manualAmount;
+        paymentOrigin = "MANUAL";
+      } else if (onlinePaid > 0) {
+        totalPaid = onlinePaid;
+        paymentOrigin = "ONLINE";
+      } else {
+        totalPaid = 0;
+        paymentOrigin = isManual ? "MANUAL" : "ONLINE";
       }
 
       const remainingAmount = Math.max(0, Math.round(rawPrice - totalPaid));
       const isInstallmentCourse = course?.allow_installments || false;
       const totalInstallments = isInstallmentCourse ? (course?.installments_count || 3) : 1;
-      const paidInstallmentsCount = hasOnlinePayment ? payInfo.count : (manualStatus === "CASH_FULL" ? 1 : (totalPaid > 0 ? 1 : 0));
+      const paidInstallmentsCount = (payInfo && payInfo.count > 0) ? payInfo.count : (manualStatus === "CASH_FULL" ? 1 : (totalPaid > 0 ? 1 : 0));
       const remainingInstallmentsCount = remainingAmount <= 0 ? 0 : Math.max(0, totalInstallments - paidInstallmentsCount);
 
       let pStatus = "none";
-      if (hasOnlinePayment) {
-        if (totalPaid >= rawPrice && rawPrice > 0) pStatus = "PAID";
-        else if (totalPaid > 0) pStatus = "PARTIAL";
-      } else if (isManual) {
-        if (manualStatus === "CASH_FULL") pStatus = "MANUAL_CASH_FULL";
-        else if (manualStatus === "CASH_INSTALLMENT") pStatus = "MANUAL_CASH_PARTIAL";
-        else pStatus = "FREE_SCHOLARSHIP";
+      if (manualStatus === "FREE_SCHOLARSHIP" && totalPaid === 0) {
+        pStatus = "FREE_SCHOLARSHIP";
+      } else if (totalPaid >= rawPrice && rawPrice > 0) {
+        pStatus = paymentOrigin === "MANUAL" ? "MANUAL_CASH_FULL" : "PAID";
+      } else if (totalPaid > 0) {
+        pStatus = paymentOrigin === "MANUAL" ? "MANUAL_CASH_PARTIAL" : "PARTIAL";
       }
 
       return {
