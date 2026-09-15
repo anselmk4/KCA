@@ -353,6 +353,104 @@ export async function sendEmail(to: string, subject: string, bodyContent: string
   return { success: true, provider: "Mock/Log" };
 }
 
+/**
+ * Dispatch batch emails efficiently.
+ * Uses Resend batch endpoint (up to 100 individual emails per HTTP call) when available.
+ */
+export async function sendBatchEmail(
+  recipients: string[],
+  subject: string,
+  bodyContent: string
+): Promise<{
+  total: number;
+  sentCount: number;
+  failedCount: number;
+  results: Array<{ email: string; success: boolean; error?: string; id?: string }>;
+}> {
+  const html = getEmailTemplate(subject, bodyContent);
+  const resendKey = process.env.RESEND_API_KEY || process.env.RESEND_API_TOKEN || process.env.EMAIL_API_KEY;
+  const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM || "Ansella Learning Platform <noreply@ansella.app>";
+
+  const results: Array<{ email: string; success: boolean; error?: string; id?: string }> = [];
+  let sentCount = 0;
+  let failedCount = 0;
+
+  // 1. Resend Batch API
+  if (resendKey && recipients.length > 0) {
+    const BATCH_SIZE = 100;
+    for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
+      const chunk = recipients.slice(i, i + BATCH_SIZE);
+      try {
+        const batchPayload = chunk.map((email) => ({
+          from: fromEmail,
+          to: [email],
+          subject,
+          html,
+        }));
+
+        const res = await fetch("https://api.resend.com/emails/batch", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${resendKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(batchPayload),
+        });
+
+        const data = await res.json();
+        if (res.ok && data?.data && Array.isArray(data.data)) {
+          chunk.forEach((email, idx) => {
+            const item = data.data[idx];
+            sentCount++;
+            results.push({ email, success: true, id: item?.id });
+          });
+          console.log(`[sendBatchEmail] Successfully dispatched batch chunk of ${chunk.length} emails via Resend`);
+        } else {
+          console.warn("[sendBatchEmail] Resend batch failed, falling back to individual sends:", data);
+          // Fallback to individual sending for this chunk
+          for (const email of chunk) {
+            const indRes = await sendEmail(email, subject, bodyContent);
+            if (indRes && indRes.success) {
+              sentCount++;
+              results.push({ email, success: true, id: indRes.id });
+            } else {
+              failedCount++;
+              results.push({ email, success: false, error: "Échec API email" });
+            }
+          }
+        }
+      } catch (err: any) {
+        console.error("[sendBatchEmail] Resend batch exception:", err);
+        for (const email of chunk) {
+          failedCount++;
+          results.push({ email, success: false, error: err?.message || "Erreur réseau" });
+        }
+      }
+    }
+
+    return { total: recipients.length, sentCount, failedCount, results };
+  }
+
+  // 2. Fallback to individual sendEmail for other providers or local log
+  for (const email of recipients) {
+    try {
+      const indRes = await sendEmail(email, subject, bodyContent);
+      if (indRes && indRes.success) {
+        sentCount++;
+        results.push({ email, success: true, id: indRes.id });
+      } else {
+        failedCount++;
+        results.push({ email, success: false, error: "Échec API email" });
+      }
+    } catch (err: any) {
+      failedCount++;
+      results.push({ email, success: false, error: err?.message || "Erreur d'envoi" });
+    }
+  }
+
+  return { total: recipients.length, sentCount, failedCount, results };
+}
+
 // --- Standardized Email Templates ---
 
 export async function sendInvoiceEmail(

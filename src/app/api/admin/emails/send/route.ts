@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { sendEmail } from "@/lib/email";
+import { sendBatchEmail } from "@/lib/email";
+import { isAuthorizedSuperAdmin } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,11 @@ const ADMIN_ROLE_NAMES = [
   "SUPPORT_AGENT",
 ];
 
-async function isCallerAdmin(userId: string): Promise<boolean> {
+async function isCallerAdmin(userId: string, email?: string): Promise<boolean> {
+  if (isAuthorizedSuperAdmin(email)) {
+    return true;
+  }
+
   try {
     const { data: dbRoles } = await supabaseAdmin.from("roles").select("id, name");
     const roleIdToName = new Map<string, string>();
@@ -35,6 +40,32 @@ async function isCallerAdmin(userId: string): Promise<boolean> {
   }
 }
 
+// Helper: fetch profile emails given a list of user IDs in safe chunks
+async function getEmailsForUserIds(userIds: string[]): Promise<string[]> {
+  if (!userIds || userIds.length === 0) return [];
+  const emails: string[] = [];
+  const chunkSize = 80;
+
+  for (let i = 0; i < userIds.length; i += chunkSize) {
+    const chunk = userIds.slice(i, i + chunkSize);
+    const { data: profiles, error } = await supabaseAdmin
+      .from("profiles")
+      .select("email")
+      .in("id", chunk)
+      .not("email", "is", null);
+
+    if (!error && profiles) {
+      profiles.forEach((p: any) => {
+        if (p.email && typeof p.email === "string" && p.email.trim()) {
+          emails.push(p.email.trim().toLowerCase());
+        }
+      });
+    }
+  }
+
+  return emails;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -44,7 +75,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    const isAdmin = await isCallerAdmin(user.id);
+    const isAdmin = await isCallerAdmin(user.id, user.email);
     if (!isAdmin) {
       return NextResponse.json({ error: "Accès refusé. Réservé aux administrateurs." }, { status: 403 });
     }
@@ -78,7 +109,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Veuillez spécifier au moins une adresse email valide." }, { status: 400 });
       }
       targetEmails = customEmails
-        .map((e: string) => e.trim().toLowerCase())
+        .map((e: string) => (typeof e === "string" ? e.trim().toLowerCase() : ""))
         .filter((e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
     } else {
       // Resolve role-based target
@@ -88,38 +119,85 @@ export async function POST(req: NextRequest) {
         roleMap[r.name] = r.id;
       });
 
-      if (targetType === "students" && roleMap["STUDENT"]) {
+      if (targetType === "instructors") {
+        // Query user_roles for INSTRUCTOR and TEACHING_ASSISTANT
+        const instructorRoleIds = [roleMap["INSTRUCTOR"], roleMap["TEACHING_ASSISTANT"]].filter(Boolean);
         const { data: userRoles } = await supabaseAdmin
           .from("user_roles")
-          .select("user_id, profiles!inner(email)")
+          .select("user_id")
+          .in("role_id", instructorRoleIds);
+
+        const userIds = Array.from(new Set((userRoles || []).map((ur: any) => ur.user_id).filter(Boolean)));
+        targetEmails = await getEmailsForUserIds(userIds);
+
+        // Fallback: Also look in profiles for any instructor specialty/academy if user_roles didn't yield emails
+        if (targetEmails.length === 0) {
+          const { data: instProfiles } = await supabaseAdmin
+            .from("profiles")
+            .select("email")
+            .not("email", "is", null)
+            .or("specialty.not.is.null,academy_name.not.is.null");
+
+          if (instProfiles) {
+            instProfiles.forEach((p: any) => {
+              if (p.email && typeof p.email === "string" && p.email.trim()) {
+                targetEmails.push(p.email.trim().toLowerCase());
+              }
+            });
+          }
+        }
+      } else if (targetType === "students" && roleMap["STUDENT"]) {
+        // Query user_roles for STUDENT
+        const { data: userRoles } = await supabaseAdmin
+          .from("user_roles")
+          .select("user_id")
           .eq("role_id", roleMap["STUDENT"]);
 
-        targetEmails = (userRoles || [])
-          .map((ur: any) => ur.profiles?.email)
-          .filter(Boolean);
-      } else if (targetType === "instructors" && roleMap["INSTRUCTOR"]) {
-        const { data: userRoles } = await supabaseAdmin
-          .from("user_roles")
-          .select("user_id, profiles!inner(email)")
-          .eq("role_id", roleMap["INSTRUCTOR"]);
-
-        targetEmails = (userRoles || [])
-          .map((ur: any) => ur.profiles?.email)
-          .filter(Boolean);
+        const userIds = Array.from(new Set((userRoles || []).map((ur: any) => ur.user_id).filter(Boolean)));
+        targetEmails = await getEmailsForUserIds(userIds);
       } else if (targetType === "all") {
-        const { data: profiles } = await supabaseAdmin
-          .from("profiles")
-          .select("email")
-          .not("email", "is", null);
+        // Query all profiles with pagination to avoid 1000 rows limit
+        let page = 0;
+        const pageSize = 1000;
+        let hasMore = true;
 
-        targetEmails = (profiles || [])
-          .map((p: any) => p.email)
-          .filter(Boolean);
+        while (hasMore) {
+          const from = page * pageSize;
+          const to = from + pageSize - 1;
+          const { data: profiles, error } = await supabaseAdmin
+            .from("profiles")
+            .select("email")
+            .not("email", "is", null)
+            .range(from, to);
+
+          if (error || !profiles || profiles.length === 0) {
+            hasMore = false;
+            break;
+          }
+
+          profiles.forEach((p: any) => {
+            if (p.email && typeof p.email === "string" && p.email.trim()) {
+              targetEmails.push(p.email.trim().toLowerCase());
+            }
+          });
+
+          if (profiles.length < pageSize) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        }
       }
     }
 
-    // Deduplicate
-    targetEmails = Array.from(new Set(targetEmails.filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))));
+    // Deduplicate and filter out malformed emails
+    targetEmails = Array.from(
+      new Set(
+        targetEmails
+          .map((e) => (typeof e === "string" ? e.trim().toLowerCase() : ""))
+          .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+      )
+    );
 
     if (targetEmails.length === 0) {
       return NextResponse.json({ error: "Aucun destinataire valide trouvé pour cette sélection." }, { status: 400 });
@@ -174,26 +252,8 @@ export async function POST(req: NextRequest) {
       ${buttonHtml}
     `;
 
-    // 3. Dispatch Emails (Batching safely)
-    const results: Array<{ email: string; success: boolean; error?: string; id?: string }> = [];
-    let sentCount = 0;
-    let failedCount = 0;
-
-    for (const email of targetEmails) {
-      try {
-        const sendRes = await sendEmail(email, subject.trim(), fullBodyContent);
-        if (sendRes && sendRes.success) {
-          sentCount++;
-          results.push({ email, success: true, id: (sendRes as any).id });
-        } else {
-          failedCount++;
-          results.push({ email, success: false, error: "Échec de l'API email" });
-        }
-      } catch (err: any) {
-        failedCount++;
-        results.push({ email, success: false, error: err.message || "Erreur d'envoi" });
-      }
-    }
+    // 3. Dispatch Emails in fast Batch
+    const batchResult = await sendBatchEmail(targetEmails, subject.trim(), fullBodyContent);
 
     // 4. Log the broadcast into audit logs
     try {
@@ -206,8 +266,8 @@ export async function POST(req: NextRequest) {
           heading: heading?.trim() || null,
           targetType,
           totalTargeted: targetEmails.length,
-          sentCount,
-          failedCount,
+          sentCount: batchResult.sentCount,
+          failedCount: batchResult.failedCount,
         } as any,
       });
     } catch (auditErr) {
@@ -216,10 +276,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      sentCount,
-      failedCount,
+      sentCount: batchResult.sentCount,
+      failedCount: batchResult.failedCount,
       total: targetEmails.length,
-      results,
+      results: batchResult.results,
     });
   } catch (error: any) {
     console.error("[POST /api/admin/emails/send] Error:", error);
