@@ -48,14 +48,14 @@ export async function GET(req: NextRequest) {
     }
 
     const courseIds = (courses || []).map((c: any) => c.id);
-    const courseMap = new Map((courses || []).map((c: any) => [c.id, c]));
+    const courseMap = new Map<string, any>((courses || []).map((c: any) => [c.id, c]));
 
     // Fetch sessions for all these courses
     const { data: rawSessions } = await (dbClient
       .from("course_sessions" as any) as any)
       .select("id, course_id, name, status, start_date, end_date, max_capacity, is_default")
       .in("course_id", courseIds);
-    const sessionMap = new Map((rawSessions || []).map((s: any) => [s.id, s]));
+    const sessionMap = new Map<string, any>((rawSessions || []).map((s: any) => [s.id, s]));
 
     // --- BEHAVIOR 1: Single Student Detail ---
     if (studentId) {
@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
         .select("id, course_id")
         .in("course_id", enrolledCourseIds);
       const sectionIds = sections?.map((s: any) => s.id) || [];
-      const sectionCourseMap = new Map(sections?.map((s: any) => [s.id, s.course_id]) || []);
+      const sectionCourseMap = new Map<string, any>(sections?.map((s: any) => [s.id, s.course_id]) || []);
 
       const { data: lessons } = await dbClient
         .from("lessons")
@@ -132,7 +132,7 @@ export async function GET(req: NextRequest) {
         .from("order_items")
         .select("order_id, course_id")
         .in("course_id", enrolledCourseIds);
-      const orderItemCourseMap = new Map(orderItems?.map((oi: any) => [oi.order_id, oi.course_id]) || []);
+      const orderItemCourseMap = new Map<string, any>(orderItems?.map((oi: any) => [oi.order_id, oi.course_id]) || []);
 
       // Calculate total paid and number of payments per course for this student
       const paySumByCourse = new Map<string, { totalAmount: number; count: number; lastDate: string | null; status: string }>();
@@ -163,7 +163,7 @@ export async function GET(req: NextRequest) {
         .select("course_id, issued_at")
         .eq("student_id", studentId)
         .in("course_id", enrolledCourseIds);
-      const certMap = new Map(certs?.map((c: any) => [c.course_id, c.issued_at]) || []);
+      const certMap = new Map<string, any>(certs?.map((c: any) => [c.course_id, c.issued_at]) || []);
 
       // Assemble course details
       const courseDetails = (enrollments as any[]).map((e: any) => {
@@ -212,7 +212,7 @@ export async function GET(req: NextRequest) {
           pStatus = paymentOrigin === "MANUAL" ? "MANUAL_CASH_PARTIAL" : "PARTIAL";
         }
 
-        const sess = (e as any).session_id ? sessionMap.get((e as any).session_id) : null;
+        const sess: any = (e as any).session_id ? sessionMap.get((e as any).session_id) : null;
 
         return {
           courseId: e.course_id,
@@ -278,13 +278,13 @@ export async function GET(req: NextRequest) {
       .from("profiles")
       .select("id, full_name, email")
       .in("id", studentIds);
-    const profileMap = new Map(profiles?.map((p: any) => [p.id, p]) || []);
+    const profileMap = new Map<string, any>(profiles?.map((p: any) => [p.id, p]) || []);
 
     const { data: orderItems } = await dbClient
       .from("order_items")
       .select("order_id, course_id")
       .in("course_id", courseIds);
-    const orderItemMap = new Map(orderItems?.map((oi: any) => [oi.order_id, oi.course_id]) || []);
+    const orderItemMap = new Map<string, any>(orderItems?.map((oi: any) => [oi.order_id, oi.course_id]) || []);
 
     // Track total paid per (student_id, course_id)
     const paymentMap = new Map<string, { totalPaid: number; count: number; status: string }>();
@@ -363,7 +363,7 @@ export async function GET(req: NextRequest) {
         pStatus = paymentOrigin === "MANUAL" ? "MANUAL_CASH_PARTIAL" : "PARTIAL";
       }
 
-      const sess = (e as any).session_id ? sessionMap.get((e as any).session_id) : null;
+      const sess: any = (e as any).session_id ? sessionMap.get((e as any).session_id) : null;
 
       return {
         studentId: e.student_id,
