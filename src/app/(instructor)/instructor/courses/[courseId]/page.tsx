@@ -37,6 +37,8 @@ import {
   Mail,
   AlertCircle,
   Eye,
+  Zap,
+  Info,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import RichEditor from "@/components/editor/RichEditor";
