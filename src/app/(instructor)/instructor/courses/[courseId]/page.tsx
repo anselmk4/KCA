@@ -974,14 +974,20 @@ export default function CourseDetailPage() {
   };
 
   const handleSavePrice = async () => {
+    const numericPrice = parseFloat(coursePrice) || 0;
+    if (course?.type === "self_paced" && numericPrice > 25) {
+      alert("Erreur : Le prix d'un cours avec mention autonomie ne peut pas dépasser 25 $.");
+      return;
+    }
     setSaving(true);
     try {
+      const finalPrice = course?.type === "self_paced" ? Math.min(numericPrice, 25) : numericPrice;
       const { error } = await (supabase as any)
         .from("courses")
         .update({
-          price: parseFloat(coursePrice) || 0,
-          allow_installments: allowInstallments,
-          installments_count: installmentsCount,
+          price: finalPrice,
+          allow_installments: course?.type === "self_paced" ? false : allowInstallments,
+          installments_count: course?.type === "self_paced" ? 1 : installmentsCount,
           updated_at: new Date().toISOString()
         })
         .eq("id", courseId);
@@ -2689,16 +2695,47 @@ export default function CourseDetailPage() {
             </div>
             <div className="space-y-5">
               <div>
-                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">Prix d'accès (USD)</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                    Prix d'accès (USD)
+                  </label>
+                  {course?.type === "self_paced" && (
+                    <span className="text-[11px] font-extrabold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <Zap className="w-3.5 h-3.5" /> Plafond Autonomie : 25 $ max
+                    </span>
+                  )}
+                </div>
                 <div className="relative rounded-xl shadow-sm max-w-xs">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <DollarSign className="h-4 w-4 text-zinc-400" />
                   </div>
-                  <input type="number" value={coursePrice} onChange={(e) => setCoursePrice(e.target.value)} placeholder="0" min="0" className="pl-9 pr-4 py-2.5 w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/20" />
+                  <input
+                    type="number"
+                    value={coursePrice}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (course?.type === "self_paced" && parseFloat(val) > 25) {
+                        setCoursePrice("25");
+                      } else {
+                        setCoursePrice(val);
+                      }
+                    }}
+                    placeholder="0"
+                    min="0"
+                    max={course?.type === "self_paced" ? 25 : undefined}
+                    className="pl-9 pr-4 py-2.5 w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                  />
                 </div>
-                <p className="text-[10px] text-zinc-400 mt-1.5">Prix à 0 = cours gratuit.</p>
+                {course?.type === "self_paced" ? (
+                  <div className="mt-2.5 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-xl text-xs text-amber-700 dark:text-amber-400 font-semibold flex items-center gap-2">
+                    <Info className="w-4 h-4 shrink-0 text-amber-500" />
+                    <span>Ce cours est en mode <strong>Autonomie (Self-paced)</strong> : son tarif ne peut pas dépasser <strong>25 $</strong> et le règlement s'effectue en une seule fois.</span>
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-zinc-400 mt-1.5">Prix à 0 = cours gratuit.</p>
+                )}
               </div>
-              {Number(coursePrice) > 0 && (
+              {Number(coursePrice) > 0 && course?.type !== "self_paced" && (
                 <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-4">
                   <div className="flex items-center gap-3">
                     <input type="checkbox" id="allowInstallments" checked={allowInstallments} onChange={(e) => setAllowInstallments(e.target.checked)} className="w-4 h-4 rounded text-teal-600 border-zinc-300 focus:ring-teal-500 cursor-pointer" />

@@ -134,12 +134,20 @@ export function CourseInspectionModal({ courseId, onClose, onStatusChanged }: Co
   // Save Course Meta
   const handleSaveMeta = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (metaForm.type === "self_paced" && Number(metaForm.price) > 25) {
+      alert("Le prix d'un cours avec mention autonomie ne peut pas dépasser 25 $.");
+      return;
+    }
     setSaving(true);
     try {
+      const sanitizedMeta = {
+        ...metaForm,
+        price: metaForm.type === "self_paced" ? Math.min(Number(metaForm.price), 25) : Number(metaForm.price)
+      };
       const res = await fetch(`/api/admin/courses/${courseId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "course", courseData: metaForm }),
+        body: JSON.stringify({ type: "course", courseData: sanitizedMeta }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erreur de mise à jour");
@@ -487,14 +495,32 @@ export function CourseInspectionModal({ courseId, onClose, onStatusChanged }: Co
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
-                        <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1 block">Prix ($)</label>
+                        <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1 flex items-center justify-between">
+                          <span>Prix ($)</span>
+                          {metaForm.type === "self_paced" && (
+                            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">Max 25$</span>
+                          )}
+                        </label>
                         <input
                           type="number"
                           min={0}
+                          max={metaForm.type === "self_paced" ? 25 : undefined}
                           value={metaForm.price}
-                          onChange={e => setMetaForm({ ...metaForm, price: Number(e.target.value) })}
+                          onChange={e => {
+                            const val = Number(e.target.value);
+                            if (metaForm.type === "self_paced" && val > 25) {
+                              setMetaForm({ ...metaForm, price: 25 });
+                            } else {
+                              setMetaForm({ ...metaForm, price: val });
+                            }
+                          }}
                           className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 dark:text-white"
                         />
+                        {metaForm.type === "self_paced" && (
+                          <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-1">
+                            ⚡ Mode autonomie : plafonné à 25 $ max.
+                          </p>
+                        )}
                       </div>
 
                       <div>
@@ -515,11 +541,18 @@ export function CourseInspectionModal({ courseId, onClose, onStatusChanged }: Co
                         <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1 block font-bold text-red-600 dark:text-red-400">Format & Modèle (Type)</label>
                         <select
                           value={metaForm.type}
-                          onChange={e => setMetaForm({ ...metaForm, type: e.target.value as "academic" | "self_paced" })}
+                          onChange={e => {
+                            const newType = e.target.value as "academic" | "self_paced";
+                            setMetaForm({
+                              ...metaForm,
+                              type: newType,
+                              price: newType === "self_paced" && Number(metaForm.price) > 25 ? 25 : metaForm.price,
+                            });
+                          }}
                           className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 dark:text-white font-bold"
                         >
                           <option value="academic">🎓 Cours Encadré (Academic)</option>
-                          <option value="self_paced">⚡ Cours en Autonomie (Self-Paced)</option>
+                          <option value="self_paced">⚡ Cours en Autonomie (Self-Paced - Max 25$)</option>
                         </select>
                       </div>
                     </div>

@@ -28,6 +28,7 @@ export type Course = {
   level?: string;
   allowInstallments?: boolean;
   installmentsCount?: number;
+  type?: "academic" | "self_paced";
 };
 
 export type CourseSection = {
@@ -417,12 +418,15 @@ export const addCourse = (course: Partial<Course> & { title: string; price: numb
   const db = getDB();
   const id = generateUUID();
   const slug = course.slug || course.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const courseType = course.type || "academic";
+  const finalPrice = courseType === "self_paced" ? Math.min(course.price, 25) : course.price;
   const newCourse: Course = {
     id,
     title: course.title,
     slug,
     description: course.description || "",
-    price: course.price,
+    price: finalPrice,
+    type: courseType,
     status: "DRAFT",
     instructorId: course.instructorId || "u3",
     instructorName: course.instructorName || "Prof. Kuettu",
@@ -444,6 +448,7 @@ export const addCourse = (course: Partial<Course> & { title: string; price: numb
       slug: newCourse.slug,
       description: newCourse.description,
       price: newCourse.price,
+      type: newCourse.type,
       createdAt: newCourse.createdAt,
       category: newCourse.category,
       level: newCourse.level,

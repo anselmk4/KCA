@@ -143,6 +143,11 @@ export function CourseCreationWizardModal({
       alert("Veuillez saisir un titre pour votre cours.");
       return;
     }
+    if (step === 2 && isPaid && type === "self_paced" && currentPriceNumber > 25) {
+      alert("Le prix d'un cours avec mention autonomie ne peut pas dépasser 25 $.");
+      setPrice("25");
+      return;
+    }
     if (step < 4) setStep(step + 1);
   };
 
@@ -188,6 +193,14 @@ export function CourseCreationWizardModal({
       return;
     }
 
+    if (isPaid && type === "self_paced" && currentPriceNumber > 25) {
+      alert("Le prix d'un cours avec mention autonomie ne peut pas dépasser 25 $.");
+      setPrice("25");
+      setStep(2);
+      return;
+    }
+
+    const finalPrice = type === "self_paced" ? Math.min(currentPriceNumber, 25) : currentPriceNumber;
     const activeImage = customThumbnail.trim() || thumbnailUrl || PRESET_CARDS[0].url;
 
     await onSubmit({
@@ -196,7 +209,7 @@ export function CourseCreationWizardModal({
       shortDescription: shortDescription.trim() || "Aperçu du cours.",
       category,
       language: language.toLowerCase() || "fr",
-      price: currentPriceNumber,
+      price: finalPrice,
       isPaid,
       installmentsEnabled: type === "academic" && isPaid && installmentsEnabled,
       installmentCount,
@@ -350,6 +363,9 @@ export function CourseCreationWizardModal({
                     onClick={() => {
                       setType("self_paced");
                       setInstallmentsEnabled(false);
+                      if (parseFloat(price) > 25 || price === "49") {
+                        setPrice("25");
+                      }
                     }}
                     className={`p-4 rounded-2xl border-2 transition-all text-left flex flex-col justify-between cursor-pointer ${
                       type === "self_paced"
@@ -361,13 +377,14 @@ export function CourseCreationWizardModal({
                       <div className="flex items-center gap-2">
                         <Zap className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                         <span className="font-extrabold text-sm text-zinc-900 dark:text-white">Cours en Autonomie</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">Max 25$</span>
                       </div>
                       <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${type === "self_paced" ? "bg-teal-600 text-white" : "border border-zinc-300"}`}>
                         {type === "self_paced" && <Check className="w-3 h-3" />}
                       </span>
                     </div>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                      Format style Udemy : accès immédiat et illimité après un paiement unique. Sans devoirs, révocations ni tranches.
+                      Format style Udemy : accès immédiat et illimité après un paiement unique (tarif plafonné à 25 $ max). Sans devoirs, révocations ni tranches.
                     </p>
                   </button>
                 </div>
@@ -513,20 +530,41 @@ export function CourseCreationWizardModal({
               {isPaid && (
                 <div className="p-5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-700/60 rounded-3xl space-y-5 animate-in fade-in">
                   <div>
-                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
-                      Prix Total du Cours ($ USD)
-                    </label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                        Prix Total du Cours ($ USD)
+                      </label>
+                      {type === "self_paced" && (
+                        <span className="text-[11px] font-extrabold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                          <Zap className="w-3.5 h-3.5" /> Plafond Autonomie : 25 $ max
+                        </span>
+                      )}
+                    </div>
                     <div className="relative max-w-xs">
                       <DollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                       <input
                         type="number"
                         value={price}
-                        onChange={(e) => setPrice(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (type === "self_paced" && parseFloat(val) > 25) {
+                            setPrice("25");
+                          } else {
+                            setPrice(val);
+                          }
+                        }}
                         min="1"
-                        placeholder="49"
+                        max={type === "self_paced" ? 25 : undefined}
+                        placeholder={type === "self_paced" ? "25" : "49"}
                         className="w-full pl-10 pr-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-lg font-bold text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30"
                       />
                     </div>
+                    {type === "self_paced" && (
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1.5 mt-2">
+                        <Info className="w-3.5 h-3.5 shrink-0" />
+                        Règle Autonomie : Aucun cours créé en mode autonomie ne peut dépasser 25 $.
+                      </p>
+                    )}
                   </div>
 
                   <div className="pt-4 border-t border-zinc-200 dark:border-zinc-700/60 space-y-4">

@@ -136,6 +136,13 @@ export async function PUT(
     const { type, courseData, lessonData, sectionData } = body;
 
     if (type === "course") {
+      // Fetch current course to check existing type/price
+      const { data: existingCourse } = await supabaseAdmin
+        .from("courses")
+        .select("id, type, price")
+        .eq("id", courseId)
+        .maybeSingle();
+
       // Update course metadata
       const allowed = ["title", "slug", "description", "price", "category_id", "level", "allow_installments", "installments_count", "prerequisites", "learning_outcomes", "type"];
       const updates: Record<string, any> = { updated_at: new Date().toISOString() };
@@ -144,8 +151,21 @@ export async function PUT(
         if (courseData[k] !== undefined) updates[k] = courseData[k];
       }
 
+      const targetType = updates.type !== undefined ? updates.type : existingCourse?.type;
+      const targetPrice = updates.price !== undefined ? parseFloat(updates.price) : (existingCourse?.price !== undefined ? parseFloat(existingCourse.price) : 0);
+
+      if (targetType === "self_paced" && targetPrice > 25) {
+        return NextResponse.json(
+          { error: "Le prix d'un cours avec mention autonomie ne peut pas dépasser 25 $." },
+          { status: 400 }
+        );
+      }
+
       if (updates.type === "self_paced") {
         updates.allow_installments = false;
+        if (updates.price !== undefined) {
+          updates.price = Math.min(parseFloat(updates.price), 25);
+        }
       }
 
       const { data: updated, error } = await supabaseAdmin

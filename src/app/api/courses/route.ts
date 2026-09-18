@@ -110,6 +110,16 @@ export async function POST(req: NextRequest) {
       .replace(/(^-|-$)+/g, '');
     const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}`;
 
+    const courseType = type === 'self_paced' ? 'self_paced' : 'academic';
+    const coursePrice = price ? parseFloat(price) : 0;
+
+    if (courseType === 'self_paced' && coursePrice > 25) {
+      return NextResponse.json(
+        { error: "Le prix d'un cours avec mention autonomie ne peut pas dépasser 25 $." },
+        { status: 400 }
+      );
+    }
+
     // Prepare course insert payload
     const coursePayload: Record<string, any> = {
       instructor_id: user.id,
@@ -119,11 +129,11 @@ export async function POST(req: NextRequest) {
       description: description || null,
       level: mappedLevel,
       language: (body.language || 'fr').toLowerCase(),
-      price: price ? parseFloat(price) : 0,
+      price: courseType === 'self_paced' ? Math.min(coursePrice, 25) : coursePrice,
       status: 'DRAFT',
-      type: type === 'self_paced' ? 'self_paced' : 'academic',
-      allow_installments: type === 'academic',
-      installments_count: type === 'academic' ? 3 : 1,
+      type: courseType,
+      allow_installments: courseType === 'academic',
+      installments_count: courseType === 'academic' ? 3 : 1,
       learning_outcomes: Array.isArray(learningOutcomes) ? learningOutcomes : [],
       prerequisites: Array.isArray(prerequisites) ? prerequisites : [],
       created_at: new Date().toISOString(),
@@ -197,7 +207,7 @@ export async function PUT(req: NextRequest) {
     // BOLA Authorization Check: Verify caller is course owner or admin
     const { data: existingCourse, error: fetchErr } = await dbClient
       .from('courses')
-      .select('id, instructor_id')
+      .select('id, instructor_id, type, price')
       .eq('id', id)
       .maybeSingle();
 
@@ -228,6 +238,16 @@ export async function PUT(req: NextRequest) {
     if (updates.title !== undefined) sbUpdates.title = updates.title;
     if (updates.description !== undefined) sbUpdates.description = updates.description;
     if (updates.price !== undefined) sbUpdates.price = updates.price;
+
+    const targetType = sbUpdates.type || existingCourse.type;
+    const targetPrice = sbUpdates.price !== undefined ? parseFloat(sbUpdates.price) : (existingCourse.price !== undefined ? parseFloat(existingCourse.price) : 0);
+
+    if (targetType === 'self_paced' && targetPrice > 25) {
+      return NextResponse.json(
+        { error: "Le prix d'un cours avec mention autonomie ne peut pas dépasser 25 $." },
+        { status: 400 }
+      );
+    }
     if (updates.status !== undefined && isAdmin) sbUpdates.status = updates.status;
     if (updates.slug !== undefined) sbUpdates.slug = updates.slug;
     if (updates.thumbnailUrl !== undefined) sbUpdates.thumbnail_url = updates.thumbnailUrl;

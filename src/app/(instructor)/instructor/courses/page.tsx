@@ -262,18 +262,30 @@ export default function InstructorCoursesPage() {
     prerequisites: string;
     type: "academic" | "self_paced";
   }) => {
+    if (courseData.type === "self_paced" && courseData.price > 25) {
+      alert("Erreur : Le prix d'un cours avec mention autonomie ne peut pas dépasser 25 $.");
+      return;
+    }
     setCreating(true);
     try {
+      const courseType = courseData.type || "academic";
+      const sanitizedPrice = courseType === "self_paced" ? Math.min(courseData.price, 25) : courseData.price;
+      const payloadToSend = { ...courseData, price: sanitizedPrice };
+
       // 1. Call API /api/courses endpoint
       const res = await fetch("/api/courses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(courseData),
+        body: JSON.stringify(payloadToSend),
       });
 
       const resData = await res.json();
 
       if (!res.ok) {
+        if (res.status === 400) {
+          throw new Error(resData.error || "Erreur de validation lors de la création du cours.");
+        }
+
         // Direct client-side insert fallback using authenticated Supabase user
         const { data: { user } } = await supabase.auth.getUser();
         const activeUserId = user?.id || session?.userId;
@@ -289,7 +301,6 @@ export default function InstructorCoursesPage() {
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/(^-|-$)/g, "") + "-" + Math.floor(Math.random() * 1000);
 
-        const courseType = courseData.type || "academic";
         const allowInstallments = courseType === "academic" ? courseData.installmentsEnabled : false;
 
         let { error: directErr } = await (supabase as any)
@@ -298,7 +309,7 @@ export default function InstructorCoursesPage() {
             title: courseData.title,
             slug,
             description: courseData.description,
-            price: courseData.price,
+            price: sanitizedPrice,
             level: courseData.level.includes("Intermédiaire") ? "INTERMEDIATE" : courseData.level.includes("Avancé") ? "ADVANCED" : "BEGINNER",
             language: courseData.language || "fr",
             thumbnail_url: courseData.thumbnailUrl,
@@ -315,7 +326,7 @@ export default function InstructorCoursesPage() {
               title: courseData.title,
               slug,
               description: courseData.description,
-              price: courseData.price,
+              price: sanitizedPrice,
               level: courseData.level.includes("Intermédiaire") ? "INTERMEDIATE" : courseData.level.includes("Avancé") ? "ADVANCED" : "BEGINNER",
               thumbnail_url: courseData.thumbnailUrl,
               instructor_id: activeUserId,
