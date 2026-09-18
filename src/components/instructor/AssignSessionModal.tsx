@@ -39,6 +39,20 @@ type AssignSessionModalProps = {
   onSuccess: () => void;
 };
 
+function normalizeSession(s: any): CourseSession {
+  return {
+    id: s.id,
+    courseId: s.courseId || s.course_id || "",
+    courseTitle: s.courseTitle || s.course_title || "",
+    name: s.name || "",
+    status: s.status || "UPCOMING",
+    startDate: s.startDate || s.start_date || null,
+    endDate: s.endDate || s.end_date || null,
+    maxCapacity: s.maxCapacity !== undefined ? s.maxCapacity : (s.max_capacity !== undefined ? s.max_capacity : null),
+    studentsCount: s.studentsCount !== undefined ? s.studentsCount : (s.students_count !== undefined ? s.students_count : undefined),
+  };
+}
+
 export function AssignSessionModal({
   isOpen,
   onClose,
@@ -51,7 +65,9 @@ export function AssignSessionModal({
   availableSessions = [],
   onSuccess,
 }: AssignSessionModalProps) {
-  const [sessions, setSessions] = useState<CourseSession[]>(availableSessions);
+  const [sessions, setSessions] = useState<CourseSession[]>(() =>
+    (availableSessions || []).map(normalizeSession)
+  );
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string>(currentSessionId || "");
   const [submitting, setSubmitting] = useState(false);
@@ -65,26 +81,57 @@ export function AssignSessionModal({
     setError(null);
     setSuccessMsg(null);
 
-    async function fetchSessions() {
-      if (availableSessions.length > 0) {
-        setSessions(availableSessions.filter((s) => s.courseId === courseId));
+    async function loadSessions() {
+      // 1. If availableSessions were provided
+      if (availableSessions && availableSessions.length > 0) {
+        const normalized = availableSessions.map(normalizeSession);
+
+        // Filter by courseId
+        const matching = normalized.filter((s) => {
+          if (!courseId) return true;
+          return s.courseId === courseId || (s as any).course_id === courseId;
+        });
+
+        if (matching.length > 0) {
+          setSessions(matching);
+          return;
+        }
+
+        // If all sessions passed in belong to the same course context
+        const allSameCourse = normalized.every(
+          (s) => !s.courseId || s.courseId === normalized[0].courseId
+        );
+        if (allSameCourse && normalized.length > 0) {
+          setSessions(normalized);
+          return;
+        }
+      }
+
+      // 2. Fetch fresh from API
+      if (!courseId) {
+        setSessions([]);
         return;
       }
+
       setLoadingSessions(true);
       try {
-        const res = await fetch(`/api/instructor/courses/${courseId}/sessions`);
+        const res = await fetch(`/api/instructor/courses/${encodeURIComponent(courseId)}/sessions`);
         if (res.ok) {
           const data = await res.json();
-          setSessions(data.sessions || []);
+          const apiSessions = (data.sessions || []).map(normalizeSession);
+          setSessions(apiSessions);
+        } else {
+          setSessions([]);
         }
       } catch (err) {
-        console.error("Failed to load sessions:", err);
+        console.error("Failed to load sessions from API:", err);
+        setSessions([]);
       } finally {
         setLoadingSessions(false);
       }
     }
 
-    fetchSessions();
+    loadSessions();
   }, [isOpen, courseId, currentSessionId, availableSessions]);
 
   if (!isOpen) return null;
@@ -252,15 +299,17 @@ export function AssignSessionModal({
               {/* Sessions list */}
               {sessions.map((sess) => {
                 const isSelected = selectedSessionId === sess.id;
-                const startDateFormatted = sess.startDate
-                  ? new Date(sess.startDate).toLocaleDateString("fr-FR", {
+                const rawStart = sess.startDate || (sess as any).start_date;
+                const rawEnd = sess.endDate || (sess as any).end_date;
+                const startDateFormatted = rawStart && !isNaN(new Date(rawStart).getTime())
+                  ? new Date(rawStart).toLocaleDateString("fr-FR", {
                       day: "numeric",
                       month: "short",
                       year: "numeric",
                     })
                   : null;
-                const endDateFormatted = sess.endDate
-                  ? new Date(sess.endDate).toLocaleDateString("fr-FR", {
+                const endDateFormatted = rawEnd && !isNaN(new Date(rawEnd).getTime())
+                  ? new Date(rawEnd).toLocaleDateString("fr-FR", {
                       day: "numeric",
                       month: "short",
                       year: "numeric",

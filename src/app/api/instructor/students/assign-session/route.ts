@@ -167,6 +167,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: updateErr.message }, { status: 400 });
     }
 
+    if (!updatedEnrollment) {
+      const { data: existingEnr } = await (dbClient.from("enrollments" as any) as any)
+        .select("id")
+        .eq("student_id", studentId)
+        .eq("course_id", course.id)
+        .maybeSingle();
+
+      if (!existingEnr) {
+        return NextResponse.json({
+          error: "Inscription introuvable pour cet apprenant dans ce cours."
+        }, { status: 404 });
+      }
+    }
+
     // Send notification to the student if assigned to a session
     if (sessionId) {
       try {

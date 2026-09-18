@@ -100,6 +100,7 @@ interface EnrollmentData {
   id: string;
   student_id: string;
   course_id: string;
+  session_id?: string | null;
   status: string;
   progress_percent: number;
   created_at: string;
@@ -3362,7 +3363,17 @@ export default function CourseDetailPage() {
           courseTitle={course?.title || "Cours"}
           currentSessionId={assignModalStudent.currentSessionId}
           currentSessionName={assignModalStudent.currentSessionName}
-          availableSessions={courseSessions}
+          availableSessions={courseSessions.map((s) => ({
+            id: s.id,
+            courseId: s.course_id || s.courseId || course?.id || courseId,
+            courseTitle: course?.title || "Cours",
+            name: s.name,
+            status: s.status,
+            startDate: s.start_date || s.startDate || null,
+            endDate: s.end_date || s.endDate || null,
+            maxCapacity: s.max_capacity ?? s.maxCapacity ?? null,
+            studentsCount: enrollments.filter((e: any) => e.session_id === s.id).length,
+          }))}
           onSuccess={() => loadData(true)}
         />
       )}
