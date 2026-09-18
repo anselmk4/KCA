@@ -47,8 +47,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(studentId ? { error: "Aucun cours trouvé pour ce formateur." } : { enrollments: [] });
     }
 
-    const courseIds = courses.map(c => c.id);
-    const courseMap = new Map(courses.map(c => [c.id, c]));
+    const courseIds = (courses || []).map((c: any) => c.id);
+    const courseMap = new Map((courses || []).map((c: any) => [c.id, c]));
 
     // Fetch sessions for all these courses
     const { data: rawSessions } = await (dbClient
@@ -93,8 +93,8 @@ export async function GET(req: NextRequest) {
         .from("course_sections")
         .select("id, course_id")
         .in("course_id", enrolledCourseIds);
-      const sectionIds = sections?.map(s => s.id) || [];
-      const sectionCourseMap = new Map(sections?.map(s => [s.id, s.course_id]) || []);
+      const sectionIds = sections?.map((s: any) => s.id) || [];
+      const sectionCourseMap = new Map(sections?.map((s: any) => [s.id, s.course_id]) || []);
 
       const { data: lessons } = await dbClient
         .from("lessons")
@@ -102,12 +102,12 @@ export async function GET(req: NextRequest) {
         .in("section_id", sectionIds);
 
       const lessonCountByCourse = new Map<string, number>();
-      lessons?.forEach(l => {
+      lessons?.forEach((l: any) => {
         const cId = sectionCourseMap.get(l.section_id);
         if (cId) lessonCountByCourse.set(cId, (lessonCountByCourse.get(cId) || 0) + 1);
       });
 
-      const enrollmentIds = enrollments.map(e => e.id);
+      const enrollmentIds = (enrollments as any[]).map((e: any) => e.id);
       const completedLessonIds = new Set<string>();
 
       if (enrollmentIds.length > 0) {
@@ -116,11 +116,11 @@ export async function GET(req: NextRequest) {
           .select("lesson_id, completed")
           .in("enrollment_id", enrollmentIds)
           .eq("completed", true);
-        lessonProgress?.forEach(lp => { if (lp.lesson_id) completedLessonIds.add(lp.lesson_id); });
+        lessonProgress?.forEach((lp: any) => { if (lp.lesson_id) completedLessonIds.add(lp.lesson_id); });
       }
 
       const completedByCourse = new Map<string, number>();
-      lessons?.forEach(l => {
+      lessons?.forEach((l: any) => {
         if (completedLessonIds.has(l.id)) {
           const cId = sectionCourseMap.get(l.section_id);
           if (cId) completedByCourse.set(cId, (completedByCourse.get(cId) || 0) + 1);
@@ -132,7 +132,7 @@ export async function GET(req: NextRequest) {
         .from("order_items")
         .select("order_id, course_id")
         .in("course_id", enrolledCourseIds);
-      const orderItemCourseMap = new Map(orderItems?.map(oi => [oi.order_id, oi.course_id]) || []);
+      const orderItemCourseMap = new Map(orderItems?.map((oi: any) => [oi.order_id, oi.course_id]) || []);
 
       // Calculate total paid and number of payments per course for this student
       const paySumByCourse = new Map<string, { totalAmount: number; count: number; lastDate: string | null; status: string }>();
@@ -143,7 +143,7 @@ export async function GET(req: NextRequest) {
         .eq("user_id", studentId)
         .eq("status", "PAID");
 
-      paidUserPayments?.forEach(p => {
+      paidUserPayments?.forEach((p: any) => {
         const methodParts = (p.method || "").split("::");
         const cId = methodParts[2] || (p.order_id ? orderItemCourseMap.get(p.order_id) : null);
         if (cId) {
@@ -163,10 +163,10 @@ export async function GET(req: NextRequest) {
         .select("course_id, issued_at")
         .eq("student_id", studentId)
         .in("course_id", enrolledCourseIds);
-      const certMap = new Map(certs?.map(c => [c.course_id, c.issued_at]) || []);
+      const certMap = new Map(certs?.map((c: any) => [c.course_id, c.issued_at]) || []);
 
       // Assemble course details
-      const courseDetails = enrollments.map(e => {
+      const courseDetails = (enrollments as any[]).map((e: any) => {
         const course = courseMap.get(e.course_id);
         const payInfo = paySumByCourse.get(e.course_id);
         const certDate = certMap.get(e.course_id) || null;
@@ -278,13 +278,13 @@ export async function GET(req: NextRequest) {
       .from("profiles")
       .select("id, full_name, email")
       .in("id", studentIds);
-    const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+    const profileMap = new Map(profiles?.map((p: any) => [p.id, p]) || []);
 
     const { data: orderItems } = await dbClient
       .from("order_items")
       .select("order_id, course_id")
       .in("course_id", courseIds);
-    const orderItemMap = new Map(orderItems?.map(oi => [oi.order_id, oi.course_id]) || []);
+    const orderItemMap = new Map(orderItems?.map((oi: any) => [oi.order_id, oi.course_id]) || []);
 
     // Track total paid per (student_id, course_id)
     const paymentMap = new Map<string, { totalPaid: number; count: number; status: string }>();
@@ -296,7 +296,7 @@ export async function GET(req: NextRequest) {
         .in("user_id", studentIds)
         .eq("status", "PAID");
 
-      paidPayments?.forEach(p => {
+      paidPayments?.forEach((p: any) => {
         const methodParts = (p.method || "").split("::");
         const cId = methodParts[2] || orderItemMap.get(p.order_id);
         if (cId) {
@@ -315,9 +315,9 @@ export async function GET(req: NextRequest) {
       .from("certificates")
       .select("student_id, course_id")
       .in("course_id", courseIds);
-    const certSet = new Set(certs?.map(c => `${c.student_id}_${c.course_id}`) || []);
+    const certSet = new Set(certs?.map((c: any) => `${c.student_id}_${c.course_id}`) || []);
 
-    const rows = enrData.map(e => {
+    const rows = (enrData as any[]).map((e: any) => {
       const profile = profileMap.get(e.student_id);
       const course = courseMap.get(e.course_id);
       const payInfo = paymentMap.get(`${e.student_id}_${e.course_id}`);
@@ -410,7 +410,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       enrollments: rows,
-      courses: (courses || []).map(c => ({
+      courses: (courses || []).map((c: any) => ({
         id: c.id,
         title: c.title,
         type: c.type || "academic"
@@ -437,7 +437,7 @@ export async function POST(req: NextRequest) {
       .eq("user_id", user.id);
 
     const roles = userRoles?.map((ur: any) => ur.roles?.name) || [];
-    const isAuthorized = roles.some(r => ["SUPER_ADMIN", "ADMIN", "INSTRUCTOR"].includes(r));
+    const isAuthorized = roles.some((r: any) => ["SUPER_ADMIN", "ADMIN", "INSTRUCTOR"].includes(r));
     if (!isAuthorized) {
       return NextResponse.json({ error: "Non autorisé. Rôle insuffisant." }, { status: 403 });
     }
@@ -449,7 +449,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Données manquantes (studentId ou courseId)." }, { status: 400 });
     }
 
-    const isAdmin = roles.some(r => ["SUPER_ADMIN", "ADMIN"].includes(r));
+    const isAdmin = roles.some((r: any) => ["SUPER_ADMIN", "ADMIN"].includes(r));
     let targetCoursePrice = 0;
     if (!isAdmin) {
       const { data: course, error: courseErr } = await supabaseAdmin
