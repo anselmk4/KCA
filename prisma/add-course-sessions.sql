@@ -21,6 +21,10 @@ CREATE TABLE IF NOT EXISTS public.course_sessions (
 ALTER TABLE public.enrollments 
 ADD COLUMN IF NOT EXISTS session_id UUID REFERENCES public.course_sessions(id) ON DELETE SET NULL;
 
+-- 2b. Ensure type column exists on courses table
+ALTER TABLE public.courses
+ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'academic';
+
 -- 3. Create indexes for high-speed queries and filtering
 CREATE INDEX IF NOT EXISTS idx_course_sessions_course_id ON public.course_sessions(course_id);
 CREATE INDEX IF NOT EXISTS idx_course_sessions_status ON public.course_sessions(status);

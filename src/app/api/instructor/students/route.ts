@@ -31,30 +31,72 @@ export async function GET(req: NextRequest) {
       ? supabaseAdmin
       : supabase;
 
-    // Get instructor's courses
-    const { data: coursesRaw, error: coursesError } = await (dbClient
+    // Get instructor's courses (resilient to 'type' column presence in DB)
+    let courses: any[] = [];
+    const coursesRes = await (dbClient
       .from("courses" as any) as any)
       .select("id, title, slug, price, type, allow_installments, installments_count")
       .eq("instructor_id", user.id);
-    const courses: any[] | null = coursesRaw;
 
-    if (coursesError) {
-      console.error("[students-api] error fetching instructor courses:", coursesError);
-      return NextResponse.json({ error: coursesError.message }, { status: 400 });
+    if (coursesRes.error) {
+      console.warn("[students-api] courses query with 'type' failed, falling back without 'type':", coursesRes.error.message);
+      const fallbackRes = await (dbClient
+        .from("courses" as any) as any)
+        .select("id, title, slug, price, allow_installments, installments_count")
+        .eq("instructor_id", user.id);
+      courses = fallbackRes.data || [];
+    } else {
+      courses = coursesRes.data || [];
     }
 
+    // If no owned courses, check collaborator courses or if admin
+    if (courses.length === 0) {
+      const { data: collabData } = await (dbClient
+        .from("course_collaborators" as any) as any)
+        .select("course_id")
+        .eq("collaborator_id", user.id);
+      const collabCourseIds = (collabData || []).map((c: any) => c.course_id);
+      if (collabCourseIds.length > 0) {
+        const { data: collabCourses } = await (dbClient
+          .from("courses" as any) as any)
+          .select("id, title, slug, price, allow_installments, installments_count")
+          .in("id", collabCourseIds);
+        courses = collabCourses || [];
+      } else if (roles.some((r: any) => ["SUPER_ADMIN", "ADMIN"].includes(r))) {
+        const { data: allCourses } = await (dbClient
+          .from("courses" as any) as any)
+          .select("id, title, slug, price, allow_installments, installments_count")
+          .limit(100);
+        courses = allCourses || [];
+      }
+    }
+
+    const formattedCourses = (courses || []).map((c: any) => ({
+      id: c.id,
+      title: c.title,
+      type: c.type || "academic"
+    }));
+
     if (!courses || courses.length === 0) {
-      return NextResponse.json(studentId ? { error: "Aucun cours trouvé pour ce formateur." } : { enrollments: [] });
+      return NextResponse.json(studentId ? { error: "Aucun cours trouvé pour ce formateur." } : { enrollments: [], courses: [], sessions: [] });
     }
 
     const courseIds = (courses || []).map((c: any) => c.id);
     const courseMap = new Map<string, any>((courses || []).map((c: any) => [c.id, c]));
 
-    // Fetch sessions for all these courses
-    const { data: rawSessions } = await (dbClient
-      .from("course_sessions" as any) as any)
-      .select("id, course_id, name, status, start_date, end_date, max_capacity, is_default")
-      .in("course_id", courseIds);
+    // Fetch sessions for all these courses safely (never crash if table doesn't exist yet)
+    let rawSessions: any[] = [];
+    try {
+      const { data: sessData, error: sessErr } = await (dbClient
+        .from("course_sessions" as any) as any)
+        .select("id, course_id, name, status, start_date, end_date, max_capacity, is_default")
+        .in("course_id", courseIds);
+      if (!sessErr && sessData) {
+        rawSessions = sessData;
+      }
+    } catch (e) {
+      console.warn("[students-api] course_sessions query warning:", e);
+    }
     const sessionMap = new Map<string, any>((rawSessions || []).map((s: any) => [s.id, s]));
 
     // --- BEHAVIOR 1: Single Student Detail ---
@@ -69,11 +111,24 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Étudiant introuvable." }, { status: 404 });
       }
 
-      const { data: enrollments } = await (dbClient
+      let enrollments: any[] = [];
+      const enrSingleRes = await (dbClient
         .from("enrollments" as any) as any)
         .select("id, course_id, session_id, progress_percent, status, enrolled_at, enrollment_type, manual_payment_status, manual_amount_paid")
         .eq("student_id", studentId)
         .in("course_id", courseIds);
+
+      if (enrSingleRes.error) {
+        console.warn("[students-api] single student enrollments query with session_id failed, falling back without session_id:", enrSingleRes.error.message);
+        const fallbackSingle = await (dbClient
+          .from("enrollments" as any) as any)
+          .select("id, course_id, progress_percent, status, enrolled_at, enrollment_type, manual_payment_status, manual_amount_paid")
+          .eq("student_id", studentId)
+          .in("course_id", courseIds);
+        enrollments = fallbackSingle.data || [];
+      } else {
+        enrollments = enrSingleRes.data || [];
+      }
 
       if (!enrollments || enrollments.length === 0) {
         return NextResponse.json({
@@ -258,18 +313,46 @@ export async function GET(req: NextRequest) {
     }
 
     // --- BEHAVIOR 2: All Students List ---
-    const { data: enrData, error: enrError } = await (dbClient
+    let enrData: any[] = [];
+    const enrRes = await (dbClient
       .from("enrollments" as any) as any)
       .select("id, student_id, course_id, session_id, progress_percent, status, enrolled_at, enrollment_type, manual_payment_status, manual_amount_paid")
       .in("course_id", courseIds);
 
-    if (enrError) {
-      console.error("[students-api] error fetching enrollments:", enrError);
-      return NextResponse.json({ error: enrError.message }, { status: 400 });
+    if (enrRes.error) {
+      console.warn("[students-api] enrollments query with session_id failed, falling back without session_id:", enrRes.error.message);
+      const fallbackEnr = await (dbClient
+        .from("enrollments" as any) as any)
+        .select("id, student_id, course_id, progress_percent, status, enrolled_at, enrollment_type, manual_payment_status, manual_amount_paid")
+        .in("course_id", courseIds);
+
+      if (fallbackEnr.error) {
+        console.error("[students-api] error fetching enrollments:", fallbackEnr.error);
+        return NextResponse.json({ error: fallbackEnr.error.message }, { status: 400 });
+      }
+      enrData = fallbackEnr.data || [];
+    } else {
+      enrData = enrRes.data || [];
     }
 
+    const sessionsList = (rawSessions || []).map((s: any) => ({
+      id: s.id,
+      courseId: s.course_id,
+      courseTitle: courseMap.get(s.course_id)?.title || "",
+      name: s.name,
+      status: s.status,
+      startDate: s.start_date,
+      endDate: s.end_date,
+      maxCapacity: s.max_capacity,
+      isDefault: s.is_default || false,
+    }));
+
     if (!enrData || enrData.length === 0) {
-      return NextResponse.json({ enrollments: [] });
+      return NextResponse.json({
+        enrollments: [],
+        courses: formattedCourses,
+        sessions: sessionsList,
+      });
     }
 
     const studentIds = [...new Set((enrData as any[]).map((e: any) => e.student_id))];
@@ -396,25 +479,9 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    const sessionsList = (rawSessions || []).map((s: any) => ({
-      id: s.id,
-      courseId: s.course_id,
-      courseTitle: courseMap.get(s.course_id)?.title || "",
-      name: s.name,
-      status: s.status,
-      startDate: s.start_date,
-      endDate: s.end_date,
-      maxCapacity: s.max_capacity,
-      isDefault: s.is_default || false,
-    }));
-
     return NextResponse.json({
       enrollments: rows,
-      courses: (courses || []).map((c: any) => ({
-        id: c.id,
-        title: c.title,
-        type: c.type || "academic"
-      })),
+      courses: formattedCourses,
       sessions: sessionsList,
     });
   } catch (err: any) {
