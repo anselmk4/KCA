@@ -3345,7 +3345,7 @@ export default function CourseDetailPage() {
         <CreateSessionModal
           isOpen={showCreateSessionModal}
           onClose={() => setShowCreateSessionModal(false)}
-          courseId={courseId}
+          courseId={course?.id || courseId}
           courseTitle={course?.title || "Cours"}
           onSuccess={() => loadData(true)}
         />
@@ -3358,7 +3358,7 @@ export default function CourseDetailPage() {
           onClose={() => setAssignModalStudent(null)}
           studentId={assignModalStudent.studentId}
           studentName={assignModalStudent.studentName}
-          courseId={courseId}
+          courseId={course?.id || courseId}
           courseTitle={course?.title || "Cours"}
           currentSessionId={assignModalStudent.currentSessionId}
           currentSessionName={assignModalStudent.currentSessionName}

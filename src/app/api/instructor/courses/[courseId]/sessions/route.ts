@@ -2,6 +2,102 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
+async function resolveCourse(dbClient: any, courseIdentifier: string) {
+  const rawId = courseIdentifier || "";
+  let decodedId = rawId;
+  try {
+    decodedId = decodeURIComponent(rawId);
+  } catch {
+    // keep rawId
+  }
+
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawId);
+
+  let course: any = null;
+  if (isUuid) {
+    try {
+      const { data } = await (dbClient.from("courses" as any) as any)
+        .select("id, title, instructor_id")
+        .eq("id", rawId)
+        .maybeSingle();
+      course = data;
+    } catch (e) {
+      console.warn("[resolveCourse] UUID query error:", e);
+    }
+  }
+
+  if (!course) {
+    try {
+      const { data } = await (dbClient.from("courses" as any) as any)
+        .select("id, title, instructor_id")
+        .eq("slug", decodedId)
+        .maybeSingle();
+      course = data;
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!course && decodedId !== rawId) {
+    try {
+      const { data } = await (dbClient.from("courses" as any) as any)
+        .select("id, title, instructor_id")
+        .eq("slug", rawId)
+        .maybeSingle();
+      course = data;
+    } catch {
+      // ignore
+    }
+  }
+
+  // Fallback: search by title
+  if (!course) {
+    try {
+      const { data } = await (dbClient.from("courses" as any) as any)
+        .select("id, title, instructor_id")
+        .ilike("title", decodedId)
+        .maybeSingle();
+      course = data;
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!course) return null;
+
+  let courseType = "academic";
+  try {
+    const { data: tData, error: tErr } = await (dbClient.from("courses" as any) as any)
+      .select("type")
+      .eq("id", course.id)
+      .maybeSingle();
+    if (!tErr && tData?.type) {
+      courseType = tData.type;
+    }
+  } catch {
+    // type column not in DB yet, default to academic
+  }
+
+  return { ...course, type: courseType };
+}
+
+async function checkAccess(supabase: any, dbClient: any, userId: string, course: any) {
+  const { data: userRoles } = await supabase
+    .from("user_roles")
+    .select("roles(name)")
+    .eq("user_id", userId);
+  const roles = userRoles?.map((ur: any) => ur.roles?.name) || [];
+  const isOwnerOrAdmin = course.instructor_id === userId || roles.some((r: any) => ["SUPER_ADMIN", "ADMIN", "ACADEMIC_ADMIN"].includes(r));
+  if (isOwnerOrAdmin) return true;
+
+  const { data: collab } = await (dbClient.from("course_collaborators" as any) as any)
+    .select("id")
+    .eq("course_id", course.id)
+    .eq("collaborator_id", userId)
+    .maybeSingle();
+  return !!collab;
+}
+
 export async function GET(
   req: NextRequest,
   context: { params: Promise<{ courseId: string }> }
@@ -20,46 +116,40 @@ export async function GET(
       ? supabaseAdmin
       : supabase;
 
-    // Check course existence & access
-    const { data: course, error: courseErr } = await (dbClient
-      .from("courses" as any) as any)
-      .select("id, title, type, instructor_id")
-      .eq("id", courseId)
-      .maybeSingle();
-
-    if (courseErr || !course) {
+    const course = await resolveCourse(dbClient, courseId);
+    if (!course) {
       return NextResponse.json({ error: "Cours introuvable." }, { status: 404 });
     }
 
-    // Check roles
-    const { data: userRoles } = await supabase
-      .from("user_roles")
-      .select("roles(name)")
-      .eq("user_id", user.id);
-    const roles = userRoles?.map((ur: any) => ur.roles?.name) || [];
-    const isOwnerOrAdmin = course.instructor_id === user.id || roles.some(r => ["SUPER_ADMIN", "ADMIN", "ACADEMIC_ADMIN"].includes(r));
-
-    if (!isOwnerOrAdmin) {
+    const hasAccess = await checkAccess(supabase, dbClient, user.id, course);
+    if (!hasAccess) {
       return NextResponse.json({ error: "Accès refusé. Vous n'êtes pas le formateur de ce cours." }, { status: 403 });
     }
 
-    // Fetch sessions
-    const { data: sessions, error: sessionsErr } = await (dbClient
-      .from("course_sessions" as any) as any)
-      .select("*")
-      .eq("course_id", courseId)
-      .order("start_date", { ascending: true, nullsFirst: false });
-
-    if (sessionsErr) {
-      console.error("[sessions GET] error:", sessionsErr);
-      return NextResponse.json({ error: sessionsErr.message }, { status: 400 });
+    // Fetch sessions safely
+    let sessions: any[] = [];
+    try {
+      const { data: sessData } = await (dbClient
+        .from("course_sessions" as any) as any)
+        .select("*")
+        .eq("course_id", course.id)
+        .order("start_date", { ascending: true, nullsFirst: false });
+      if (sessData) sessions = sessData;
+    } catch {
+      sessions = [];
     }
 
-    // Fetch student counts per session
-    const { data: enrollments } = await (dbClient
-      .from("enrollments" as any) as any)
-      .select("session_id, id")
-      .eq("course_id", courseId);
+    // Fetch student counts per session safely
+    let enrollments: any[] = [];
+    try {
+      const { data: enrData, error: enrErr } = await (dbClient
+        .from("enrollments" as any) as any)
+        .select("session_id, id")
+        .eq("course_id", course.id);
+      if (!enrErr && enrData) enrollments = enrData;
+    } catch {
+      enrollments = [];
+    }
 
     const countMap = new Map<string, number>();
     let unassignedCount = 0;
@@ -115,14 +205,8 @@ export async function POST(
       ? supabaseAdmin
       : supabase;
 
-    // Check course existence
-    const { data: course, error: courseErr } = await (dbClient
-      .from("courses" as any) as any)
-      .select("id, title, type, instructor_id")
-      .eq("id", courseId)
-      .maybeSingle();
-
-    if (courseErr || !course) {
+    const course = await resolveCourse(dbClient, courseId);
+    if (!course) {
       return NextResponse.json({ error: "Cours introuvable." }, { status: 404 });
     }
 
@@ -133,14 +217,8 @@ export async function POST(
       );
     }
 
-    const { data: userRoles } = await supabase
-      .from("user_roles")
-      .select("roles(name)")
-      .eq("user_id", user.id);
-    const roles = userRoles?.map((ur: any) => ur.roles?.name) || [];
-    const isOwnerOrAdmin = course.instructor_id === user.id || roles.some(r => ["SUPER_ADMIN", "ADMIN", "ACADEMIC_ADMIN"].includes(r));
-
-    if (!isOwnerOrAdmin) {
+    const hasAccess = await checkAccess(supabase, dbClient, user.id, course);
+    if (!hasAccess) {
       return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
     }
 
@@ -153,9 +231,13 @@ export async function POST(
 
     // If isDefault is true, set others for this course to false
     if (isDefault) {
-      await (dbClient.from("course_sessions" as any) as any)
-        .update({ is_default: false })
-        .eq("course_id", courseId);
+      try {
+        await (dbClient.from("course_sessions" as any) as any)
+          .update({ is_default: false })
+          .eq("course_id", course.id);
+      } catch (e) {
+        console.warn("[sessions POST] update default warning:", e);
+      }
     }
 
     const sessionStatus = status || "UPCOMING";
@@ -163,7 +245,7 @@ export async function POST(
     const { data: newSession, error: insertErr } = await (dbClient
       .from("course_sessions" as any) as any)
       .insert({
-        course_id: courseId,
+        course_id: course.id,
         name: name.trim(),
         start_date: startDate ? new Date(startDate).toISOString() : null,
         end_date: endDate ? new Date(endDate).toISOString() : null,
@@ -176,6 +258,11 @@ export async function POST(
 
     if (insertErr) {
       console.error("[sessions POST] insert error:", insertErr);
+      if (insertErr.message?.includes("does not exist") || (insertErr as any).code === "42P01") {
+        return NextResponse.json({
+          error: "La table 'course_sessions' n'est pas encore créée en base. Veuillez exécuter le script prisma/add-course-sessions.sql dans Supabase SQL Editor."
+        }, { status: 400 });
+      }
       return NextResponse.json({ error: insertErr.message }, { status: 400 });
     }
 

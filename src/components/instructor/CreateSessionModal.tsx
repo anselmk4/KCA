@@ -51,7 +51,7 @@ export function CreateSessionModal({
     setError(null);
 
     try {
-      const res = await fetch(`/api/instructor/courses/${courseId}/sessions`, {
+      const res = await fetch(`/api/instructor/courses/${encodeURIComponent(courseId)}/sessions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
