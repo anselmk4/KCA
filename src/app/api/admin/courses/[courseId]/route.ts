@@ -152,7 +152,7 @@ export async function PUT(
       }
 
       const targetType = updates.type !== undefined ? updates.type : existingCourse?.type;
-      const targetPrice = updates.price !== undefined ? parseFloat(updates.price) : (existingCourse?.price !== undefined ? parseFloat(existingCourse.price) : 0);
+      const targetPrice = updates.price !== undefined ? Number(updates.price) : Number(existingCourse?.price || 0);
 
       if (targetType === "self_paced" && targetPrice > 25) {
         return NextResponse.json(
@@ -164,7 +164,7 @@ export async function PUT(
       if (updates.type === "self_paced") {
         updates.allow_installments = false;
         if (updates.price !== undefined) {
-          updates.price = Math.min(parseFloat(updates.price), 25);
+          updates.price = Math.min(Number(updates.price), 25);
         }
       }
 

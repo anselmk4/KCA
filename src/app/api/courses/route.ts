@@ -240,7 +240,7 @@ export async function PUT(req: NextRequest) {
     if (updates.price !== undefined) sbUpdates.price = updates.price;
 
     const targetType = sbUpdates.type || existingCourse.type;
-    const targetPrice = sbUpdates.price !== undefined ? parseFloat(sbUpdates.price) : (existingCourse.price !== undefined ? parseFloat(existingCourse.price) : 0);
+    const targetPrice = sbUpdates.price !== undefined ? Number(sbUpdates.price) : Number(existingCourse.price || 0);
 
     if (targetType === 'self_paced' && targetPrice > 25) {
       return NextResponse.json(
