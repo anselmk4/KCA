@@ -69,8 +69,8 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Étudiant introuvable." }, { status: 404 });
       }
 
-      const { data: enrollments } = await dbClient
-        .from("enrollments")
+      const { data: enrollments } = await (dbClient
+        .from("enrollments" as any) as any)
         .select("id, course_id, session_id, progress_percent, status, enrolled_at, enrollment_type, manual_payment_status, manual_amount_paid")
         .eq("student_id", studentId)
         .in("course_id", courseIds);
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
         });
       }
 
-      const enrolledCourseIds = enrollments.map(e => e.course_id);
+      const enrolledCourseIds = (enrollments as any[]).map((e: any) => e.course_id);
 
       // Get sections & lessons for lesson completion statistics
       const { data: sections } = await dbClient
@@ -258,8 +258,8 @@ export async function GET(req: NextRequest) {
     }
 
     // --- BEHAVIOR 2: All Students List ---
-    const { data: enrData, error: enrError } = await dbClient
-      .from("enrollments")
+    const { data: enrData, error: enrError } = await (dbClient
+      .from("enrollments" as any) as any)
       .select("id, student_id, course_id, session_id, progress_percent, status, enrolled_at, enrollment_type, manual_payment_status, manual_amount_paid")
       .in("course_id", courseIds);
 
@@ -272,7 +272,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ enrollments: [] });
     }
 
-    const studentIds = [...new Set(enrData.map(e => e.student_id))];
+    const studentIds = [...new Set((enrData as any[]).map((e: any) => e.student_id))];
 
     const { data: profiles } = await dbClient
       .from("profiles")
@@ -485,8 +485,8 @@ export async function POST(req: NextRequest) {
     const manualStatus = paymentOption === "CASH_FULL" ? "CASH_FULL" : paymentOption === "CASH_INSTALLMENT" ? "CASH_INSTALLMENT" : "FREE_SCHOLARSHIP";
     const manualAmount = paymentOption === "FREE" ? 0 : (Number(paidAmount) || (paymentOption === "CASH_FULL" ? targetCoursePrice : 0));
 
-    const { error: insertErr } = await supabaseAdmin
-      .from("enrollments")
+    const { error: insertErr } = await (supabaseAdmin
+      .from("enrollments" as any) as any)
       .insert({
         student_id: studentId,
         course_id: courseId,

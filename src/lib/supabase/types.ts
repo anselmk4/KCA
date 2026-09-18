@@ -368,6 +368,53 @@ export type Database = {
           },
         ]
       }
+      course_sessions: {
+        Row: {
+          course_id: string
+          created_at: string
+          end_date: string | null
+          id: string
+          is_default: boolean
+          max_capacity: number | null
+          name: string
+          start_date: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          is_default?: boolean
+          max_capacity?: number | null
+          name: string
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          is_default?: boolean
+          max_capacity?: number | null
+          name?: string
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_sessions_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_tags: {
         Row: {
           course_id: string
@@ -530,6 +577,7 @@ export type Database = {
           manual_amount_paid: number | null
           manual_payment_status: string | null
           progress_percent: number | null
+          session_id: string | null
           status: Database["public"]["Enums"]["student_status"] | null
           student_id: string
           updated_at: string
@@ -545,6 +593,7 @@ export type Database = {
           manual_amount_paid?: number | null
           manual_payment_status?: string | null
           progress_percent?: number | null
+          session_id?: string | null
           status?: Database["public"]["Enums"]["student_status"] | null
           student_id: string
           updated_at?: string
@@ -560,6 +609,7 @@ export type Database = {
           manual_amount_paid?: number | null
           manual_payment_status?: string | null
           progress_percent?: number | null
+          session_id?: string | null
           status?: Database["public"]["Enums"]["student_status"] | null
           student_id?: string
           updated_at?: string
@@ -570,6 +620,13 @@ export type Database = {
             columns: ["course_id"]
             isOneToOne: false
             referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollments_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "course_sessions"
             referencedColumns: ["id"]
           },
           {
