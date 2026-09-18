@@ -7,12 +7,13 @@ import {
   Users, Search, TrendingUp, BookOpen, Award, DollarSign,
   ArrowRight, Filter, ChevronDown, Loader2, UserCheck,
   AlertCircle, Clock, CheckCircle2, Circle, Sparkles, Lock, Unlock,
-  Coins
+  Coins, GraduationCap, Zap, RefreshCw, X
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { getSimulatedSession } from "@/lib/rbac";
 import { useLanguage } from "@/context/LanguageContext";
 import { AddInstallmentModal } from "@/components/instructor/AddInstallmentModal";
+import { AssignSessionModal } from "@/components/instructor/AssignSessionModal";
 
 type StudentEnrollment = {
   studentId: string;
@@ -21,6 +22,12 @@ type StudentEnrollment = {
   courseId: string;
   courseTitle: string;
   coursePrice: number;
+  courseType?: "academic" | "self_paced";
+  sessionId?: string | null;
+  sessionName?: string | null;
+  sessionStatus?: "UPCOMING" | "IN_PROGRESS" | "COMPLETED" | "ARCHIVED" | string | null;
+  sessionStartDate?: string | null;
+  sessionEndDate?: string | null;
   totalPaid: number;
   remainingAmount: number;
   isInstallmentCourse: boolean;
@@ -49,16 +56,46 @@ type GroupedStudent = {
   lastActivity: string;
 };
 
+type CourseItem = {
+  id: string;
+  title: string;
+  type: string;
+};
+
+type SessionItem = {
+  id: string;
+  courseId: string;
+  courseTitle?: string;
+  name: string;
+  status: string;
+  startDate: string | null;
+  endDate: string | null;
+};
+
 export default function StudentsPage() {
   const { t } = useLanguage();
   const router = useRouter();
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [enrollments, setEnrollments] = useState<StudentEnrollment[]>([]);
+  const [courses, setCourses] = useState<CourseItem[]>([]);
+  const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [search, setSearch] = useState("");
+  const [filterCourse, setFilterCourse] = useState("all");
+  const [filterSession, setFilterSession] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPayment, setFilterPayment] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
+
+  // Assign Session Modal state
+  const [assignSessionTarget, setAssignSessionTarget] = useState<{
+    studentId: string;
+    studentName: string;
+    courseId: string;
+    courseTitle: string;
+    currentSessionId?: string | null;
+    currentSessionName?: string | null;
+  } | null>(null);
 
   // Installment Modal state
   const [installmentTarget, setInstallmentTarget] = useState<{
@@ -89,6 +126,8 @@ export default function StudentsPage() {
       }
       const data = await res.json();
       setEnrollments(data.enrollments || []);
+      setCourses(data.courses || []);
+      setSessions(data.sessions || []);
     } catch (err) {
       console.error("[students] fetch error:", err);
     } finally {
@@ -194,16 +233,33 @@ export default function StudentsPage() {
   const avgProgress = grouped.length > 0 ? Math.round(grouped.reduce((s, g) => s + g.avgProgress, 0) / grouped.length) : 0;
   const certifiedCount = grouped.filter(g => g.hasCertificate).length;
 
-  // Filtering
+  // Filtering with Course and Session / Cohort differentiation
   const filtered = useMemo(() => {
     return grouped.filter(g => {
-      const q = search.toLowerCase();
+      const q = search.toLowerCase().trim();
       const matchSearch = !q || g.studentName.toLowerCase().includes(q) || g.studentEmail.toLowerCase().includes(q);
       const matchStatus = filterStatus === "all" || g.enrollments.some(e => e.enrollmentStatus === filterStatus);
       const matchPayment = filterPayment === "all" || g.enrollments.some(e => e.paymentStatus === filterPayment);
-      return matchSearch && matchStatus && matchPayment;
+      const matchCourse = filterCourse === "all" || g.enrollments.some(e => e.courseId === filterCourse);
+
+      let matchSession = true;
+      if (filterSession !== "all") {
+        if (filterSession === "IN_PROGRESS") {
+          matchSession = g.enrollments.some(e => e.courseType !== "self_paced" && e.sessionStatus === "IN_PROGRESS");
+        } else if (filterSession === "UPCOMING") {
+          matchSession = g.enrollments.some(e => e.courseType !== "self_paced" && e.sessionStatus === "UPCOMING");
+        } else if (filterSession === "COMPLETED") {
+          matchSession = g.enrollments.some(e => e.courseType !== "self_paced" && e.sessionStatus === "COMPLETED");
+        } else if (filterSession === "UNASSIGNED") {
+          matchSession = g.enrollments.some(e => e.courseType !== "self_paced" && !e.sessionId);
+        } else {
+          matchSession = g.enrollments.some(e => e.sessionId === filterSession);
+        }
+      }
+
+      return matchSearch && matchStatus && matchPayment && matchCourse && matchSession;
     });
-  }, [grouped, search, filterStatus, filterPayment]);
+  }, [grouped, search, filterStatus, filterPayment, filterCourse, filterSession]);
 
   if (loading) return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -258,33 +314,120 @@ export default function StudentsPage() {
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 space-y-4 shadow-xs">
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          <div className="relative flex-1 w-full">
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 space-y-3 shadow-xs">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+          {/* Search bar */}
+          <div className="relative flex-1">
             <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Rechercher par nom ou email d'étudiant..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl pl-10 pr-4 py-2 text-xs font-medium text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+              className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl pl-10 pr-8 py-2 text-xs font-medium text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
+
+          {/* Filter by Course */}
+          <div className="w-full md:w-56">
+            <select
+              value={filterCourse}
+              onChange={(e) => {
+                setFilterCourse(e.target.value);
+                setFilterSession("all");
+              }}
+              className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs font-medium text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 cursor-pointer"
+            >
+              <option value="all">📚 Tous les cours ({courses.length})</option>
+              {courses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.type === "self_paced" ? "⚡ " : "🎓 "}
+                  {c.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filter by Session / Cohort */}
+          <div className="w-full md:w-64">
+            <select
+              value={filterSession}
+              onChange={(e) => setFilterSession(e.target.value)}
+              className="w-full bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800/60 rounded-xl px-3 py-2 text-xs font-bold text-teal-800 dark:text-teal-300 focus:outline-none focus:ring-2 focus:ring-teal-500/30 cursor-pointer"
+            >
+              <option value="all">🎓 Toutes les classes / sessions</option>
+              <option value="IN_PROGRESS">🟢 En cours (Session active)</option>
+              <option value="UPCOMING">🟡 À venir (Inscriptions ouvertes)</option>
+              <option value="COMPLETED">⚪ Sessions terminées</option>
+              <option value="UNASSIGNED">⚠️ Non assigné à une classe</option>
+              {sessions
+                .filter((s) => filterCourse === "all" || s.courseId === filterCourse)
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    • {s.name} ({s.status === "IN_PROGRESS" ? "En cours" : s.status === "UPCOMING" ? "À venir" : "Terminée"})
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          {/* Reset Filters button */}
+          {(search || filterCourse !== "all" || filterSession !== "all" || filterPayment !== "all") && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("");
+                setFilterCourse("all");
+                setFilterSession("all");
+                setFilterPayment("all");
+              }}
+              className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+              title="Réinitialiser tous les filtres"
+            >
+              <RefreshCw className="w-3 h-3" />
+              <span>Réinitialiser</span>
+            </button>
+          )}
         </div>
+
+        {/* Quick active filter info */}
+        {filterSession !== "all" && (
+          <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-400">
+            <span className="font-bold text-teal-600 dark:text-teal-400">Filtre actif :</span>
+            <span>
+              {filterSession === "IN_PROGRESS" && "Apprenants actuellement en session d'apprentissage (En cours)."}
+              {filterSession === "UPCOMING" && "Apprenants inscrits pour les prochaines rentrées / sessions (À venir)."}
+              {filterSession === "COMPLETED" && "Apprenants des promotions terminées / archivées."}
+              {filterSession === "UNASSIGNED" && "Apprenants inscrits aux cours encadrés sans classe attribuée."}
+              {!["IN_PROGRESS", "UPCOMING", "COMPLETED", "UNASSIGNED"].includes(filterSession) &&
+                "Affichage filtré par promotion spécifique."}
+            </span>
+            <span className="ml-auto font-bold text-zinc-900 dark:text-white">
+              {filtered.length} apprenant{filtered.length > 1 ? "s" : ""}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Students List Table */}
       {filtered.length === 0 ? (
         <div className="text-center py-16 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 space-y-3">
           <Users className="w-12 h-12 text-zinc-300 mx-auto" />
-          <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Aucun étudiant trouvé.</p>
+          <p className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Aucun étudiant trouvé pour ces critères.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {filtered.map((student) => {
             const firstEnr = student.enrollments[0];
             const isBlocked = student.enrollments.some(e => e.enrollmentStatus === "SUSPENDED");
-            const hasRemainingBalance = student.enrollments.some(e => (e.remainingAmount || 0) > 0);
 
             return (
               <div
@@ -308,8 +451,8 @@ export default function StudentsPage() {
                     </div>
                   </div>
 
-                  {/* Courses & Installments breakdown */}
-                  <div className="md:col-span-4 space-y-1.5">
+                  {/* Courses, Sessions & Installments breakdown */}
+                  <div className="md:col-span-4 space-y-2">
                     {student.enrollments.map((e) => {
                       const isOnline = e.paymentOrigin === "ONLINE";
                       const manualStatus = e.manualPaymentStatus || "FREE_SCHOLARSHIP";
@@ -339,40 +482,118 @@ export default function StudentsPage() {
                       }
 
                       const canAddInstallment = e.remainingAmount > 0 || manualStatus === "CASH_INSTALLMENT" || manualStatus === "FREE_SCHOLARSHIP";
+                      const isAcademic = e.courseType !== "self_paced";
 
                       return (
-                        <div key={e.courseId} className="flex items-center justify-between text-xs bg-zinc-50 dark:bg-zinc-800/40 p-2 rounded-xl border border-zinc-100 dark:border-zinc-800 gap-2">
-                          <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate max-w-[140px]" title={e.courseTitle}>
-                            {e.courseTitle}
-                          </span>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${badgeStyle}`}>
-                              {badgeLabel}
+                        <div
+                          key={e.courseId}
+                          className="bg-zinc-50 dark:bg-zinc-800/40 p-2.5 rounded-xl border border-zinc-100 dark:border-zinc-800 space-y-1.5"
+                        >
+                          {/* Top: Course Title & Payment Badge */}
+                          <div className="flex items-center justify-between text-xs gap-2">
+                            <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate max-w-[140px]" title={e.courseTitle}>
+                              {e.courseTitle}
                             </span>
-                            {canAddInstallment && (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${badgeStyle}`}>
+                                {badgeLabel}
+                              </span>
+                              {canAddInstallment && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setInstallmentTarget({
+                                      studentId: student.studentId,
+                                      studentName: student.studentName,
+                                      studentEmail: student.studentEmail,
+                                      courseId: e.courseId,
+                                      courseTitle: e.courseTitle,
+                                      coursePrice: e.coursePrice,
+                                      totalPaid: e.totalPaid || e.manualAmountPaid || 0,
+                                      remainingAmount: e.remainingAmount,
+                                      isSuspended: e.enrollmentStatus === "SUSPENDED",
+                                    })
+                                  }
+                                  className="px-2 py-0.5 bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/40 dark:hover:bg-teal-900/50 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800/60 rounded-lg text-[10px] font-extrabold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                                  title="Enregistrer une tranche de paiement pour cet apprenant"
+                                >
+                                  <Coins className="w-3 h-3" />
+                                  <span>+ Tranche</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Bottom: Session / Cohort status (for academic courses) or Self-paced notice */}
+                          {isAcademic ? (
+                            <div className="flex items-center justify-between pt-1 border-t border-zinc-200/50 dark:border-zinc-700/50 text-[10px]">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <GraduationCap className="w-3 h-3 text-teal-600 dark:text-teal-400 shrink-0" />
+                                {e.sessionId ? (
+                                  <span
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold truncate max-w-[170px] ${
+                                      e.sessionStatus === "IN_PROGRESS"
+                                        ? "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60"
+                                        : e.sessionStatus === "UPCOMING"
+                                        ? "bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60"
+                                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700"
+                                    }`}
+                                    title={`Session : ${e.sessionName} (${
+                                      e.sessionStatus === "IN_PROGRESS"
+                                        ? "En cours"
+                                        : e.sessionStatus === "UPCOMING"
+                                        ? "À venir"
+                                        : "Terminée"
+                                    })`}
+                                  >
+                                    {e.sessionStatus === "IN_PROGRESS" && (
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                                    )}
+                                    {e.sessionStatus === "UPCOMING" && (
+                                      <Clock className="w-2.5 h-2.5 shrink-0" />
+                                    )}
+                                    <span className="truncate">{e.sessionName}</span>
+                                    <span className="text-[9px] opacity-75 shrink-0">
+                                      •{" "}
+                                      {e.sessionStatus === "IN_PROGRESS"
+                                        ? "En cours"
+                                        : e.sessionStatus === "UPCOMING"
+                                        ? "À venir"
+                                        : "Terminée"}
+                                    </span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900/40">
+                                    <AlertCircle className="w-2.5 h-2.5 shrink-0" />
+                                    Non assigné à une classe
+                                  </span>
+                                )}
+                              </div>
+
                               <button
                                 type="button"
                                 onClick={() =>
-                                  setInstallmentTarget({
+                                  setAssignSessionTarget({
                                     studentId: student.studentId,
                                     studentName: student.studentName,
-                                    studentEmail: student.studentEmail,
                                     courseId: e.courseId,
                                     courseTitle: e.courseTitle,
-                                    coursePrice: e.coursePrice,
-                                    totalPaid: e.totalPaid || e.manualAmountPaid || 0,
-                                    remainingAmount: e.remainingAmount,
-                                    isSuspended: e.enrollmentStatus === "SUSPENDED",
+                                    currentSessionId: e.sessionId,
+                                    currentSessionName: e.sessionName,
                                   })
                                 }
-                                className="px-2 py-0.5 bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/40 dark:hover:bg-teal-900/50 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800/60 rounded-lg text-[10px] font-extrabold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                                title="Enregistrer une tranche de paiement pour cet apprenant"
+                                className="text-teal-700 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300 font-extrabold text-[10px] underline underline-offset-2 ml-2 shrink-0 cursor-pointer"
+                                title="Affecter ou changer de promotion"
                               >
-                                <Coins className="w-3 h-3" />
-                                <span>+ Tranche</span>
+                                {e.sessionId ? "Changer" : "+ Affecter"}
                               </button>
-                            )}
-                          </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 pt-1 border-t border-zinc-200/50 dark:border-zinc-700/50 text-[10px] text-zinc-400">
+                              <Zap className="w-3 h-3 text-amber-500 shrink-0" />
+                              <span>Cours autonome (Accès libre continu)</span>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -395,6 +616,7 @@ export default function StudentsPage() {
                     {/* Block/Unblock toggle */}
                     {firstEnr && (
                       <button
+                        type="button"
                         onClick={() => handleBlockAccess(student.studentId, firstEnr.courseId, firstEnr.enrollmentStatus, student.studentName)}
                         className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                           isBlocked
@@ -439,6 +661,24 @@ export default function StudentsPage() {
           totalPaid={installmentTarget.totalPaid}
           remainingAmount={installmentTarget.remainingAmount}
           isSuspended={installmentTarget.isSuspended}
+          onSuccess={() => {
+            if (session?.userId) fetchStudents(session.userId);
+          }}
+        />
+      )}
+
+      {/* Assign Session Modal */}
+      {assignSessionTarget && (
+        <AssignSessionModal
+          isOpen={!!assignSessionTarget}
+          onClose={() => setAssignSessionTarget(null)}
+          studentId={assignSessionTarget.studentId}
+          studentName={assignSessionTarget.studentName}
+          courseId={assignSessionTarget.courseId}
+          courseTitle={assignSessionTarget.courseTitle}
+          currentSessionId={assignSessionTarget.currentSessionId}
+          currentSessionName={assignSessionTarget.currentSessionName}
+          availableSessions={sessions}
           onSuccess={() => {
             if (session?.userId) fetchStudents(session.userId);
           }}

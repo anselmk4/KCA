@@ -105,6 +105,13 @@ model Profile {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+enum SessionStatus {
+  UPCOMING
+  IN_PROGRESS
+  COMPLETED
+  ARCHIVED
+}
+
 model Course {
   id          String       @id @default(uuid())
   title       String
@@ -121,6 +128,7 @@ model Course {
   instructor  User          @relation("AuthoredCourses", fields: [instructorId], references: [id])
   sections    CourseSection[]
   enrollments Enrollment[]
+  sessions    CourseSession[]
   quizzes     Quiz[]
   certificates Certificate[]
   homeworks   Homework[]
@@ -163,15 +171,33 @@ model Resource {
   lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 }
 
+model CourseSession {
+  id          String        @id @default(uuid())
+  courseId    String
+  name        String
+  startDate   DateTime?
+  endDate     DateTime?
+  status      SessionStatus @default(UPCOMING)
+  maxCapacity Int?
+  isDefault   Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  course      Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  enrollments Enrollment[]
+}
+
 model Enrollment {
   id              String   @id @default(uuid())
   studentId       String
   courseId        String
+  sessionId       String?
   progressPercent Float    @default(0.0)
   joinedAt        DateTime @default(now())
 
-  student         User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  course          Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student         User          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course          Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  session         CourseSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   lessonProgress  Progress[]
 
   @@unique([studentId, courseId])

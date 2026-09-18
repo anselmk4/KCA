@@ -7,17 +7,24 @@ import {
   ArrowLeft, BookOpen, TrendingUp, DollarSign, Award, Clock,
   CheckCircle2, Circle, PlayCircle, AlertTriangle, Mail,
   Calendar, BarChart3, ExternalLink, Loader2, User, Lock, Unlock,
-  Coins
+  Coins, GraduationCap, Zap
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { getSimulatedSession } from "@/lib/rbac";
 import { AddInstallmentModal } from "@/components/instructor/AddInstallmentModal";
+import { AssignSessionModal } from "@/components/instructor/AssignSessionModal";
 
 type CourseDetail = {
   courseId: string;
   courseTitle: string;
   courseSlug: string;
   coursePrice: number;
+  courseType?: "academic" | "self_paced";
+  sessionId?: string | null;
+  sessionName?: string | null;
+  sessionStatus?: "UPCOMING" | "IN_PROGRESS" | "COMPLETED" | "ARCHIVED" | string | null;
+  sessionStartDate?: string | null;
+  sessionEndDate?: string | null;
   totalPaid?: number;
   remainingAmount?: number;
   isInstallmentCourse?: boolean;
@@ -104,6 +111,16 @@ export default function StudentDetailPage() {
     totalPaid: number;
     remainingAmount: number;
     isSuspended?: boolean;
+  } | null>(null);
+
+  // Assign session modal state
+  const [assignSessionTarget, setAssignSessionTarget] = useState<{
+    studentId: string;
+    studentName: string;
+    courseId: string;
+    courseTitle: string;
+    currentSessionId?: string | null;
+    currentSessionName?: string | null;
   } | null>(null);
 
   async function handleBlockAccess(courseId: string, currentStatus: string, courseTitle: string) {
@@ -459,6 +476,50 @@ export default function StudentDetailPage() {
                             Inscrit le {new Date(course.enrolledAt).toLocaleDateString("fr-FR")}
                           </span>
                         </div>
+
+                        {/* Session / Cohort status */}
+                        {course.courseType !== "self_paced" ? (
+                          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                            {course.sessionId ? (
+                              <span
+                                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                  course.sessionStatus === "IN_PROGRESS"
+                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200"
+                                    : course.sessionStatus === "UPCOMING"
+                                    ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200"
+                                    : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                                }`}
+                              >
+                                🎓 {course.sessionName} • {course.sessionStatus === "IN_PROGRESS" ? "En cours" : course.sessionStatus === "UPCOMING" ? "À venir" : "Terminée"}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/30 dark:text-rose-400">
+                                ⚠️ Non assigné à une classe
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAssignSessionTarget({
+                                  studentId: student.id,
+                                  studentName: student.name,
+                                  courseId: course.courseId,
+                                  courseTitle: course.courseTitle,
+                                  currentSessionId: course.sessionId,
+                                  currentSessionName: course.sessionName,
+                                })
+                              }
+                              className="text-xs text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer"
+                            >
+                              {course.sessionId ? "Changer de classe" : "+ Affecter à une classe"}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 mt-1 text-xs text-zinc-400">
+                            <Zap className="w-3.5 h-3.5 text-amber-500" />
+                            <span>Cours en autonomie (Self-paced)</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -933,6 +994,25 @@ export default function StudentDetailPage() {
           totalPaid={installmentTarget.totalPaid}
           remainingAmount={installmentTarget.remainingAmount}
           isSuspended={installmentTarget.isSuspended}
+          onSuccess={() => {
+            const session = getSimulatedSession();
+            if (session?.userId && studentId) {
+              fetchStudentDetail(session.userId, studentId);
+            }
+          }}
+        />
+      )}
+      {/* Assign Session Modal */}
+      {assignSessionTarget && (
+        <AssignSessionModal
+          isOpen={!!assignSessionTarget}
+          onClose={() => setAssignSessionTarget(null)}
+          studentId={assignSessionTarget.studentId}
+          studentName={assignSessionTarget.studentName}
+          courseId={assignSessionTarget.courseId}
+          courseTitle={assignSessionTarget.courseTitle}
+          currentSessionId={assignSessionTarget.currentSessionId}
+          currentSessionName={assignSessionTarget.currentSessionName}
           onSuccess={() => {
             const session = getSimulatedSession();
             if (session?.userId && studentId) {

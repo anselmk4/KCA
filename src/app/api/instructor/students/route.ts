@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     // Get instructor's courses
     const { data: coursesRaw, error: coursesError } = await (dbClient
       .from("courses" as any) as any)
-      .select("id, title, slug, price, allow_installments, installments_count")
+      .select("id, title, slug, price, type, allow_installments, installments_count")
       .eq("instructor_id", user.id);
     const courses: any[] | null = coursesRaw;
 
@@ -50,6 +50,13 @@ export async function GET(req: NextRequest) {
     const courseIds = courses.map(c => c.id);
     const courseMap = new Map(courses.map(c => [c.id, c]));
 
+    // Fetch sessions for all these courses
+    const { data: rawSessions } = await (dbClient
+      .from("course_sessions" as any) as any)
+      .select("id, course_id, name, status, start_date, end_date, max_capacity, is_default")
+      .in("course_id", courseIds);
+    const sessionMap = new Map((rawSessions || []).map((s: any) => [s.id, s]));
+
     // --- BEHAVIOR 1: Single Student Detail ---
     if (studentId) {
       const { data: profile } = await dbClient
@@ -64,7 +71,7 @@ export async function GET(req: NextRequest) {
 
       const { data: enrollments } = await dbClient
         .from("enrollments")
-        .select("id, course_id, progress_percent, status, enrolled_at, enrollment_type, manual_payment_status, manual_amount_paid")
+        .select("id, course_id, session_id, progress_percent, status, enrolled_at, enrollment_type, manual_payment_status, manual_amount_paid")
         .eq("student_id", studentId)
         .in("course_id", courseIds);
 
@@ -205,11 +212,19 @@ export async function GET(req: NextRequest) {
           pStatus = paymentOrigin === "MANUAL" ? "MANUAL_CASH_PARTIAL" : "PARTIAL";
         }
 
+        const sess = (e as any).session_id ? sessionMap.get((e as any).session_id) : null;
+
         return {
           courseId: e.course_id,
           courseTitle: course?.title || "Cours",
           courseSlug: course?.slug || "",
           coursePrice: rawPrice,
+          courseType: course?.type || "academic",
+          sessionId: (e as any).session_id || null,
+          sessionName: sess?.name || null,
+          sessionStatus: sess?.status || null,
+          sessionStartDate: sess?.start_date || null,
+          sessionEndDate: sess?.end_date || null,
           totalPaid,
           remainingAmount,
           isInstallmentCourse,
@@ -245,7 +260,7 @@ export async function GET(req: NextRequest) {
     // --- BEHAVIOR 2: All Students List ---
     const { data: enrData, error: enrError } = await dbClient
       .from("enrollments")
-      .select("id, student_id, course_id, progress_percent, status, enrolled_at, enrollment_type, manual_payment_status, manual_amount_paid")
+      .select("id, student_id, course_id, session_id, progress_percent, status, enrolled_at, enrollment_type, manual_payment_status, manual_amount_paid")
       .in("course_id", courseIds);
 
     if (enrError) {
@@ -348,13 +363,21 @@ export async function GET(req: NextRequest) {
         pStatus = paymentOrigin === "MANUAL" ? "MANUAL_CASH_PARTIAL" : "PARTIAL";
       }
 
+      const sess = (e as any).session_id ? sessionMap.get((e as any).session_id) : null;
+
       return {
         studentId: e.student_id,
         studentName: profile?.full_name || "Étudiant",
         studentEmail: profile?.email || "",
         courseId: e.course_id,
         courseTitle: course?.title || "Cours",
+        courseType: course?.type || "academic",
         coursePrice: rawPrice,
+        sessionId: (e as any).session_id || null,
+        sessionName: sess?.name || null,
+        sessionStatus: sess?.status || null,
+        sessionStartDate: sess?.start_date || null,
+        sessionEndDate: sess?.end_date || null,
         totalPaid,
         remainingAmount,
         isInstallmentCourse,
@@ -373,7 +396,27 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json({ enrollments: rows });
+    const sessionsList = (rawSessions || []).map((s: any) => ({
+      id: s.id,
+      courseId: s.course_id,
+      courseTitle: courseMap.get(s.course_id)?.title || "",
+      name: s.name,
+      status: s.status,
+      startDate: s.start_date,
+      endDate: s.end_date,
+      maxCapacity: s.max_capacity,
+      isDefault: s.is_default || false,
+    }));
+
+    return NextResponse.json({
+      enrollments: rows,
+      courses: (courses || []).map(c => ({
+        id: c.id,
+        title: c.title,
+        type: c.type || "academic"
+      })),
+      sessions: sessionsList,
+    });
   } catch (err: any) {
     console.error("[students-api GET] Error:", err);
     return NextResponse.json({ error: err.message || "Erreur interne du serveur." }, { status: 500 });
@@ -400,7 +443,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { studentId, courseId, paymentOption, paidAmount } = body;
+    const { studentId, courseId, sessionId, paymentOption, paidAmount } = body;
 
     if (!studentId || !courseId) {
       return NextResponse.json({ error: "Données manquantes (studentId ou courseId)." }, { status: 400 });
@@ -447,6 +490,7 @@ export async function POST(req: NextRequest) {
       .insert({
         student_id: studentId,
         course_id: courseId,
+        session_id: sessionId || null,
         status: "ACTIVE",
         progress_percent: 0,
         created_at: new Date().toISOString(),

@@ -41,6 +41,8 @@ import {
 import { supabase } from "@/lib/supabase/client";
 import RichEditor from "@/components/editor/RichEditor";
 import { BlockEditor } from "@/components/editor/BlockEditor";
+import { CreateSessionModal } from "@/components/instructor/CreateSessionModal";
+import { AssignSessionModal } from "@/components/instructor/AssignSessionModal";
 
 // ─── Types locaux ─────────────────────────────────────────
 type CourseStatus = "DRAFT" | "REVIEW" | "PUBLISHED" | "ARCHIVED";
@@ -215,6 +217,18 @@ export default function CourseDetailPage() {
   const [invitePaymentOption, setInvitePaymentOption] = useState<"FREE" | "CASH_FULL" | "CASH_INSTALLMENT">("FREE");
   const [invitePaidAmount, setInvitePaidAmount] = useState<string>("");
 
+  // ─── Sessions & Cohorts states ────────────────────────────
+  const [courseSessions, setCourseSessions] = useState<any[]>([]);
+  const [showCreateSessionModal, setShowCreateSessionModal] = useState(false);
+  const [assignModalStudent, setAssignModalStudent] = useState<{
+    studentId: string;
+    studentName: string;
+    currentSessionId?: string | null;
+    currentSessionName?: string | null;
+  } | null>(null);
+  const [courseSessionFilter, setCourseSessionFilter] = useState("all");
+  const [inviteSessionId, setInviteSessionId] = useState("");
+
   // ─── Price tab states ─────────────────────────────────────
   const [coursePrice, setCoursePrice] = useState("0");
   const [allowInstallments, setAllowInstallments] = useState(false);
@@ -278,7 +292,7 @@ export default function CourseDetailPage() {
       if (!user) { router.push("/login"); return; }
       setUserId(user.id);
 
-      // Fast Parallel Batch 1: Fetch Course, Profile Plan, Categories, Sections, Quizzes, Enrollments, Homeworks
+      // Fast Parallel Batch 1: Fetch Course, Profile Plan, Categories, Sections, Quizzes, Enrollments, Homeworks, Sessions
       const [
         { data: courseData },
         { data: profData },
@@ -286,7 +300,8 @@ export default function CourseDetailPage() {
         { data: sectionsData },
         { data: quizzesData },
         { data: enrollmentsData },
-        { data: hwData }
+        { data: hwData },
+        { data: sessionsData }
       ] = await Promise.all([
         supabase.from("courses").select("*").eq("id", courseId).maybeSingle(),
         supabase.from("profiles").select("plan").eq("id", user.id).maybeSingle(),
@@ -294,8 +309,11 @@ export default function CourseDetailPage() {
         supabase.from("course_sections").select("*").eq("course_id", courseId).order("sort_order"),
         supabase.from("quizzes").select("*").eq("course_id", courseId),
         supabase.from("enrollments").select("*, profiles!student_id(full_name, email)").eq("course_id", courseId),
-        (supabase as any).from("homeworks").select("*").eq("course_id", courseId)
+        (supabase as any).from("homeworks").select("*").eq("course_id", courseId),
+        (supabase as any).from("course_sessions").select("*").eq("course_id", courseId).order("start_date", { ascending: true, nullsFirst: false })
       ]);
+
+      setCourseSessions(sessionsData || []);
 
       if (!courseData) {
         if (!silent) setLoading(false);
@@ -1131,6 +1149,7 @@ export default function CourseDetailPage() {
         body: JSON.stringify({
           studentId: inviteFound.id,
           courseId: courseId,
+          sessionId: inviteSessionId || null,
           paymentOption: invitePaymentOption,
           paidAmount: Number(invitePaidAmount) || 0
         }),
@@ -1148,6 +1167,7 @@ export default function CourseDetailPage() {
         setShowInviteModal(false);
         setInviteEmail("");
         setInviteFound(null);
+        setInviteSessionId("");
         loadData(true);
       }, 2000);
     } catch (err: any) {
@@ -2301,13 +2321,28 @@ export default function CourseDetailPage() {
           </div>
         )}
 
-        {/* ── TAB 4: Étudiants ── */}
+        {/* ── TAB 4: Étudiants & Cohortes ── */}
         {activeTab === "students" && (
           <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm space-y-6">
-            <div className="pb-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between flex-wrap gap-4">
+            {/* Header */}
+            <div className="pb-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between flex-wrap gap-4">
               <div>
-                <h3 className="font-bold text-zinc-900 dark:text-white text-base">Inscriptions & Cohortes</h3>
-                <p className="text-zinc-400 text-xs mt-0.5">{enrollments.length} étudiant{enrollments.length > 1 ? "s" : ""} inscrit{enrollments.length > 1 ? "s" : ""}</p>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-zinc-900 dark:text-white text-base">Inscriptions &amp; Cohortes</h3>
+                  {course?.type !== "self_paced" ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 dark:bg-teal-950/40 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800">
+                      🎓 Cours Encadré
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                      ⚡ Autonome
+                    </span>
+                  )}
+                </div>
+                <p className="text-zinc-400 text-xs mt-0.5">
+                  {enrollments.length} étudiant{enrollments.length > 1 ? "s" : ""} inscrit{enrollments.length > 1 ? "s" : ""}
+                  {course?.type !== "self_paced" && ` · ${courseSessions.length} classe${courseSessions.length > 1 ? "s" : ""}/session${courseSessions.length > 1 ? "s" : ""}`}
+                </p>
               </div>
 
               <div className="flex items-center gap-3">
@@ -2316,65 +2351,321 @@ export default function CourseDetailPage() {
                   <span>Revenus Générés : {totalCourseRevenue.toLocaleString()}$</span>
                 </div>
 
-                <button onClick={() => setShowInviteModal(true)} className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer">
+                {course?.type !== "self_paced" && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateSessionModal(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/40 dark:hover:bg-teal-900/50 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Nouvelle Classe / Session
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setShowInviteModal(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+                >
                   <UserPlus className="w-3.5 h-3.5" /> Enrôler un Étudiant
                 </button>
               </div>
             </div>
+
+            {/* Academic Courses: Session / Cohort Management Block */}
+            {course?.type !== "self_paced" && (
+              <div className="p-5 bg-zinc-50/70 dark:bg-zinc-850/40 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                    <h4 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
+                      Classes &amp; Sessions de cette formation
+                    </h4>
+                  </div>
+                  <span className="text-[11px] text-zinc-400 font-medium">
+                    {courseSessions.length} session{courseSessions.length > 1 ? "s" : ""} configurée{courseSessions.length > 1 ? "s" : ""}
+                  </span>
+                </div>
+
+                {courseSessions.length === 0 ? (
+                  <div className="text-center py-6 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl space-y-2">
+                    <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                      Aucune classe ou session n&apos;est encore créée
+                    </p>
+                    <p className="text-[11px] text-zinc-400 max-w-md mx-auto">
+                      Créez vos promotions pour distinguer les étudiants actuellement en cours de ceux inscrits pour les rentrées futures.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateSessionModal(true)}
+                      className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 mt-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Créer une première classe
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {courseSessions.map((sess) => {
+                      const count = enrollments.filter((e: any) => e.session_id === sess.id).length;
+                      const startDateFormatted = sess.start_date
+                        ? new Date(sess.start_date).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })
+                        : null;
+                      const endDateFormatted = sess.end_date
+                        ? new Date(sess.end_date).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })
+                        : null;
+
+                      let statusBadge = (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                          Terminée
+                        </span>
+                      );
+                      if (sess.status === "IN_PROGRESS") {
+                        statusBadge = (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            En cours
+                          </span>
+                        );
+                      } else if (sess.status === "UPCOMING") {
+                        statusBadge = (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60">
+                            <Clock className="w-2.5 h-2.5" />
+                            À venir
+                          </span>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={sess.id}
+                          className="p-3.5 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-2xs space-y-2 flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="flex items-start justify-between gap-2">
+                              <h5 className="font-extrabold text-xs text-zinc-900 dark:text-white truncate">
+                                {sess.name}
+                              </h5>
+                              {statusBadge}
+                            </div>
+                            <div className="mt-2 text-[11px] text-zinc-400 space-y-0.5">
+                              {startDateFormatted && (
+                                <p className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" /> Début : {startDateFormatted}
+                                </p>
+                              )}
+                              {endDateFormatted && <p>Fin : {endDateFormatted}</p>}
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs">
+                            <span className="font-extrabold text-zinc-800 dark:text-zinc-200 flex items-center gap-1">
+                              <Users className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                              {count} inscrit{count > 1 ? "s" : ""}
+                              {sess.max_capacity ? ` / ${sess.max_capacity}` : ""}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setCourseSessionFilter(sess.id)}
+                              className="text-[10px] text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer"
+                            >
+                              Filtrer liste
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Self-paced Notice */}
+            {course?.type === "self_paced" && (
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500 flex items-center gap-2">
+                <Users className="w-4 h-4 text-zinc-400" />
+                <span>Ce cours est en autonomie libre : chaque étudiant avance à son rythme individuel.</span>
+              </div>
+            )}
+
+            {/* Enrollments Table Header & Filter Pills */}
+            {enrollments.length > 0 && course?.type !== "self_paced" && (
+              <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
+                <div className="flex items-center gap-1.5 flex-wrap text-xs">
+                  <span className="font-bold text-zinc-500 mr-1 text-[11px] uppercase tracking-wider">Filtrer par :</span>
+                  <button
+                    type="button"
+                    onClick={() => setCourseSessionFilter("all")}
+                    className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                      courseSessionFilter === "all"
+                        ? "bg-teal-600 text-white shadow-2xs"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200"
+                    }`}
+                  >
+                    Toutes ({enrollments.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCourseSessionFilter("IN_PROGRESS")}
+                    className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                      courseSessionFilter === "IN_PROGRESS"
+                        ? "bg-emerald-600 text-white shadow-2xs"
+                        : "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100"
+                    }`}
+                  >
+                    🟢 En cours
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCourseSessionFilter("UPCOMING")}
+                    className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                      courseSessionFilter === "UPCOMING"
+                        ? "bg-amber-600 text-white shadow-2xs"
+                        : "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100"
+                    }`}
+                  >
+                    🟡 À venir
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCourseSessionFilter("COMPLETED")}
+                    className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                      courseSessionFilter === "COMPLETED"
+                        ? "bg-zinc-700 text-white shadow-2xs"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200"
+                    }`}
+                  >
+                    ⚪ Terminées
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCourseSessionFilter("UNASSIGNED")}
+                    className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                      courseSessionFilter === "UNASSIGNED"
+                        ? "bg-rose-600 text-white shadow-2xs"
+                        : "bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 hover:bg-rose-100"
+                    }`}
+                  >
+                    ⚠️ Sans classe
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Students List Table */}
             {enrollments.length === 0 ? (
               <div className="py-20 text-center">
                 <Users className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
                 <h4 className="font-semibold text-zinc-700 dark:text-zinc-300 text-sm">Aucun apprenant inscrit</h4>
-                <p className="text-zinc-450 text-xs mt-1 mb-5">Inscrivez manuellement des étudiants pour qu'ils puissent démarrer la formation.</p>
-                <button onClick={() => setShowInviteModal(true)} className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-xl">
+                <p className="text-zinc-450 text-xs mt-1 mb-5">Inscrivez manuellement des étudiants pour qu&apos;ils puissent démarrer la formation.</p>
+                <button
+                  type="button"
+                  onClick={() => setShowInviteModal(true)}
+                  className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-xl"
+                >
                   Inscrire un premier étudiant
                 </button>
               </div>
             ) : (
               <div className="border border-zinc-150 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
                 <div className="grid grid-cols-12 bg-zinc-50 dark:bg-zinc-850 px-6 py-3 border-b border-zinc-150 dark:border-zinc-800 text-xs font-bold text-zinc-500 uppercase tracking-wider">
-                  <span className="col-span-5">Nom / Email</span>
-                  <span className="col-span-3 text-center">Inscription</span>
+                  <span className={course?.type !== "self_paced" ? "col-span-4" : "col-span-5"}>Nom / Email</span>
+                  {course?.type !== "self_paced" && <span className="col-span-3">Classe / Session</span>}
+                  <span className={course?.type !== "self_paced" ? "col-span-2 text-center" : "col-span-3 text-center"}>Inscription</span>
                   <span className="col-span-2 text-center">Progression</span>
-                  <span className="col-span-2 text-center">Statut</span>
+                  <span className="col-span-1 text-center">Statut</span>
                 </div>
                 <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {enrollments.map((enr) => {
-                    const profile = (enr as any).profiles;
-                    const name = profile?.full_name || "Apprenant";
-                    const email = profile?.email || "";
-                    const initials = name.split(" ").map((n: string) => n[0] || "").join("").slice(0, 2).toUpperCase();
-                    const date = enr.created_at ? new Date(enr.created_at).toLocaleDateString("fr-FR") : "—";
-                    return (
-                      <div key={enr.id} className="grid grid-cols-12 px-6 py-4 items-center text-xs text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50/50 dark:hover:bg-zinc-850/20 transition-colors">
-                        <div className="col-span-5 flex items-center gap-3 min-w-0">
-                          <div className="w-8 h-8 bg-teal-100 dark:bg-teal-900/30 rounded-full flex items-center justify-center text-teal-600 font-bold shrink-0">{initials}</div>
-                          <div className="min-w-0 truncate">
-                            <p className="font-bold text-zinc-900 dark:text-white truncate">{name}</p>
-                            <p className="text-[10px] text-zinc-450 dark:text-zinc-500 mt-0.5 truncate">{email}</p>
+                  {enrollments
+                    .filter((enr: any) => {
+                      if (courseSessionFilter === "all") return true;
+                      const sess = courseSessions.find((s) => s.id === enr.session_id);
+                      if (courseSessionFilter === "IN_PROGRESS") return sess?.status === "IN_PROGRESS";
+                      if (courseSessionFilter === "UPCOMING") return sess?.status === "UPCOMING";
+                      if (courseSessionFilter === "COMPLETED") return sess?.status === "COMPLETED";
+                      if (courseSessionFilter === "UNASSIGNED") return !enr.session_id;
+                      return enr.session_id === courseSessionFilter;
+                    })
+                    .map((enr) => {
+                      const profile = (enr as any).profiles;
+                      const name = profile?.full_name || "Apprenant";
+                      const email = profile?.email || "";
+                      const initials = name.split(" ").map((n: string) => n[0] || "").join("").slice(0, 2).toUpperCase();
+                      const date = enr.created_at ? new Date(enr.created_at).toLocaleDateString("fr-FR") : "—";
+                      const assignedSess = courseSessions.find((s) => s.id === (enr as any).session_id);
+
+                      return (
+                        <div key={enr.id} className="grid grid-cols-12 px-6 py-4 items-center text-xs text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50/50 dark:hover:bg-zinc-850/20 transition-colors">
+                          <div className={course?.type !== "self_paced" ? "col-span-4 flex items-center gap-3 min-w-0" : "col-span-5 flex items-center gap-3 min-w-0"}>
+                            <div className="w-8 h-8 bg-teal-100 dark:bg-teal-900/30 rounded-full flex items-center justify-center text-teal-600 font-bold shrink-0">{initials}</div>
+                            <div className="min-w-0 truncate">
+                              <p className="font-bold text-zinc-900 dark:text-white truncate">{name}</p>
+                              <p className="text-[10px] text-zinc-450 dark:text-zinc-500 mt-0.5 truncate">{email}</p>
+                            </div>
                           </div>
-                        </div>
-                        <span className="col-span-3 text-center text-zinc-500">{date}</span>
-                        <div className="col-span-2 flex items-center justify-center gap-2">
-                          <div className="w-16 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-teal-500 rounded-full" style={{ width: `${enr.progress_percent}%` }} />
+
+                          {/* Session / Cohort Column */}
+                          {course?.type !== "self_paced" && (
+                            <div className="col-span-3 flex items-center justify-between pr-3 gap-2">
+                              {assignedSess ? (
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[10px] truncate max-w-[170px] ${
+                                    assignedSess.status === "IN_PROGRESS"
+                                      ? "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 border border-emerald-200"
+                                      : assignedSess.status === "UPCOMING"
+                                      ? "bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-400 border border-amber-200"
+                                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300"
+                                  }`}
+                                  title={assignedSess.name}
+                                >
+                                  {assignedSess.status === "IN_PROGRESS" && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                                  {assignedSess.status === "UPCOMING" && <Clock className="w-2.5 h-2.5" />}
+                                  <span className="truncate">{assignedSess.name}</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/30 dark:text-rose-400">
+                                  Non assigné
+                                </span>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setAssignModalStudent({
+                                    studentId: (enr as any).student_id,
+                                    studentName: name,
+                                    currentSessionId: (enr as any).session_id,
+                                    currentSessionName: assignedSess?.name,
+                                  })
+                                }
+                                className="text-[10px] text-teal-600 dark:text-teal-400 font-extrabold hover:underline cursor-pointer shrink-0"
+                              >
+                                {assignedSess ? "Changer" : "+ Assigner"}
+                              </button>
+                            </div>
+                          )}
+
+                          <span className={course?.type !== "self_paced" ? "col-span-2 text-center text-zinc-500" : "col-span-3 text-center text-zinc-500"}>{date}</span>
+                          
+                          <div className="col-span-2 flex items-center justify-center gap-2">
+                            <div className="w-16 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-teal-500 rounded-full" style={{ width: `${enr.progress_percent}%` }} />
+                            </div>
+                            <span className="font-bold text-zinc-800 dark:text-zinc-200 text-right w-8">{enr.progress_percent}%</span>
                           </div>
-                          <span className="font-bold text-zinc-800 dark:text-zinc-200 text-right w-8">{enr.progress_percent}%</span>
-                        </div>
-                        <span className="col-span-2 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
-                            enr.status === "ACTIVE"
-                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-450"
-                              : enr.status === "COMPLETED"
-                              ? "bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-450"
-                              : "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-450"
-                          }`}>
-                            {enr.status === "ACTIVE" ? "Actif" : enr.status === "COMPLETED" ? "Terminé" : "En attente"}
+
+                          <span className="col-span-1 text-center">
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                              enr.status === "ACTIVE"
+                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-450"
+                                : enr.status === "COMPLETED"
+                                ? "bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-450"
+                                : "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-450"
+                            }`}>
+                              {enr.status === "ACTIVE" ? "Actif" : enr.status === "COMPLETED" ? "Terminé" : "En attente"}
+                            </span>
                           </span>
-                        </span>
-                      </div>
-                    );
-                  })}
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             )}
@@ -2949,6 +3240,27 @@ export default function CourseDetailPage() {
                       <p className="text-[11px] text-zinc-500">{inviteFound.email}</p>
                     </div>
 
+                    {/* Sélection de la session / classe (pour cours encadrés) */}
+                    {course?.type !== "self_paced" && (
+                      <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700 space-y-1.5">
+                        <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                          Classe / Session de rattachement :
+                        </label>
+                        <select
+                          value={inviteSessionId}
+                          onChange={(e) => setInviteSessionId(e.target.value)}
+                          className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold text-zinc-900 dark:text-white outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer"
+                        >
+                          <option value="">⚠️ Non assigné (À affecter plus tard)</option>
+                          {courseSessions.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name} ({s.status === "IN_PROGRESS" ? "En cours" : s.status === "UPCOMING" ? "À venir" : "Terminée"})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
                     {/* Mode de règlement manuel */}
                     <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700 space-y-2">
                       <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
@@ -3027,6 +3339,34 @@ export default function CourseDetailPage() {
           </div>
         </div>
       )}
+
+      {/* ── MODAL: Créer une Session / Promotion ── */}
+      {showCreateSessionModal && (
+        <CreateSessionModal
+          isOpen={showCreateSessionModal}
+          onClose={() => setShowCreateSessionModal(false)}
+          courseId={courseId}
+          courseTitle={course?.title || "Cours"}
+          onSuccess={() => loadData(true)}
+        />
+      )}
+
+      {/* ── MODAL: Assigner / Changer Session ── */}
+      {assignModalStudent && (
+        <AssignSessionModal
+          isOpen={!!assignModalStudent}
+          onClose={() => setAssignModalStudent(null)}
+          studentId={assignModalStudent.studentId}
+          studentName={assignModalStudent.studentName}
+          courseId={courseId}
+          courseTitle={course?.title || "Cours"}
+          currentSessionId={assignModalStudent.currentSessionId}
+          currentSessionName={assignModalStudent.currentSessionName}
+          availableSessions={courseSessions}
+          onSuccess={() => loadData(true)}
+        />
+      )}
+
     </div>
   );
 }
