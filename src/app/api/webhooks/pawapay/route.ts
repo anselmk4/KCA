@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   try {
     // 1. Authenticate webhook request via secret token header or query parameter
     const webhookSecret = process.env.PAWAPAY_WEBHOOK_SECRET;
-    if (webhookSecret) {
+    if (webhookSecret && webhookSecret !== 'your_pawapay_webhook_secret_here' && webhookSecret.trim() !== '') {
       const authHeader = req.headers.get('authorization') || req.headers.get('x-pawapay-token');
       const querySecret = req.nextUrl.searchParams.get('secret');
       const isValid =
@@ -27,11 +27,24 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     console.log('[webhook-pawapay] Callback payload:', JSON.stringify(body, null, 2));
 
-    // PawaPay callbacks can arrive as an array of event objects or a single object
-    const events = Array.isArray(body) ? body : [body];
+    // PawaPay callbacks can arrive as an array of event objects, a single object, or nested in data
+    let events: any[] = [];
+    if (Array.isArray(body)) {
+      events = body;
+    } else if (body && Array.isArray(body.data)) {
+      events = body.data;
+    } else if (body && body.data && typeof body.data === 'object' && (body.data.depositId || body.data.payoutId)) {
+      events = [body.data];
+    } else if (body) {
+      events = [body];
+    }
 
     for (const event of events) {
-      const { depositId, payoutId, status, failureCode } = event;
+      const depositId = event.depositId || event.data?.depositId;
+      const payoutId = event.payoutId || event.data?.payoutId;
+      const rawStatus = event.status || event.data?.status || '';
+      const status = (rawStatus === 'FOUND' && event.data?.status ? event.data.status : rawStatus).toUpperCase();
+      const failureCode = event.failureCode || event.data?.failureCode;
 
       if (!depositId && !payoutId) {
         console.warn('[webhook-pawapay] Skipping event due to missing depositId and payoutId');
@@ -65,7 +78,7 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        if (status === 'COMPLETED') {
+        if (['COMPLETED', 'PAID', 'SUCCESS', 'SUCCESSFUL'].includes(status)) {
           console.log(`[webhook-pawapay] Payout ${payout.id} (ref ${payoutId}) is COMPLETED. Updating database...`);
           await supabaseAdmin
             .from('payouts')
@@ -149,7 +162,7 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      if (status === 'COMPLETED') {
+      if (['COMPLETED', 'PAID', 'SUCCESS', 'SUCCESSFUL'].includes(status)) {
         console.log(`[webhook-pawapay] Deposit ${depositId} is COMPLETED. Updating database...`);
 
         // Update payment to PAID

@@ -504,9 +504,17 @@ export async function getPawaPayDepositStatus(depositId: string): Promise<PawaPa
       data = {};
     }
 
-    const depositObj = Array.isArray(data) ? data[0] : data;
+    // PawaPay V2 returns { status: "FOUND", data: { depositId, status, ... } }
+    // V1 or direct responses return [ { depositId, status, ... } ] or { depositId, status, ... }
+    let depositObj = Array.isArray(data) ? data[0] : data;
+    if (depositObj && (depositObj.status === 'FOUND' || depositObj.data) && typeof depositObj.data === 'object') {
+      const inner = Array.isArray(depositObj.data) ? depositObj.data[0] : depositObj.data;
+      if (inner) {
+        depositObj = inner;
+      }
+    }
 
-    if (!depositObj) {
+    if (!depositObj || (!depositObj.status && !depositObj.depositId)) {
       return {
         success: false,
         depositId,
@@ -687,8 +695,15 @@ export async function getPawaPayPayoutStatus(payoutId: string): Promise<PawaPayP
       data = {};
     }
 
-    const payoutObj = Array.isArray(data) ? data[0] : data;
-    if (!payoutObj) {
+    let payoutObj = Array.isArray(data) ? data[0] : data;
+    if (payoutObj && (payoutObj.status === 'FOUND' || payoutObj.data) && typeof payoutObj.data === 'object') {
+      const inner = Array.isArray(payoutObj.data) ? payoutObj.data[0] : payoutObj.data;
+      if (inner) {
+        payoutObj = inner;
+      }
+    }
+
+    if (!payoutObj || (!payoutObj.status && !payoutObj.payoutId)) {
       return {
         success: false,
         payoutId,

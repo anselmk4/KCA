@@ -890,6 +890,25 @@ export default function PaymentPage() {
               <span>Détection automatique en cours dès la saisie de votre code PIN...</span>
             </div>
 
+            <button
+              type="button"
+              onClick={() => checkPaymentStatus(false)}
+              disabled={verifying}
+              className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm cursor-pointer"
+            >
+              {verifying ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Vérification de votre paiement en cours...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4" />
+                  <span>J&apos;ai saisi mon code PIN — Vérifier et débloquer mon cours</span>
+                </>
+              )}
+            </button>
+
             {/* Sandbox Simulation Button */}
             {isSandboxMode && (
               <button

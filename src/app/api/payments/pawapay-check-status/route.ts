@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
     console.log(`[pawapay-check-status] Deposit ${depositId} PawaPay status: ${pawaStatus}`);
 
     // 5. Process COMPLETED status
-    if (pawaStatus === 'COMPLETED') {
+    if (['COMPLETED', 'PAID', 'SUCCESS', 'SUCCESSFUL'].includes(pawaStatus)) {
       console.log(`[pawapay-check-status] Deposit ${depositId} is COMPLETED. Updating database...`);
 
       // Update payment to PAID
