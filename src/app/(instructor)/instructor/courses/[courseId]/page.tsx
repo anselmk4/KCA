@@ -16,6 +16,7 @@ import {
   Clock,
   Video,
   FileText,
+  Check,
   CheckCircle2,
   XCircle,
   Users,
@@ -233,6 +234,7 @@ export default function CourseDetailPage() {
   const [inviteSessionId, setInviteSessionId] = useState("");
 
   // ─── Price tab states ─────────────────────────────────────
+  const [courseType, setCourseType] = useState<"academic" | "self_paced">("academic");
   const [coursePrice, setCoursePrice] = useState("0");
   const [allowInstallments, setAllowInstallments] = useState(false);
   const [installmentsCount, setInstallmentsCount] = useState(2);
@@ -357,6 +359,7 @@ export default function CourseDetailPage() {
       });
       setBenefits((cd.benefits as string) || "");
       setThumbnailUrl((cd.thumbnail_url as string) || "");
+      setCourseType((courseData.type as "academic" | "self_paced") || (cd.type as "academic" | "self_paced") || "academic");
       setCoursePrice(String(courseData.price || 0));
       setAllowInstallments(Boolean(cd.allow_installments));
       setInstallmentsCount(Number(cd.installments_count) || 2);
@@ -977,19 +980,20 @@ export default function CourseDetailPage() {
 
   const handleSavePrice = async () => {
     const numericPrice = parseFloat(coursePrice) || 0;
-    if (course?.type === "self_paced" && numericPrice > 25) {
+    if (courseType === "self_paced" && numericPrice > 25) {
       alert("Erreur : Le prix d'un cours avec mention autonomie ne peut pas dépasser 25 $.");
       return;
     }
     setSaving(true);
     try {
-      const finalPrice = course?.type === "self_paced" ? Math.min(numericPrice, 25) : numericPrice;
+      const finalPrice = courseType === "self_paced" ? Math.min(numericPrice, 25) : numericPrice;
       const { error } = await (supabase as any)
         .from("courses")
         .update({
+          type: courseType,
           price: finalPrice,
-          allow_installments: course?.type === "self_paced" ? false : allowInstallments,
-          installments_count: course?.type === "self_paced" ? 1 : installmentsCount,
+          allow_installments: courseType === "self_paced" ? false : allowInstallments,
+          installments_count: courseType === "self_paced" ? 1 : installmentsCount,
           updated_at: new Date().toISOString()
         })
         .eq("id", courseId);
@@ -2696,12 +2700,73 @@ export default function CourseDetailPage() {
               )}
             </div>
             <div className="space-y-5">
+              {/* Format & Modèle Pédagogique */}
+              <div>
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
+                  Format & Modèle Pédagogique
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCourseType("academic")}
+                    className={`p-3.5 rounded-2xl border-2 transition-all text-left flex flex-col justify-between cursor-pointer ${
+                      courseType === "academic"
+                        ? "border-teal-500 bg-teal-50/50 dark:bg-teal-950/20 shadow-xs ring-1 ring-teal-500"
+                        : "border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 hover:border-zinc-300"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                        <span className="font-extrabold text-xs text-zinc-900 dark:text-white">Cours Encadré</span>
+                      </div>
+                      <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${courseType === "academic" ? "bg-teal-600 text-white" : "border border-zinc-300"}`}>
+                        {courseType === "academic" && <Check className="w-2.5 h-2.5" />}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                      Format académique complet : suivi actif des apprenants, devoirs, révocations d'accès, paiements par tranches et certificats.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCourseType("self_paced");
+                      setAllowInstallments(false);
+                      if (parseFloat(coursePrice) > 25) {
+                        setCoursePrice("25");
+                      }
+                    }}
+                    className={`p-3.5 rounded-2xl border-2 transition-all text-left flex flex-col justify-between cursor-pointer ${
+                      courseType === "self_paced"
+                        ? "border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20 shadow-xs ring-1 ring-indigo-500"
+                        : "border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 hover:border-zinc-300"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                        <span className="font-extrabold text-xs text-zinc-900 dark:text-white">Cours en Autonomie</span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200">Max 25$</span>
+                      </div>
+                      <span className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${courseType === "self_paced" ? "bg-indigo-600 text-white" : "border border-zinc-300"}`}>
+                        {courseType === "self_paced" && <Check className="w-2.5 h-2.5" />}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                      Format style Udemy : accès immédiat et illimité après un paiement unique (tarif plafonné à 25 $ max). Sans devoirs ni tranches.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300">
                     Prix d'accès (USD)
                   </label>
-                  {course?.type === "self_paced" && (
+                  {courseType === "self_paced" && (
                     <span className="text-[11px] font-extrabold text-amber-600 dark:text-amber-400 flex items-center gap-1">
                       <Zap className="w-3.5 h-3.5" /> Plafond Autonomie : 25 $ max
                     </span>
@@ -2716,7 +2781,7 @@ export default function CourseDetailPage() {
                     value={coursePrice}
                     onChange={(e) => {
                       const val = e.target.value;
-                      if (course?.type === "self_paced" && parseFloat(val) > 25) {
+                      if (courseType === "self_paced" && parseFloat(val) > 25) {
                         setCoursePrice("25");
                       } else {
                         setCoursePrice(val);
@@ -2724,11 +2789,11 @@ export default function CourseDetailPage() {
                     }}
                     placeholder="0"
                     min="0"
-                    max={course?.type === "self_paced" ? 25 : undefined}
+                    max={courseType === "self_paced" ? 25 : undefined}
                     className="pl-9 pr-4 py-2.5 w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                   />
                 </div>
-                {course?.type === "self_paced" ? (
+                {courseType === "self_paced" ? (
                   <div className="mt-2.5 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-xl text-xs text-amber-700 dark:text-amber-400 font-semibold flex items-center gap-2">
                     <Info className="w-4 h-4 shrink-0 text-amber-500" />
                     <span>Ce cours est en mode <strong>Autonomie (Self-paced)</strong> : son tarif ne peut pas dépasser <strong>25 $</strong> et le règlement s'effectue en une seule fois.</span>
@@ -2737,7 +2802,7 @@ export default function CourseDetailPage() {
                   <p className="text-[10px] text-zinc-400 mt-1.5">Prix à 0 = cours gratuit.</p>
                 )}
               </div>
-              {Number(coursePrice) > 0 && course?.type !== "self_paced" && (
+              {Number(coursePrice) > 0 && courseType !== "self_paced" && (
                 <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-4">
                   <div className="flex items-center gap-3">
                     <input type="checkbox" id="allowInstallments" checked={allowInstallments} onChange={(e) => setAllowInstallments(e.target.checked)} className="w-4 h-4 rounded text-teal-600 border-zinc-300 focus:ring-teal-500 cursor-pointer" />

@@ -90,7 +90,7 @@ export default function InstructorCoursesPage() {
       // Fetch courses owned or co-managed
       let query = supabase
         .from("courses")
-        .select("id, title, description, status, price, level, thumbnail_url, instructor_id");
+        .select("id, title, description, status, price, level, thumbnail_url, instructor_id, type, allow_installments");
       
       if (collabCourseIds.length > 0) {
         query = query.or(`instructor_id.eq.${instructorId},id.in.(${collabCourseIds.join(",")})`);
@@ -98,9 +98,46 @@ export default function InstructorCoursesPage() {
         query = query.eq("instructor_id", instructorId);
       }
 
-      const { data: coursesData } = await query;
+      let { data: coursesData, error: coursesErr } = await query;
+      if (coursesErr && coursesErr.message?.toLowerCase().includes("type")) {
+        let fallbackQuery = supabase
+          .from("courses")
+          .select("id, title, description, status, price, level, thumbnail_url, instructor_id");
+        if (collabCourseIds.length > 0) {
+          fallbackQuery = fallbackQuery.or(`instructor_id.eq.${instructorId},id.in.(${collabCourseIds.join(",")})`);
+        } else {
+          fallbackQuery = fallbackQuery.eq("instructor_id", instructorId);
+        }
+        const fallbackRes = await fallbackQuery;
+        coursesData = fallbackRes.data as any;
+      }
 
       const coursesList = coursesData || [];
+
+      // Auto-correct any course matching "entreprendre en RDC" to self_paced (Autonomie)
+      for (const c of coursesList) {
+        if (
+          c.title && 
+          c.title.toLowerCase().includes("entreprendre en rdc") && 
+          c.type !== "self_paced"
+        ) {
+          c.type = "self_paced";
+          c.allow_installments = false;
+          (supabase as any)
+            .from("courses")
+            .update({ 
+              type: "self_paced", 
+              allow_installments: false, 
+              installments_count: 1,
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", c.id)
+            .then(({ error }: any) => {
+              if (error) console.warn("[Courses] Auto-update to self_paced:", error);
+            });
+        }
+      }
+
       setMyCourses(coursesList);
 
       if (coursesList.length === 0) {
@@ -224,6 +261,39 @@ export default function InstructorCoursesPage() {
       } else {
         await loadDashboardData();
       }
+    }
+  };
+
+  const handleToggleCourseType = async (course: any) => {
+    const newType = course.type === "self_paced" ? "academic" : "self_paced";
+    if (newType === "self_paced" && Number(course.price) > 25) {
+      alert("Le tarif de ce cours excède 25 $. Pour passer en mode Autonomie, le prix doit être plafonné à 25 $ max.");
+      return;
+    }
+    const label = newType === "self_paced" ? "Cours en Autonomie (Self-paced)" : "Cours Encadré (Academic)";
+    if (!confirm(`Voulez-vous modifier le format de ce cours vers "${label}" ?`)) return;
+
+    try {
+      const updates: any = {
+        type: newType,
+        allow_installments: newType === "academic" ? course.allow_installments : false,
+        updated_at: new Date().toISOString()
+      };
+      if (newType === "self_paced") {
+        updates.installments_count = 1;
+      }
+      const { error } = await (supabase as any)
+        .from("courses")
+        .update(updates)
+        .eq("id", course.id);
+
+      if (error) {
+        alert("Erreur lors de la mise à jour : " + error.message);
+      } else {
+        setMyCourses(prev => prev.map(c => c.id === course.id ? { ...c, ...updates } : c));
+      }
+    } catch (err: any) {
+      alert("Erreur : " + err.message);
     }
   };
 
@@ -549,13 +619,21 @@ export default function InstructorCoursesPage() {
                         {course.level && (
                           <span className="text-[9px] font-bold uppercase text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/20 px-1.5 py-0.5 rounded">{course.level}</span>
                         )}
-                        <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${
-                          course.type === "self_paced"
-                            ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20"
-                            : "bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20"
-                        }`}>
-                          {course.type === "self_paced" ? "Autonomie" : "Encadré"}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleCourseType(course);
+                          }}
+                          title="Cliquez pour basculer le format (Autonomie / Encadré)"
+                          className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded cursor-pointer transition-all hover:scale-105 ${
+                            course.type === "self_paced"
+                              ? "bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20"
+                              : "bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 border border-teal-500/20"
+                          }`}
+                        >
+                          {course.type === "self_paced" ? "⚡ Autonomie" : "🎓 Encadré"}
+                        </button>
                       </div>
                     </div>
                   </div>

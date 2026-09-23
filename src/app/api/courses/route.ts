@@ -178,10 +178,11 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
+      // Check for known optional columns explicitly mentioned as missing
       let removedKnown = false;
-      const knownOptional = ['learning_outcomes', 'prerequisites', 'type', 'language', 'allow_installments', 'installments_count', 'thumbnail_url', 'category_id'];
+      const knownOptional = ['learning_outcomes', 'prerequisites', 'language', 'allow_installments', 'installments_count', 'thumbnail_url', 'category_id'];
       for (const col of knownOptional) {
-        if (col in coursePayload && errMsg.toLowerCase().includes(col)) {
+        if (col in coursePayload && (errMsg.toLowerCase().includes(`'${col}'`) || errMsg.toLowerCase().includes(`"${col}"`))) {
           delete coursePayload[col];
           removedKnown = true;
           break;
@@ -192,19 +193,10 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      if (errMsg.toLowerCase().includes("schema cache") || errMsg.toLowerCase().includes("type")) {
-        if ('type' in coursePayload) {
-          delete coursePayload.type;
-          continue;
-        }
-        if ('learning_outcomes' in coursePayload) {
-          delete coursePayload.learning_outcomes;
-          continue;
-        }
-        if ('prerequisites' in coursePayload) {
-          delete coursePayload.prerequisites;
-          continue;
-        }
+      // Only strip 'type' if the column 'type' is explicitly reported missing
+      if ('type' in coursePayload && (errMsg.toLowerCase().includes("'type'") || errMsg.toLowerCase().includes('"type"') || errMsg.toLowerCase().includes("column type"))) {
+        delete coursePayload.type;
+        continue;
       }
 
       break;
@@ -361,11 +353,11 @@ export async function PUT(req: NextRequest) {
         continue;
       }
 
-      if (errMsg.toLowerCase().includes("type") && 'type' in sbUpdates) {
+      if ('type' in sbUpdates && (errMsg.toLowerCase().includes("'type'") || errMsg.toLowerCase().includes('"type"') || errMsg.toLowerCase().includes("column type"))) {
         delete sbUpdates.type;
         continue;
       }
-      if (errMsg.toLowerCase().includes("allow_installments") && 'allow_installments' in sbUpdates) {
+      if ('allow_installments' in sbUpdates && (errMsg.toLowerCase().includes("'allow_installments'") || errMsg.toLowerCase().includes('"allow_installments"'))) {
         delete sbUpdates.allow_installments;
         continue;
       }
