@@ -1070,16 +1070,16 @@ export default function CourseLearnPage() {
 
                 <div className="space-y-4">
                   {activeLesson.description && (
-                    <div className="p-4 bg-zinc-50 dark:bg-zinc-800/20 rounded-xl border border-zinc-200/50">
-                      <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Résumé de la leçon :</p>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{stripHtml(activeLesson.description)}</p>
+                    <div className="p-5 bg-zinc-50 dark:bg-zinc-800/20 rounded-2xl border border-zinc-200/50">
+                      <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Résumé de la leçon :</p>
+                      <p className="text-sm text-zinc-600 dark:text-zinc-300 mt-1.5 leading-relaxed">{stripHtml(activeLesson.description)}</p>
                     </div>
                   )}
-                  <div className="prose dark:prose-invert max-w-none text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed pt-2">
+                  <div className="lesson-reading-content prose prose-zinc dark:prose-invert prose-teal max-w-none text-base md:text-[17px] text-zinc-800 dark:text-zinc-200 leading-relaxed pt-2">
                     {activeLesson.content ? (
                       <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(activeLesson.content) }} />
                     ) : (
-                      <p>Aucun contenu écrit pour cette leçon. Regardez la vidéo ci-dessus pour comprendre les concepts clés.</p>
+                      <p className="text-zinc-400">Aucun contenu écrit pour cette leçon. Regardez la vidéo ci-dessus pour comprendre les concepts clés.</p>
                     )}
                   </div>
                 </div>

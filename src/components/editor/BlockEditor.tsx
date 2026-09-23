@@ -159,13 +159,13 @@ export function simpleMarkdownToHtml(md: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 
-  html = html.replace(/^### (.*$)/gim, '<h3 class="text-base font-bold my-2">$1</h3>');
-  html = html.replace(/^## (.*$)/gim, '<h2 class="text-lg font-extrabold my-2">$1</h2>');
-  html = html.replace(/^# (.*$)/gim, '<h1 class="text-xl font-black my-3">$1</h1>');
+  html = html.replace(/^### (.*$)/gim, '<h3 class="text-lg sm:text-xl font-bold my-3 text-zinc-900 dark:text-white">$1</h3>');
+  html = html.replace(/^## (.*$)/gim, '<h2 class="text-xl sm:text-2xl font-extrabold my-4 tracking-tight text-zinc-900 dark:text-white">$1</h2>');
+  html = html.replace(/^# (.*$)/gim, '<h1 class="text-2xl sm:text-3xl font-black my-5 tracking-tight text-zinc-900 dark:text-white">$1</h1>');
 
   html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
   html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
-  html = html.replace(/```([\s\S]*?)```/g, '<pre class="bg-zinc-900 text-teal-400 p-3 rounded-xl font-mono text-xs my-2 overflow-x-auto"><code>$1</code></pre>');
+  html = html.replace(/```([\s\S]*?)```/g, '<pre class="bg-zinc-900 text-teal-400 p-4 rounded-xl font-mono text-xs my-3 overflow-x-auto"><code>$1</code></pre>');
   html = html.replace(/`(.*?)`/g, '<code class="bg-zinc-200 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-xs font-mono">$1</code>');
   html = html.replace(/^\s*-\s+(.*$)/gim, '<li class="ml-4 list-disc">$1</li>');
   html = html.replace(/\n/g, "<br />");
@@ -320,10 +320,16 @@ export function serializeBlocksToHtml(blocks: Block[]): string {
       switch (block.type) {
         case "title": {
           const level = block.value.level || 2;
-          return `<h${level} data-block-type="title" data-level="${level}" class="text-xl font-bold mt-6 mb-3 text-zinc-900 dark:text-white">${block.value.text || ""}</h${level}>`;
+          const sizeClass =
+            level === 1
+              ? "text-2xl sm:text-3xl font-extrabold mt-8 mb-4 tracking-tight"
+              : level === 2
+              ? "text-xl sm:text-2xl font-extrabold mt-7 mb-3.5 tracking-tight"
+              : "text-lg sm:text-xl font-bold mt-6 mb-3 tracking-tight";
+          return `<h${level} data-block-type="title" data-level="${level}" class="${sizeClass} text-zinc-900 dark:text-white">${block.value.text || ""}</h${level}>`;
         }
         case "text": {
-          return `<div data-block-type="text" class="prose dark:prose-invert max-w-none text-zinc-800 dark:text-zinc-150 my-3">${block.value.html || ""}</div>`;
+          return `<div data-block-type="text" class="prose dark:prose-invert max-w-none text-base sm:text-[17px] leading-relaxed text-zinc-800 dark:text-zinc-200 my-4">${block.value.html || ""}</div>`;
         }
         case "image": {
           return `<div data-block-type="image" data-url="${block.value.url || ""}" data-caption="${block.value.caption || ""}" class="my-6">
@@ -413,11 +419,11 @@ export function serializeBlocksToHtml(blocks: Block[]): string {
         case "info": {
           const style = block.value.style || "info";
           const styleClasses =
-            style === "warning" ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 text-amber-800 dark:text-amber-400"
-            : style === "success" ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-250 text-emerald-800 dark:text-emerald-400"
-            : style === "danger" ? "bg-red-50 dark:bg-red-950/20 border-red-250 text-red-800 dark:text-red-400"
-            : "bg-blue-50 dark:bg-blue-950/20 border-blue-250 text-blue-800 dark:text-blue-400";
-          return `<div data-block-type="info" data-style="${style}" class="my-4 p-4 rounded-2xl border text-sm ${styleClasses}">${block.value.text || ""}</div>`;
+            style === "warning" ? "bg-amber-50/85 dark:bg-amber-950/25 border-amber-250 dark:border-amber-900/50 text-amber-950 dark:text-amber-200 border-l-4 border-l-amber-500"
+            : style === "success" ? "bg-emerald-50/85 dark:bg-emerald-950/25 border-emerald-250 dark:border-emerald-900/50 text-emerald-950 dark:text-emerald-200 border-l-4 border-l-emerald-600"
+            : style === "danger" ? "bg-red-50/85 dark:bg-red-950/25 border-red-250 dark:border-red-900/50 text-red-950 dark:text-red-200 border-l-4 border-l-red-600"
+            : "bg-blue-50/85 dark:bg-blue-950/25 border-blue-250 dark:border-blue-900/50 text-blue-950 dark:text-blue-200 border-l-4 border-l-blue-600";
+          return `<div data-block-type="info" data-style="${style}" class="my-6 p-5 sm:p-6 rounded-2xl border text-base sm:text-[17px] leading-relaxed shadow-xs ${styleClasses}">${block.value.text || ""}</div>`;
         }
         case "google_docs": {
           const docType = block.value.type || "doc";
@@ -555,7 +561,7 @@ export function serializeBlocksToHtml(blocks: Block[]): string {
         }
         case "markdown": {
           const mdContent = block.value.content || "";
-          return `<div data-block-type="markdown" data-content="${encodeURIComponent(mdContent)}" class="my-6 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed">${simpleMarkdownToHtml(mdContent)}</div>`;
+          return `<div data-block-type="markdown" data-content="${encodeURIComponent(mdContent)}" class="my-6 p-5 sm:p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-base sm:text-[17px] text-zinc-800 dark:text-zinc-200 leading-relaxed">${simpleMarkdownToHtml(mdContent)}</div>`;
         }
         default:
           return "";

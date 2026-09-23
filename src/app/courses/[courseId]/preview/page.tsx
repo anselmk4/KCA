@@ -505,10 +505,10 @@ export default function CoursePreviewPlayerPage() {
                   </div>
 
                   {/* HTML Content rendering */}
-                  <div className="flex-1 bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-850 rounded-3xl p-6 md:p-8 overflow-y-auto space-y-4">
+                  <div className="flex-1 bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-850 rounded-3xl p-6 md:p-10 overflow-y-auto">
                     {activeLesson.content ? (
                       <article
-                        className="prose prose-zinc dark:prose-invert prose-teal max-w-none text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed space-y-4"
+                        className="lesson-reading-content prose prose-zinc dark:prose-invert prose-teal max-w-none text-base md:text-[17px] text-zinc-800 dark:text-zinc-200 leading-relaxed"
                         dangerouslySetInnerHTML={{ __html: sanitizeHtml(activeLesson.content) }}
                       />
                     ) : (

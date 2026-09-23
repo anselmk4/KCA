@@ -637,7 +637,7 @@ export function CourseInspectionModal({ courseId, onClose, onStatusChanged }: Co
                     {/* Content Markdown Body */}
                     <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
                       <span className="font-bold text-xs uppercase tracking-wider text-zinc-400 block">Contenu Pédagogique (Markdown/Texte)</span>
-                      <div className="prose dark:prose-invert max-w-none text-sm bg-zinc-50 dark:bg-zinc-950/40 p-5 rounded-2xl border border-zinc-150 dark:border-zinc-850">
+                      <div className="lesson-reading-content prose prose-zinc dark:prose-invert prose-teal max-w-none text-base text-zinc-800 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-950/40 p-6 rounded-2xl border border-zinc-150 dark:border-zinc-850">
                         {selectedLesson.content ? (
                           <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedLesson.content) }} />
                         ) : (

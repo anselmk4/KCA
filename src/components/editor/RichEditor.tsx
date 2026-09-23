@@ -58,7 +58,7 @@ export const RichEditor: React.FC<RichEditorProps> = ({ value, onChange, placeho
     },
     editorProps: {
       attributes: {
-        class: "prose dark:prose-invert max-w-none focus:outline-none min-h-[220px] p-4 text-sm text-zinc-800 dark:text-zinc-100",
+        class: "prose dark:prose-invert max-w-none focus:outline-none min-h-[220px] p-4 text-base text-zinc-800 dark:text-zinc-100 leading-relaxed",
       },
     },
   });

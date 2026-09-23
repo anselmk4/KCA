@@ -151,28 +151,29 @@
   min-height: 220px;
 }
 .ProseMirror p {
-  margin-bottom: 0.75em;
-  line-height: 1.6;
+  margin-bottom: 0.85em;
+  font-size: 1.0625rem;
+  line-height: 1.75;
 }
 .ProseMirror h1 {
-  font-size: 1.75rem;
+  font-size: 1.875rem;
   font-weight: 800;
+  margin-top: 1.5rem;
+  margin-bottom: 0.6rem;
+  color: inherit;
+}
+.ProseMirror h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
   margin-top: 1.25rem;
   margin-bottom: 0.5rem;
   color: inherit;
 }
-.ProseMirror h2 {
-  font-size: 1.4rem;
-  font-weight: 700;
+.ProseMirror h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
   margin-top: 1rem;
   margin-bottom: 0.4rem;
-  color: inherit;
-}
-.ProseMirror h3 {
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin-top: 0.8rem;
-  margin-bottom: 0.3rem;
   color: inherit;
 }
 .ProseMirror ul {
@@ -187,6 +188,8 @@
 }
 .ProseMirror li {
   margin-bottom: 0.25em;
+  font-size: 1.0625rem;
+  line-height: 1.75;
 }
 .ProseMirror strong {
   font-weight: 700;
@@ -225,6 +228,238 @@
 }
 .ProseMirror u {
   text-decoration: underline;
+}
+
+/* --- LESSON READING TYPOGRAPHY (STUDENT LEARNING & INSTRUCTOR PREVIEW) --- */
+/* Designed for optimal editorial reading comfort (~17-18px body, clear headings, spacious callouts) */
+.lesson-reading-content {
+  font-size: 1.0625rem; /* 17px */
+  line-height: 1.75;
+  color: #27272a;
+}
+.dark .lesson-reading-content {
+  color: #e4e4e7;
+}
+
+/* Headings in lesson content */
+.lesson-reading-content h1,
+.lesson-reading-content [data-block-type="title"][data-level="1"],
+.lesson-reading-content h1[data-block-type="title"] {
+  font-size: 1.875rem !important; /* 30px */
+  line-height: 1.25 !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.025em !important;
+  margin-top: 2.25rem !important;
+  margin-bottom: 1rem !important;
+  color: #09090b !important;
+}
+.dark .lesson-reading-content h1,
+.dark .lesson-reading-content [data-block-type="title"][data-level="1"],
+.dark .lesson-reading-content h1[data-block-type="title"] {
+  color: #fafafa !important;
+}
+
+.lesson-reading-content h2,
+.lesson-reading-content [data-block-type="title"][data-level="2"],
+.lesson-reading-content h2[data-block-type="title"] {
+  font-size: 1.5rem !important; /* 24px */
+  line-height: 1.3 !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.02em !important;
+  margin-top: 2rem !important;
+  margin-bottom: 0.875rem !important;
+  color: #09090b !important;
+}
+@media (min-width: 640px) {
+  .lesson-reading-content h2,
+  .lesson-reading-content [data-block-type="title"][data-level="2"],
+  .lesson-reading-content h2[data-block-type="title"] {
+    font-size: 1.625rem !important; /* 26px */
+  }
+}
+.dark .lesson-reading-content h2,
+.dark .lesson-reading-content [data-block-type="title"][data-level="2"],
+.dark .lesson-reading-content h2[data-block-type="title"] {
+  color: #fafafa !important;
+}
+
+.lesson-reading-content h3,
+.lesson-reading-content [data-block-type="title"][data-level="3"],
+.lesson-reading-content h3[data-block-type="title"] {
+  font-size: 1.25rem !important; /* 20px */
+  line-height: 1.35 !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.015em !important;
+  margin-top: 1.75rem !important;
+  margin-bottom: 0.75rem !important;
+  color: #18181b !important;
+}
+.dark .lesson-reading-content h3,
+.dark .lesson-reading-content [data-block-type="title"][data-level="3"],
+.dark .lesson-reading-content h3[data-block-type="title"] {
+  color: #f4f4f5 !important;
+}
+
+/* Paragraphs & Text Blocks */
+.lesson-reading-content p,
+.lesson-reading-content [data-block-type="text"],
+.lesson-reading-content [data-block-type="text"] p,
+.lesson-reading-content [data-block-type="markdown"],
+.lesson-reading-content [data-block-type="markdown"] p {
+  font-size: 1.0625rem !important; /* 17px */
+  line-height: 1.75 !important;
+  color: #27272a !important;
+}
+@media (min-width: 640px) {
+  .lesson-reading-content p,
+  .lesson-reading-content [data-block-type="text"],
+  .lesson-reading-content [data-block-type="text"] p,
+  .lesson-reading-content [data-block-type="markdown"],
+  .lesson-reading-content [data-block-type="markdown"] p {
+    font-size: 1.0625rem !important;
+    line-height: 1.8 !important;
+  }
+}
+.dark .lesson-reading-content p,
+.dark .lesson-reading-content [data-block-type="text"],
+.dark .lesson-reading-content [data-block-type="text"] p,
+.dark .lesson-reading-content [data-block-type="markdown"],
+.dark .lesson-reading-content [data-block-type="markdown"] p {
+  color: #e4e4e7 !important;
+}
+
+.lesson-reading-content p {
+  margin-bottom: 1.25rem !important;
+}
+
+.lesson-reading-content strong,
+.lesson-reading-content b {
+  font-weight: 700 !important;
+  color: #09090b !important;
+}
+.dark .lesson-reading-content strong,
+.dark .lesson-reading-content b {
+  color: #ffffff !important;
+}
+
+/* Callout / Info blocks (Exemples, Notes, Chiffres clés) */
+.lesson-reading-content [data-block-type="info"] {
+  font-size: 1.0625rem !important;
+  line-height: 1.75 !important;
+  padding: 1.25rem 1.5rem !important;
+  margin-top: 1.5rem !important;
+  margin-bottom: 1.5rem !important;
+  border-radius: 1rem !important;
+}
+@media (min-width: 640px) {
+  .lesson-reading-content [data-block-type="info"] {
+    padding: 1.5rem 1.75rem !important;
+  }
+}
+
+.lesson-reading-content [data-block-type="info"] p {
+  font-size: 1.0625rem !important;
+  line-height: 1.75 !important;
+  margin-bottom: 0.75rem !important;
+}
+.lesson-reading-content [data-block-type="info"] p:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Specific styling for Info Callout variants matching screenshot 2 */
+.lesson-reading-content [data-block-type="info"][data-style="success"],
+.lesson-reading-content [data-block-type="info"].border-emerald-250,
+.lesson-reading-content [data-block-type="info"].border-emerald-200 {
+  background-color: rgba(236, 253, 245, 0.85) !important;
+  border-color: rgba(167, 243, 208, 0.8) !important;
+  border-left-width: 5px !important;
+  border-left-color: #059669 !important;
+  color: #064e3b !important;
+}
+.dark .lesson-reading-content [data-block-type="info"][data-style="success"],
+.dark .lesson-reading-content [data-block-type="info"].border-emerald-250,
+.dark .lesson-reading-content [data-block-type="info"].border-emerald-200 {
+  background-color: rgba(6, 78, 59, 0.25) !important;
+  border-color: rgba(6, 95, 70, 0.5) !important;
+  border-left-color: #10b981 !important;
+  color: #a7f3d0 !important;
+}
+
+.lesson-reading-content [data-block-type="info"][data-style="warning"],
+.lesson-reading-content [data-block-type="info"].border-amber-250,
+.lesson-reading-content [data-block-type="info"].border-amber-200 {
+  background-color: rgba(254, 252, 232, 0.85) !important;
+  border-color: rgba(254, 240, 138, 0.8) !important;
+  border-left-width: 5px !important;
+  border-left-color: #d97706 !important;
+  color: #78350f !important;
+}
+.dark .lesson-reading-content [data-block-type="info"][data-style="warning"],
+.dark .lesson-reading-content [data-block-type="info"].border-amber-250,
+.dark .lesson-reading-content [data-block-type="info"].border-amber-200 {
+  background-color: rgba(120, 53, 15, 0.25) !important;
+  border-color: rgba(146, 64, 14, 0.5) !important;
+  border-left-color: #f59e0b !important;
+  color: #fde68a !important;
+}
+
+.lesson-reading-content [data-block-type="info"][data-style="info"],
+.lesson-reading-content [data-block-type="info"].border-blue-250,
+.lesson-reading-content [data-block-type="info"].border-blue-200 {
+  background-color: rgba(239, 246, 255, 0.85) !important;
+  border-color: rgba(191, 219, 254, 0.8) !important;
+  border-left-width: 5px !important;
+  border-left-color: #2563eb !important;
+  color: #1e3a8a !important;
+}
+.dark .lesson-reading-content [data-block-type="info"][data-style="info"],
+.dark .lesson-reading-content [data-block-type="info"].border-blue-250,
+.dark .lesson-reading-content [data-block-type="info"].border-blue-200 {
+  background-color: rgba(30, 58, 138, 0.25) !important;
+  border-color: rgba(30, 64, 175, 0.5) !important;
+  border-left-color: #3b82f6 !important;
+  color: #bfdbfe !important;
+}
+
+.lesson-reading-content [data-block-type="info"][data-style="danger"],
+.lesson-reading-content [data-block-type="info"].border-red-250,
+.lesson-reading-content [data-block-type="info"].border-red-200 {
+  background-color: rgba(254, 242, 242, 0.85) !important;
+  border-color: rgba(254, 202, 202, 0.8) !important;
+  border-left-width: 5px !important;
+  border-left-color: #dc2626 !important;
+  color: #7f1d1d !important;
+}
+.dark .lesson-reading-content [data-block-type="info"][data-style="danger"],
+.dark .lesson-reading-content [data-block-type="info"].border-red-250,
+.dark .lesson-reading-content [data-block-type="info"].border-red-200 {
+  background-color: rgba(127, 29, 29, 0.25) !important;
+  border-color: rgba(153, 27, 27, 0.5) !important;
+  border-left-color: #ef4444 !important;
+  color: #fecaca !important;
+}
+
+/* Lists */
+.lesson-reading-content ul {
+  list-style-type: disc !important;
+  padding-left: 1.75rem !important;
+  margin-top: 1rem !important;
+  margin-bottom: 1.25rem !important;
+}
+.lesson-reading-content ol {
+  list-style-type: decimal !important;
+  padding-left: 1.75rem !important;
+  margin-top: 1rem !important;
+  margin-bottom: 1.25rem !important;
+}
+.lesson-reading-content li {
+  font-size: 1.0625rem !important;
+  line-height: 1.75 !important;
+  margin-bottom: 0.5rem !important;
+  color: #27272a !important;
+}
+.dark .lesson-reading-content li {
+  color: #e4e4e7 !important;
 }
 
 /* --- GLOBAL RESPONSIVENESS AND OVERFLOW CORRECTIONS --- */
