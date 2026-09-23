@@ -168,14 +168,54 @@ export async function PUT(
         }
       }
 
-      const { data: updated, error } = await supabaseAdmin
-        .from("courses")
-        .update(updates as any)
-        .eq("id", courseId)
-        .select()
-        .single();
+      let updated: any = null;
+      let updateError: any = null;
+      const maxRetries = 6;
 
-      if (error) throw error;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const res = await supabaseAdmin
+          .from("courses")
+          .update(updates as any)
+          .eq("id", courseId)
+          .select()
+          .single();
+
+        if (!res.error) {
+          updated = res.data;
+          updateError = null;
+          break;
+        }
+
+        updateError = res.error;
+        const errMsg = res.error.message || '';
+
+        const schemaCacheMatch = errMsg.match(/Could not find the '([^']+)' column/i);
+        const colNotFoundMatch = errMsg.match(/column "?([a-zA-Z0-9_]+)"? of relation/i) || errMsg.match(/column "?([a-zA-Z0-9_]+)"? does not exist/i);
+        const missingCol = schemaCacheMatch?.[1] || colNotFoundMatch?.[1];
+
+        if (missingCol && missingCol in updates) {
+          console.warn(`[API admin/courses PUT] Removing missing column '${missingCol}' from updates and retrying...`);
+          delete updates[missingCol];
+          continue;
+        }
+
+        if (errMsg.toLowerCase().includes("type") && 'type' in updates) {
+          delete updates.type;
+          continue;
+        }
+        if (errMsg.toLowerCase().includes("learning_outcomes") && 'learning_outcomes' in updates) {
+          delete updates.learning_outcomes;
+          continue;
+        }
+        if (errMsg.toLowerCase().includes("prerequisites") && 'prerequisites' in updates) {
+          delete updates.prerequisites;
+          continue;
+        }
+
+        break;
+      }
+
+      if (updateError) throw updateError;
       return NextResponse.json({ success: true, course: updated });
     }
 

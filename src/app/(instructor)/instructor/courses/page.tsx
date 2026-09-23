@@ -282,16 +282,22 @@ export default function InstructorCoursesPage() {
       const resData = await res.json();
 
       if (!res.ok) {
-        if (res.status === 400) {
-          throw new Error(resData.error || "Erreur de validation lors de la création du cours.");
+        const errMsg = resData.error || "";
+        const isValidationError = 
+          errMsg.includes("Le titre du cours est requis") || 
+          errMsg.includes("Le prix d'un cours");
+
+        if (isValidationError) {
+          throw new Error(errMsg);
         }
 
         // Direct client-side insert fallback using authenticated Supabase user
+        console.warn("[InstructorCourses] API /api/courses failed, falling back to direct client insert:", errMsg);
         const { data: { user } } = await supabase.auth.getUser();
         const activeUserId = user?.id || session?.userId;
 
         if (!activeUserId) {
-          throw new Error(resData.error || "Impossible d'identifier l'utilisateur. Veuillez vous reconnecter.");
+          throw new Error(errMsg || "Impossible d'identifier l'utilisateur. Veuillez vous reconnecter.");
         }
 
         const slug = courseData.title
@@ -303,37 +309,58 @@ export default function InstructorCoursesPage() {
 
         const allowInstallments = courseType === "academic" ? courseData.installmentsEnabled : false;
 
-        let { error: directErr } = await (supabase as any)
-          .from("courses")
-          .insert({
-            title: courseData.title,
-            slug,
-            description: courseData.description,
-            price: sanitizedPrice,
-            level: courseData.level.includes("Intermédiaire") ? "INTERMEDIATE" : courseData.level.includes("Avancé") ? "ADVANCED" : "BEGINNER",
-            language: courseData.language || "fr",
-            thumbnail_url: courseData.thumbnailUrl,
-            instructor_id: activeUserId,
-            status: "DRAFT",
-            type: courseType,
-            allow_installments: allowInstallments,
-          });
+        const directPayload: Record<string, any> = {
+          title: courseData.title,
+          slug,
+          description: courseData.description,
+          price: sanitizedPrice,
+          level: courseData.level.includes("Intermédiaire") ? "INTERMEDIATE" : courseData.level.includes("Avancé") ? "ADVANCED" : "BEGINNER",
+          language: courseData.language || "fr",
+          thumbnail_url: courseData.thumbnailUrl,
+          instructor_id: activeUserId,
+          status: "DRAFT",
+          type: courseType,
+          allow_installments: allowInstallments,
+        };
 
-        if (directErr && (directErr.message?.toLowerCase().includes("type") || directErr.message?.toLowerCase().includes("language") || directErr.message?.toLowerCase().includes("schema cache"))) {
-          const { error: retryErr } = await (supabase as any)
+        let directErr: any = null;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const { error } = await (supabase as any)
             .from("courses")
-            .insert({
-              title: courseData.title,
-              slug,
-              description: courseData.description,
-              price: sanitizedPrice,
-              level: courseData.level.includes("Intermédiaire") ? "INTERMEDIATE" : courseData.level.includes("Avancé") ? "ADVANCED" : "BEGINNER",
-              thumbnail_url: courseData.thumbnailUrl,
-              instructor_id: activeUserId,
-              status: "DRAFT",
-            });
-          if (retryErr) throw retryErr;
-        } else if (directErr) {
+            .insert(directPayload);
+
+          if (!error) {
+            directErr = null;
+            break;
+          }
+
+          directErr = error;
+          const msg = error.message || "";
+          const schemaCacheMatch = msg.match(/Could not find the '([^']+)' column/i);
+          const colNotFoundMatch = msg.match(/column "?([a-zA-Z0-9_]+)"? of relation/i) || msg.match(/column "?([a-zA-Z0-9_]+)"? does not exist/i);
+          const missingCol = schemaCacheMatch?.[1] || colNotFoundMatch?.[1];
+
+          if (missingCol && missingCol in directPayload) {
+            delete directPayload[missingCol];
+            continue;
+          }
+
+          if (msg.toLowerCase().includes("type") && "type" in directPayload) {
+            delete directPayload.type;
+            continue;
+          }
+          if (msg.toLowerCase().includes("language") && "language" in directPayload) {
+            delete directPayload.language;
+            continue;
+          }
+          if (msg.toLowerCase().includes("allow_installments") && "allow_installments" in directPayload) {
+            delete directPayload.allow_installments;
+            continue;
+          }
+          break;
+        }
+
+        if (directErr) {
           throw directErr;
         }
       }

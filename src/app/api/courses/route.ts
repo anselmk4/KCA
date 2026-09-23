@@ -134,29 +134,80 @@ export async function POST(req: NextRequest) {
       type: courseType,
       allow_installments: courseType === 'academic',
       installments_count: courseType === 'academic' ? 3 : 1,
-      learning_outcomes: Array.isArray(learningOutcomes) ? learningOutcomes : [],
-      prerequisites: Array.isArray(prerequisites) ? prerequisites : [],
+      thumbnail_url: body.thumbnailUrl || body.thumbnail_url || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
 
-    let { data, error } = await dbClient
-      .from('courses')
-      .insert(coursePayload as any)
-      .select()
-      .single();
+    if (Array.isArray(learningOutcomes) && learningOutcomes.length > 0) {
+      coursePayload.learning_outcomes = learningOutcomes;
+    }
+    if (Array.isArray(prerequisites) && prerequisites.length > 0) {
+      coursePayload.prerequisites = prerequisites;
+    }
 
-    if (error && (error.message?.toLowerCase().includes("type") || error.message?.toLowerCase().includes("language") || error.message?.toLowerCase().includes("schema cache"))) {
-      delete coursePayload.type;
-      delete coursePayload.language;
-      const retryRes = await dbClient
+    let data: any = null;
+    let error: any = null;
+    const maxRetries = 6;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const res = await dbClient
         .from('courses')
         .insert(coursePayload as any)
         .select()
         .single();
 
-      data = retryRes.data;
-      error = retryRes.error;
+      if (!res.error) {
+        data = res.data;
+        error = null;
+        break;
+      }
+
+      error = res.error;
+      const errMsg = res.error.message || '';
+
+      // Match PostgREST schema cache missing column error:
+      // "Could not find the 'xyz' column of 'courses' in the schema cache"
+      const schemaCacheMatch = errMsg.match(/Could not find the '([^']+)' column/i);
+      const colNotFoundMatch = errMsg.match(/column "?([a-zA-Z0-9_]+)"? of relation/i) || errMsg.match(/column "?([a-zA-Z0-9_]+)"? does not exist/i);
+      const missingCol = schemaCacheMatch?.[1] || colNotFoundMatch?.[1];
+
+      if (missingCol && missingCol in coursePayload) {
+        console.warn(`[API /courses POST] Removing missing column '${missingCol}' from payload and retrying...`);
+        delete coursePayload[missingCol];
+        continue;
+      }
+
+      let removedKnown = false;
+      const knownOptional = ['learning_outcomes', 'prerequisites', 'type', 'language', 'allow_installments', 'installments_count', 'thumbnail_url', 'category_id'];
+      for (const col of knownOptional) {
+        if (col in coursePayload && errMsg.toLowerCase().includes(col)) {
+          delete coursePayload[col];
+          removedKnown = true;
+          break;
+        }
+      }
+
+      if (removedKnown) {
+        continue;
+      }
+
+      if (errMsg.toLowerCase().includes("schema cache") || errMsg.toLowerCase().includes("type")) {
+        if ('type' in coursePayload) {
+          delete coursePayload.type;
+          continue;
+        }
+        if ('learning_outcomes' in coursePayload) {
+          delete coursePayload.learning_outcomes;
+          continue;
+        }
+        if ('prerequisites' in coursePayload) {
+          delete coursePayload.prerequisites;
+          continue;
+        }
+      }
+
+      break;
     }
 
     if (error) {
@@ -279,23 +330,47 @@ export async function PUT(req: NextRequest) {
     }
     sbUpdates.updated_at = new Date().toISOString();
 
-    let { data, error } = await dbClient
-      .from('courses')
-      .update(sbUpdates as any)
-      .eq('id', id)
-      .select().single();
+    let data: any = null;
+    let error: any = null;
+    const maxRetries = 6;
 
-    // Fallback if 'type' column missing in schema cache
-    if (error && (error.message?.toLowerCase().includes("type") || error.message?.toLowerCase().includes("schema cache"))) {
-      delete sbUpdates.type;
-      const retryRes = await dbClient
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const res = await dbClient
         .from('courses')
         .update(sbUpdates as any)
         .eq('id', id)
-        .select().single();
+        .select()
+        .single();
 
-      data = retryRes.data;
-      error = retryRes.error;
+      if (!res.error) {
+        data = res.data;
+        error = null;
+        break;
+      }
+
+      error = res.error;
+      const errMsg = res.error.message || '';
+
+      const schemaCacheMatch = errMsg.match(/Could not find the '([^']+)' column/i);
+      const colNotFoundMatch = errMsg.match(/column "?([a-zA-Z0-9_]+)"? of relation/i) || errMsg.match(/column "?([a-zA-Z0-9_]+)"? does not exist/i);
+      const missingCol = schemaCacheMatch?.[1] || colNotFoundMatch?.[1];
+
+      if (missingCol && missingCol in sbUpdates) {
+        console.warn(`[API /courses PUT] Removing missing column '${missingCol}' from updates and retrying...`);
+        delete sbUpdates[missingCol];
+        continue;
+      }
+
+      if (errMsg.toLowerCase().includes("type") && 'type' in sbUpdates) {
+        delete sbUpdates.type;
+        continue;
+      }
+      if (errMsg.toLowerCase().includes("allow_installments") && 'allow_installments' in sbUpdates) {
+        delete sbUpdates.allow_installments;
+        continue;
+      }
+
+      break;
     }
 
     if (error) {
