@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Lock, Users, Tag, User, ChevronLeft, Loader2, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
+import { CourseReviewsSection } from "@/components/reviews";
 
 // ─── Local Types ──────────────────────────────────────────
 interface Course {
@@ -334,6 +335,11 @@ export default function CoursePreviewPage() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Reviews Section */}
+            <div className="mt-8">
+              <CourseReviewsSection courseId={course.id} courseTitle={course.title} />
             </div>
           </div>
         </div>

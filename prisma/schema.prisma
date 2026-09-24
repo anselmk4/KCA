@@ -94,6 +94,7 @@ model User {
   supportTickets SupportTicket[] @relation("UserTickets")
   assignedTickets SupportTicket[] @relation("AgentTickets")
   homeworkSubmissions HomeworkSubmission[]
+  reviews       CourseReview[]
 }
 
 model Profile {
@@ -132,6 +133,7 @@ model Course {
   quizzes     Quiz[]
   certificates Certificate[]
   homeworks   Homework[]
+  reviews     CourseReview[]
 }
 
 model CourseSection {
@@ -332,3 +334,23 @@ model HomeworkSubmission {
 
   @@unique([homeworkId, studentId])
 }
+
+model CourseReview {
+  id        String   @id @default(uuid())
+  courseId  String
+  userId    String
+  rating    Int
+  comment   String?
+  status    String   @default("PUBLISHED")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, userId])
+  @@index([courseId])
+  @@index([userId])
+  @@index([createdAt])
+}
+

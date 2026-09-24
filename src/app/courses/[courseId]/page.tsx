@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { sanitizeHtml } from "@/lib/sanitize";
+import { CourseReviewsSection } from "@/components/reviews";
 
 // ─── Types ──────────────────────────────────────────────────
 interface CourseDetail {
@@ -285,10 +286,10 @@ export default function CourseDetailPage() {
                   </span>
                 )}
                 {course.rating_avg !== null && course.rating_avg > 0 && (
-                  <span className="flex items-center gap-1.5">
+                  <a href="#evaluations" className="flex items-center gap-1.5 hover:underline text-amber-400 cursor-pointer">
                     <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                    {course.rating_avg.toFixed(1)}/5
-                  </span>
+                    <span>{course.rating_avg.toFixed(1)}/5</span>
+                  </a>
                 )}
               </div>
 
@@ -440,6 +441,11 @@ export default function CourseDetailPage() {
               })}
             </div>
           )}
+
+          {/* Course Reviews & Ratings Section */}
+          <div className="mt-16 pt-16 border-t border-zinc-200 dark:border-zinc-800">
+            <CourseReviewsSection courseId={course.id} courseTitle={course.title} />
+          </div>
 
           {/* Bottom CTA */}
           <div className="mt-12 bg-gradient-to-r from-teal-600 to-teal-700 rounded-2xl p-8 text-white text-center space-y-4">

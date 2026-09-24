@@ -27,6 +27,7 @@ import { sanitizeHtml } from "@/lib/sanitize";
 import { stripHtml } from "@/lib/utils";
 import { supabase } from "@/lib/supabase/client";
 import { getVideoEmbedInfo, getVideoThumbnail } from "@/lib/video";
+import { CourseReviewsSection } from "@/components/reviews";
 
 // ─────────────────────────────────────────────────────────
 // Types locaux (sync avec sync.ts)
@@ -1137,6 +1138,13 @@ export default function CourseLearnPage() {
                   )}
                 </div>
               </div>
+
+              {/* Course Reviews Section */}
+              {course && (
+                <div className="mt-10 pt-10 border-t border-zinc-200 dark:border-zinc-800">
+                  <CourseReviewsSection courseId={course.id} courseTitle={course.title} />
+                </div>
+              )}
             </div>
           ) : activeHomework ? (
             <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-8 shadow-sm space-y-6 animate-in slide-in-from-right-3 duration-300">
