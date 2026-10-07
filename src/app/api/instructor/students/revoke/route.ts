@@ -20,13 +20,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const dbClient = (process.env.SUPABASE_SERVICE_ROLE_KEY &&
-                      process.env.SUPABASE_SERVICE_ROLE_KEY !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-      ? supabaseAdmin
-      : supabase;
+    // Verify user role with supabaseAdmin
+    const { data: userRoles } = await supabaseAdmin
+      .from("user_roles")
+      .select("roles(name)")
+      .eq("user_id", user.id);
 
-    // Verify course belongs to this instructor
-    const { data: course, error: courseErr } = await dbClient
+    const roles: string[] = userRoles?.map((ur: any) => ur.roles?.name) || [];
+    const isAdmin = roles.some(r => ["SUPER_ADMIN", "ADMIN"].includes(r));
+
+    // Verify course belongs to this instructor or user is admin/collaborator
+    const { data: course, error: courseErr } = await supabaseAdmin
       .from("courses")
       .select("id, title, instructor_id")
       .eq("id", courseId)
@@ -36,15 +40,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Cours introuvable." }, { status: 404 });
     }
 
-    if (course.instructor_id !== user.id) {
+    let isAllowed = isAdmin || (course.instructor_id === user.id);
+    if (!isAllowed) {
+      const { data: collab } = await (supabaseAdmin
+        .from("course_collaborators" as any) as any)
+        .select("id")
+        .eq("course_id", courseId)
+        .eq("collaborator_id", user.id)
+        .maybeSingle();
+      if (collab) {
+        isAllowed = true;
+      }
+    }
+
+    if (!isAllowed) {
       return NextResponse.json(
         { error: "Vous n'avez pas l'autorisation de gérer cet apprenant sur ce cours." },
         { status: 403 }
       );
     }
 
-    // Delete enrollment from database
-    const { error: deleteErr } = await dbClient
+    // Delete enrollment from database using service role client to bypass RLS
+    const { error: deleteErr } = await supabaseAdmin
       .from("enrollments")
       .delete()
       .eq("student_id", studentId)

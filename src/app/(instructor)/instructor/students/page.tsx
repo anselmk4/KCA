@@ -426,8 +426,8 @@ export default function StudentsPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((student) => {
-            const firstEnr = student.enrollments[0];
-            const isBlocked = student.enrollments.some(e => e.enrollmentStatus === "SUSPENDED");
+            const targetEnr = (filterCourse !== "all" ? student.enrollments.find(e => e.courseId === filterCourse) : null) || student.enrollments[0];
+            const isBlocked = targetEnr ? targetEnr.enrollmentStatus === "SUSPENDED" : student.enrollments.some(e => e.enrollmentStatus === "SUSPENDED");
 
             return (
               <div
@@ -614,10 +614,10 @@ export default function StudentsPage() {
                     )}
 
                     {/* Block/Unblock toggle */}
-                    {firstEnr && (
+                    {targetEnr && (
                       <button
                         type="button"
-                        onClick={() => handleBlockAccess(student.studentId, firstEnr.courseId, firstEnr.enrollmentStatus, student.studentName)}
+                        onClick={() => handleBlockAccess(student.studentId, targetEnr.courseId, targetEnr.enrollmentStatus, student.studentName)}
                         className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                           isBlocked
                             ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500 shadow-xs"

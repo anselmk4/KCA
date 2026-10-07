@@ -19,43 +19,52 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "studentId, courseId et action ('BLOCK' | 'UNBLOCK') sont requis." }, { status: 400 });
     }
 
-    // Verify user role
-    const { data: userRoles } = await supabase
+    // Verify user role with supabaseAdmin to prevent RLS read restrictions
+    const { data: userRoles } = await supabaseAdmin
       .from("user_roles")
       .select("roles(name)")
       .eq("user_id", user.id);
 
-    const roles = userRoles?.map((ur: any) => ur.roles?.name) || [];
+    const roles: string[] = userRoles?.map((ur: any) => ur.roles?.name) || [];
     const isAdmin = roles.some(r => ["SUPER_ADMIN", "ADMIN"].includes(r));
 
-    const dbClient = (process.env.SUPABASE_SERVICE_ROLE_KEY &&
-                      process.env.SUPABASE_SERVICE_ROLE_KEY !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-      ? supabaseAdmin
-      : supabase;
-
-    // Verify course belongs to this instructor (unless admin)
-    const { data: course, error: courseErr } = await dbClient
+    // Verify course exists (select only existing columns: id, title, instructor_id - do not select 'type')
+    const { data: course, error: courseErr } = await supabaseAdmin
       .from("courses")
-      .select("id, title, instructor_id, type")
+      .select("id, title, instructor_id")
       .eq("id", courseId)
       .maybeSingle();
 
-    if (courseErr || !course) {
+    if (courseErr) {
+      console.error("[block-access] Error querying course:", courseErr.message);
+    }
+
+    if (!course) {
       return NextResponse.json({ error: "Cours introuvable." }, { status: 404 });
     }
 
-    if (!isAdmin && course.instructor_id !== user.id) {
-      return NextResponse.json({ error: "Vous n'êtes pas le formateur de ce cours." }, { status: 403 });
+    // Verify instructor ownership, admin privileges, or course collaborator access
+    let isAllowed = isAdmin || (course.instructor_id === user.id);
+    if (!isAllowed) {
+      const { data: collab } = await (supabaseAdmin
+        .from("course_collaborators" as any) as any)
+        .select("id")
+        .eq("course_id", courseId)
+        .eq("collaborator_id", user.id)
+        .maybeSingle();
+      if (collab) {
+        isAllowed = true;
+      }
     }
 
-    if (action === "BLOCK" && course.type === "self_paced") {
-      return NextResponse.json({ error: "Le blocage manuel d'accès est réservé aux cours encadrés (Academic). Les cours en autonomie ne permettent pas la suspension d'accès." }, { status: 400 });
+    if (!isAllowed) {
+      return NextResponse.json({ error: "Vous n'êtes pas autorisé à modifier l'accès pour ce cours." }, { status: 403 });
     }
 
     const nextStatus = action === "BLOCK" ? "SUSPENDED" : "ACTIVE";
 
     // Update enrollment status in database using service role client to bypass RLS
-    const { error: updateErr } = await dbClient
+    const { error: updateErr } = await supabaseAdmin
       .from("enrollments")
       .update({
         status: nextStatus,

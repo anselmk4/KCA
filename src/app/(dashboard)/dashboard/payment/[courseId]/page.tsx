@@ -715,105 +715,13 @@ export default function PaymentPage() {
         return;
       }
 
-      // 1. Écrire l'enrollment dans Supabase en tant qu'ACTIVE (Pour PayPal et Crypto, simulation instantanée)
-      const { error: enrollError } = await supabase
-        .from('enrollments')
-        .upsert({
-          student_id: user.id,
-          course_id: course.id,
-          progress_percent: 0,
-          status: 'ACTIVE',
-          enrolled_at: new Date().toISOString()
-        }, { onConflict: 'student_id,course_id' });
-
-      if (enrollError) {
-        console.error('[payment] Error writing enrollment to Supabase:', enrollError.message);
-        throw new Error("Impossible d'activer votre inscription dans la base de données. Veuillez réessayer.");
+      if (method === 'crypto' || method === 'crypto_btc') {
+        alert("Pour valider un paiement en cryptomonnaie (Bitcoin ou Solana), veuillez effectuer la transaction à l'adresse indiquée, saisir votre Hash / TxID et cliquer sur 'Vérifier & Valider'.");
+        setSubmitting(false);
+        return;
       }
 
-      // 2. Écrire la transaction dans Supabase
-      try {
-        const orderId = crypto.randomUUID();
-        const orderNumber = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-        await supabase.from('orders').insert({
-          id: orderId,
-          order_number: orderNumber,
-          user_id: user.id,
-          status: 'COMPLETED',
-          subtotal: course.price,
-          discount_amount: course.price - discountedAmount,
-          tax_amount: 0,
-          total: discountedAmount,
-          currency: 'USD',
-          coupon_id: appliedCoupon?.id || null,
-          created_at: new Date().toISOString()
-        } as any);
-
-        if (appliedCoupon?.id) {
-          const { data: couponData } = await supabase
-            .from('coupons')
-            .select('current_uses')
-            .eq('id', appliedCoupon.id)
-            .maybeSingle();
-          
-          const newUses = (couponData?.current_uses || 0) + 1;
-          await supabase
-            .from('coupons')
-            .update({ current_uses: newUses } as any)
-            .eq('id', appliedCoupon.id);
-        }
-
-        await supabase.from('order_items').insert({
-          id: crypto.randomUUID(),
-          order_id: orderId,
-          course_id: course.id,
-          unit_price: course.price,
-          discount_amount: course.price - discountedAmount,
-          final_price: discountedAmount,
-          created_at: new Date().toISOString()
-        } as any);
-
-        let payProvider: 'STRIPE' | 'PAYPAL' | 'MOBILE_MONEY' | 'CRYPTO' | 'MANUAL' = 'STRIPE';
-        if ((method as string) === 'paypal') payProvider = 'PAYPAL';
-        else if (method === 'crypto') payProvider = 'CRYPTO';
-
-        await supabase.from('payments').insert({
-          id: crypto.randomUUID(),
-          order_id: orderId,
-          user_id: user.id,
-          amount: discountedAmount,
-          currency: 'USD',
-          provider: payProvider,
-          status: 'PAID',
-          method: payProvider,
-          paid_at: new Date().toISOString()
-        } as any);
-
-        // Trigger Receipt and Alert Email sending on server-side
-        try {
-          await fetch("/api/payments/send-receipt", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              orderId,
-              userId: user.id,
-              courseId: course.id,
-              amount: discountedAmount
-            })
-          });
-        } catch (mailApiErr) {
-          console.warn('[payment] Email notification warning:', mailApiErr);
-        }
-      } catch (receiptErr) {
-        console.warn('[payment] Order/Payment receipt insert warning (non-blocking):', receiptErr);
-      }
-
-      setSubmitting(false);
-      setSuccess(true);
-      router.refresh();
-      setTimeout(() => {
-        router.push("/dashboard/courses");
-      }, 3000);
+      throw new Error("Veuillez sélectionner un mode de paiement valide.");
     } catch (err: any) {
       console.error('[payment] Unexpected error during checkout:', err);
       alert(err.message || "Une erreur est survenue lors de la validation de votre paiement.");
@@ -1448,6 +1356,7 @@ export default function PaymentPage() {
                               body: JSON.stringify({
                                 txHash: btcTxHash.trim(),
                                 courseId: course.id,
+                                payInstallment,
                               }),
                             });
 
@@ -1547,7 +1456,7 @@ export default function PaymentPage() {
               )}
 
               {/* Submit CTA */}
-              {method !== "paypal" && (
+              {method !== "paypal" && method !== "crypto" && method !== "crypto_btc" && (
                 <button
                   type="submit"
                   disabled={submitting}

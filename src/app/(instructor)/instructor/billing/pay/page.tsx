@@ -519,17 +519,13 @@ function PaymentContent() {
       return;
     }
 
-    // Simulate other payment methods (crypto) — update Supabase directly
-    setTimeout(async () => {
-      try {
-        // Update plan in Supabase
-        await supabase.from("profiles").update({ plan }).eq("id", userId);
-      } catch (err) {
-        console.error("[instructor-pay] Error updating plan for simulated method:", err);
-      }
+    if (method === "crypto" || method === "crypto_btc") {
+      alert("Veuillez saisir votre Hash de transaction Bitcoin ci-dessus et cliquer sur 'Vérifier & Valider'.");
       setLoading(false);
-      handlePaymentSuccess();
-    }, 2000);
+      return;
+    }
+
+    setLoading(false);
   };
 
 
@@ -1079,7 +1075,7 @@ function PaymentContent() {
                 >
                   Annuler
                 </Link>
-                {method !== "paypal" && (
+                {method !== "paypal" && method !== "crypto" && method !== "crypto_btc" && (
                   <button
                     type="submit"
                     disabled={loading}

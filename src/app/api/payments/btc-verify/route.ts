@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { txHash, courseId, planId } = body;
+    const { txHash, courseId, planId, payInstallment } = body;
 
     if (!txHash || typeof txHash !== "string" || txHash.trim().length < 20) {
       return NextResponse.json(
@@ -141,7 +141,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Cours introuvable." }, { status: 404 });
       }
 
-      expectedUsdAmount = Number(course.price) || 0;
+      const fullPrice = Number(course.price) || 0;
+      const installmentCount = (typeof payInstallment === "number" && payInstallment > 1) ? payInstallment : 1;
+      expectedUsdAmount = Math.round(fullPrice / installmentCount);
       itemTitle = course.title;
       targetCourseId = course.id;
     } else if (planId) {
@@ -224,7 +226,7 @@ export async function POST(req: NextRequest) {
       currency: "USD",
       status: "PAID",
       provider: "CRYPTO_BTC",
-      method: `BITCOIN::ON_CHAIN::${cleanHash}`,
+      method: `BITCOIN::ON_CHAIN::${targetCourseId || 'PLAN'}::${cleanHash}`,
       provider_transaction_id: cleanHash,
       paid_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
