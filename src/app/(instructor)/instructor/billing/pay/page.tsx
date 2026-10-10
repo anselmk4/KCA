@@ -17,7 +17,7 @@ import {
 import Link from "next/link";
 import Script from "next/script";
 import { supabase } from "@/lib/supabase/client";
-import { getPawaPayConfigForCountry } from "@/lib/pawapay";
+import { getPawaPayConfigForCountry, PAWAPAY_FEE_RATE } from "@/lib/pawapay";
 import { OperatorLogo } from "@/components/icons/PaymentLogos";
 import { SOLANA_TREASURY_ADDRESS, getSolanaPayUri, getSolanaQrCodeUrl, getBackupQrCodeUrl, connectSolanaWallet } from "@/lib/crypto";
 import { SolanaQrCode } from "@/components/ui/SolanaQrCode";
@@ -239,7 +239,7 @@ function PaymentContent() {
   };
 
   // Dynamic Fee Surcharge: +2.5% for Mobile Money (pawaPay), +3% for PayPal / Card, 0% for Crypto
-  const feeRate = method === "mobile_money" ? 0.025 : (method === "paypal" || method === "mastercard") ? 0.03 : 0;
+  const feeRate = method === "mobile_money" ? PAWAPAY_FEE_RATE : (method === "paypal" || method === "mastercard") ? 0.03 : 0;
   const feeSurchargeAmount = Number((currentPlanDetails.price * feeRate).toFixed(2));
   const finalAmountWithFee = Number((currentPlanDetails.price * (1 + feeRate)).toFixed(2));
 
@@ -311,7 +311,7 @@ function PaymentContent() {
         body: JSON.stringify([{
           depositId: paymentId,
           status: "COMPLETED",
-          amount: currentPlanDetails.price.toString(),
+          amount: finalAmountWithFee.toString(),
           currency: countryConfig.currency,
           payer: {
             type: "MSISDN",
@@ -651,16 +651,30 @@ function PaymentContent() {
                     <span>Réduction souscription annuelle (-10%)</span>
                     <span>-${currentPlanDetails.discountAmount.toFixed(2)} USD</span>
                   </div>
+                  {feeSurchargeAmount > 0 && (
+                    <div className="flex justify-between items-center text-xs font-semibold text-amber-600 dark:text-amber-400">
+                      <span>Frais ({method === "mobile_money" ? "+2.5% Mobile Money" : "+3% PayPal/Carte"}) :</span>
+                      <span>+${feeSurchargeAmount.toFixed(2)} USD</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center pt-3 border-t border-zinc-100 dark:border-zinc-800 text-sm font-bold">
                     <span className="text-zinc-900 dark:text-white">Total à payer (12 mois)</span>
-                    <span className="text-indigo-600 dark:text-indigo-400 font-extrabold text-base">${currentPlanDetails.price.toFixed(2)} USD</span>
+                    <span className="text-indigo-600 dark:text-indigo-400 font-extrabold text-base">${finalAmountWithFee.toFixed(2)} USD</span>
                   </div>
                 </>
               ) : (
-                <div className="flex justify-between items-center pt-3 border-t border-zinc-100 dark:border-zinc-800 text-sm font-bold">
-                  <span className="text-zinc-900 dark:text-white">Total récurrent</span>
-                  <span className="text-teal-600 dark:text-teal-400">${currentPlanDetails.price.toFixed(2)} USD / mois</span>
-                </div>
+                <>
+                  {feeSurchargeAmount > 0 && (
+                    <div className="flex justify-between items-center pt-3 border-t border-zinc-100 dark:border-zinc-800 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                      <span>Frais ({method === "mobile_money" ? "+2.5% Mobile Money" : "+3% PayPal/Carte"}) :</span>
+                      <span>+${feeSurchargeAmount.toFixed(2)} USD</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center pt-3 border-t border-zinc-100 dark:border-zinc-800 text-sm font-bold">
+                    <span className="text-zinc-900 dark:text-white">Total récurrent</span>
+                    <span className="text-teal-600 dark:text-teal-400">${finalAmountWithFee.toFixed(2)} USD / mois</span>
+                  </div>
+                </>
               )}
             </div>
 
@@ -1018,7 +1032,7 @@ function PaymentContent() {
                         </div>
                       </div>
                       <p className="text-[10px] text-zinc-400 mt-1">
-                        Montant à régler : {momoCurrency === "USD" ? `$${currentPlanDetails.price} USD` : `FC ${(currentPlanDetails.price * countryConfig.exchangeRate).toLocaleString()} CDF`}
+                        Montant à régler : {momoCurrency === "USD" ? `$${finalAmountWithFee.toFixed(2)} USD` : `FC ${Math.round(finalAmountWithFee * countryConfig.exchangeRate).toLocaleString()} CDF`}
                       </p>
                     </div>
                   )}

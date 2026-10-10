@@ -6,7 +6,9 @@ import {
   getPawaPayConfigForCountry, 
   detectPawaPayCountry,
   formatPawaPayPhoneNumber,
-  normalizePawaPayCorrespondent
+  normalizePawaPayCorrespondent,
+  calculatePawaPayAmountWithFee,
+  PAWAPAY_FEE_RATE
 } from '@/lib/pawapay';
 
 export async function POST(req: NextRequest) {
@@ -82,9 +84,9 @@ export async function POST(req: NextRequest) {
       ? supabaseAdmin 
       : supabase;
 
-    // Server-side verification and calculation of price + discount to prevent tampering
-    let calculatedAmount = amount;
-    let subtotal = amount;
+    // Server-side verification and calculation of base price + discount to prevent tampering
+    let baseAmount = typeof amount === 'number' ? amount : (parseFloat(amount) || 0);
+    let subtotal = baseAmount;
     let discountAmount = 0;
 
     if (type === 'STUDENT_COURSE') {
@@ -128,9 +130,24 @@ export async function POST(req: NextRequest) {
 
         subtotal = Math.round(originalPrice / installmentCount);
         discountAmount = Math.round(fullCourseDiscount / installmentCount);
-        calculatedAmount = Math.max(0, Math.round(discountedTotalCoursePrice / installmentCount));
+        baseAmount = Math.max(0, Math.round(discountedTotalCoursePrice / installmentCount));
+      }
+    } else if (type === 'INSTRUCTOR_PLAN') {
+      const planPrices: Record<string, { monthly: number; annual: number }> = {
+        BASE: { monthly: 15, annual: 144 },
+        PRO: { monthly: 29, annual: 278 },
+        MAX: { monthly: 59, annual: 566 }
+      };
+      const planConfig = planPrices[itemId?.toUpperCase()];
+      if (planConfig) {
+        baseAmount = cycle === 'ANNUAL' ? planConfig.annual : planConfig.monthly;
+        subtotal = baseAmount;
       }
     }
+
+    // Apply PawaPay Mobile Money fee surcharge (+2.5% standard).
+    // The user pays baseAmount + feeAmount so that the platform does not absorb PawaPay transaction fees.
+    const { feeAmount, totalAmount: calculatedAmountWithFee } = calculatePawaPayAmountWithFee(baseAmount);
 
     // 5. Save PENDING records in database (USD equivalent for bookkeeping and DB constraints)
     try {
@@ -142,8 +159,8 @@ export async function POST(req: NextRequest) {
         status: 'PENDING',
         subtotal: subtotal,
         discount_amount: discountAmount,
-        tax_amount: 0,
-        total: calculatedAmount,
+        tax_amount: feeAmount, // Store PawaPay fee surcharge
+        total: calculatedAmountWithFee, // Full debited amount
         currency: 'USD', // Standardized currency in DB to match prices
         coupon_id: couponId || null,
         created_at: new Date().toISOString(),
@@ -160,7 +177,7 @@ export async function POST(req: NextRequest) {
           course_id: itemId,
           unit_price: subtotal,
           discount_amount: discountAmount,
-          final_price: calculatedAmount,
+          final_price: baseAmount,
           created_at: new Date().toISOString()
         } as any);
 
@@ -171,7 +188,7 @@ export async function POST(req: NextRequest) {
         id: paymentId,
         order_id: orderId,
         user_id: user.id,
-        amount: calculatedAmount,
+        amount: calculatedAmountWithFee, // Full debited amount
         currency: 'USD',
         status: 'PENDING',
         provider: 'MOBILE_MONEY',
@@ -205,16 +222,16 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
 
-    // Convert amount to target currency for billing the user via PawaPay Mobile Money
+    // Convert amount (with fee surcharge included) to target currency for billing the user via PawaPay Mobile Money
     const isDRC = countryConfig.countryCode === 'CD';
     const isUSDRequested = (currency || '').toUpperCase() === 'USD';
 
     let targetCurrency = countryConfig.currency;
-    let targetAmount = Math.round(calculatedAmount * countryConfig.exchangeRate);
+    let targetAmount = Math.round(calculatedAmountWithFee * countryConfig.exchangeRate);
 
     if (isDRC && isUSDRequested) {
       targetCurrency = 'USD';
-      targetAmount = Math.round(calculatedAmount);
+      targetAmount = calculatedAmountWithFee;
     }
 
     // Build meaningful payment description for mobile money statement (max 22 chars, alphanumeric & spaces only)
@@ -222,7 +239,7 @@ export async function POST(req: NextRequest) {
     if (type === 'INSTRUCTOR_PLAN') {
       statementDescription = `Ansella Plan ${itemId.toUpperCase()}`;
     } else if (type === 'STUDENT_COURSE') {
-      statementDescription = `Ansella Cours ${calculatedAmount}`;
+      statementDescription = `Ansella Cours ${calculatedAmountWithFee}`;
     }
     // Strict PawaPay rule: only alphanumeric and spaces
     statementDescription = statementDescription.replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 22);

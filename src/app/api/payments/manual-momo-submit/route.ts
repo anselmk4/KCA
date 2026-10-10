@@ -54,9 +54,21 @@ export async function POST(req: NextRequest) {
         final_price: amount,
         created_at: new Date().toISOString()
       } as any);
+
+      // Create enrollment in INACTIVE status awaiting manual confirmation
+      await supabaseAdmin.from('enrollments').upsert({
+        student_id: user.id,
+        course_id: itemId,
+        progress_percent: 0,
+        status: 'INACTIVE',
+        enrolled_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      } as any, { onConflict: 'student_id,course_id' });
     }
 
     // 4. Create Payment with PENDING status (awaiting manual admin verification)
+    // Note: provider MUST be 'MANUAL' to match PostgreSQL enum PaymentProvider
     const { error: paymentError } = await supabaseAdmin.from('payments').insert({
       id: paymentId,
       order_id: orderId,
@@ -64,8 +76,8 @@ export async function POST(req: NextRequest) {
       amount: amount,
       currency: 'USD',
       status: 'PENDING',
-      provider: 'MOBILE_MONEY_MANUAL',
-      method: `MANUAL_MOMO::${carrier || 'MTN'}::${itemId}::MONTHLY`,
+      provider: 'MANUAL',
+      method: `MANUAL_MOMO::${carrier || 'MOMO'}::${itemId}::MONTHLY`,
       failure_reason: `Réf Virement MoMo : ${cleanRef} (${phoneNumber}) — En attente de validation administrative`,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -94,6 +106,25 @@ export async function POST(req: NextRequest) {
         type: "INFO",
         link: "/dashboard/payments"
       });
+
+      // Also notify all admins of new pending payment
+      const { data: adminRoles } = await supabaseAdmin
+        .from('user_roles')
+        .select('user_id, roles!inner(name)')
+        .in('roles.name', ['SUPER_ADMIN', 'ADMIN', 'FINANCE_ADMIN']) as any;
+
+      if (adminRoles && adminRoles.length > 0) {
+        const adminUserIds = [...new Set(adminRoles.map((r: any) => r.user_id))] as string[];
+        for (const adminId of adminUserIds) {
+          await createNotification({
+            userId: adminId,
+            title: "Nouveau virement à valider 🔔",
+            message: `Un paiement manuel de $${amount} (Réf: ${cleanRef}) pour ${itemTitle} attend votre validation.`,
+            type: "WARNING",
+            link: "/admin/transactions"
+          });
+        }
+      }
     } catch (e) {
       console.warn('[manual-momo-submit] Notification error:', e);
     }

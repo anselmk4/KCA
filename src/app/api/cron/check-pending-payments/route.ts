@@ -197,8 +197,21 @@ export async function GET(req: NextRequest) {
               if (instructorProfile) {
                 const instPlan = instructorProfile.plan || 'FREE';
                 const commissionRate = instPlan === 'FREE' ? 0.20 : (instPlan === 'BASE' ? 0.10 : 0.0);
-                const platformFee = payment.amount * commissionRate;
-                const instructorEarnings = payment.amount - platformFee;
+
+                // Base instructor commission on course price (excluding gateway fee surcharge)
+                const { data: orderItem } = await supabaseAdmin
+                  .from('order_items')
+                  .select('final_price')
+                  .eq('order_id', payment.order_id)
+                  .eq('course_id', courseId)
+                  .maybeSingle();
+
+                const courseRevenue = orderItem?.final_price 
+                  ? (parseFloat(orderItem.final_price) || 0)
+                  : payment.amount;
+
+                const platformFee = courseRevenue * commissionRate;
+                const instructorEarnings = courseRevenue - platformFee;
 
                 await createNotification({
                   userId: courseData.instructor_id,

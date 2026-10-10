@@ -1,278 +1,326 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { CheckCircle2, XCircle, Clock, Loader2, Search, SlidersHorizontal, ChevronLeft, ChevronRight } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
+import { 
+  CheckCircle2, 
+  XCircle, 
+  Clock, 
+  Loader2, 
+  Search, 
+  ChevronLeft, 
+  ChevronRight, 
+  RefreshCw, 
+  Check, 
+  X, 
+  Copy, 
+  CheckCheck,
+  AlertTriangle,
+  Smartphone,
+  CreditCard,
+  DollarSign,
+  Coins,
+  ShieldCheck,
+  PhoneCall
+} from "lucide-react";
 
-const PLAN_COMMISSION_CONFIG: Record<string, { commissionRate: number; instructorShare: number; label: string }> = {
-  FREE: { commissionRate: 0.20, instructorShare: 0.80, label: "Free (20%)" },
-  BASE: { commissionRate: 0.10, instructorShare: 0.90, label: "Base (10%)" },
-  PRO: { commissionRate: 0.05, instructorShare: 0.95, label: "Pro (5%)" },
-  MAX: { commissionRate: 0.00, instructorShare: 1.00, label: "Max (0%)" },
-};
-
-const planUuidMap: Record<string, string> = {
-  "99999999-9999-9999-9999-999999990001": "Forfait Formateur BASE",
-  "99999999-9999-9999-9999-999999990002": "Forfait Formateur PRO",
-  "99999999-9999-9999-9999-999999990003": "Forfait Formateur MAX",
-};
-
-interface AdminTransaction {
+interface AdminPayment {
   id: string;
   orderId: string;
+  userId: string;
   studentName: string;
   studentEmail: string;
+  studentPhone: string;
+  courseId: string;
   courseTitle: string;
   amount: number;
-  method: string;
-  date: string;
-  status: string;
+  currency: string;
+  status: "PENDING" | "PAID" | "FAILED" | "CANCELLED";
+  provider: string;
+  rawMethod: string;
+  formattedMethod: string;
+  paymentType: "MANUAL_MOMO" | "PAWAPAY_AUTO" | "PAYPAL" | "CRYPTO" | "CARD" | "OTHER";
+  isManual: boolean;
+  manualReference: string;
+  failureReason: string | null;
   instructorName: string;
   instructorPlan: string;
   commissionAmount: number;
   instructorShareAmount: number;
   siteAmount: number;
+  paidAt: string | null;
+  createdAt: string;
+  date: string;
 }
 
 export default function AdminTransactionsPage() {
   const [loading, setLoading] = useState(true);
-  const [transactions, setTransactions] = useState<AdminTransaction[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [payments, setPayments] = useState<AdminPayment[]>([]);
+  const [counts, setCounts] = useState({ all: 0, pending: 0, paid: 0, failed: 0 });
+  const [totals, setTotals] = useState({ pendingTotalAmount: 0, paidTotalAmount: 0 });
 
-  // Filter States
-  const [statusFilter, setStatusFilter] = useState<string>("PAID"); // PAID by default
-  const [pageSize, setPageSize] = useState<number>(25); // 25 by default
-  const [currentPage, setCurrentPage] = useState<number>(1);
+  // Filters & Pagination
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [pageSize, setPageSize] = useState<number>(25);
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
-  const fetchAdminTransactions = useCallback(async () => {
-    if (transactions.length === 0) {
-      setLoading(true);
-    }
+  // Action Modals State
+  const [actionPayment, setActionPayment] = useState<AdminPayment | null>(null);
+  const [actionType, setActionType] = useState<"APPROVE" | "REJECT" | null>(null);
+  const [actionNotes, setActionNotes] = useState<string>("");
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Copied Reference State
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const fetchPayments = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    else setRefreshing(true);
+
     try {
-      // 1. Get all successful payments (filtering out FAILED and CANCELLED for clean accounting)
-      const { data: payments } = await supabase
-        .from("payments")
-        .select("id, order_id, user_id, amount, status, provider, paid_at")
-        .eq("status", "PAID")
-        .order("paid_at", { ascending: false });
+      const url = `/api/admin/payments?status=${encodeURIComponent(statusFilter)}&search=${encodeURIComponent(searchTerm)}`;
+      const res = await fetch(url);
+      const data = await res.json();
 
-      if (!payments || payments.length === 0) {
-        setTransactions([]);
-        setLoading(false);
-        return;
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur de chargement des paiements");
       }
 
-      const userIds = [...new Set(payments.map((p) => p.user_id))];
-      const orderIds = payments.map((p) => p.order_id);
-
-      // 2. Get student profiles
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, full_name, email")
-        .in("id", userIds);
-
-      const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
-
-      // 3. Get order items to find courses
-      const { data: orderItems } = await supabase
-        .from("order_items")
-        .select("order_id, course_id")
-        .in("order_id", orderIds);
-
-      const orderItemMap = new Map(orderItems?.map((oi) => [oi.order_id, oi.course_id]) || []);
-      const courseIds = [...new Set(orderItems?.map((oi) => oi.course_id) || [])];
-
-      // 4. Get courses titles and instructor IDs
-      let courseMap = new Map<string, { title: string; instructorId: string }>();
-      const instructorIds: string[] = [];
-      if (courseIds.length > 0) {
-        const { data: courses } = await supabase
-          .from("courses")
-          .select("id, title, instructor_id")
-          .in("id", courseIds);
-        if (courses) {
-          courses.forEach((c) => {
-            courseMap.set(c.id, { title: c.title, instructorId: c.instructor_id || "" });
-            if (c.instructor_id) instructorIds.push(c.instructor_id);
-          });
-        }
-      }
-
-      // 5. Get instructor profiles to get their plan details
-      let instructorMap = new Map<string, { name: string; plan: string }>();
-      if (instructorIds.length > 0) {
-        const { data: instProfiles } = await supabase
-          .from("profiles")
-          .select("id, full_name, plan")
-          .in("id", [...new Set(instructorIds)]);
-        if (instProfiles) {
-          instProfiles.forEach((p) => {
-            instructorMap.set(p.id, { name: p.full_name || "Formateur", plan: p.plan || "FREE" });
-          });
-        }
-      }
-
-      // 6. Map everything to transaction list
-      const mapped: AdminTransaction[] = payments.map((p) => {
-        const profile = profileMap.get(p.user_id);
-        const courseId = orderItemMap.get(p.order_id) || "";
-        
-        const planName = planUuidMap[courseId];
-        
-        let courseTitle = "";
-        let commissionAmount = 0;
-        let instructorShareAmount = 0;
-        let siteAmount = 0;
-        let instName = "N/A";
-        let instPlan = "N/A";
-
-        if (planName) {
-          // It is a plan purchase -> 100% goes to site, commission is 0
-          courseTitle = planName;
-          commissionAmount = 0;
-          instructorShareAmount = 0;
-          siteAmount = p.amount || 0;
-          
-          instName = profile?.full_name || "Formateur";
-          instPlan = planName.replace("Forfait Formateur ", "");
-        } else {
-          // It is a course purchase
-          const courseInfo = courseMap.get(courseId);
-          courseTitle = courseInfo?.title || "Abonnement ou Autre";
-          const instructorId = courseInfo?.instructorId || "";
-          const instructorInfo = instructorMap.get(instructorId);
-
-          instName = instructorInfo?.name || "Formateur";
-          instPlan = instructorInfo?.plan || "FREE";
-
-          const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;
-          commissionAmount = (p.amount || 0) * commConfig.commissionRate;
-          instructorShareAmount = (p.amount || 0) * commConfig.instructorShare;
-          siteAmount = commissionAmount; // Site share is just the commission
-        }
-
-        let payMethod: string = p.provider || "STRIPE";
-        if (payMethod === "MOBILE_MONEY") payMethod = "MoMo";
-
-        return {
-          id: p.id.substring(0, 8) + "...",
-          orderId: p.order_id,
-          studentName: profile?.full_name || "Étudiant",
-          studentEmail: profile?.email || "Non renseigné",
-          courseTitle,
-          amount: p.amount || 0,
-          method: payMethod,
-          date: p.paid_at || new Date().toISOString(),
-          status: p.status || "PAID",
-          instructorName: instName,
-          instructorPlan: instPlan,
-          commissionAmount,
-          instructorShareAmount,
-          siteAmount,
-        };
-      });
-
-      setTransactions(mapped);
-    } catch (err) {
-      console.error("Error fetching admin transactions:", err);
+      setPayments(data.payments || []);
+      if (data.counts) setCounts(data.counts);
+      if (data.totals) setTotals(data.totals);
+    } catch (err: any) {
+      console.error("[AdminTransactions] Fetch error:", err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, []);
+  }, [statusFilter, searchTerm]);
 
   useEffect(() => {
-    fetchAdminTransactions();
-  }, [fetchAdminTransactions]);
+    fetchPayments();
+  }, [fetchPayments]);
 
-  // Filtering Logic
-  const filtered = transactions.filter((tx) => {
-    // Status Filter
-    const matchesStatus = statusFilter === "ALL" || tx.status === statusFilter;
-    
-    // Search Term Filter (Student Name/Email or Course Title)
-    const normalizedSearch = searchTerm.toLowerCase();
-    const matchesSearch =
-      tx.studentName.toLowerCase().includes(normalizedSearch) ||
-      tx.studentEmail.toLowerCase().includes(normalizedSearch) ||
-      tx.courseTitle.toLowerCase().includes(normalizedSearch) ||
-      tx.instructorName.toLowerCase().includes(normalizedSearch);
+  // Auto-polling every 15 seconds to catch new manual payments
+  useEffect(() => {
+    const timer = setInterval(() => {
+      fetchPayments(true);
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [fetchPayments]);
 
-    return matchesStatus && matchesSearch;
-  });
+  // Handle Approve or Reject
+  const handleExecuteAction = async () => {
+    if (!actionPayment || !actionType) return;
+    setActionLoading(true);
+    setActionMessage(null);
+
+    try {
+      const res = await fetch("/api/admin/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paymentId: actionPayment.id,
+          action: actionType,
+          notes: actionNotes.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Échec de l'opération");
+
+      setActionMessage({
+        type: "success",
+        text: actionType === "APPROVE" 
+          ? `Paiement #${actionPayment.id.slice(0, 8)} validé ! L'accès de l'apprenant a été activé.` 
+          : `Paiement #${actionPayment.id.slice(0, 8)} rejeté.`,
+      });
+
+      // Close modal after brief delay and refresh table
+      setTimeout(() => {
+        setActionPayment(null);
+        setActionType(null);
+        setActionNotes("");
+        setActionMessage(null);
+      }, 1500);
+
+      await fetchPayments(true);
+    } catch (err: any) {
+      setActionMessage({ type: "error", text: err.message || "Erreur lors de l'opération" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   // Pagination Logic
-  const totalItems = filtered.length;
+  const totalItems = payments.length;
   const totalPages = Math.ceil(totalItems / pageSize) || 1;
-  const paginatedTransactions = filtered.slice(
+  const paginatedPayments = payments.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
 
-  // Totals calculations
-  const totalAmount = filtered.reduce((sum, tx) => sum + tx.amount, 0);
-  const totalCommission = filtered.reduce((sum, tx) => sum + tx.commissionAmount, 0);
-  const totalInstructorShare = filtered.reduce((sum, tx) => sum + tx.instructorShareAmount, 0);
-  const totalSiteAmount = filtered.reduce((sum, tx) => sum + tx.siteAmount, 0);
-
-  // Reset page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [statusFilter, pageSize, searchTerm]);
-
-  if (transactions.length === 0 && loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-10 h-10 text-teal-600 animate-spin" />
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in">
-      {/* Header */}
+    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in pb-12">
+      {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2 flex items-center gap-2">
-            Suivi des Paiements
-            {loading && <Loader2 className="w-5 h-5 text-teal-600 animate-spin shrink-0" />}
+          <h1 className="text-2xl font-black text-zinc-900 dark:text-white flex items-center gap-3">
+            Paiements & Transactions
+            {refreshing && <Loader2 className="w-5 h-5 text-teal-600 animate-spin" />}
           </h1>
-          <p className="text-zinc-500 dark:text-zinc-400 text-sm">
-            Historique en temps réel des transactions et répartition des commissions.
+          <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">
+            Gestion centralisée de tous les paiements automatiques (PawaPay, PayPal, Crypto) et manuels (Virements Mobile Money).
           </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => fetchPayments(true)}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-all cursor-pointer shadow-sm"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-teal-600" : ""}`} />
+            <span>Actualiser</span>
+          </button>
         </div>
       </div>
 
-      {/* Control Panel (Filters & Limits) */}
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 md:p-5 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
-        {/* Search */}
-        <div className="relative w-full md:max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-450 dark:text-zinc-500" />
-          <input
-            type="text"
-            placeholder="Rechercher étudiant, cours..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-zinc-900 dark:text-white transition-all"
-          />
+      {/* KPI Highlights Bar */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xs">
+          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Paiements Validés</span>
+          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+            ${totals.paidTotalAmount.toFixed(2)}
+          </div>
+          <span className="text-xxs text-zinc-500 font-medium">{counts.paid} transaction(s) complétée(s)</span>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          {/* Status badge indicator */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Paiements Validés Uniquement</span>
+        <div className={`p-4 rounded-2xl border shadow-xs transition-all ${
+          counts.pending > 0 
+            ? "bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-300"
+            : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+        }`}>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">En Attente de Validation</span>
+            {counts.pending > 0 && (
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+            )}
+          </div>
+          <div className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">
+            ${totals.pendingTotalAmount.toFixed(2)}
+          </div>
+          <span className="text-xxs font-bold text-amber-700 dark:text-amber-400">
+            {counts.pending} virement(s) à approuver
+          </span>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xs">
+          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Rejetés / Échoués</span>
+          <div className="text-2xl font-black text-red-500 dark:text-red-400 mt-1">
+            {counts.failed}
+          </div>
+          <span className="text-xxs text-zinc-500 font-medium">Transactions annulées</span>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xs">
+          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Total Enregistré</span>
+          <div className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">
+            {counts.all}
+          </div>
+          <span className="text-xxs text-zinc-500 font-medium">Toutes méthodes confondues</span>
+        </div>
+      </div>
+
+      {/* Control Panel: Filter Tabs & Search */}
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 shadow-sm space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          {/* Status Tabs */}
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-zinc-100 dark:bg-zinc-800/80 rounded-xl">
+            <button
+              type="button"
+              onClick={() => { setStatusFilter("ALL"); setCurrentPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                statusFilter === "ALL"
+                  ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+              }`}
+            >
+              Tous ({counts.all})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setStatusFilter("PENDING"); setCurrentPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                statusFilter === "PENDING"
+                  ? "bg-amber-500 text-white shadow-xs"
+                  : counts.pending > 0
+                  ? "text-amber-600 dark:text-amber-400 font-extrabold"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+              }`}
+            >
+              <span>À Valider</span>
+              {counts.pending > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-600 text-white font-black">
+                  {counts.pending}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setStatusFilter("PAID"); setCurrentPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                statusFilter === "PAID"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+              }`}
+            >
+              Validés ({counts.paid})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setStatusFilter("FAILED"); setCurrentPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                statusFilter === "FAILED"
+                  ? "bg-red-600 text-white shadow-xs"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+              }`}
+            >
+              Rejetés ({counts.failed})
+            </button>
           </div>
 
-          <div className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800 hidden md:block" />
+          {/* Search Input */}
+          <div className="flex items-center gap-3">
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+              <input
+                type="text"
+                placeholder="Rechercher étudiant, réf virement, cours..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none text-zinc-900 dark:text-white transition-all font-medium"
+              />
+            </div>
 
-          {/* Page size limit */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-zinc-500 font-medium">Afficher:</span>
             <select
               value={pageSize}
-              onChange={(e) => setPageSize(Number(e.target.value))}
-              className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none cursor-pointer"
+              onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+              className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-2.5 py-2 text-xs font-semibold text-zinc-800 dark:text-zinc-200 outline-none cursor-pointer"
             >
               <option value={25}>25 lignes</option>
               <option value={50}>50 lignes</option>
@@ -285,93 +333,226 @@ export default function AdminTransactionsPage() {
       {/* Transactions Table */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          {paginatedTransactions.length === 0 ? (
-            <div className="p-12 text-center text-zinc-500">
-              Aucune transaction trouvée avec les critères sélectionnés.
+          {loading ? (
+            <div className="p-16 flex flex-col items-center justify-center gap-3 text-zinc-500">
+              <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+              <span className="text-xs font-medium">Chargement des paiements...</span>
+            </div>
+          ) : paginatedPayments.length === 0 ? (
+            <div className="p-16 text-center space-y-2">
+              <p className="text-sm font-bold text-zinc-700 dark:text-zinc-300">Aucun paiement trouvé</p>
+              <p className="text-xs text-zinc-400">
+                {statusFilter === "PENDING"
+                  ? "Aucun virement manuel en attente de validation pour le moment."
+                  : "Aucune transaction ne correspond à vos filtres actuels."}
+              </p>
             </div>
           ) : (
-            <table className="w-full text-left font-sans">
-              <thead className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-550 dark:text-zinc-400 text-xs uppercase tracking-wider">
+            <table className="w-full text-left font-sans text-xs">
+              <thead className="bg-zinc-50 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 uppercase tracking-wider text-[10px] border-b border-zinc-200 dark:border-zinc-800">
                 <tr>
-                  <th className="px-6 py-4 font-bold">ID</th>
-                  <th className="px-6 py-4 font-bold">Étudiant / Formateur</th>
-                  <th className="px-6 py-4 font-bold">Formateur (Forfait)</th>
-                  <th className="px-6 py-4 font-bold">Module / Cours</th>
-                  <th className="px-6 py-4 font-bold">Montant</th>
-                  <th className="px-6 py-4 font-bold text-amber-600 dark:text-amber-400">Com. Site</th>
-                  <th className="px-6 py-4 font-bold text-blue-600 dark:text-blue-400">Montant Site</th>
-                  <th className="px-6 py-4 font-bold text-emerald-600 dark:text-emerald-400">Part Prof</th>
-                  <th className="px-6 py-4 font-bold">Méthode</th>
-                  <th className="px-6 py-4 font-bold">Date</th>
-                  <th className="px-6 py-4 font-bold">Statut</th>
+                  <th className="px-5 py-3.5 font-bold">Paiement / Réf. Virement</th>
+                  <th className="px-5 py-3.5 font-bold">Apprenant / Contact</th>
+                  <th className="px-5 py-3.5 font-bold">Formation / Forfait</th>
+                  <th className="px-5 py-3.5 font-bold">Montant</th>
+                  <th className="px-5 py-3.5 font-bold">Méthode</th>
+                  <th className="px-5 py-3.5 font-bold">Date</th>
+                  <th className="px-5 py-3.5 font-bold">Statut</th>
+                  <th className="px-5 py-3.5 font-bold text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                {paginatedTransactions.map((tx) => (
-                  <tr key={tx.orderId} className="text-zinc-900 dark:text-zinc-100 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-                    <td className="px-6 py-4 font-mono text-xs text-zinc-450">{tx.id}</td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold">{tx.studentName}</div>
-                      <div className="text-xxs text-zinc-450 dark:text-zinc-400 font-medium">{tx.studentEmail}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold">{tx.instructorName}</div>
-                      <div className="text-xxs font-bold uppercase text-amber-500">{tx.instructorPlan}</div>
-                    </td>
-                    <td className="px-6 py-4 font-medium">{tx.courseTitle}</td>
-                    <td className="px-6 py-4 font-extrabold text-teal-600">{tx.amount}$</td>
-                    <td className="px-6 py-4 font-extrabold text-amber-650 dark:text-amber-500">
-                      {tx.commissionAmount.toFixed(2)}$
-                    </td>
-                    <td className="px-6 py-4 font-extrabold text-blue-600 dark:text-blue-450">
-                      {tx.siteAmount.toFixed(2)}$
-                    </td>
-                    <td className="px-6 py-4 font-extrabold text-emerald-600 dark:text-emerald-400">
-                      {tx.instructorShareAmount.toFixed(2)}$
-                    </td>
-                    <td className="px-6 py-4 font-semibold text-xs">{tx.method}</td>
-                    <td className="px-6 py-4 text-zinc-500">{new Date(tx.date).toLocaleDateString("fr-FR")}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5">
-                        {tx.status === "PAID" && <CheckCircle2 className="w-4 h-4 text-green-500" />}
-                        {tx.status === "FAILED" && <XCircle className="w-4 h-4 text-red-500" />}
-                        {tx.status === "PENDING" && <Clock className="w-4 h-4 text-orange-500" />}
-                        <span className={`font-semibold text-xs ${
-                          tx.status === 'PAID' ? 'text-green-600 dark:text-green-400' :
-                          tx.status === 'FAILED' ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'
-                        }`}>
-                          {tx.status === 'PAID' ? 'Complété' : tx.status === 'FAILED' ? 'Échoué' : 'En attente'}
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/80">
+                {paginatedPayments.map((tx) => {
+                  const isPending = tx.status === "PENDING";
+                  const isPaid = tx.status === "PAID";
+                  const isFailed = tx.status === "FAILED" || tx.status === "CANCELLED";
+
+                  return (
+                    <tr 
+                      key={tx.id} 
+                      className={`transition-colors ${
+                        isPending 
+                          ? "bg-amber-50/40 dark:bg-amber-950/10 hover:bg-amber-50/70 dark:hover:bg-amber-950/20" 
+                          : "hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30"
+                      }`}
+                    >
+                      {/* ID & Reference */}
+                      <td className="px-5 py-3.5">
+                        <div className="font-mono text-zinc-500 dark:text-zinc-400 text-xxs">
+                          #{tx.id.slice(0, 8)}
+                        </div>
+                        {tx.manualReference ? (
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <span className="font-mono font-black text-xs text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800 flex items-center gap-1">
+                              <span>Réf:</span>
+                              <span>{tx.manualReference}</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(tx.manualReference, tx.id)}
+                              title="Copier la référence de virement"
+                              className="text-zinc-400 hover:text-zinc-600 dark:hover:text-white p-1 rounded-sm"
+                            >
+                              {copiedId === tx.id ? <CheckCheck className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-xxs text-zinc-400 font-mono mt-0.5">
+                            Ordre: #{tx.orderId?.slice(0, 8) || "N/A"}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Student info */}
+                      <td className="px-5 py-3.5">
+                        <div className="font-bold text-zinc-900 dark:text-white">{tx.studentName}</div>
+                        <div className="text-zinc-400 text-xxs truncate max-w-[180px]">{tx.studentEmail}</div>
+                        {tx.studentPhone && (
+                          <div className="text-zinc-500 dark:text-zinc-400 text-xxs flex items-center gap-1 mt-0.5 font-mono">
+                            <PhoneCall className="w-2.5 h-2.5 text-zinc-400" />
+                            <span>{tx.studentPhone}</span>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Item */}
+                      <td className="px-5 py-3.5">
+                        <div className="font-bold text-zinc-800 dark:text-zinc-200 max-w-[200px] truncate" title={tx.courseTitle}>
+                          {tx.courseTitle}
+                        </div>
+                        <div className="text-xxs text-zinc-400 mt-0.5">
+                          Formateur : <span className="font-semibold text-zinc-600 dark:text-zinc-300">{tx.instructorName}</span>
+                        </div>
+                      </td>
+
+                      {/* Amount */}
+                      <td className="px-5 py-3.5">
+                        <div className="font-black text-sm text-zinc-900 dark:text-white">
+                          ${tx.amount.toFixed(2)}
+                        </div>
+                        <div className="text-xxs text-zinc-400 mt-0.5">
+                          Com. site : <span className="font-semibold text-amber-600 dark:text-amber-400">${tx.commissionAmount.toFixed(2)}</span>
+                        </div>
+                      </td>
+
+                      {/* Method */}
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-1.5">
+                          {tx.paymentType === "MANUAL_MOMO" ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-900/40">
+                              <Smartphone className="w-3 h-3 text-blue-600" />
+                              MoMo Manuel
+                            </span>
+                          ) : tx.paymentType === "PAWAPAY_AUTO" ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-teal-100 text-teal-800 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-200 dark:border-teal-900/40">
+                              <Smartphone className="w-3 h-3 text-teal-600" />
+                              PawaPay Auto
+                            </span>
+                          ) : tx.paymentType === "PAYPAL" ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300 border border-sky-200 dark:border-sky-900/40">
+                              <DollarSign className="w-3 h-3 text-sky-600" />
+                              PayPal
+                            </span>
+                          ) : tx.paymentType === "CRYPTO" ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-900/40">
+                              <Coins className="w-3 h-3 text-purple-600" />
+                              Crypto
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                              <CreditCard className="w-3 h-3" />
+                              {tx.formattedMethod}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Date */}
+                      <td className="px-5 py-3.5 text-zinc-500 whitespace-nowrap text-xxs">
+                        {new Date(tx.date).toLocaleDateString("fr-FR", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-5 py-3.5">
+                        {isPaid && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Validé
+                          </span>
+                        )}
+                        {isPending && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400 animate-pulse">
+                            <Clock className="w-3 h-3" />
+                            En attente
+                          </span>
+                        )}
+                        {isFailed && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-red-800 dark:bg-red-950/30 dark:text-red-400">
+                            <XCircle className="w-3 h-3" />
+                            Rejeté
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                        {isPending ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActionPayment(tx);
+                                setActionType("APPROVE");
+                                setActionNotes("");
+                              }}
+                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-xxs flex items-center gap-1 transition-all shadow-xs cursor-pointer active:scale-95"
+                            >
+                              <Check className="w-3 h-3" />
+                              <span>Valider</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActionPayment(tx);
+                                setActionType("REJECT");
+                                setActionNotes("");
+                              }}
+                              className="px-2 py-1.5 bg-zinc-200 hover:bg-red-600 hover:text-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-bold rounded-lg text-xxs flex items-center gap-1 transition-all cursor-pointer active:scale-95"
+                            >
+                              <X className="w-3 h-3" />
+                              <span>Rejeter</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xxs text-zinc-400 italic">Terminé</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
-              <tfoot>
-                <tr className="bg-zinc-100/60 dark:bg-zinc-800/50 text-zinc-900 dark:text-white font-extrabold text-sm border-t-2 border-zinc-200 dark:border-zinc-800">
-                  <td colSpan={4} className="px-6 py-4 text-right">TOTAL :</td>
-                  <td className="px-6 py-4 text-teal-600">{totalAmount.toFixed(2)}$</td>
-                  <td className="px-6 py-4 text-amber-650 dark:text-amber-500">{totalCommission.toFixed(2)}$</td>
-                  <td className="px-6 py-4 text-blue-600 dark:text-blue-450">{totalSiteAmount.toFixed(2)}$</td>
-                  <td className="px-6 py-4 text-emerald-600 dark:text-emerald-450">{totalInstructorShare.toFixed(2)}$</td>
-                  <td colSpan={3} className="px-6 py-4"></td>
-                </tr>
-              </tfoot>
             </table>
           )}
         </div>
 
         {/* Pagination Footer */}
         {totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900 flex items-center justify-between">
+          <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex items-center justify-between">
             <div className="text-xs text-zinc-500 font-medium">
               Affichage de {((currentPage - 1) * pageSize) + 1} à {Math.min(currentPage * pageSize, totalItems)} sur {totalItems} transactions
             </div>
             <div className="flex items-center gap-2">
               <button
                 disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => prev - 1)}
-                className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-550 disabled:opacity-50 cursor-pointer"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 disabled:opacity-40 cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -380,8 +561,8 @@ export default function AdminTransactionsPage() {
               </span>
               <button
                 disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(prev => prev + 1)}
-                className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-550 disabled:opacity-50 cursor-pointer"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 disabled:opacity-40 cursor-pointer"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -389,6 +570,115 @@ export default function AdminTransactionsPage() {
           </div>
         )}
       </div>
+
+      {/* Confirmation Modal for APPROVE / REJECT */}
+      {actionPayment && actionType && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl max-w-md w-full p-6 space-y-5 animate-in zoom-in-95">
+            <div className="flex items-center gap-3">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                actionType === "APPROVE" ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400"
+              }`}>
+                {actionType === "APPROVE" ? <ShieldCheck className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
+              </div>
+              <div>
+                <h3 className="text-base font-black text-zinc-900 dark:text-white">
+                  {actionType === "APPROVE" ? "Valider le paiement manuel" : "Rejeter le paiement"}
+                </h3>
+                <p className="text-xs text-zinc-500">
+                  {actionType === "APPROVE" ? "Confirmation du virement et déblocage immédiat de l'accès" : "Annulation de la commande et notification à l'apprenant"}
+                </p>
+              </div>
+            </div>
+
+            {/* Recap Box */}
+            <div className="p-4 bg-zinc-50 dark:bg-zinc-850 rounded-2xl border border-zinc-200 dark:border-zinc-800 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Apprenant :</span>
+                <span className="font-bold text-zinc-900 dark:text-white">{actionPayment.studentName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Cours / Module :</span>
+                <span className="font-bold text-zinc-900 dark:text-white max-w-[200px] truncate">{actionPayment.courseTitle}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-500">Montant :</span>
+                <span className="font-extrabold text-teal-600 dark:text-teal-400">${actionPayment.amount.toFixed(2)} USD</span>
+              </div>
+              {actionPayment.manualReference && (
+                <div className="flex justify-between pt-1 border-t border-zinc-200 dark:border-zinc-700">
+                  <span className="text-zinc-500">Référence Virement :</span>
+                  <span className="font-mono font-black text-blue-600 dark:text-blue-400">{actionPayment.manualReference}</span>
+                </div>
+              )}
+              {actionPayment.studentPhone && (
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Téléphone MoMo :</span>
+                  <span className="font-mono font-bold text-zinc-700 dark:text-zinc-300">{actionPayment.studentPhone}</span>
+                </div>
+              )}
+            </div>
+
+            {actionType === "REJECT" && (
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-zinc-750 dark:text-zinc-300">
+                  Motif du rejet (notifié à l'apprenant) :
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Référence introuvable sur le compte marchand"
+                  value={actionNotes}
+                  onChange={(e) => setActionNotes(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-xs text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                />
+              </div>
+            )}
+
+            {actionMessage && (
+              <div className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                actionMessage.type === "success" 
+                  ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                  : "bg-red-50 text-red-800 dark:bg-red-950/40 dark:text-red-300"
+              }`}>
+                {actionMessage.type === "success" ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
+                <span>{actionMessage.text}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={() => {
+                  setActionPayment(null);
+                  setActionType(null);
+                  setActionNotes("");
+                  setActionMessage(null);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={handleExecuteAction}
+                className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md ${
+                  actionType === "APPROVE"
+                    ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20"
+                    : "bg-red-600 hover:bg-red-500 shadow-red-600/20"
+                }`}
+              >
+                {actionLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>
+                  {actionType === "APPROVE" ? "Confirmer la validation" : "Confirmer le rejet"}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

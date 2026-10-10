@@ -121,6 +121,31 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
 ];
 
 /**
+ * Default fee surcharge rate for PawaPay Mobile Money transactions (2.5%).
+ * Overridable via NEXT_PUBLIC_PAWAPAY_FEE_RATE or PAWAPAY_FEE_RATE environment variables.
+ */
+export const PAWAPAY_FEE_RATE = 
+  (typeof process !== 'undefined' && (process.env.NEXT_PUBLIC_PAWAPAY_FEE_RATE || process.env.PAWAPAY_FEE_RATE))
+    ? parseFloat(process.env.NEXT_PUBLIC_PAWAPAY_FEE_RATE || process.env.PAWAPAY_FEE_RATE || '0.025')
+    : 0.025;
+
+/**
+ * Calculates the transaction amount including PawaPay fee surcharge.
+ * e.g., baseAmount = 100, feeRate = 0.025 -> feeAmount = 2.50, totalAmount = 102.50
+ */
+export function calculatePawaPayAmountWithFee(baseAmount: number, feeRate: number = PAWAPAY_FEE_RATE) {
+  const safeBase = typeof baseAmount === 'number' && !isNaN(baseAmount) ? baseAmount : (parseFloat(baseAmount as any) || 0);
+  const feeAmount = Number((safeBase * feeRate).toFixed(2));
+  const totalAmount = Number((safeBase + feeAmount).toFixed(2));
+  return {
+    baseAmount: safeBase,
+    feeRate,
+    feeAmount,
+    totalAmount
+  };
+}
+
+/**
  * Normalizes legacy or shorthand pawaPay operator/correspondent codes to valid official codes.
  */
 export function normalizePawaPayCorrespondent(correspondent: any): string {
@@ -336,7 +361,7 @@ export interface InitiateDepositResponse {
  * Request deposit via PawaPay API (V2 with V1 fallback)
  */
 export async function initiatePawaPayDeposit(params: {
-  amount: number;
+  amount: number | string;
   currency: string;
   correspondent: string;
   phoneNumber: string;
@@ -350,10 +375,21 @@ export async function initiatePawaPayDeposit(params: {
   const correspondent = normalizePawaPayCorrespondent(params.correspondent);
   const cleanDesc = (params.statementDescription || "Ansella Academy").replace(/[^a-zA-Z0-9 ]/g, '').trim().substring(0, 22) || "Ansella Academy";
 
+  // Format amount according to PawaPay official specifications:
+  // - USD (e.g. DRC): up to 2 decimal places, no trailing zeroes (e.g. "102.5", "102.55", "100")
+  // - Local African currencies (CDF, XOF, XAF, RWF, UGX, ZMW): integers only
+  let formattedAmount: string;
+  const numAmount = typeof params.amount === 'string' ? parseFloat(params.amount) : params.amount;
+  if ((params.currency || '').toUpperCase() === 'USD') {
+    formattedAmount = Number(Number(numAmount || 0).toFixed(2)).toString();
+  } else {
+    formattedAmount = Math.round(Number(numAmount || 0)).toString();
+  }
+
   // Official PawaPay Deposit Payload (compatible with V2 and V1 endpoints)
   const payload = {
     depositId: depositId,
-    amount: Math.round(params.amount).toString(),
+    amount: formattedAmount,
     currency: params.currency,
     correspondent: correspondent,
     payer: {
@@ -366,7 +402,7 @@ export async function initiatePawaPayDeposit(params: {
     statementDescription: cleanDesc
   };
 
-  console.log(`[PawaPayService] Initiating deposit (${depositId}) for ${correspondent}, phone: ${params.phoneNumber}, amount: ${params.amount} ${params.currency}`);
+  console.log(`[PawaPayService] Initiating deposit (${depositId}) for ${correspondent}, phone: ${params.phoneNumber}, amount: ${formattedAmount} ${params.currency}`);
 
   try {
     // Try primary PawaPay /deposits endpoint (V1 standard collection endpoint)

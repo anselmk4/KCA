@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Users, CreditCard, TrendingUp, BookOpen, Clock, Calendar, RefreshCw, BarChart3, PieChart, ShieldCheck, Loader2 } from "lucide-react";
+import { Users, CreditCard, TrendingUp, BookOpen, Clock, Calendar, RefreshCw, BarChart3, PieChart, ShieldCheck, Loader2, ArrowRight } from "lucide-react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 
 // Plan configuration for commissions
@@ -30,6 +31,8 @@ interface OverviewData {
   plansRevenue: number;
   planProportions: { BASE: number; PRO: number; MAX: number; total: number };
   mostPurchasedPlan: string;
+  pendingPaymentsCount: number;
+  pendingPaymentsAmount: number;
 }
 
 export default function AdminDashboardPage() {
@@ -124,13 +127,32 @@ export default function AdminDashboardPage() {
       const topCourse = courses?.find(c => c.id === topCourseId);
       const topCourseTitle = topCourse?.title || "Aucun module";
 
-      // 4. Fetch payments — include method field for type resolution
-      const { data: payments } = await supabase
-        .from("payments")
-        .select("id, amount, status, paid_at, user_id, order_id, method")
-        .eq("status", "PAID");
+      // 5. Fetch all payments via admin API (bypasses RLS to include all student/instructor payments, manual and auto)
+      let payments: any[] = [];
+      let pendingPaymentsCount = 0;
+      let pendingPaymentsAmount = 0;
 
-      // 5. Get instructor plans to calculate commissions
+      try {
+        const pRes = await fetch("/api/admin/payments?status=ALL");
+        if (pRes.ok) {
+          const pData = await pRes.json();
+          payments = pData.payments || [];
+          pendingPaymentsCount = pData.counts?.pending || 0;
+          pendingPaymentsAmount = pData.totals?.pendingTotalAmount || 0;
+        } else {
+          // Fallback to client query if endpoint is not reachable
+          const { data: fallbackPayments } = await supabase
+            .from("payments")
+            .select("id, amount, status, paid_at, user_id, order_id, method");
+          payments = fallbackPayments || [];
+          pendingPaymentsCount = payments.filter((p: any) => p.status === "PENDING").length;
+          pendingPaymentsAmount = payments.filter((p: any) => p.status === "PENDING").reduce((acc: number, p: any) => acc + (p.amount || 0), 0);
+        }
+      } catch (e) {
+        console.error("Failed to load payments from admin API:", e);
+      }
+
+      // 6. Get instructor plans to calculate commissions
       const instructorIds = [...new Set(courses?.map(c => c.instructor_id).filter(Boolean))];
       let instructorPlans: Record<string, string> = {};
       if (instructorIds.length > 0) {
@@ -163,8 +185,9 @@ export default function AdminDashboardPage() {
         if (endDate) filterEnd = new Date(endDate);
       }
 
-      // Filter payments based on date range
-      const filteredPayments = (payments || []).filter(p => {
+      // Filter PAID payments based on date range for revenue, commissions, & charts
+      const paidPayments = (payments || []).filter(p => p.status === "PAID");
+      const filteredPayments = paidPayments.filter(p => {
         if (!p.paid_at) return false;
         const pDate = new Date(p.paid_at);
         return pDate >= filterStart && pDate <= filterEnd;
@@ -312,7 +335,9 @@ export default function AdminDashboardPage() {
           MAX: planCounts.MAX,
           total: totalPlansCount
         },
-        mostPurchasedPlan
+        mostPurchasedPlan,
+        pendingPaymentsCount,
+        pendingPaymentsAmount
       });
     } catch (err) {
       console.error("Error generating overview stats:", err);
@@ -417,6 +442,35 @@ export default function AdminDashboardPage() {
           </button>
         </div>
       </div>
+
+      {/* Pending Manual/Auto Payments Alert Banner */}
+      {stats.pendingPaymentsCount > 0 && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 shadow-sm animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 animate-pulse">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-bold text-sm text-zinc-900 dark:text-white flex items-center gap-2">
+                <span>{stats.pendingPaymentsCount} paiement{stats.pendingPaymentsCount > 1 ? "s" : ""} en attente de validation</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500 text-white font-semibold">
+                  {stats.pendingPaymentsAmount.toFixed(2)}$
+                </span>
+              </p>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">
+                Des virements Mobile Money manuels ou transactions en attente nécessitent votre approbation pour débloquer l'accès aux cours des apprenants.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/admin/transactions?status=PENDING"
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-amber-500 hover:bg-amber-600 text-white shadow-sm transition-colors shrink-0"
+          >
+            Traiter les paiements
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      )}
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">

@@ -7,7 +7,7 @@ import Script from "next/script";
 import { ChevronLeft, CreditCard, Smartphone, ShieldCheck, QrCode, Loader2, CheckCircle, AlertCircle, Sparkles, Bitcoin } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
-import { getPawaPayConfigForCountry } from "@/lib/pawapay";
+import { getPawaPayConfigForCountry, PAWAPAY_FEE_RATE } from "@/lib/pawapay";
 import { OperatorLogo } from "@/components/icons/PaymentLogos";
 import { SOLANA_TREASURY_ADDRESS, getSolanaPayUri, getSolanaQrCodeUrl, getBackupQrCodeUrl, connectSolanaWallet } from "@/lib/crypto";
 import { SolanaQrCode } from "@/components/ui/SolanaQrCode";
@@ -383,7 +383,7 @@ export default function PaymentPage() {
   const discountedAmount = Math.round(discountedTotalCoursePrice / selectedInstallmentCount);
 
   // Dynamic Fee Surcharge: +2.5% for Mobile Money (pawaPay), +3% for PayPal / Card, 0% for Crypto
-  const feeRate = method === "momo" ? 0.025 : (method === "paypal" || method === "card") ? 0.03 : 0;
+  const feeRate = method === "momo" ? PAWAPAY_FEE_RATE : (method === "paypal" || method === "card") ? 0.03 : 0;
   const feeSurchargeAmount = Number((discountedAmount * feeRate).toFixed(2));
   const finalAmountWithFee = Number((discountedAmount * (1 + feeRate)).toFixed(2));
 
@@ -447,7 +447,7 @@ export default function PaymentPage() {
         body: JSON.stringify([{
           depositId: paymentId,
           status: "COMPLETED",
-          amount: discountedAmount.toString(),
+          amount: finalAmountWithFee.toString(),
           currency: countryConfig.currency,
           payer: {
             type: "MSISDN",
@@ -1094,7 +1094,7 @@ export default function PaymentPage() {
                         </button>
                       </div>
                       <p className="text-xxs text-zinc-400 mt-1">
-                        Total à régler : {momoCurrency === "USD" ? `$${discountedAmount} USD` : `FC ${(discountedAmount * countryConfig.exchangeRate).toLocaleString()} CDF`}
+                        Total à régler : {momoCurrency === "USD" ? `$${finalAmountWithFee.toFixed(2)} USD` : `FC ${Math.round(finalAmountWithFee * countryConfig.exchangeRate).toLocaleString()} CDF`}
                       </p>
                     </div>
                   )}
