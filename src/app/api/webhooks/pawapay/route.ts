@@ -343,8 +343,8 @@ export async function POST(req: NextRequest) {
                   .eq('course_id', courseId)
                   .maybeSingle();
 
-                const courseRevenue = orderItem?.final_price 
-                  ? (parseFloat(orderItem.final_price) || 0)
+                const courseRevenue = orderItem?.final_price != null 
+                  ? (Number(orderItem.final_price) || 0)
                   : payment.amount;
 
                 const platformFee = courseRevenue * commissionRate;

@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false });
 
     if (statusParam !== "ALL") {
-      query = query.eq("status", statusParam);
+      query = query.eq("status", statusParam as any);
     }
 
     const { data: paymentsData, error: paymentsErr } = await query;
@@ -182,7 +182,7 @@ export async function GET(req: NextRequest) {
         instPlan = instructor?.plan || "FREE";
 
         const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;
-        const baseRev = orderItem?.final_price ? parseFloat(orderItem.final_price) : (p.amount || 0);
+        const baseRev = orderItem?.final_price != null ? Number(orderItem.final_price) : (p.amount || 0);
         commissionAmount = baseRev * commConfig.commissionRate;
         instructorShareAmount = baseRev * commConfig.instructorShare;
         siteAmount = commissionAmount;
