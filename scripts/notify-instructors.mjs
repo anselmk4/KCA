@@ -1,20 +1,23 @@
 import fs from "node:fs";
 import path from "node:path";
 
-// Charger les variables de .env.local sans dépendance externe
+// 1. Charger les variables d'environnement (.env.local puis .env)
 function loadEnv() {
-  const envPath = path.join(process.cwd(), ".env.local");
-  if (fs.existsSync(envPath)) {
-    const lines = fs.readFileSync(envPath, "utf8").split("\n");
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const idx = trimmed.indexOf("=");
-      if (idx !== -1) {
-        const key = trimmed.slice(0, idx).trim();
-        const val = trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, "");
-        if (!process.env[key]) {
-          process.env[key] = val;
+  const envFiles = [".env.local", ".env"];
+  for (const file of envFiles) {
+    const envPath = path.join(process.cwd(), file);
+    if (fs.existsSync(envPath)) {
+      const lines = fs.readFileSync(envPath, "utf8").split("\n");
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const idx = trimmed.indexOf("=");
+        if (idx !== -1) {
+          const key = trimmed.slice(0, idx).trim();
+          const val = trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, "");
+          if (!process.env[key]) {
+            process.env[key] = val;
+          }
         }
       }
     }
@@ -110,11 +113,10 @@ async function sendAnnouncement(email, name) {
 
   const html = getEmailTemplate(subject, body);
   const localPath = await writeMockEmailFile(email, subject, html);
-  console.log(`[Copie locale] Fichier sauvegardé : ${localPath}`);
 
   if (RESEND_KEY) {
     try {
-      console.log(`[Resend API] Envoi réel en cours vers ${email}...`);
+      console.log(`[Resend API] Envoi en cours vers ${email}...`);
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
@@ -130,7 +132,7 @@ async function sendAnnouncement(email, name) {
       });
       const data = await res.json();
       if (res.ok && data?.id) {
-        console.log(`✓ [Resend SUCCESS] Envoyé avec succès à ${email} (ID: ${data.id})`);
+        console.log(`✓ [Resend SUCCESS] Délivré à ${email} (ID: ${data.id})`);
         return { success: true, resendId: data.id };
       } else {
         console.warn(`⚠️ [Resend Note] Réponse pour ${email}:`, data);
@@ -140,25 +142,83 @@ async function sendAnnouncement(email, name) {
       console.error(`✗ [Resend Error] Erreur envoi vers ${email}:`, err.message);
       return { success: false, error: err.message };
     }
+  } else {
+    console.log(`✓ [Local Backup] Sauvegardé : ${localPath}`);
   }
 
   return { success: true, localOnly: true };
 }
 
-async function run() {
-  console.log("===============================================================");
-  console.log("   DIFFUSION DE L'EMAIL ANSELLA AUX FORMATEURS (OPTION 2)   ");
-  console.log("===============================================================");
-  console.log(`Expéditeur : ${FROM_EMAIL}`);
-  console.log(`Clé Resend active : ${RESEND_KEY ? "Oui (" + RESEND_KEY.substring(0, 7) + "...)" : "Non"}\n`);
+async function discoverInstructors() {
+  const map = new Map();
 
-  const instructors = [
+  // 1. Liste socle des formateurs officiels de la plateforme
+  const baseInstructors = [
     { name: "Ansel Makomo", email: "ansel@kuettu.com" },
     { name: "Anselme (Admin & Formateur)", email: "anselmk4@gmail.com" },
     { name: "Pr. Dieudonné Mwamba", email: "dieudonne.mwamba@ansella.app" },
     { name: "Amina Diallo", email: "amina.diallo@ansella.app" },
     { name: "Koffi Mensah", email: "koffi.mensah@ansella.app" },
   ];
+
+  baseInstructors.forEach((i) => {
+    map.set(i.email.toLowerCase().trim(), i);
+  });
+
+  // 2. Vérification Supabase dynamique si configuré
+  const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (sbUrl && sbKey && !sbUrl.includes("your-project.supabase.co")) {
+    try {
+      const { createClient } = await import("@supabase/supabase-js");
+      const supabase = createClient(sbUrl, sbKey);
+      const { data: dbProfiles } = await supabase.from("profiles").select("id, full_name, email, role, plan");
+      if (dbProfiles && dbProfiles.length > 0) {
+        dbProfiles.forEach((p) => {
+          if (p.email && (p.role === "INSTRUCTOR" || (p.plan && p.plan !== "FREE"))) {
+            map.set(p.email.toLowerCase().trim(), {
+              name: p.full_name || "Formateur Ansella",
+              email: p.email.toLowerCase().trim(),
+            });
+          }
+        });
+      }
+    } catch (err) {
+      console.log("[Détection Supabase]", err.message);
+    }
+  }
+
+  // 3. Arguments ligne de commande (permet d'ajouter n'importe quelle adresse supplémentaire)
+  const args = process.argv.slice(2);
+  args.forEach((arg) => {
+    const rawEmails = arg.split(/[,;\s]+/);
+    rawEmails.forEach((e) => {
+      const clean = e.trim().toLowerCase();
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+        map.set(clean, {
+          name: clean.split("@")[0],
+          email: clean,
+        });
+      }
+    });
+  });
+
+  return Array.from(map.values());
+}
+
+async function run() {
+  console.log("===============================================================");
+  console.log("   DIFFUSION ANSELLA : TOUS LES FORMATEURS DE LA PLATEFORME    ");
+  console.log("===============================================================");
+  console.log(`Expéditeur : ${FROM_EMAIL}`);
+  console.log(`Clé Resend active : ${RESEND_KEY ? "Oui (" + RESEND_KEY.substring(0, 7) + "...)" : "Non"}\n`);
+
+  const instructors = await discoverInstructors();
+  console.log(`📋 Total formateurs ciblés : ${instructors.length}`);
+  instructors.forEach((i, idx) => {
+    console.log(`   ${idx + 1}. ${i.name} <${i.email}>`);
+  });
+  console.log("");
 
   let successCount = 0;
   for (const inst of instructors) {
@@ -167,7 +227,7 @@ async function run() {
   }
 
   console.log("\n===============================================================");
-  console.log(`✓ Campagne terminée : ${successCount}/${instructors.length} emails traités avec succès !`);
+  console.log(`✓ Campagne terminée : ${successCount}/${instructors.length} emails envoyés avec succès !`);
   console.log("===============================================================");
 }
 
