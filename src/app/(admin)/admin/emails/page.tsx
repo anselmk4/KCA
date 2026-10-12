@@ -418,6 +418,14 @@ export default function AdminEmailsPage() {
 
               {/* Quick suggestions */}
               <div className="flex flex-wrap gap-1.5 pt-1">
+                <button
+                  type="button"
+                  onClick={loadDigitalProductsAnnouncementTemplate}
+                  className="text-[11px] px-3 py-1 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 text-teal-400 dark:text-teal-300 font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <Sparkles className="w-3 h-3 text-teal-400" />
+                  <span>🚀 Modèle : Annonce Vente Produits Digitaux Formateurs</span>
+                </button>
                 {SUBJECT_SUGGESTIONS.map((sug) => (
                   <button
                     key={sug}
