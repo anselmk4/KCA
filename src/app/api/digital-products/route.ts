@@ -4,8 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-// Plafond strict de prix pour les produits numériques
-const MAX_DIGITAL_PRODUCT_PRICE = 25.0;
+import { validateDigitalProductPrice } from "@/lib/digital-products-pricing";
 
 export async function GET(req: NextRequest) {
   try {
@@ -138,22 +137,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. RÈGLE D'OR : CONTRÔLE DE VALIDATION STRICT DU PRIX (PLAFOND 25.00 $ MAX)
+    // 2. RÈGLE TARIFAIRE : SEULS LES E-BOOKS ET GUIDES PDF SONT PLAFONNÉS À 25 $ MAX
     const numericPrice = parseFloat(price);
-    if (isNaN(numericPrice) || numericPrice < 0) {
+    const priceCheck = validateDigitalProductPrice(numericPrice, category, file_name);
+    if (!priceCheck.isValid) {
       return NextResponse.json(
-        { error: "Le prix spécifié est invalide. Il doit être positif ou égal à 0." },
-        { status: 400 }
-      );
-    }
-
-    if (numericPrice > MAX_DIGITAL_PRODUCT_PRICE) {
-      return NextResponse.json(
-        {
-          error: `RÈGLE DE SÉCURITÉ : Tous les produits digitaux sont strictement plafonnés à 25 $ USD max. Votre prix ($${numericPrice.toFixed(
-            2
-          )}) dépasse ce plafond.`,
-        },
+        { error: priceCheck.error },
         { status: 400 }
       );
     }

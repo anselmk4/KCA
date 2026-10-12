@@ -3,8 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
-
-const MAX_DIGITAL_PRODUCT_PRICE = 25.0;
+import { validateDigitalProductPrice } from "@/lib/digital-products-pricing";
 
 export async function GET(
   req: NextRequest,
@@ -79,21 +78,14 @@ export async function PUT(
     if (body.status !== undefined) updates.status = body.status;
     if (body.preview_url !== undefined) updates.preview_url = body.preview_url;
 
-    // RÈGLE D'OR : CONTROLE STRICT DU PRIX SUR LA MISE À JOUR
+    // RÈGLE TARIFAIRE : SEULS LES E-BOOKS ET GUIDES PDF SONT PLAFONNÉS À 25 $ MAX
     if (body.price !== undefined) {
       const numPrice = parseFloat(body.price);
-      if (isNaN(numPrice) || numPrice < 0) {
-        return NextResponse.json({ error: "Prix invalide." }, { status: 400 });
-      }
-      if (numPrice > MAX_DIGITAL_PRODUCT_PRICE) {
-        return NextResponse.json(
-          {
-            error: `RÈGLE DE SÉCURITÉ : Le prix des produits digitaux est strictement plafonné à 25 $ USD max (Reçu: $${numPrice.toFixed(
-              2
-            )}).`,
-          },
-          { status: 400 }
-        );
+      const categoryToCheck = body.category !== undefined ? body.category : existing.category;
+      const fileToCheck = body.file_name !== undefined ? body.file_name : existing.file_name;
+      const priceCheck = validateDigitalProductPrice(numPrice, categoryToCheck, fileToCheck);
+      if (!priceCheck.isValid) {
+        return NextResponse.json({ error: priceCheck.error }, { status: 400 });
       }
       updates.price = numPrice;
     }

@@ -107,8 +107,7 @@ export default function AdminEmailsPage() {
     setShowAdvanced(true);
     setButtonText("Accéder à Mes Produits");
     setButtonUrl("https://ansella.app/instructor/courses");
-    setInfoBoxType("success");
-    setInfoBoxText("Tous les produits numériques sont plafonnés à 25 $ USD max avec encaissement instantané via Mobile Money et Crypto.");
+    setInfoBoxText("Seuls les E-books et Guides PDF sont plafonnés à 25 $ USD max. Pour tous les logiciels, scripts et templates, vous êtes 100% libre de fixer le prix voulu !");
   };
 
   // Quick subject suggestions

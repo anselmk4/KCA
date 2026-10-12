@@ -208,7 +208,7 @@ export default function StoreCatalogPage() {
                 <Sparkles className="w-4 h-4 text-teal-300" />
                 <span>Boutique Digitale & Ressources Créateurs</span>
                 <span className="bg-amber-400 text-zinc-950 px-2 py-0.5 rounded-full text-[10px] font-black">
-                  Plafonné à 25 $ MAX
+                  E-books ≤ 25 $ · Logiciels & Templates Prix Libres
                 </span>
               </div>
 
@@ -450,7 +450,7 @@ export default function StoreCatalogPage() {
                 Vous avez un e-book, un template Notion ou un script à vendre ?
               </h3>
               <p className="text-xs md:text-sm text-zinc-300 max-w-xl leading-relaxed">
-                Créez votre boutique digitale personnalisée sur ANSELLA en 2 minutes. Fixez votre prix (jusqu&apos;à 25 $ max) et recevez vos gains directement par Mobile Money et Crypto sans tracas bancaire.
+                Créez votre boutique digitale personnalisée sur ANSELLA en 2 minutes. Fixez votre prix (E-books ≤ 25 $, logiciels et templates au tarif de votre choix) et recevez vos gains directement par Mobile Money et Crypto sans tracas bancaire.
               </p>
             </div>
             <Link

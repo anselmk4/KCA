@@ -95,7 +95,7 @@ async function sendAnnouncement(email, name) {
     <h3 style="color: #0f172a; font-size: 17px; margin-top: 24px; margin-bottom: 12px;">Pourquoi publier vos produits dès aujourd'hui ?</h3>
     <ul style="color: #475569; font-size: 14px; line-height: 1.7; padding-left: 20px;">
       <li>⚡ <strong>Paiement Panafricain Instantané :</strong> Vos acheteurs paient en un clic via Mobile Money (RDC, Congo-Brazzaville, Cameroun, Côte d'Ivoire, Sénégal, Bénin...) et Crypto.</li>
-      <li>🏷️ <strong>Prix accessible (≤ 25$ max) :</strong> Le format idéal pour convertir un grand volume d'apprenants sans friction d'engagement long.</li>
+      <li>🏷️ <strong>Tarification avantageuse :</strong> Les E-books et Guides PDF sont plafonnés à 25 $ max, tandis que vous êtes 100% libre de fixer votre prix pour les logiciels, templates et scripts.</li>
       <li>🏪 <strong>Votre Vitrine Officielle :</strong> Vos produits sont automatiquement mis en avant sur votre boutique créateur personnelle et sur le catalogue public.</li>
       <li>🔒 <strong>Téléchargement instantané sécurisé :</strong> Les fichiers sont protégés et remis instantanément aux apprenants dès le paiement validé.</li>
     </ul>

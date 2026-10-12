@@ -22,8 +22,20 @@ CREATE TABLE IF NOT EXISTS public.digital_products (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-  -- RÈGLE D'OR : CONTRAINTE STRICTE DE PLAFONNEMENT À 25.00 $ MAX
-  CONSTRAINT check_digital_product_price_cap CHECK (price >= 0.00 AND price <= 25.00)
+  -- RÈGLE TARIFAIRE : CONTRAINTE DE PLAFONNEMENT À 25.00 $ MAX UNIQUEMENT SUR LES E-BOOKS & GUIDES PDF
+  CONSTRAINT check_digital_product_price_cap CHECK (
+    price >= 0.00 AND (
+      (
+        LOWER(category) NOT LIKE '%ebook%' 
+        AND LOWER(category) NOT LIKE '%e-book%' 
+        AND LOWER(category) NOT LIKE '%pdf%'
+        AND LOWER(category) NOT LIKE '%guide%'
+        AND LOWER(COALESCE(file_name, '')) NOT LIKE '%.pdf'
+        AND LOWER(COALESCE(file_name, '')) NOT LIKE '%.epub'
+      )
+      OR price <= 25.00
+    )
+  )
 );
 
 -- Index pour les performances

@@ -22,6 +22,11 @@ import {
   Info,
   FileCheck,
 } from "lucide-react";
+import {
+  validateDigitalProductPrice,
+  isEbookOrPdfCategory,
+  MAX_EBOOK_PRICE,
+} from "@/lib/digital-products-pricing";
 
 interface CourseCreationWizardModalProps {
   isOpen: boolean;
@@ -295,19 +300,14 @@ export function CourseCreationWizardModal({
       return;
     }
 
-    // RÈGLE D'OR : CONTRÔLE DE VALIDATION STRICT <= 25$ USD MAX
+    // RÈGLE TARIFAIRE : SEULS LES E-BOOKS ET GUIDES PDF SONT PLAFONNÉS À 25 $ MAX
     const numericPrice = parseFloat(digitalPrice) || 0;
-    if (numericPrice < 0) {
-      alert("Le prix doit être positif ou nul.");
-      return;
-    }
-    if (numericPrice > 25.0) {
-      alert(
-        `RÈGLE STRICTE : Tous les produits numériques sont plafonnés à 25 $ USD max.\nVotre prix actuel ($${numericPrice.toFixed(
-          2
-        )}) dépasse le plafond autorisé.`
-      );
-      setDigitalPrice("25.00");
+    const priceCheck = validateDigitalProductPrice(numericPrice, category, digitalFileName);
+    if (!priceCheck.isValid) {
+      alert(priceCheck.error);
+      if (priceCheck.isCapped) {
+        setDigitalPrice("25.00");
+      }
       return;
     }
 
@@ -592,7 +592,7 @@ export function CourseCreationWizardModal({
                       </span>
                     </div>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                      E-books, logiciels sous forme ZIP, scripts, modèles Notion/Figma, prompts et guides PDF. Vente directe et téléchargement instantané (25 $ max).
+                      E-books & guides PDF (25 $ max), logiciels ZIP, scripts et modèles Notion/Figma (tarifs libres). Vente directe et téléchargement instantané.
                     </p>
                   </button>
                 </div>
@@ -606,7 +606,7 @@ export function CourseCreationWizardModal({
                     <div className="text-xs text-teal-900 dark:text-teal-200 leading-relaxed">
                       <p className="font-bold mb-0.5">Configuration Produit Numérique (E-book, Logiciel ZIP, Guide, Template)</p>
                       <p className="text-teal-700 dark:text-teal-300">
-                        Règle tarifaire : Les produits numériques sont strictement plafonnés à <strong className="underline">25 $ USD max</strong>. Les acheteurs accèdent instantanément au téléchargement sécurisé du fichier après règlement via Mobile Money, Carte ou Crypto.
+                        Règle tarifaire : Seuls les <strong className="underline">E-books et Guides PDF</strong> sont plafonnés à <strong className="underline">25 $ USD max</strong>. Pour les logiciels, scripts ZIP, outils et templates, vous êtes <strong className="text-emerald-700 dark:text-emerald-400 underline">100% libre de fixer le prix voulu</strong>.
                       </p>
                     </div>
                   </div>
@@ -709,44 +709,60 @@ export function CourseCreationWizardModal({
                     </div>
                   </div>
 
-                  {/* Prix (Plafond 25$) & Catégorie */}
+                  {/* Prix (Plafond 25$ pour E-books/PDF, Libre pour Logiciels/Templates) & Catégorie */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 flex items-center justify-between">
-                        <span>Prix de vente ($ USD)</span>
-                        <span className="text-[10px] font-extrabold text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
-                          Plafond : 25 $ MAX
-                        </span>
-                      </label>
-                      <div className="relative">
-                        <DollarSign className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="number"
-                          min="0"
-                          max="25"
-                          step="0.5"
-                          value={digitalPrice}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (parseFloat(val) > 25) {
-                              alert("RÈGLE STRICTE : Les produits digitaux ne peuvent excéder 25 $ USD.");
-                              setDigitalPrice("25.00");
-                            } else {
-                              setDigitalPrice(val);
-                            }
-                          }}
-                          className={`w-full pl-9 pr-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border rounded-2xl text-sm font-bold text-zinc-900 dark:text-white focus:outline-none transition-all ${
-                            parseFloat(digitalPrice) > 25
-                              ? "border-red-500 focus:ring-2 focus:ring-red-500/30"
-                              : "border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-teal-500/30"
-                          }`}
-                        />
-                      </div>
-                      {parseFloat(digitalPrice) > 25 && (
-                        <p className="text-[11px] text-red-500 mt-1 font-semibold">
-                          Le prix ne doit pas dépasser 25.00 $.
-                        </p>
-                      )}
+                      {(() => {
+                        const isCapped = isEbookOrPdfCategory(category, digitalFileName);
+                        const numVal = parseFloat(digitalPrice) || 0;
+                        const isExceeded = isCapped && numVal > 25;
+
+                        return (
+                          <>
+                            <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+                              <span>Prix de vente ($ USD)</span>
+                              {isCapped ? (
+                                <span className="text-[10px] font-extrabold text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+                                  Plafond E-book/PDF : 25 $ MAX
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-extrabold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                                  ✓ Tarif Libre (Logiciel / Template)
+                                </span>
+                              )}
+                            </label>
+                            <div className="relative">
+                              <DollarSign className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                              <input
+                                type="number"
+                                min="0"
+                                max={isCapped ? "25" : undefined}
+                                step="0.5"
+                                value={digitalPrice}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (isCapped && parseFloat(val) > 25) {
+                                    alert("RÈGLE TARIFAIRE : Seuls les E-books et Guides PDF sont plafonnés à 25 $ USD max.\n(Pour les logiciels, templates et scripts, le tarif est 100% libre).");
+                                    setDigitalPrice("25.00");
+                                  } else {
+                                    setDigitalPrice(val);
+                                  }
+                                }}
+                                className={`w-full pl-9 pr-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border rounded-2xl text-sm font-bold text-zinc-900 dark:text-white focus:outline-none transition-all ${
+                                  isExceeded
+                                    ? "border-red-500 focus:ring-2 focus:ring-red-500/30"
+                                    : "border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-teal-500/30"
+                                }`}
+                              />
+                            </div>
+                            {isExceeded && (
+                              <p className="text-[11px] text-red-500 mt-1 font-semibold">
+                                Le prix d&apos;un E-book ou Guide PDF ne doit pas dépasser 25.00 $.
+                              </p>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     <div>
