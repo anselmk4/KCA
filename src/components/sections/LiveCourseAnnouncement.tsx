@@ -26,8 +26,8 @@ interface TimeLeft {
   isStarted: boolean;
 }
 
-// Date de début : 1er Août 2026 à 08:00 GMT
-const TARGET_DATE = new Date("2026-08-01T08:00:00Z").getTime();
+// Date de début : 20 Octobre 2026 à 08:00 GMT (2ème session)
+const TARGET_DATE = new Date("2026-10-20T08:00:00Z").getTime();
 
 export function LiveCourseAnnouncement() {
   const { language } = useLanguage();
@@ -84,19 +84,23 @@ export function LiveCourseAnnouncement() {
           {/* COLONNE GAUCHE: Informations sur la Formation & Formateur */}
           <div className="lg:col-span-7 space-y-6">
             
-            {/* Badge événement en direct */}
+            {/* Badge événement en direct avec mention 2ème session */}
             <div className="inline-flex items-center gap-2.5 rounded-full border border-teal-400/40 bg-teal-950/70 px-4 py-1.5 text-xs sm:text-sm font-semibold text-teal-300 shadow-inner backdrop-blur-md">
               <span className="relative flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
               </span>
               <span className="uppercase tracking-wider font-bold">
-                {isEn ? "Live Event Announcement" : "Événement Exclusif • Session en Direct"}
+                {isEn ? "Exclusive Event • 2nd Live Session" : "Événement Exclusif • 2ème Session en Direct"}
               </span>
             </div>
 
             {/* Titre Principal de la Formation */}
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{isEn ? "2nd Session • October 2026 Cohort" : "2ème Session • Cohorte du 20 Octobre 2026"}</span>
+              </div>
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-[1.15]">
                 {isEn ? "Formation:" : "Formation :"}{" "}
                 <span className="bg-gradient-to-r from-teal-300 via-emerald-300 to-indigo-300 bg-clip-text text-transparent">
@@ -106,10 +110,10 @@ export function LiveCourseAnnouncement() {
                   & Cryptomonnaies
                 </span>
               </h2>
-              <p className="text-zinc-300 text-base sm:text-lg leading-relaxed pt-2">
+              <p className="text-zinc-300 text-base sm:text-lg leading-relaxed pt-1">
                 {isEn 
-                  ? "Join the flagship live training on Blockchain technology, smart contracts, and crypto ecosystem. Master the future of decentralized finance."
-                  : "Rejoignez la grande formation en direct sur la technologie Blockchain, les smart contracts et l'écosystème crypto. Maîtrisez les fondamentaux de la finance décentralisée."}
+                  ? "Join the 2nd session of the flagship live training on Blockchain technology, smart contracts, and crypto ecosystem. Master the future of decentralized finance."
+                  : "Rejoignez la 2ème session de la grande formation en direct sur la technologie Blockchain, les smart contracts et l'écosystème crypto. Maîtrisez les fondamentaux de la finance décentralisée."}
               </p>
             </div>
 
@@ -142,7 +146,7 @@ export function LiveCourseAnnouncement() {
                 <Calendar className="w-4 h-4 text-teal-400 flex-shrink-0" />
                 <div>
                   <span className="block text-[10px] text-zinc-400 uppercase font-bold">{isEn ? "Date" : "Date de début"}</span>
-                  <span className="font-bold text-white">1er Août 2026</span>
+                  <span className="font-bold text-white">{isEn ? "October 20, 2026" : "20 Octobre 2026"}</span>
                 </div>
               </div>
 

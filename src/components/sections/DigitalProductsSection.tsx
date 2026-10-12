@@ -7,12 +7,8 @@ import {
   Download,
   Sparkles,
   ArrowRight,
-  Eye,
-  Star,
+  BookOpen,
   CheckCircle2,
-  TrendingUp,
-  Tag,
-  DollarSign,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { DigitalProductCheckoutModal } from "@/components/digital-products/DigitalProductCheckoutModal";
@@ -37,87 +33,104 @@ interface DigitalProductItem {
   };
 }
 
-// Fallbacks de démonstration de grande qualité mettant en valeur l'écosystème africain
-const FEATURED_DIGITAL_PRODUCTS: DigitalProductItem[] = [
-  {
-    id: "dp-1",
-    title: "Guide Ultime : Entreprendre dans la DeFi & Web3 en Afrique",
-    description: "Comprendre les protocoles de liquidité, les stablecoins et l'arbitrage pour sécuriser son capital contre l'inflation monétaire locale.",
-    price: 15.0,
-    category: "Blockchain, Web3 & Crypto",
-    cover_image_url: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?auto=format&fit=crop&w=600&q=80",
-    file_url: "https://example.com/guide-defi-afrique.pdf",
-    file_name: "Guide_DeFi_Afrique_2026.pdf",
-    tags: ["DeFi", "Stablecoins", "Afrique"],
-    profiles: {
-      full_name: "Pr. Dieudonné Mwamba",
-      specialty: "Chercheur en Économie Décentralisée",
-      academy_name: "Kinshasa Web3 Institute",
-    },
-  },
-  {
-    id: "dp-2",
-    title: "Prompt Engineering & Automatisation IA pour PME Africaines",
-    description: "Plus de 120 prompts testés pour le service client WhatsApp, la comptabilité simplifiée et la génération de contenu marketing bilingue.",
-    price: 19.5,
-    category: "Intelligence Artificielle & Data",
-    cover_image_url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80",
-    file_url: "https://example.com/prompts-ia-pme.pdf",
-    file_name: "Pack_Prompts_IA_PME.pdf",
-    tags: ["IA", "Automatisation", "WhatsApp"],
-    profiles: {
-      full_name: "Amina Diallo",
-      specialty: "Formatrice IA Générative",
-      academy_name: "Dakar AI Lab",
-    },
-  },
-  {
-    id: "dp-3",
-    title: "Manuel Pratique : Intégration Mobile Money & Crypto Gateway",
-    description: "Guide d'architecture complet pour développeurs : connecter PawaPay, M-Pesa, Orange Money et Solana Pay à votre boutique e-commerce.",
-    price: 24.0,
-    category: "Développement Web & Mobile",
-    cover_image_url: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=600&q=80",
-    file_url: "https://example.com/guide-momo-crypto.pdf",
-    file_name: "Architecture_MoMo_Crypto_Dev.pdf",
-    tags: ["Fintech", "Mobile Money", "PawaPay"],
-    profiles: {
-      full_name: "Koffi Mensah",
-      specialty: "Ingénieur Fintech & Cloud",
-      academy_name: "Abidjan Tech Hub",
-    },
-  },
-];
+function ProductCover({
+  title,
+  category,
+  coverUrl,
+}: {
+  title: string;
+  category: string;
+  coverUrl?: string;
+}) {
+  const [imgFailed, setImgFailed] = useState(false);
+
+  if (coverUrl && !imgFailed) {
+    return (
+      <div className="relative h-56 w-full bg-zinc-900 overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={coverUrl}
+          alt={title}
+          onError={() => setImgFailed(true)}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/80 via-transparent to-transparent pointer-events-none" />
+      </div>
+    );
+  }
+
+  // Couverture stylisée type E-book numérique de haute qualité (fallback propre sans image cassée)
+  return (
+    <div className="relative h-56 w-full bg-gradient-to-br from-slate-900 via-teal-950 to-zinc-950 p-5 flex flex-col justify-between overflow-hidden border-b border-teal-500/20 select-none">
+      {/* Texture & Glow */}
+      <div className="absolute -top-10 -right-10 w-36 h-36 bg-teal-500/15 rounded-full blur-2xl pointer-events-none" />
+      <div className="absolute inset-y-0 left-0 w-3 bg-gradient-to-r from-teal-500/40 via-teal-500/10 to-transparent pointer-events-none" />
+      
+      {/* Haut : Badge icône */}
+      <div className="relative z-10 flex items-center justify-between">
+        <div className="w-9 h-9 rounded-xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center text-teal-300 shadow-inner">
+          <BookOpen className="w-5 h-5 text-teal-300" />
+        </div>
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-teal-400/80 bg-teal-950/60 px-2 py-0.5 rounded border border-teal-800/50">
+          PDF Édition
+        </span>
+      </div>
+
+      {/* Centre / Bas : Titre & catégorie de l'e-book */}
+      <div className="relative z-10 space-y-1.5 pl-2">
+        <p className="text-[10px] font-black uppercase tracking-wider text-teal-400 line-clamp-1">
+          {category}
+        </p>
+        <p className="text-sm font-bold text-white line-clamp-2 leading-snug drop-shadow-sm group-hover:text-teal-200 transition-colors">
+          {title}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export function DigitalProductsSection() {
   const { language } = useLanguage();
-  const [products, setProducts] = useState<DigitalProductItem[]>(FEATURED_DIGITAL_PRODUCTS);
+  const [products, setProducts] = useState<DigitalProductItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [selectedDetail, setSelectedDetail] = useState<DigitalProductItem | null>(null);
   const [selectedBuy, setSelectedBuy] = useState<DigitalProductItem | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     async function fetchLatestProducts() {
       try {
-        const res = await fetch("/api/digital-products?limit=6");
+        const res = await fetch("/api/digital-products?limit=9");
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data.products) && data.products.length > 0) {
+          if (isMounted && Array.isArray(data.products)) {
             setProducts(data.products);
           }
         }
       } catch (err) {
-        // Garder les featured products réalistes en fallback
+        console.error("[DigitalProductsSection] Error fetching products:", err);
+      } finally {
+        if (isMounted) setLoading(false);
       }
     }
     fetchLatestProducts();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
+  // RÈGLE DEMANDÉE PAR L'UTILISATEUR :
+  // Si le chargement est en cours OU s'il n'y a aucun e-book disponible en base, masquer totalement la section.
+  if (loading || products.length === 0) {
+    return null;
+  }
+
+  // Catégories dynamiques dérivées des e-books réellement disponibles
+  const availableCategories = Array.from(new Set(products.map((p) => p.category).filter(Boolean)));
   const categories = [
-    { id: "ALL", label: language === "en" ? "All Products" : "Toutes les ressources" },
-    { id: "Blockchain, Web3 & Crypto", label: "Web3 & Crypto" },
-    { id: "Intelligence Artificielle & Data", label: "IA & Productivité" },
-    { id: "Développement Web & Mobile", label: "Code & Fintech" },
+    { id: "ALL", label: language === "en" ? "All E-books" : "Tous les e-books" },
+    ...availableCategories.map((c) => ({ id: c, label: c })),
   ];
 
   const filteredProducts = products.filter((p) => {
@@ -126,13 +139,13 @@ export function DigitalProductsSection() {
   });
 
   return (
-    <section className="py-24 bg-zinc-50/70 dark:bg-zinc-950/40 border-t border-zinc-200 dark:border-zinc-900 relative">
+    <section className="py-20 bg-zinc-50/70 dark:bg-zinc-950/40 border-t border-zinc-200 dark:border-zinc-900 relative">
       <div className="container mx-auto px-4 md:px-8 max-w-6xl">
         {/* Titre de section */}
-        <div className="text-center mb-14 space-y-4">
+        <div className="text-center mb-12 space-y-4">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>{language === "en" ? "Digital Storefronts" : "E-books & Ressources Numériques"}</span>
+            <span>{language === "en" ? "Digital Storefronts" : "E-books & Guides Pratiques"}</span>
             <span className="bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full text-[10px] font-extrabold">
               Max $25
             </span>
@@ -140,32 +153,34 @@ export function DigitalProductsSection() {
 
           <h2 className="text-3xl md:text-5xl font-extrabold text-zinc-900 dark:text-white tracking-tight">
             {language === "en"
-              ? "Practical E-books & Guides from African Creators"
+              ? "E-books & Guides from Leading Creators"
               : "Guides Pratiques & E-books des Meilleurs Créateurs"}
           </h2>
 
           <p className="text-base text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed">
             {language === "en"
               ? "Download high-impact templates, PDF guides, and e-books instantly. Pay easily via Mobile Money or Crypto with no subscription required."
-              : "Téléchargez immédiatement des e-books, modèles et guides PDF rédigés par des experts du continent. Paiement fluide en Mobile Money (M-Pesa, Orange, MTN) et Crypto."}
+              : "Téléchargez immédiatement des e-books, modèles et guides PDF rédigés par des experts certifiés. Paiement instantané en Mobile Money (M-Pesa, Orange, MTN) et Crypto."}
           </p>
 
-          {/* Filtres de catégories */}
-          <div className="flex flex-wrap justify-center gap-2 pt-2">
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  selectedCategory === cat.id
-                    ? "bg-teal-600 text-white shadow-md shadow-teal-500/20"
-                    : "bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
+          {/* Filtres si plusieurs catégories */}
+          {categories.length > 2 && (
+            <div className="flex flex-wrap justify-center gap-2 pt-2">
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    selectedCategory === cat.id
+                      ? "bg-teal-600 text-white shadow-md shadow-teal-500/20"
+                      : "bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Grille de Produits */}
@@ -177,20 +192,23 @@ export function DigitalProductsSection() {
                 key={product.id}
                 className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm hover:shadow-2xl hover:border-teal-500/50 transition-all duration-300 flex flex-col group text-left"
               >
-                {/* Couverture */}
-                <div className="relative h-52 w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={product.cover_image_url || "/placeholder-course.jpg"}
-                    alt={product.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                {/* Couverture avec fallback de haute qualité */}
+                <div className="relative">
+                  <ProductCover
+                    title={product.title}
+                    category={product.category}
+                    coverUrl={product.cover_image_url}
                   />
-                  <div className="absolute top-3.5 left-3.5 flex gap-2">
+
+                  {/* Badge E-book */}
+                  <div className="absolute top-3.5 left-3.5 flex gap-2 z-10">
                     <span className="px-3 py-1 rounded-full text-[10px] font-black bg-teal-600 text-white shadow-lg uppercase tracking-wider">
                       PDF / Ebook
                     </span>
                   </div>
-                  <div className="absolute top-3.5 right-3.5 bg-zinc-950/85 backdrop-blur-md text-amber-400 px-3 py-1 rounded-full text-xs font-black border border-amber-400/30 shadow-md">
+
+                  {/* Badge Prix (Plafonné à $25) */}
+                  <div className="absolute top-3.5 right-3.5 z-10 bg-zinc-950/90 backdrop-blur-md text-amber-400 px-3 py-1 rounded-full text-xs font-black border border-amber-400/30 shadow-md">
                     ${price.toFixed(2)} USD
                   </div>
                 </div>
@@ -220,7 +238,7 @@ export function DigitalProductsSection() {
                           {product.profiles.full_name}
                         </p>
                         <p className="text-[10px] text-zinc-400 truncate">
-                          {product.profiles.academy_name || product.profiles.specialty}
+                          {product.profiles.academy_name || product.profiles.specialty || "Créateur certifié"}
                         </p>
                       </div>
                     </div>
@@ -248,7 +266,7 @@ export function DigitalProductsSection() {
           })}
         </div>
 
-        {/* Bannière d'encouragement créateur */}
+        {/* Bannière créateur */}
         <div className="mt-16 p-8 rounded-3xl bg-gradient-to-r from-teal-900 via-zinc-900 to-zinc-900 border border-teal-500/20 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
           <div className="space-y-2 text-center md:text-left">
             <h3 className="text-xl font-bold flex items-center justify-center md:justify-start gap-2">
@@ -256,7 +274,7 @@ export function DigitalProductsSection() {
               Vous êtes auteur, formateur ou créateur de contenu ?
             </h3>
             <p className="text-xs md:text-sm text-zinc-300 max-w-xl">
-              Publiez et monétisez vos e-books, guides et modèles auprès de milliers d&apos;apprenants africains. Encaissez vos revenus directement par Mobile Money et Crypto.
+              Publiez et monétisez vos e-books, guides et modèles auprès de milliers d&apos;apprenants. Encaissez vos revenus directement par Mobile Money et Crypto.
             </p>
           </div>
           <Link
