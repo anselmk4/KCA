@@ -14,6 +14,9 @@ import {
   ArrowRight,
   Sparkles,
   TrendingUp,
+  FileText,
+  Download,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { getSimulatedSession } from "@/lib/rbac";
@@ -56,6 +59,8 @@ export default function InstructorCoursesPage() {
   };
   const [session, setSession] = useState<any>(null);
   const [myCourses, setMyCourses] = useState<any[]>([]);
+  const [myDigitalProducts, setMyDigitalProducts] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<"courses" | "digital_products">("courses");
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
@@ -79,6 +84,17 @@ export default function InstructorCoursesPage() {
 
     try {
       const instructorId = activeSession.userId;
+      
+      // Fetch digital products owned by instructor
+      try {
+        const dpRes = await fetch(`/api/digital-products?authorId=${instructorId}`);
+        if (dpRes.ok) {
+          const dpData = await dpRes.json();
+          setMyDigitalProducts(dpData.products || []);
+        }
+      } catch (dpErr) {
+        console.warn("[InstructorCourses] Error loading digital products:", dpErr);
+      }
       
       // Fetch co-managed course IDs where this instructor is a collaborator
       const { data: collabData } = await (supabase as any)
@@ -261,6 +277,22 @@ export default function InstructorCoursesPage() {
       } else {
         await loadDashboardData();
       }
+    }
+  };
+
+  const handleDeleteDigitalProduct = async (productId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce produit digital ?")) return;
+    try {
+      const res = await fetch(`/api/digital-products/${productId}`, { method: "DELETE" });
+      if (res.ok) {
+        setMyDigitalProducts((prev) => prev.filter((p) => p.id !== productId));
+        alert("Produit digital supprimé avec succès.");
+      } else {
+        const d = await res.json();
+        alert("Erreur lors de la suppression : " + (d.error || "Erreur inconnue"));
+      }
+    } catch (err: any) {
+      alert("Erreur : " + err.message);
     }
   };
 
@@ -519,38 +551,163 @@ export default function InstructorCoursesPage() {
           onClick={handleNewCourseClick}
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-medium text-sm transition-colors shadow-sm cursor-pointer"
         >
-          <Plus className="w-4 h-4" /> {t("student.payment.applyCoupon", "Nouveau Cours").toLowerCase().includes("appliqu") ? "New Course" : "Nouveau Cours"}
+          <Plus className="w-4 h-4" /> {t("student.payment.applyCoupon", "Nouveau Contenu").toLowerCase().includes("appliqu") ? "New Content" : "Nouveau Contenu"}
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-          <input
-            type="text"
-            placeholder={t("student.payment.applyCoupon", "Rechercher").toLowerCase().includes("appliqu") ? "Search courses..." : "Rechercher un cours..."}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
-          />
-        </div>
-        <div className="flex gap-2">
-          {(["ALL", "PUBLISHED", "DRAFT", "REVIEW", "ARCHIVED"] as StatusFilter[]).map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                statusFilter === s
-                  ? "bg-teal-50 dark:bg-teal-900/20 text-teal-600 border border-teal-200 dark:border-teal-800"
-                  : "bg-white dark:bg-zinc-900 text-zinc-500 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-              }`}
-            >
-              {s === "ALL" ? (t("student.payment.applyCoupon", "Tous").toLowerCase().includes("appliqu") ? "All" : "Tous") : getStatusLabel(s)}
-            </button>
-          ))}
-        </div>
+      {/* Tabs Switcher : Formations vs Produits Digitaux */}
+      <div className="flex border-b border-zinc-200 dark:border-zinc-800 gap-6">
+        <button
+          onClick={() => setActiveTab("courses")}
+          className={`pb-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+            activeTab === "courses"
+              ? "border-teal-500 text-teal-600 dark:text-teal-400"
+              : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          Formations & Cours ({myCourses.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("digital_products")}
+          className={`pb-3 text-sm font-bold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+            activeTab === "digital_products"
+              ? "border-teal-500 text-teal-600 dark:text-teal-400"
+              : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          Produits Digitaux & E-books ({myDigitalProducts.length})
+          <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 font-extrabold border border-amber-200 dark:border-amber-800">
+            ≤ 25$
+          </span>
+        </button>
       </div>
+
+      {activeTab === "digital_products" ? (
+        /* VUE PRODUITS DIGITAUX */
+        <div className="space-y-6">
+          {myDigitalProducts.length === 0 ? (
+            <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-12 text-center">
+              <FileText className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+                Aucun produit digital publié pour le moment
+              </h3>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6 max-w-md mx-auto">
+                Partagez votre expertise sous forme d&apos;e-books, guides pratiques PDF et modèles téléchargeables (tarif plafonné à 25 $ max).
+              </p>
+              <button
+                onClick={handleNewCourseClick}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-medium text-sm transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4" /> Publier un Produit Digital
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {myDigitalProducts.map((prod) => (
+                <div
+                  key={prod.id}
+                  className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col"
+                >
+                  <div className="relative h-44 w-full bg-zinc-100 dark:bg-zinc-800">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={prod.cover_image_url || "/placeholder-course.jpg"}
+                      alt={prod.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-3 left-3 flex gap-2">
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-teal-600 text-white shadow-md">
+                        PDF / EBOOK
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${prod.status === "published" ? "bg-emerald-500 text-white" : "bg-zinc-700 text-zinc-200"}`}>
+                        {prod.status === "published" ? "Publié" : "Brouillon"}
+                      </span>
+                    </div>
+                    <div className="absolute top-3 right-3 bg-zinc-900/80 backdrop-blur-sm text-amber-400 px-2.5 py-1 rounded-full text-xs font-black border border-amber-400/30">
+                      ${Number(prod.price).toFixed(2)}
+                    </div>
+                  </div>
+
+                  <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                    <div>
+                      <span className="text-[10px] font-bold text-teal-600 uppercase tracking-wider">
+                        {prod.category || "Ressource"}
+                      </span>
+                      <h4 className="text-base font-bold text-zinc-900 dark:text-white mt-1 line-clamp-1">
+                        {prod.title}
+                      </h4>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 line-clamp-2 leading-relaxed">
+                        {prod.description}
+                      </p>
+                    </div>
+
+                    <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-2">
+                      <Link
+                        href={`/store/${session?.userId || "me"}`}
+                        target="_blank"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-600 hover:text-teal-700"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" /> Voir en boutique
+                      </Link>
+
+                      <div className="flex items-center gap-1.5">
+                        <a
+                          href={prod.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2 text-zinc-500 hover:text-teal-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                          title="Télécharger / Vérifier"
+                        >
+                          <Download className="w-4 h-4" />
+                        </a>
+                        <button
+                          onClick={() => handleDeleteDigitalProduct(prod.id)}
+                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* VUE FORMATIONS CLASSIQUES */
+        <>
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+              <input
+                type="text"
+                placeholder={t("student.payment.applyCoupon", "Rechercher").toLowerCase().includes("appliqu") ? "Search courses..." : "Rechercher un cours..."}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
+              />
+            </div>
+            <div className="flex gap-2">
+              {(["ALL", "PUBLISHED", "DRAFT", "REVIEW", "ARCHIVED"] as StatusFilter[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    statusFilter === s
+                      ? "bg-teal-50 dark:bg-teal-900/20 text-teal-600 border border-teal-200 dark:border-teal-800"
+                      : "bg-white dark:bg-zinc-900 text-zinc-500 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                  }`}
+                >
+                  {s === "ALL" ? (t("student.payment.applyCoupon", "Tous").toLowerCase().includes("appliqu") ? "All" : "Tous") : getStatusLabel(s)}
+                </button>
+              ))}
+            </div>
+          </div>
 
       {/* Course List */}
       {filtered.length === 0 ? (
@@ -711,6 +868,8 @@ export default function InstructorCoursesPage() {
           })}
         </div>
       )}
+    </>
+  )}
 
       {/* Multi-step Course Creation Onboarding Wizard Modal */}
       <CourseCreationWizardModal
@@ -718,6 +877,7 @@ export default function InstructorCoursesPage() {
         onClose={() => setShowCreateModal(false)}
         onSubmit={handleWizardSubmit}
         creating={creating}
+        onDigitalProductCreated={loadDashboardData}
       />
 
       {/* Limit Alert Modal */}

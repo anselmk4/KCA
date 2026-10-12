@@ -95,6 +95,8 @@ model User {
   assignedTickets SupportTicket[] @relation("AgentTickets")
   homeworkSubmissions HomeworkSubmission[]
   reviews       CourseReview[]
+  digitalProducts DigitalProduct[] @relation("AuthoredDigitalProducts")
+  digitalPurchases DigitalProductPurchase[]
 }
 
 model Profile {
@@ -352,5 +354,48 @@ model CourseReview {
   @@index([courseId])
   @@index([userId])
   @@index([createdAt])
+}
+
+model DigitalProduct {
+  id            String    @id @default(uuid())
+  authorId      String
+  title         String
+  description   String
+  coverImageUrl String
+  fileUrl       String
+  fileName      String?
+  fileSizeBytes BigInt?
+  price         Float     // Plafond strict 25.00$
+  category      String    @default("Autre")
+  tags          String[]  @default([])
+  status        String    @default("draft") // "draft" | "published"
+  previewUrl    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  author        User      @relation("AuthoredDigitalProducts", fields: [authorId], references: [id], onDelete: Cascade)
+  purchases     DigitalProductPurchase[]
+
+  @@index([authorId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model DigitalProductPurchase {
+  id            String         @id @default(uuid())
+  productId     String
+  userId        String
+  pricePaid     Float
+  paymentMethod String         // "momo" | "crypto" | "card" | "paypal"
+  status        PaymentStatus  @default(PAID)
+  transactionId String?
+  createdAt     DateTime       @default(now())
+
+  product       DigitalProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId])
+  @@index([userId])
+  @@index([productId])
 }
 

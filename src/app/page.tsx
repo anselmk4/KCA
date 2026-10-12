@@ -5,6 +5,7 @@ import { LiveCourseAnnouncement } from "@/components/sections/LiveCourseAnnounce
 import { ValueProposition } from "@/components/sections/ValueProposition";
 import { WhyChooseUs } from "@/components/sections/WhyChooseUs";
 import { FeaturesGrid } from "@/components/sections/FeaturesGrid";
+import { DigitalProductsSection } from "@/components/sections/DigitalProductsSection";
 import { Testimonials } from "@/components/sections/Testimonials";
 import { InfoRDC } from "@/components/sections/InfoRDC";
 import { Pricing } from "@/components/sections/Pricing";
@@ -25,6 +26,7 @@ export default function Home() {
         <ValueProposition />
         <WhyChooseUs />
         <FeaturesGrid />
+        <DigitalProductsSection />
         <Testimonials />
         <InfoRDC />
         <Pricing />

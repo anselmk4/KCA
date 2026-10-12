@@ -16,6 +16,93 @@ export type Database = {
   }
   public: {
     Tables: {
+      digital_products: {
+        Row: {
+          id: string
+          author_id: string
+          title: string
+          description: string
+          cover_image_url: string
+          file_url: string
+          file_name: string | null
+          file_size_bytes: number | null
+          price: number
+          category: string
+          tags: string[]
+          status: 'draft' | 'published'
+          preview_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          author_id: string
+          title: string
+          description: string
+          cover_image_url: string
+          file_url: string
+          file_name?: string | null
+          file_size_bytes?: number | null
+          price: number
+          category?: string
+          tags?: string[]
+          status?: 'draft' | 'published'
+          preview_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          author_id?: string
+          title?: string
+          description?: string
+          cover_image_url?: string
+          file_url?: string
+          file_name?: string | null
+          file_size_bytes?: number | null
+          price?: number
+          category?: string
+          tags?: string[]
+          status?: 'draft' | 'published'
+          preview_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      digital_product_purchases: {
+        Row: {
+          id: string
+          product_id: string
+          user_id: string
+          price_paid: number
+          payment_method: string
+          payment_status: string
+          transaction_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          user_id: string
+          price_paid: number
+          payment_method?: string
+          payment_status?: string
+          transaction_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          user_id?: string
+          price_paid?: number
+          payment_method?: string
+          payment_status?: string
+          transaction_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       course_reviews: {
         Row: {
           id: string

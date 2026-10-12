@@ -20,6 +20,7 @@ import {
   Loader2,
   GraduationCap,
   Info,
+  FileCheck,
 } from "lucide-react";
 
 interface CourseCreationWizardModalProps {
@@ -41,6 +42,7 @@ interface CourseCreationWizardModalProps {
     type: "academic" | "self_paced";
   }) => Promise<void>;
   creating: boolean;
+  onDigitalProductCreated?: () => void;
 }
 
 export const COURSE_LANGUAGES = [
@@ -101,12 +103,13 @@ export function CourseCreationWizardModal({
   onClose,
   onSubmit,
   creating,
+  onDigitalProductCreated,
 }: CourseCreationWizardModalProps) {
   const [step, setStep] = useState<number>(1);
 
   // Step 1: Identity & Description & Format
   const [title, setTitle] = useState("");
-  const [type, setType] = useState<"academic" | "self_paced">("academic");
+  const [type, setType] = useState<"academic" | "self_paced" | "digital_product">("academic");
   const [category, setCategory] = useState("Intelligence Artificielle & Data");
   const [language, setLanguage] = useState("fr");
   const [shortDescription, setShortDescription] = useState("");
@@ -118,6 +121,18 @@ export function CourseCreationWizardModal({
   const [installmentsEnabled, setInstallmentsEnabled] = useState<boolean>(false);
   const [installmentCount, setInstallmentCount] = useState<number>(3);
   const [level, setLevel] = useState("Tous niveaux");
+
+  // Digital Product Specific States
+  const [digitalPrice, setDigitalPrice] = useState<string>("9.99");
+  const [digitalFileUrl, setDigitalFileUrl] = useState<string>("");
+  const [digitalFileName, setDigitalFileName] = useState<string>("");
+  const [digitalFileSize, setDigitalFileSize] = useState<number>(0);
+  const [digitalCoverUrl, setDigitalCoverUrl] = useState<string>(PRESET_CARDS[0].url);
+  const [digitalTags, setDigitalTags] = useState<string>("Guide, PDF, Ebook");
+  const [digitalStatus, setDigitalStatus] = useState<"published" | "draft">("published");
+  const [uploadingDigitalFile, setUploadingDigitalFile] = useState<boolean>(false);
+  const [uploadingDigitalCover, setUploadingDigitalCover] = useState<boolean>(false);
+  const [submittingDigital, setSubmittingDigital] = useState<boolean>(false);
 
   // Step 3: Thumbnail & Media
   const [selectedPreset, setSelectedPreset] = useState(PRESET_CARDS[0]);
@@ -186,6 +201,141 @@ export function CourseCreationWizardModal({
     reader.readAsDataURL(file);
   };
 
+  const handleDigitalFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 80 * 1024 * 1024) {
+      alert("Le fichier numérique dépasse la taille limite de 80 Mo.");
+      return;
+    }
+
+    setUploadingDigitalFile(true);
+    setDigitalFileName(file.name);
+    setDigitalFileSize(file.size);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "document");
+
+      const res = await fetch("/api/upload/file", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Échec du téléversement du fichier.");
+      }
+
+      setDigitalFileUrl(data.url);
+    } catch (err: any) {
+      alert(err.message || "Erreur lors de l'upload du document.");
+    } finally {
+      setUploadingDigitalFile(false);
+    }
+  };
+
+  const handleDigitalCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingDigitalCover(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "image");
+
+      const res = await fetch("/api/upload/file", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Échec de l'upload de la couverture.");
+      }
+
+      setDigitalCoverUrl(data.url);
+    } catch (err: any) {
+      // Fallback base64
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        if (evt.target?.result) setDigitalCoverUrl(evt.target.result as string);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setUploadingDigitalCover(false);
+    }
+  };
+
+  const handleSubmitDigitalProduct = async () => {
+    if (!title.trim()) {
+      alert("Veuillez renseigner le titre du produit digital.");
+      return;
+    }
+
+    if (!digitalFileUrl.trim()) {
+      alert("Veuillez téléverser le fichier numérique (PDF, eBook, guide).");
+      return;
+    }
+
+    // RÈGLE D'OR : CONTRÔLE DE VALIDATION STRICT <= 25$ USD MAX
+    const numericPrice = parseFloat(digitalPrice) || 0;
+    if (numericPrice < 0) {
+      alert("Le prix doit être positif ou nul.");
+      return;
+    }
+    if (numericPrice > 25.0) {
+      alert(
+        `RÈGLE STRICTE : Tous les produits numériques sont plafonnés à 25 $ USD max.\nVotre prix actuel ($${numericPrice.toFixed(
+          2
+        )}) dépasse le plafond autorisé.`
+      );
+      setDigitalPrice("25.00");
+      return;
+    }
+
+    setSubmittingDigital(true);
+    try {
+      const payload = {
+        title: title.trim(),
+        description: description.trim() || shortDescription.trim() || "Guide & produit digital téléchargeable.",
+        cover_image_url: digitalCoverUrl || PRESET_CARDS[0].url,
+        file_url: digitalFileUrl,
+        file_name: digitalFileName || "document.pdf",
+        file_size_bytes: digitalFileSize,
+        price: numericPrice,
+        category,
+        tags: digitalTags.split(",").map((t) => t.trim()).filter(Boolean),
+        status: digitalStatus,
+        preview_url: null,
+      };
+
+      const res = await fetch("/api/digital-products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur lors de la création du produit digital.");
+      }
+
+      alert("Produit Digital publié avec succès !");
+      onClose();
+      if (onDigitalProductCreated) {
+        onDigitalProductCreated();
+      }
+    } catch (err: any) {
+      alert(err.message || "Erreur lors de la publication du produit digital.");
+    } finally {
+      setSubmittingDigital(false);
+    }
+  };
+
   const handleFinalSubmit = async () => {
     if (!title.trim()) {
       alert("Le titre du cours est obligatoire.");
@@ -216,7 +366,7 @@ export function CourseCreationWizardModal({
       level,
       thumbnailUrl: activeImage,
       prerequisites,
-      type,
+      type: type === "self_paced" ? "self_paced" : "academic",
     });
   };
 
@@ -334,7 +484,7 @@ export function CourseCreationWizardModal({
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
                   Format & Modèle Pédagogique <span className="text-teal-600">*</span>
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <button
                     type="button"
                     onClick={() => setType("academic")}
@@ -384,91 +534,339 @@ export function CourseCreationWizardModal({
                       </span>
                     </div>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                      Format style Udemy : accès immédiat et illimité après un paiement unique (tarif plafonné à 25 $ max). Sans devoirs, révocations ni tranches.
+                      Format style Udemy : accès immédiat après un paiement unique (tarif plafonné à 25 $ max). Sans devoirs ni tranches.
+                    </p>
+                  </button>
+
+                  {/* OPTION 3 : PRODUIT DIGITAL (PDF/EBOOK) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setType("digital_product");
+                      if (parseFloat(digitalPrice) > 25) {
+                        setDigitalPrice("25.00");
+                      }
+                    }}
+                    className={`p-4 rounded-2xl border-2 transition-all text-left flex flex-col justify-between cursor-pointer ${
+                      type === "digital_product"
+                        ? "border-teal-500 bg-teal-50/50 dark:bg-teal-950/20 shadow-md ring-1 ring-teal-500"
+                        : "border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 hover:border-zinc-300"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+                        <span className="font-extrabold text-sm text-zinc-900 dark:text-white">Produit Digital (PDF/Ebook)</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">Max 25$</span>
+                      </div>
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${type === "digital_product" ? "bg-teal-600 text-white" : "border border-zinc-300"}`}>
+                        {type === "digital_product" && <Check className="w-3 h-3" />}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                      Publication de ressources téléchargeables : e-books, guides PDF, templates et modèles. Vente directe plafonnée à 25 $ max.
                     </p>
                   </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
-                    Domaine / Catégorie
-                  </label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-medium transition-all"
-                  >
-                    {CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
+              {/* Formulaire Spécifique : PRODUIT DIGITAL */}
+              {type === "digital_product" ? (
+                <div className="space-y-5 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                  <div className="p-4 rounded-2xl bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800/50 flex items-start gap-3">
+                    <Info className="w-5 h-5 text-teal-600 dark:text-teal-400 shrink-0 mt-0.5" />
+                    <div className="text-xs text-teal-900 dark:text-teal-200 leading-relaxed">
+                      <p className="font-bold mb-0.5">Configuration Produit Numérique (E-book / Guide PDF / Modèle)</p>
+                      <p className="text-teal-700 dark:text-teal-300">
+                        Règle tarifaire : Les produits numériques sont strictement plafonnés à <strong className="underline">25 $ USD max</strong>. Les acheteurs accèdent instantanément au téléchargement sécurisé du fichier après règlement via Mobile Money, Carte ou Crypto.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Upload Fichier Sécurisé */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
+                      Fichier Téléchargeable (PDF / eBook / Modèle) <span className="text-teal-600">*</span>
+                    </label>
+                    <div className="border-2 border-dashed border-zinc-200 dark:border-zinc-700 rounded-2xl p-5 text-center hover:border-teal-500 transition-colors bg-zinc-50/50 dark:bg-zinc-800/20">
+                      {digitalFileUrl ? (
+                        <div className="flex items-center justify-between p-3 bg-white dark:bg-zinc-800 rounded-xl border border-teal-200 dark:border-teal-800 shadow-sm">
+                          <div className="flex items-center gap-3 truncate">
+                            <FileCheck className="w-6 h-6 text-emerald-500 shrink-0" />
+                            <div className="text-left truncate">
+                              <p className="text-xs font-bold text-zinc-900 dark:text-white truncate">
+                                {digitalFileName || "Document prêt"}
+                              </p>
+                              <p className="text-[10px] text-zinc-500">
+                                {digitalFileSize ? `${(digitalFileSize / 1024 / 1024).toFixed(2)} Mo` : "Fichier vérifié"}
+                              </p>
+                            </div>
+                          </div>
+                          <label className="px-3 py-1.5 text-xs font-bold text-teal-600 hover:text-teal-700 cursor-pointer">
+                            Remplacer
+                            <input
+                              type="file"
+                              accept=".pdf,.epub,.mobi,.zip,.doc,.docx"
+                              onChange={handleDigitalFileUpload}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                      ) : (
+                        <label className="cursor-pointer block">
+                          <input
+                            type="file"
+                            accept=".pdf,.epub,.mobi,.zip,.doc,.docx"
+                            onChange={handleDigitalFileUpload}
+                            disabled={uploadingDigitalFile}
+                            className="hidden"
+                          />
+                          <div className="flex flex-col items-center gap-2">
+                            {uploadingDigitalFile ? (
+                              <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+                            ) : (
+                              <UploadCloud className="w-8 h-8 text-teal-600 dark:text-teal-400" />
+                            )}
+                            <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                              {uploadingDigitalFile ? "Téléversement sécurisé en cours..." : "Cliquez pour téléverser votre fichier PDF ou eBook"}
+                            </span>
+                            <span className="text-[10px] text-zinc-400">
+                              Formats acceptés : PDF, EPUB, MOBI, ZIP (jusqu'à 80 Mo)
+                            </span>
+                          </div>
+                        </label>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Image de Couverture */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
+                      Image de Couverture du Produit <span className="text-teal-600">*</span>
+                    </label>
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                      {digitalCoverUrl && (
+                        <div className="w-24 h-32 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700 shrink-0 bg-zinc-100">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={digitalCoverUrl}
+                            alt="Couverture"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1 w-full space-y-2">
+                        <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 cursor-pointer">
+                          {uploadingDigitalCover ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
+                          ) : (
+                            <FileImage className="w-4 h-4 text-teal-600" />
+                          )}
+                          <span>Téléverser une image de couverture personnalisée</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleDigitalCoverUpload}
+                            className="hidden"
+                          />
+                        </label>
+                        <input
+                          type="text"
+                          value={digitalCoverUrl}
+                          onChange={(e) => setDigitalCoverUrl(e.target.value)}
+                          placeholder="Ou collez l'URL directe d'une illustration de couverture"
+                          className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Prix (Plafond 25$) & Catégorie */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+                        <span>Prix de vente ($ USD)</span>
+                        <span className="text-[10px] font-extrabold text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+                          Plafond : 25 $ MAX
+                        </span>
+                      </label>
+                      <div className="relative">
+                        <DollarSign className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="number"
+                          min="0"
+                          max="25"
+                          step="0.5"
+                          value={digitalPrice}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (parseFloat(val) > 25) {
+                              alert("RÈGLE STRICTE : Les produits digitaux ne peuvent excéder 25 $ USD.");
+                              setDigitalPrice("25.00");
+                            } else {
+                              setDigitalPrice(val);
+                            }
+                          }}
+                          className={`w-full pl-9 pr-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border rounded-2xl text-sm font-bold text-zinc-900 dark:text-white focus:outline-none transition-all ${
+                            parseFloat(digitalPrice) > 25
+                              ? "border-red-500 focus:ring-2 focus:ring-red-500/30"
+                              : "border-zinc-200 dark:border-zinc-700 focus:ring-2 focus:ring-teal-500/30"
+                          }`}
+                        />
+                      </div>
+                      {parseFloat(digitalPrice) > 25 && (
+                        <p className="text-[11px] text-red-500 mt-1 font-semibold">
+                          Le prix ne doit pas dépasser 25.00 $.
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                        Domaine / Catégorie
+                      </label>
+                      <select
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                        className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-medium transition-all"
+                      >
+                        {CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Tags & Statut */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                        Mots-clés / Tags (séparés par des virgules)
+                      </label>
+                      <input
+                        type="text"
+                        value={digitalTags}
+                        onChange={(e) => setDigitalTags(e.target.value)}
+                        placeholder="Ex: PDF, Guide DeFi, Python, Prompting"
+                        className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs text-zinc-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1">
+                        Statut de publication
+                      </label>
+                      <select
+                        value={digitalStatus}
+                        onChange={(e) => setDigitalStatus(e.target.value as any)}
+                        className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs text-zinc-900 dark:text-white font-semibold"
+                      >
+                        <option value="published">Publié immédiatement (Accessible en boutique)</option>
+                        <option value="draft">Brouillon (Non visible)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Description / Aperçu du document */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                      Description & Aperçu du contenu
+                    </label>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={4}
+                      placeholder="Résumez la valeur apportée par votre ressource, le sommaire des chapitres et les outils inclus..."
+                      className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-medium transition-all resize-none"
+                    />
+                  </div>
                 </div>
+              ) : (
+                /* Formulaire de Cours Traditionnel */
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
+                        Domaine / Catégorie
+                      </label>
+                      <select
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                        className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-medium transition-all"
+                      >
+                        {CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
-                    Niveau recommandé
-                  </label>
-                  <select
-                    value={level}
-                    onChange={(e) => setLevel(e.target.value)}
-                    className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-medium transition-all"
-                  >
-                    <option value="Tous niveaux">Tous niveaux</option>
-                    <option value="Débutant">Débutant</option>
-                    <option value="Intermédiaire">Intermédiaire</option>
-                    <option value="Avancé / Expert">Avancé / Expert</option>
-                  </select>
-                </div>
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
+                        Niveau recommandé
+                      </label>
+                      <select
+                        value={level}
+                        onChange={(e) => setLevel(e.target.value)}
+                        className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-medium transition-all"
+                      >
+                        <option value="Tous niveaux">Tous niveaux</option>
+                        <option value="Débutant">Débutant</option>
+                        <option value="Intermédiaire">Intermédiaire</option>
+                        <option value="Avancé / Expert">Avancé / Expert</option>
+                      </select>
+                    </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
-                    Langue du cours
-                  </label>
-                  <select
-                    value={language}
-                    onChange={(e) => setLanguage(e.target.value)}
-                    className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-semibold transition-all"
-                  >
-                    {COURSE_LANGUAGES.map((l) => (
-                      <option key={l.code} value={l.code}>
-                        {l.flag} {l.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
+                        Langue du cours
+                      </label>
+                      <select
+                        value={language}
+                        onChange={(e) => setLanguage(e.target.value)}
+                        className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-semibold transition-all"
+                      >
+                        {COURSE_LANGUAGES.map((l) => (
+                          <option key={l.code} value={l.code}>
+                            {l.flag} {l.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
 
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                  <span>Accroche courte (Aperçu dans le catalogue)</span>
-                  <span className="text-[10px] text-zinc-400 font-normal">Exposée sur /discover</span>
-                </label>
-                <input
-                  type="text"
-                  value={shortDescription}
-                  onChange={(e) => setShortDescription(e.target.value)}
-                  placeholder="Ex: Maîtrisez les outils IA de pointe pour automatiser vos tâches et multiplier votre productivité."
-                  maxLength={150}
-                  className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-medium transition-all"
-                />
-              </div>
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                      <span>Accroche courte (Aperçu dans le catalogue)</span>
+                      <span className="text-[10px] text-zinc-400 font-normal">Exposée sur /discover</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={shortDescription}
+                      onChange={(e) => setShortDescription(e.target.value)}
+                      placeholder="Ex: Maîtrisez les outils IA de pointe pour automatiser vos tâches et multiplier votre productivité."
+                      maxLength={150}
+                      className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-medium transition-all"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
-                  Description détaillée & Objectifs du programme
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={4}
-                  placeholder="Détaillez le contenu, les modules clés et les compétences que les apprenants acquerront..."
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-medium transition-all resize-none"
-                />
-              </div>
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
+                      Description détaillée & Objectifs du programme
+                    </label>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={4}
+                      placeholder="Détaillez le contenu, les modules clés et les compétences que les apprenants acquerront..."
+                      className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-medium transition-all resize-none"
+                    />
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -874,7 +1272,23 @@ export function CourseCreationWizardModal({
               Annuler
             </button>
 
-            {step < 4 ? (
+            {type === "digital_product" ? (
+              <button
+                onClick={handleSubmitDigitalProduct}
+                disabled={submittingDigital || uploadingDigitalFile}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white text-xs font-extrabold shadow-xl shadow-teal-500/30 transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.02] disabled:opacity-50"
+              >
+                {submittingDigital ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Publication du produit...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 fill-white" /> Publier le Produit Digital (${parseFloat(digitalPrice) || 0})
+                  </>
+                )}
+              </button>
+            ) : step < 4 ? (
               <button
                 onClick={handleNext}
                 className="px-6 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-lg shadow-teal-500/20 transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.02]"

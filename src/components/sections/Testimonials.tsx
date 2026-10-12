@@ -8,31 +8,34 @@ export function Testimonials() {
 
   const reviews = [
     {
-      name: "Prof. Marc D.",
-      role: language === "en" ? "Finance & Trading Instructor, Paris" : "Formateur Finance & Trading, Paris",
+      name: "Pr. Dieudonné Mwamba",
+      role: language === "en" ? "Fintech & Web3 Instructor, Kinshasa (DRC)" : "Formateur Fintech & Web3, Kinshasa (RDC)",
       text: language === "en"
-        ? "Thanks to ANSELLA, I launched my online trading school. The platform collects registration fees without me having to code. My revenues doubled in 3 months."
-        : "Grâce à ANSELLA, j'ai lancé mon école de trading en ligne. La plateforme encaisse les frais d'inscription sans que je n'aie à coder. Mes revenus ont doublé en 3 mois.",
+        ? "Thanks to ANSELLA, I launched my Web3 academy and sold my PDF guides without coding. My learners across Kinshasa and Lubumbashi pay instantly via M-Pesa and Airtel Money. My revenue tripled in 3 months."
+        : "Grâce à ANSELLA, j'ai lancé mon académie Web3 et mes guides PDF sans coder. Mes apprenants à Kinshasa et Lubumbashi règlent instantanément par M-Pesa et Airtel Money. Mes revenus ont triplé en 3 mois.",
       rating: 5,
-      academy: "Global Trading Academy"
+      academy: "Kinshasa Web3 Institute",
+      location: "Kinshasa, RDC"
     },
     {
-      name: "Sarah K.",
-      role: language === "en" ? "Web3 & AI Instructor, Montreal" : "Formatrice Web3 & IA, Montréal",
+      name: "Amina Diallo",
+      role: language === "en" ? "Generative AI Trainer & E-book Author, Dakar" : "Formatrice IA & Auteure d'E-books, Dakar (Sénégal)",
       text: language === "en"
-        ? "I love the simplicity of use. I have 150 active students on my generative AI academy. Automatic quizzes save me crazy amount of time in grading."
-        : "J'adore la simplicité d'utilisation. J'ai 150 étudiants actifs sur mon académie d'IA générative. Les quiz automatiques me font gagner un temps fou dans les corrections.",
+        ? "Selling my practical AI guides and prompt collections is frictionless. With the $25 cap and Mobile Money checkout, over 300 students purchased and downloaded my guides instantly."
+        : "La vente de mes guides pratiques d'IA et mes templates est d'une simplicité totale. Avec le plafond à 25$ et le paiement Mobile Money fluide, plus de 300 étudiants ont acheté et téléchargé mes ressources en quelques secondes.",
       rating: 5,
-      academy: "Web3/AI World Academy"
+      academy: "Dakar AI Lab & EdTech",
+      location: "Dakar, Sénégal"
     },
     {
-      name: "Dr. Jean-Claude B.",
-      role: language === "en" ? "Blockchain Lecturer, Brussels" : "Enseignant Blockchain, Bruxelles",
+      name: "Koffi Mensah",
+      role: language === "en" ? "DeFi Lecturer & Content Creator, Abidjan" : "Enseignant DeFi & Créateur de Contenu, Abidjan (Côte d'Ivoire)",
       text: language === "en"
-        ? "My students receive very professional automated certificates at the end of the course. The withdrawals of my commissions are done instantly to my account."
-        : "Mes étudiants reçoivent des certificats automatisés très professionnels à la fin du cursus. Les retraits de mes commissions se font instantanément vers mon compte.",
+        ? "My students receive automated verified certificates and instant access to my technical PDF manuals. Payouts directly to my Mobile Money and crypto wallet happen smoothly without bank hurdles."
+        : "Mes étudiants reçoivent des certificats vérifiés et accèdent immédiatement à mes manuels PDF. Les retraits de mes commissions vers mon compte Mobile Money et portefeuille crypto se font instantanément et sans tracas bancaires.",
       rating: 5,
-      academy: "Blockchain Institute Europe"
+      academy: "Ivoire Crypto Academy",
+      location: "Abidjan, Côte d'Ivoire"
     }
   ];
 
@@ -69,12 +72,17 @@ export function Testimonials() {
                 &ldquo;{review.text}&rdquo;
               </p>
 
-              <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4 flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-zinc-900 dark:text-white">{review.name}</p>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400">{review.role}</p>
+              <div className="border-t border-zinc-200 dark:border-zinc-800 pt-5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-teal-600 to-emerald-500 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-md">
+                    {review.name.split(" ").map(w => w[0]).join("").slice(0, 2)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-zinc-900 dark:text-white text-sm truncate">{review.name}</p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">{review.role}</p>
+                  </div>
                 </div>
-                <span className="text-xs font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 px-2.5 py-1 rounded-full">
+                <span className="text-[10px] font-bold bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800/50 px-2.5 py-1 rounded-full shrink-0">
                   {review.academy}
                 </span>
               </div>
