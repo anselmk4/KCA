@@ -983,3 +983,58 @@ export async function sendStudentDebtFullySettledEmail(
   await sendEmail(studentEmail, `🎉 Félicitations ! Votre formation "${courseTitle}" est 100% soldée`, body);
 }
 
+/**
+ * Email d'annonce envoyé exclusivement aux formateurs pour leur présenter la vente de produits digitaux (e-books, zip, modèles).
+ */
+export async function sendInstructorDigitalProductsAnnouncementEmail(
+  instructorEmail: string,
+  instructorName: string
+) {
+  const body = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background: #ccfbf1; color: #0f766e; font-size: 11px; font-weight: 800; padding: 6px 14px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid #99f6e4;">
+        🚀 Nouvelle Fonctionnalité Formateurs
+      </span>
+    </div>
+
+    <h2>Vendez vos E-books, Logiciels & Ressources Numériques sur ANSELLA !</h2>
+    <p>Bonjour <strong>${instructorName}</strong>,</p>
+    <p>Nous avons une excellente nouvelle pour vous ! Afin de décupler vos opportunités de monétisation, ANSELLA lance aujourd'hui la <strong>Boutique de Produits Digitaux</strong> pour tous les formateurs et créateurs certifiés.</p>
+    
+    <p>Désormais, <strong>au-delà de vos formations et cours traditionnels</strong>, vous pouvez publier et vendre immédiatement des ressources numériques téléchargeables :</p>
+
+    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px; padding: 20px; margin: 20px 0; border-left: 5px solid #14b8a6;">
+      <ul style="margin: 0; padding-left: 20px; color: #134e4a; font-size: 14px; line-height: 1.8;">
+        <li>📖 <strong>E-books & Guides PDF :</strong> Livres électroniques, manuels complets, synthèses et guides méthodologiques.</li>
+        <li>💻 <strong>Logiciels & Scripts (ZIP / Code) :</strong> Outils informatiques, scripts Python/JS, micro-logiciels, bots et snippets de code.</li>
+        <li>🎨 <strong>Modèles & Templates :</strong> Workspaces Notion, templates Figma, fichiers Canva et feuilles de calcul Excel.</li>
+        <li>🤖 <strong>Packs de Prompts & Datasets IA :</strong> Collections de prompts ChatGPT / Claude / Midjourney et bases de connaissances.</li>
+      </ul>
+    </div>
+
+    <h3 style="color: #0f172a; font-size: 17px; margin-top: 24px; margin-bottom: 12px;">Pourquoi publier vos produits dès aujourd'hui ?</h3>
+    <ul style="color: #475569; font-size: 14px; line-height: 1.7; padding-left: 20px;">
+      <li>⚡ <strong>Paiement Panafricain Instantané :</strong> Vos acheteurs paient en un clic via Mobile Money (RDC, Congo-Brazzaville, Cameroun, Côte d'Ivoire, Sénégal, Bénin...) et Crypto.</li>
+      <li>🏷️ <strong>Prix accessible (≤ 25$ max) :</strong> Le format idéal pour convertir un grand volume d'apprenants sans friction d'engagement long.</li>
+      <li>🏪 <strong>Votre Vitrine Officielle :</strong> Vos produits sont automatiquement mis en avant sur votre boutique créateur personnelle et sur le catalogue public.</li>
+      <li>🔒 <strong>Téléchargement instantané sécurisé :</strong> Les fichiers sont protégés et remis instantanément aux apprenants dès le paiement validé.</li>
+    </ul>
+
+    <div style="text-align: center; margin: 34px 0 20px 0;">
+      <a href="https://ansella.app/instructor/courses" class="btn" style="background: linear-gradient(135deg, #0d9488 0%, #10b981 100%); color: #ffffff !important; padding: 14px 30px; font-weight: 800; border-radius: 12px; text-decoration: none; display: inline-block;">
+        Publier mon premier Produit Digital →
+      </a>
+    </div>
+
+    <p style="font-size: 13px; color: #64748b; text-align: center;">
+      Pour commencer, rendez-vous dans votre espace dans l'onglet <strong>Mes Produits</strong> et cliquez sur <em>Nouveau Contenu &gt; Produit Digital</em>.
+    </p>
+  `;
+
+  await sendEmail(
+    instructorEmail,
+    `🚀 Nouveauté Formateurs : Vendez vos E-books, Logiciels & Ressources sur ANSELLA !`,
+    body
+  );
+}
+

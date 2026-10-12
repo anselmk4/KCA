@@ -749,7 +749,7 @@ export default function InstructorDashboardPage() {
         {/* My Courses Quick View */}
         <div className="lg:col-span-2 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Mes Cours</h2>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Mes Produits & Formations</h2>
             <Link
               href="/instructor/courses"
               className="text-sm text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1"

@@ -409,7 +409,9 @@ export function CourseCreationWizardModal({
                   Assistant de Création de Cours
                 </h2>
                 <p className="text-xs text-teal-200/70">
-                  Configurez votre formation en 4 étapes simples et visuelles.
+                  {type === "digital_product"
+                    ? "Formulaire direct : téléversez votre fichier, fixez le prix (≤ 25$) et publiez en 1 clic."
+                    : "Configurez votre formation en 4 étapes simples et visuelles."}
                 </p>
               </div>
             </div>
@@ -422,7 +424,18 @@ export function CourseCreationWizardModal({
           </div>
 
           {/* Stepper Progress */}
-          <div className="grid grid-cols-4 gap-2 pt-2 border-t border-white/10">
+          {type === "digital_product" ? (
+            <div className="flex items-center justify-between pt-2 border-t border-white/10 text-xs text-teal-300">
+              <span className="font-bold flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-teal-400" />
+                Publication Directe Produit Digital (PDF, ZIP, Modèle)
+              </span>
+              <span className="text-[10px] bg-teal-500/20 text-teal-300 px-2.5 py-0.5 rounded-full border border-teal-500/40 font-extrabold">
+                Étape Unique • Max 25$
+              </span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-4 gap-2 pt-2 border-t border-white/10">
             {stepsList.map((s) => {
               const isActive = step === s.num;
               const isDone = step > s.num;
@@ -462,7 +475,8 @@ export function CourseCreationWizardModal({
               );
             })}
           </div>
-        </div>
+        )}
+      </div>
 
         {/* Step Body */}
         <div className="p-6 sm:p-8 overflow-y-auto flex-1 space-y-6">

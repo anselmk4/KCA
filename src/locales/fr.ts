@@ -173,7 +173,7 @@ export const fr = {
   instructor: {
     sidebar: {
       dashboard: "Tableau de bord",
-      myCourses: "Mes cours",
+      myCourses: "Mes produits",
       students: "Mes étudiants",
       analytics: "Analytique",
       notifications: "Notifications",

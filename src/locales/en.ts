@@ -175,7 +175,7 @@ export const en: LocaleType = {
   instructor: {
     sidebar: {
       dashboard: "Dashboard",
-      myCourses: "My Courses",
+      myCourses: "My Products",
       students: "My Students",
       analytics: "Analytics",
       notifications: "Notifications",

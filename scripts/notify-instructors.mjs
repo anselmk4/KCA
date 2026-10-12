@@ -1,0 +1,109 @@
+import fs from "node:fs";
+import path from "node:path";
+
+// Template d'email d'annonce formateurs
+function getEmailTemplate(title, bodyContent) {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${title}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; margin: 0; padding: 20px; }
+    .container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; }
+    .top-bar { height: 4px; background: #0d9488; }
+    .content { padding: 32px; color: #374151; font-size: 15px; line-height: 1.65; }
+    .btn { display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #0d9488 0%, #10b981 100%); color: #ffffff !important; text-decoration: none; font-weight: 700; border-radius: 10px; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="top-bar"></div>
+    <div class="content">
+      ${bodyContent}
+    </div>
+  </div>
+</body>
+</html>
+  `;
+}
+
+async function writeMockEmailFile(recipient, subject, html) {
+  const outputDir = path.join(process.cwd(), "scratch", "sent-emails");
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+  const cleanEmail = recipient.replace(/[^a-zA-Z0-9@.]/g, "_");
+  const filename = `${Date.now()}_to_${cleanEmail}_announcement.html`;
+  const filepath = path.join(outputDir, filename);
+  fs.writeFileSync(filepath, html, "utf8");
+  console.log(`[Email Sauvegardé] file:///${filepath.replace(/\\/g, "/")}`);
+}
+
+async function sendAnnouncement(email, name) {
+  const subject = "🚀 Nouveauté Formateurs : Vendez vos E-books, Logiciels & Ressources sur ANSELLA !";
+  const body = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background: #ccfbf1; color: #0f766e; font-size: 11px; font-weight: 800; padding: 6px 14px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid #99f6e4;">
+        🚀 Nouvelle Fonctionnalité Formateurs
+      </span>
+    </div>
+
+    <h2>Vendez vos E-books, Logiciels & Ressources Numériques sur ANSELLA !</h2>
+    <p>Bonjour <strong>${name}</strong>,</p>
+    <p>Nous avons une excellente nouvelle pour vous ! Afin de décupler vos opportunités de monétisation, ANSELLA lance aujourd'hui la <strong>Boutique de Produits Digitaux</strong> pour tous les formateurs certifiés.</p>
+    
+    <p>Désormais, <strong>au-delà de vos formations et cours traditionnels</strong>, vous pouvez publier et vendre immédiatement des ressources numériques téléchargeables :</p>
+
+    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px; padding: 20px; margin: 20px 0; border-left: 5px solid #14b8a6;">
+      <ul style="margin: 0; padding-left: 20px; color: #134e4a; font-size: 14px; line-height: 1.8;">
+        <li>📖 <strong>E-books & Guides PDF :</strong> Livres électroniques, manuels complets, synthèses et guides méthodologiques.</li>
+        <li>💻 <strong>Logiciels & Scripts (ZIP / Code) :</strong> Outils informatiques, scripts Python/JS, micro-logiciels, bots et snippets de code.</li>
+        <li>🎨 <strong>Modèles & Templates :</strong> Workspaces Notion, templates Figma, fichiers Canva et feuilles de calcul Excel.</li>
+        <li>🤖 <strong>Packs de Prompts & Datasets IA :</strong> Collections de prompts ChatGPT / Claude / Midjourney et bases de connaissances.</li>
+      </ul>
+    </div>
+
+    <h3 style="color: #0f172a; font-size: 17px; margin-top: 24px; margin-bottom: 12px;">Pourquoi publier vos produits dès aujourd'hui ?</h3>
+    <ul style="color: #475569; font-size: 14px; line-height: 1.7; padding-left: 20px;">
+      <li>⚡ <strong>Paiement Panafricain Instantané :</strong> Vos acheteurs paient en un clic via Mobile Money (RDC, Congo-Brazzaville, Cameroun, Côte d'Ivoire, Sénégal, Bénin...) et Crypto.</li>
+      <li>🏷️ <strong>Prix accessible (≤ 25$ max) :</strong> Le format idéal pour convertir un grand volume d'apprenants sans friction d'engagement long.</li>
+      <li>🏪 <strong>Votre Vitrine Officielle :</strong> Vos produits sont automatiquement mis en avant sur votre boutique créateur personnelle et sur le catalogue public.</li>
+      <li>🔒 <strong>Téléchargement instantané sécurisé :</strong> Les fichiers sont protégés et remis instantanément aux apprenants dès le paiement validé.</li>
+    </ul>
+
+    <div style="text-align: center; margin: 34px 0 20px 0;">
+      <a href="https://ansella.app/instructor/courses" class="btn">
+        Publier mon premier Produit Digital →
+      </a>
+    </div>
+
+    <p style="font-size: 13px; color: #64748b; text-align: center;">
+      Pour commencer, rendez-vous dans votre espace dans l'onglet <strong>Mes Produits</strong> et cliquez sur <em>Nouveau Contenu &gt; Produit Digital</em>.
+    </p>
+  `;
+
+  const html = getEmailTemplate(subject, body);
+  console.log(`[Notification] Préparation de l'email pour ${name} <${email}>...`);
+  await writeMockEmailFile(email, subject, html);
+  console.log(`✓ Email généré et enregistré pour ${email}`);
+}
+
+async function run() {
+  console.log("Démarrage de la notification des formateurs...");
+  const mockInstructors = [
+    { name: "Ansel Makomo", email: "ansel@kuettu.com" },
+    { name: "Pr. Dieudonné Mwamba", email: "dieudonne.mwamba@ansella.app" },
+    { name: "Amina Diallo", email: "amina.diallo@ansella.app" },
+    { name: "Koffi Mensah", email: "koffi.mensah@ansella.app" },
+  ];
+
+  for (const inst of mockInstructors) {
+    await sendAnnouncement(inst.email, inst.name);
+  }
+
+  console.log("Diffusion d'annonces terminée avec succès !");
+}
+
+run();

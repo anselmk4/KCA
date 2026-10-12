@@ -540,11 +540,9 @@ export default function InstructorCoursesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="text-left">
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">{t("instructor.sidebar.courses", "Mes Cours")}</h1>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">{t("instructor.sidebar.myCourses", "Mes Produits")}</h1>
           <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">
-            {t("student.payment.applyCoupon", "publiés").toLowerCase().includes("appliqu")
-              ? `${myCourses.length} courses · ${myCourses.filter((c) => c.status === "PUBLISHED").length} published`
-              : `${myCourses.length} cours · ${myCourses.filter((c) => c.status === "PUBLISHED").length} publiés`}
+            {myCourses.length} formations · {myDigitalProducts.length} produits digitaux (e-books, zip, modèles)
           </p>
         </div>
         <button
