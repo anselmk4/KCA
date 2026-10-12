@@ -1,7 +1,31 @@
 import fs from "node:fs";
 import path from "node:path";
 
-// Template d'email d'annonce formateurs
+// Charger les variables de .env.local sans dépendance externe
+function loadEnv() {
+  const envPath = path.join(process.cwd(), ".env.local");
+  if (fs.existsSync(envPath)) {
+    const lines = fs.readFileSync(envPath, "utf8").split("\n");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const idx = trimmed.indexOf("=");
+      if (idx !== -1) {
+        const key = trimmed.slice(0, idx).trim();
+        const val = trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, "");
+        if (!process.env[key]) {
+          process.env[key] = val;
+        }
+      }
+    }
+  }
+}
+
+loadEnv();
+
+const RESEND_KEY = process.env.RESEND_API_KEY;
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "Ansella Learning Platform <noreply@ansella.app>";
+
 function getEmailTemplate(title, bodyContent) {
   return `
 <!DOCTYPE html>
@@ -38,7 +62,7 @@ async function writeMockEmailFile(recipient, subject, html) {
   const filename = `${Date.now()}_to_${cleanEmail}_announcement.html`;
   const filepath = path.join(outputDir, filename);
   fs.writeFileSync(filepath, html, "utf8");
-  console.log(`[Email Sauvegardé] file:///${filepath.replace(/\\/g, "/")}`);
+  return filepath;
 }
 
 async function sendAnnouncement(email, name) {
@@ -52,7 +76,7 @@ async function sendAnnouncement(email, name) {
 
     <h2>Vendez vos E-books, Logiciels & Ressources Numériques sur ANSELLA !</h2>
     <p>Bonjour <strong>${name}</strong>,</p>
-    <p>Nous avons une excellente nouvelle pour vous ! Afin de décupler vos opportunités de monétisation, ANSELLA lance aujourd'hui la <strong>Boutique de Produits Digitaux</strong> pour tous les formateurs certifiés.</p>
+    <p>Nous avons une excellente nouvelle pour vous ! Afin de décupler vos opportunités de monétisation, ANSELLA lance aujourd'hui la <strong>Boutique de Produits Digitaux</strong> pour tous les formateurs et créateurs certifiés.</p>
     
     <p>Désormais, <strong>au-delà de vos formations et cours traditionnels</strong>, vous pouvez publier et vendre immédiatement des ressources numériques téléchargeables :</p>
 
@@ -74,7 +98,7 @@ async function sendAnnouncement(email, name) {
     </ul>
 
     <div style="text-align: center; margin: 34px 0 20px 0;">
-      <a href="https://ansella.app/instructor/courses" class="btn">
+      <a href="https://ansella.app/instructor/courses" class="btn" style="background: linear-gradient(135deg, #0d9488 0%, #10b981 100%); color: #ffffff !important; padding: 14px 30px; font-weight: 800; border-radius: 12px; text-decoration: none; display: inline-block;">
         Publier mon premier Produit Digital →
       </a>
     </div>
@@ -85,25 +109,66 @@ async function sendAnnouncement(email, name) {
   `;
 
   const html = getEmailTemplate(subject, body);
-  console.log(`[Notification] Préparation de l'email pour ${name} <${email}>...`);
-  await writeMockEmailFile(email, subject, html);
-  console.log(`✓ Email généré et enregistré pour ${email}`);
+  const localPath = await writeMockEmailFile(email, subject, html);
+  console.log(`[Copie locale] Fichier sauvegardé : ${localPath}`);
+
+  if (RESEND_KEY) {
+    try {
+      console.log(`[Resend API] Envoi réel en cours vers ${email}...`);
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${RESEND_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: FROM_EMAIL,
+          to: [email],
+          subject: subject,
+          html: html,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data?.id) {
+        console.log(`✓ [Resend SUCCESS] Envoyé avec succès à ${email} (ID: ${data.id})`);
+        return { success: true, resendId: data.id };
+      } else {
+        console.warn(`⚠️ [Resend Note] Réponse pour ${email}:`, data);
+        return { success: false, error: data };
+      }
+    } catch (err) {
+      console.error(`✗ [Resend Error] Erreur envoi vers ${email}:`, err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  return { success: true, localOnly: true };
 }
 
 async function run() {
-  console.log("Démarrage de la notification des formateurs...");
-  const mockInstructors = [
+  console.log("===============================================================");
+  console.log("   DIFFUSION DE L'EMAIL ANSELLA AUX FORMATEURS (OPTION 2)   ");
+  console.log("===============================================================");
+  console.log(`Expéditeur : ${FROM_EMAIL}`);
+  console.log(`Clé Resend active : ${RESEND_KEY ? "Oui (" + RESEND_KEY.substring(0, 7) + "...)" : "Non"}\n`);
+
+  const instructors = [
     { name: "Ansel Makomo", email: "ansel@kuettu.com" },
+    { name: "Anselme (Admin & Formateur)", email: "anselmk4@gmail.com" },
     { name: "Pr. Dieudonné Mwamba", email: "dieudonne.mwamba@ansella.app" },
     { name: "Amina Diallo", email: "amina.diallo@ansella.app" },
     { name: "Koffi Mensah", email: "koffi.mensah@ansella.app" },
   ];
 
-  for (const inst of mockInstructors) {
-    await sendAnnouncement(inst.email, inst.name);
+  let successCount = 0;
+  for (const inst of instructors) {
+    const res = await sendAnnouncement(inst.email, inst.name);
+    if (res.success) successCount++;
   }
 
-  console.log("Diffusion d'annonces terminée avec succès !");
+  console.log("\n===============================================================");
+  console.log(`✓ Campagne terminée : ${successCount}/${instructors.length} emails traités avec succès !`);
+  console.log("===============================================================");
 }
 
 run();
