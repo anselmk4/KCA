@@ -30,6 +30,18 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
     ]
   },
   {
+    countryCode: "CG",
+    countryCode3: "COG",
+    names: ["république du congo", "republique du congo", "congo-brazzaville", "congo brazzaville", "congo-brazza", "congo brazza", "republic of the congo", "congo brazza", "cg", "cog"],
+    currency: "XAF",
+    phonePrefix: "242",
+    exchangeRate: 600,
+    operators: [
+      { id: "MTN_MOMO_COG", name: "MTN Mobile Money" },
+      { id: "AIRTEL_COG", name: "Airtel Money" }
+    ]
+  },
+  {
     countryCode: "RW",
     countryCode3: "RWA",
     names: ["rwanda", "république du rwanda", "republic of rwanda"],
@@ -161,6 +173,9 @@ export function normalizePawaPayCorrespondent(correspondent: any): string {
   const upper = str.trim().toUpperCase();
   const legacyMap: Record<string, string> = {
     // MTN
+    MTN_COG: "MTN_MOMO_COG",
+    MTN_CG: "MTN_MOMO_COG",
+    MTN_MOMO_CG: "MTN_MOMO_COG",
     MTN_RWA: "MTN_MOMO_RWA",
     MTN_RW: "MTN_MOMO_RWA",
     MTN_MOMO_RW: "MTN_MOMO_RWA",
@@ -197,6 +212,8 @@ export function normalizePawaPayCorrespondent(correspondent: any): string {
     ORANGE_CI: "ORANGE_CIV",
     ORANGE_SN: "ORANGE_SEN",
     // Airtel
+    AIRTEL_COG: "AIRTEL_COG",
+    AIRTEL_CG: "AIRTEL_COG",
     AIRTEL_CD: "AIRTEL_COD",
     AIRTEL_RW: "AIRTEL_RWA",
     AIRTEL_UG: "AIRTEL_UGA",

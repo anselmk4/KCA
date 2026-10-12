@@ -984,6 +984,7 @@ export default function PaymentPage() {
                       className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-850 text-sm text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/40 mb-3"
                     >
                       <option value="CD">🇨🇩 Congo (RDC)</option>
+                      <option value="CG">🇨🇬 Congo (Brazzaville)</option>
                       <option value="CM">🇨🇲 Cameroun</option>
                       <option value="CI">🇨🇮 Côte d'Ivoire</option>
                       <option value="SN">🇸🇳 Sénégal</option>

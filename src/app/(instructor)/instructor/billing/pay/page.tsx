@@ -993,6 +993,7 @@ function PaymentContent() {
                       className="w-full px-4 py-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-800 text-sm text-zinc-900 dark:text-white outline-none focus:ring-1 focus:ring-teal-500 transition-all mb-3"
                     >
                       <option value="CD">🇨🇩 Congo (RDC)</option>
+                      <option value="CG">🇨🇬 Congo (Brazzaville)</option>
                       <option value="CM">🇨🇲 Cameroun</option>
                       <option value="CI">🇨🇮 Côte d'Ivoire</option>
                       <option value="SN">🇸🇳 Sénégal</option>

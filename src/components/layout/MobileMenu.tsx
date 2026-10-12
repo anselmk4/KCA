@@ -72,6 +72,10 @@ export function MobileMenu() {
             <Link href="/lms-afrique" onClick={() => setOpen(false)} className="text-lg font-bold py-2 border-b border-zinc-100 dark:border-zinc-800 text-teal-600 dark:text-teal-400">
               🌍 {language === "en" ? "LMS Africa" : "LMS Afrique"}
             </Link>
+            <Link href="/store" onClick={() => setOpen(false)} className="text-lg font-bold py-2 border-b border-zinc-100 dark:border-zinc-800 text-teal-600 dark:text-teal-400 flex items-center justify-between">
+              <span>🛍️ {language === "en" ? "Digital Store & E-books" : "Boutique & Produits Digitaux"}</span>
+              <span className="text-[10px] bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded-full font-bold">Max $25</span>
+            </Link>
             <Link href="/vs" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
               ⚖️ {language === "en" ? "Comparisons" : "Comparatifs LMS"}
             </Link>

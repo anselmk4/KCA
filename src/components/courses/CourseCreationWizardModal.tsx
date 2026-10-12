@@ -65,6 +65,20 @@ const CATEGORIES = [
   "Autre Domaine",
 ];
 
+export const DIGITAL_PRODUCT_CATEGORIES = [
+  "E-books & Guides PDF",
+  "Logiciels & Scripts (ZIP / Code)",
+  "Modèles & Templates (Notion, Figma, Canva, Excel)",
+  "Prompts & Datasets IA",
+  "Packs Graphiques & Médias",
+  "Blockchain, Web3 & Crypto",
+  "Intelligence Artificielle & Data",
+  "Développement Web & Mobile",
+  "Fintech, Trading & Économie",
+  "Marketing & Entrepreneuriat",
+  "Autre Ressource Digitale",
+];
+
 const PRESET_CARDS = [
   {
     id: "ai",
@@ -538,7 +552,7 @@ export function CourseCreationWizardModal({
                     </p>
                   </button>
 
-                  {/* OPTION 3 : PRODUIT DIGITAL (PDF/EBOOK) */}
+                  {/* OPTION 3 : PRODUIT DIGITAL (EBOOK / LOGICIEL ZIP / TEMPLATE) */}
                   <button
                     type="button"
                     onClick={() => {
@@ -556,7 +570,7 @@ export function CourseCreationWizardModal({
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <FileText className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-                        <span className="font-extrabold text-sm text-zinc-900 dark:text-white">Produit Digital (PDF/Ebook)</span>
+                        <span className="font-extrabold text-sm text-zinc-900 dark:text-white">Produit Digital (E-book, Logiciel ZIP, Modèle)</span>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">Max 25$</span>
                       </div>
                       <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${type === "digital_product" ? "bg-teal-600 text-white" : "border border-zinc-300"}`}>
@@ -564,7 +578,7 @@ export function CourseCreationWizardModal({
                       </span>
                     </div>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                      Publication de ressources téléchargeables : e-books, guides PDF, templates et modèles. Vente directe plafonnée à 25 $ max.
+                      E-books, logiciels sous forme ZIP, scripts, modèles Notion/Figma, prompts et guides PDF. Vente directe et téléchargement instantané (25 $ max).
                     </p>
                   </button>
                 </div>
@@ -576,7 +590,7 @@ export function CourseCreationWizardModal({
                   <div className="p-4 rounded-2xl bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800/50 flex items-start gap-3">
                     <Info className="w-5 h-5 text-teal-600 dark:text-teal-400 shrink-0 mt-0.5" />
                     <div className="text-xs text-teal-900 dark:text-teal-200 leading-relaxed">
-                      <p className="font-bold mb-0.5">Configuration Produit Numérique (E-book / Guide PDF / Modèle)</p>
+                      <p className="font-bold mb-0.5">Configuration Produit Numérique (E-book, Logiciel ZIP, Guide, Template)</p>
                       <p className="text-teal-700 dark:text-teal-300">
                         Règle tarifaire : Les produits numériques sont strictement plafonnés à <strong className="underline">25 $ USD max</strong>. Les acheteurs accèdent instantanément au téléchargement sécurisé du fichier après règlement via Mobile Money, Carte ou Crypto.
                       </p>
@@ -586,7 +600,7 @@ export function CourseCreationWizardModal({
                   {/* Upload Fichier Sécurisé */}
                   <div>
                     <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
-                      Fichier Téléchargeable (PDF / eBook / Modèle) <span className="text-teal-600">*</span>
+                      Fichier Téléchargeable (PDF, ZIP, Modèle, Logiciel) <span className="text-teal-600">*</span>
                     </label>
                     <div className="border-2 border-dashed border-zinc-200 dark:border-zinc-700 rounded-2xl p-5 text-center hover:border-teal-500 transition-colors bg-zinc-50/50 dark:bg-zinc-800/20">
                       {digitalFileUrl ? (
@@ -595,7 +609,7 @@ export function CourseCreationWizardModal({
                             <FileCheck className="w-6 h-6 text-emerald-500 shrink-0" />
                             <div className="text-left truncate">
                               <p className="text-xs font-bold text-zinc-900 dark:text-white truncate">
-                                {digitalFileName || "Document prêt"}
+                                {digitalFileName || "Fichier prêt au téléchargement"}
                               </p>
                               <p className="text-[10px] text-zinc-500">
                                 {digitalFileSize ? `${(digitalFileSize / 1024 / 1024).toFixed(2)} Mo` : "Fichier vérifié"}
@@ -606,7 +620,7 @@ export function CourseCreationWizardModal({
                             Remplacer
                             <input
                               type="file"
-                              accept=".pdf,.epub,.mobi,.zip,.doc,.docx"
+                              accept=".pdf,.epub,.mobi,.zip,.rar,.7z,.tar.gz,.doc,.docx,.xlsx,.fig,.json,.ipynb,.psd"
                               onChange={handleDigitalFileUpload}
                               className="hidden"
                             />
@@ -616,7 +630,7 @@ export function CourseCreationWizardModal({
                         <label className="cursor-pointer block">
                           <input
                             type="file"
-                            accept=".pdf,.epub,.mobi,.zip,.doc,.docx"
+                            accept=".pdf,.epub,.mobi,.zip,.rar,.7z,.tar.gz,.doc,.docx,.xlsx,.fig,.json,.ipynb,.psd"
                             onChange={handleDigitalFileUpload}
                             disabled={uploadingDigitalFile}
                             className="hidden"
@@ -628,10 +642,10 @@ export function CourseCreationWizardModal({
                               <UploadCloud className="w-8 h-8 text-teal-600 dark:text-teal-400" />
                             )}
                             <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
-                              {uploadingDigitalFile ? "Téléversement sécurisé en cours..." : "Cliquez pour téléverser votre fichier PDF ou eBook"}
+                              {uploadingDigitalFile ? "Téléversement sécurisé en cours..." : "Cliquez pour téléverser votre fichier (PDF, ZIP, etc.)"}
                             </span>
                             <span className="text-[10px] text-zinc-400">
-                              Formats acceptés : PDF, EPUB, MOBI, ZIP (jusqu'à 80 Mo)
+                              Formats acceptés : PDF, ZIP, RAR, 7Z, EPUB, DOCX, XLSX, FIGMA (jusqu'à 100 Mo)
                             </span>
                           </div>
                         </label>
@@ -730,7 +744,7 @@ export function CourseCreationWizardModal({
                         onChange={(e) => setCategory(e.target.value)}
                         className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-medium transition-all"
                       >
-                        {CATEGORIES.map((cat) => (
+                        {DIGITAL_PRODUCT_CATEGORIES.map((cat) => (
                           <option key={cat} value={cat}>
                             {cat}
                           </option>

@@ -72,6 +72,10 @@ export function Navbar() {
           <Link href="/templates" className="transition-colors hover:text-foreground/80 text-foreground/60">
             {language === "en" ? "Academy Models" : "Modèle d'académie"}
           </Link>
+          <Link href="/store" className="transition-colors hover:text-teal-600 text-teal-600 dark:text-teal-400 font-semibold flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
+            {language === "en" ? "Store" : "Boutique"}
+          </Link>
           <Link href="/blog" className="transition-colors hover:text-foreground/80 text-foreground/60">
             Blog
           </Link>

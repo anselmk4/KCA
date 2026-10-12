@@ -283,11 +283,15 @@ export function DigitalProductCheckoutModal({
                         onChange={(e) => setUserCountry(e.target.value)}
                         className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white"
                       >
-                        <option value="CD">🇨🇩 RDC (Congo Kinshasa)</option>
+                        <option value="CD">🇨🇩 Congo (RDC)</option>
+                        <option value="CG">🇨🇬 Congo (Brazzaville)</option>
+                        <option value="CM">🇨🇲 Cameroun</option>
                         <option value="CI">🇨🇮 Côte d&apos;Ivoire</option>
                         <option value="SN">🇸🇳 Sénégal</option>
-                        <option value="CM">🇨🇲 Cameroun</option>
                         <option value="BJ">🇧🇯 Bénin</option>
+                        <option value="RW">🇷🇼 Rwanda</option>
+                        <option value="UG">🇺🇬 Ouganda</option>
+                        <option value="ZM">🇿🇲 Zambie</option>
                       </select>
                     </div>
 
