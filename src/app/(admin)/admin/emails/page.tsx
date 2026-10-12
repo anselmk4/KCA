@@ -97,6 +97,20 @@ export default function AdminEmailsPage() {
     loadCounts();
   }, []);
 
+  const loadDigitalProductsAnnouncementTemplate = () => {
+    setTargetType("instructors");
+    setSubject("🚀 Nouveauté Formateurs : Vendez vos E-books, Logiciels & Ressources sur ANSELLA !");
+    setHeading("Nouvelle Opportunité : Vendez vos E-books, Logiciels & Ressources Numériques");
+    setMessage(
+      "Bonjour cher formateur,\n\nNous avons le plaisir de vous annoncer le lancement officiel de la Boutique de Produits Digitaux sur ANSELLA !\n\nDésormais, au-delà de vos cours et formations classiques, vous pouvez monétiser immédiatement vos ressources numériques téléchargeables :\n\n• E-books & Guides PDF (synthèses, manuels, livres électroniques)\n• Logiciels, scripts et micro-outils sous forme ZIP\n• Modèles et templates (Notion, Figma, Canva, feuilles Excel)\n• Packs de Prompts & Datasets IA\n\nVos apprenants peuvent régler en un clic via Mobile Money (RDC, Congo-Brazzaville, Cameroun, Côte d'Ivoire, Sénégal...) et Crypto.\n\nRetrouvez dès maintenant l'onglet « Mes Produits » dans votre espace formateur pour publier votre première ressource !"
+    );
+    setShowAdvanced(true);
+    setButtonText("Accéder à Mes Produits");
+    setButtonUrl("https://ansella.app/instructor/courses");
+    setInfoBoxType("success");
+    setInfoBoxText("Tous les produits numériques sont plafonnés à 25 $ USD max avec encaissement instantané via Mobile Money et Crypto.");
+  };
+
   // Quick subject suggestions
   const SUBJECT_SUGGESTIONS = [
     "📢 Annonce importante pour votre formation",
@@ -253,6 +267,30 @@ export default function AdminEmailsPage() {
               <span className="text-xs font-semibold text-zinc-400">
                 Gabarit Ansella automatique
               </span>
+            </div>
+
+            {/* Bannière Modèle Rapide Formateurs */}
+            <div className="p-4 bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800/60 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-teal-500/20 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-teal-950 dark:text-teal-200">
+                    Modèle Spécial : Annonce Produits Digitaux aux Formateurs
+                  </p>
+                  <p className="text-[11px] text-teal-700 dark:text-teal-400">
+                    Pré-remplit l&apos;audience (Formateurs), l&apos;objet et le message officiel en 1 clic.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={loadDigitalProductsAnnouncementTemplate}
+                className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-extrabold shadow-sm transition-all shrink-0 cursor-pointer hover:scale-[1.02]"
+              >
+                Appliquer ce modèle
+              </button>
             </div>
 
             {errorMessage && (
