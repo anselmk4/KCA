@@ -174,8 +174,18 @@ export async function POST(req: NextRequest) {
 
     if (insertError) {
       console.error("[DigitalProducts POST] Insert error:", insertError);
+      const isMissingTable =
+        insertError.message?.includes("schema cache") ||
+        insertError.message?.includes("digital_products") ||
+        (insertError as any).code === "PGRST204" ||
+        (insertError as any).code === "42P01";
+
+      const userMessage = isMissingTable
+        ? "La table 'digital_products' n'a pas encore été créée dans la base de données Supabase. Veuillez exécuter le script SQL 'prisma/add-digital-products.sql' dans votre console Supabase SQL Editor."
+        : "Erreur lors de la sauvegarde du produit digital : " + insertError.message;
+
       return NextResponse.json(
-        { error: "Erreur lors de la sauvegarde du produit digital : " + insertError.message },
+        { error: userMessage },
         { status: 500 }
       );
     }
