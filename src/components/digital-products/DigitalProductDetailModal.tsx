@@ -194,9 +194,6 @@ export function DigitalProductDetailModal({
                   ${price.toFixed(2)}
                 </span>
                 <span className="text-xs text-zinc-400">USD</span>
-                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
-                  Max 25$
-                </span>
               </div>
             </div>
 

@@ -8,15 +8,17 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
-    if (userError || !user) {
-      return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
-    }
-
-    const { type, itemId, payInstallment, couponId } = await req.json(); // type: "COURSE" or "INSTRUCTOR_PLAN", itemId: courseId or planName
+    const { type, itemId, payInstallment, couponId, userEmail, userName } = await req.json(); // type: "COURSE", "INSTRUCTOR_PLAN", or "DIGITAL_PRODUCT"
 
     if (!type || !itemId) {
       return NextResponse.json({ error: "Paramètres 'type' et 'itemId' requis." }, { status: 400 });
     }
+
+    if (!user && type !== "DIGITAL_PRODUCT") {
+      return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
+    }
+
+    const effectiveUserId = user?.id || (userEmail ? `email_${encodeURIComponent(userEmail)}` : `guest_${Date.now()}`);
 
     let baseAmount = 0;
     let customId = ""; // Used to pass metadata to capture phase: "type:itemId:userId"
@@ -63,7 +65,7 @@ export async function POST(req: NextRequest) {
 
       const discountedTotalCoursePrice = Math.max(0, originalPrice - fullCourseDiscount);
       baseAmount = Math.max(0, Math.round(discountedTotalCoursePrice / installmentCount));
-      customId = `COURSE:${itemId}:${user.id}`;
+      customId = `COURSE:${itemId}:${user?.id || effectiveUserId}`;
     } else if (type === "INSTRUCTOR_PLAN") {
       // 2. Resolve plan price
       const planPrices = {
@@ -80,7 +82,21 @@ export async function POST(req: NextRequest) {
       }
 
       baseAmount = price;
-      customId = `INSTRUCTOR_PLAN:${selectedPlan}:${user.id}`;
+      customId = `INSTRUCTOR_PLAN:${selectedPlan}:${user?.id || effectiveUserId}`;
+    } else if (type === "DIGITAL_PRODUCT") {
+      // 3. Resolve digital product price
+      const { data: product, error: prodErr } = await supabaseAdmin
+        .from("digital_products")
+        .select("id, price, title")
+        .eq("id", itemId)
+        .maybeSingle();
+
+      if (prodErr || !product) {
+        return NextResponse.json({ error: "Produit digital introuvable." }, { status: 404 });
+      }
+
+      baseAmount = Number(product.price);
+      customId = `DIGITAL_PRODUCT:${itemId}:${effectiveUserId}`;
     } else {
       return NextResponse.json({ error: "Type de paiement non supporté." }, { status: 400 });
     }

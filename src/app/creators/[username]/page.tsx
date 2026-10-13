@@ -342,9 +342,6 @@ export default function CreatorStorefrontPage({
               >
                 <FileText className="w-3.5 h-3.5" />
                 E-books & Guides ({digitalProducts.length})
-                <span className="px-2 py-0.5 rounded-full text-[9px] bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 font-black">
-                  ≤ 25$
-                </span>
               </button>
 
               <button

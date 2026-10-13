@@ -21,8 +21,8 @@ export function Testimonials() {
       name: "Amina Diallo",
       role: language === "en" ? "Generative AI Trainer & E-book Author, Dakar" : "Formatrice IA & Auteure d'E-books, Dakar (Sénégal)",
       text: language === "en"
-        ? "Selling my practical AI guides and prompt collections is frictionless. With the $25 cap and Mobile Money checkout, over 300 students purchased and downloaded my guides instantly."
-        : "La vente de mes guides pratiques d'IA et mes templates est d'une simplicité totale. Avec le plafond à 25$ et le paiement Mobile Money fluide, plus de 300 étudiants ont acheté et téléchargé mes ressources en quelques secondes.",
+        ? "Selling my practical AI guides and prompt collections is frictionless. With seamless Mobile Money and PayPal checkout, over 300 students purchased and downloaded my guides instantly."
+        : "La vente de mes guides pratiques d'IA et mes templates est d'une simplicité totale. Avec le paiement fluide par Mobile Money et PayPal, plus de 300 étudiants ont acheté et téléchargé mes ressources en quelques secondes.",
       rating: 5,
       academy: "Dakar AI Lab & EdTech",
       location: "Dakar, Sénégal"

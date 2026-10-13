@@ -10,11 +10,6 @@ export async function POST(req: NextRequest) {
     const supabase = await createClient();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-    if (userError || !user) {
-      console.error("[paypal-capture-order] Authentication failed:", userError?.message || "No user session");
-      return NextResponse.json({ error: "Non authentifié. Veuillez vous connecter." }, { status: 401 });
-    }
-
     // Determine the database client: use supabaseAdmin if the service role key is valid, otherwise use the authenticated user's client (which satisfies RLS checked columns)
     const dbClient = (process.env.SUPABASE_SERVICE_ROLE_KEY && 
                       process.env.SUPABASE_SERVICE_ROLE_KEY !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
@@ -22,7 +17,7 @@ export async function POST(req: NextRequest) {
       : supabase;
 
     const { orderId } = await req.json();
-    console.log(`[paypal-capture-order] Order ID received: ${orderId} for User: ${user.id}`);
+    console.log(`[paypal-capture-order] Order ID received: ${orderId} for User: ${user?.id || 'guest'}`);
 
     if (!orderId) {
       return NextResponse.json({ error: "orderId requis." }, { status: 400 });
@@ -108,9 +103,9 @@ export async function POST(req: NextRequest) {
     const [type, itemId, metadataUserId] = customId.split(":");
     console.log(`[paypal-capture-order] Parsed customId metadata -> Type: ${type}, ItemID: ${itemId}, MetadataUserID: ${metadataUserId}`);
 
-    // Security check
-    if (metadataUserId !== user.id) {
-      console.error(`[paypal-capture-order] Security violation. metadataUserId (${metadataUserId}) !== authenticated user.id (${user.id})`);
+    // If type is COURSE or INSTRUCTOR_PLAN, a user session is strictly required
+    if (type !== "DIGITAL_PRODUCT" && (!user || metadataUserId !== user.id)) {
+      console.error(`[paypal-capture-order] Security violation. metadataUserId (${metadataUserId}) !== authenticated user.id (${user?.id})`);
       return NextResponse.json({ error: "Conflit d'utilisateur de transaction détecté." }, { status: 403 });
     }
 
@@ -398,6 +393,82 @@ export async function POST(req: NextRequest) {
         type: "INSTRUCTOR_PLAN",
         plan: planName,
         message: `Plan formateur mis à niveau vers ${planName} avec succès par PayPal !`,
+      });
+    }
+
+    // 3. Process DIGITAL_PRODUCT Purchase
+    if (type === "DIGITAL_PRODUCT") {
+      console.log(`[paypal-capture-order] Processing DIGITAL_PRODUCT purchase for: ${itemId}`);
+
+      const { data: product, error: prodErr } = await dbClient
+        .from("digital_products")
+        .select("id, title, price, author_id")
+        .eq("id", itemId)
+        .maybeSingle();
+
+      if (prodErr || !product) {
+        console.error("[paypal-capture-order] Digital product fetch error:", prodErr?.message);
+        return NextResponse.json({ error: "Produit digital introuvable pour validation finale." }, { status: 404 });
+      }
+
+      const buyerId = user?.id || (metadataUserId.startsWith("email_") ? decodeURIComponent(metadataUserId.replace("email_", "")) : metadataUserId);
+      const buyerEmail = user?.email || (metadataUserId.startsWith("email_") ? decodeURIComponent(metadataUserId.replace("email_", "")) : "");
+
+      // Enregistrer l'achat dans digital_product_purchases
+      try {
+        await dbClient.from("digital_product_purchases").upsert({
+          product_id: itemId,
+          user_id: buyerId,
+          price_paid: amountCaptured || product.price,
+          payment_method: "paypal",
+          payment_status: "COMPLETED",
+          transaction_id: captureId,
+          created_at: new Date().toISOString(),
+        } as any, { onConflict: "product_id,user_id" });
+      } catch (purErr: any) {
+        console.warn("[paypal-capture-order] digital_product_purchases upsert warning:", purErr?.message);
+      }
+
+      // Enregistrer dans la table transactions générale
+      try {
+        await dbClient.from("transactions").insert({
+          user_id: buyerId,
+          amount: amountCaptured || product.price,
+          course_id: itemId,
+          method: "PayPal",
+          status: "PAID",
+          date: new Date().toISOString(),
+        } as any);
+      } catch (txErr: any) {
+        console.warn("[paypal-capture-order] transactions insert warning:", txErr?.message);
+      }
+
+      // Envoi de la facture / notification
+      if (buyerEmail) {
+        try {
+          const { sendInvoiceEmail } = await import("@/lib/email");
+          await sendInvoiceEmail(
+            buyerEmail,
+            user?.user_metadata?.full_name || buyerEmail.split("@")[0] || "Client",
+            `DP-${captureId.substring(0, 8).toUpperCase()}`,
+            amountCaptured || product.price,
+            product.title,
+            "Produit digital téléchargeable immédiatement."
+          );
+        } catch (emailErr) {
+          console.warn("[paypal-capture-order] Invoice email warning:", emailErr);
+        }
+      }
+
+      const downloadUrl = `/api/digital-products/${itemId}/download`;
+
+      return NextResponse.json({
+        success: true,
+        type: "DIGITAL_PRODUCT",
+        productId: itemId,
+        productTitle: product.title,
+        downloadUrl,
+        message: "Achat validé avec succès par PayPal !",
       });
     }
 

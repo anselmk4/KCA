@@ -146,9 +146,6 @@ export function DigitalProductsSection() {
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800">
             <Sparkles className="w-3.5 h-3.5" />
             <span>{language === "en" ? "Digital Storefronts" : "E-books & Guides Pratiques"}</span>
-            <span className="bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full text-[10px] font-extrabold">
-              Max $25
-            </span>
           </div>
 
           <h2 className="text-3xl md:text-5xl font-extrabold text-zinc-900 dark:text-white tracking-tight">

@@ -31,8 +31,8 @@ const CATEGORY_PILLARS = [
     titleEn: "E-books & Practical Guides",
     descFr: "Synthèses condensées, manuels de trading, feuilles de route Web3 et guides pas-à-pas à emporter partout.",
     descEn: "Concise summaries, trading manuals, Web3 roadmaps, and step-by-step guides you can take anywhere.",
-    pointsFr: ["Téléchargement immédiat en PDF", "Plafond tarifaire max 25$", "Consultable sur mobile & PC"],
-    pointsEn: ["Instant PDF download", "Capped at $25 max", "Readable on mobile & desktop"],
+    pointsFr: ["Téléchargement immédiat en PDF", "Accessible sans abonnement", "Consultable sur mobile & PC"],
+    pointsEn: ["Instant PDF download", "No subscription required", "Readable on mobile & desktop"],
   },
   {
     id: "templates",
@@ -191,10 +191,10 @@ export function DigitalProductsSpotlight() {
               </div>
               <div>
                 <p className="text-xs font-bold text-zinc-900 dark:text-white">
-                  {isEn ? "Mobile Money & Crypto" : "Mobile Money & Crypto"}
+                  {isEn ? "PayPal, Mobile Money & Crypto" : "PayPal, Mobile Money & Crypto"}
                 </p>
                 <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                  {isEn ? "M-Pesa, Orange, MTN, USDT, BTC" : "M-Pesa, Orange, Airtel, MTN, USDT, BTC"}
+                  {isEn ? "PayPal, M-Pesa, Orange, MTN, USDT, BTC" : "PayPal, M-Pesa, Orange, Airtel, MTN, USDT, BTC"}
                 </p>
               </div>
             </div>
@@ -205,10 +205,10 @@ export function DigitalProductsSpotlight() {
               </div>
               <div>
                 <p className="text-xs font-bold text-zinc-900 dark:text-white">
-                  {isEn ? "Fair Price Cap (Max $25)" : "Plafond Équitable (Max 25$)"}
+                  {isEn ? "Affordable & Fair Pricing" : "Tarifs Clairs & Accessibles"}
                 </p>
                 <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                  {isEn ? "High-value resources capped at $25" : "Guides de valeur plafonnés à 25$ max"}
+                  {isEn ? "High-value resources for every budget" : "Des ressources de valeur adaptées à tous les budgets"}
                 </p>
               </div>
             </div>
