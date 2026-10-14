@@ -119,13 +119,63 @@ export async function GET(
 
     const creatorId = creator.id;
 
-    // 5. Fetch published courses
-    const { data: coursesData } = await (admin as any)
-      .from("courses")
-      .select("id, title, slug, description, price, level, thumbnail_url, type")
-      .eq("instructor_id", creatorId)
-      .eq("status", "PUBLISHED")
-      .order("created_at", { ascending: false });
+    // 5. Fetch courses with resilient fallback (handle missing type/slug columns and casing)
+    let coursesData: any[] = [];
+    try {
+      // 5a. Check collaborator courses
+      const { data: collabData } = await (admin as any)
+        .from("course_collaborators")
+        .select("course_id")
+        .eq("collaborator_id", creatorId);
+      const collabCourseIds: string[] = (collabData || [])
+        .map((c: any) => c.course_id)
+        .filter((id: any): id is string => Boolean(id));
+
+      let courseQuery = (admin as any)
+        .from("courses")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (collabCourseIds.length > 0) {
+        courseQuery = courseQuery.or(
+          `instructor_id.eq.${creatorId},id.in.(${collabCourseIds.join(",")})`
+        );
+      } else {
+        courseQuery = courseQuery.eq("instructor_id", creatorId);
+      }
+
+      const { data: fetchedCourses, error: courseErr } = await courseQuery;
+      if (courseErr) {
+        console.warn("[CreatorStorefront API] courses select(*) error, trying safe columns:", courseErr.message);
+        const { data: fallbackCourses } = await (admin as any)
+          .from("courses")
+          .select("id, title, description, price, thumbnail_url, status, instructor_id")
+          .eq("instructor_id", creatorId);
+        coursesData = fallbackCourses || [];
+      } else {
+        coursesData = fetchedCourses || [];
+      }
+    } catch (err) {
+      console.error("[CreatorStorefront API] Error fetching courses:", err);
+    }
+
+    // Filter out ARCHIVED courses, keep all published/active/draft courses by this author
+    const formattedCourses = (coursesData || [])
+      .filter((c: any) => {
+        const s = String(c.status || "").toUpperCase();
+        return s !== "ARCHIVED";
+      })
+      .map((c: any) => ({
+        id: c.id,
+        title: c.title || "Formation",
+        slug: c.slug || c.id,
+        description: c.short_description || c.description || "",
+        price: Number(c.price) || 0,
+        level: c.level || "Tous niveaux",
+        thumbnail_url: c.thumbnail_url || c.cover_image_url || "/placeholder-course.jpg",
+        type: c.type || "course",
+        status: c.status || "PUBLISHED",
+      }));
 
     // 6. Fetch published digital products
     const { data: digitalProductsData } = await (admin as any)
@@ -134,24 +184,26 @@ export async function GET(
         "id, author_id, title, description, cover_image_url, price, category, tags, status, file_name, file_size_bytes, preview_url, created_at, file_url"
       )
       .eq("author_id", creatorId)
-      .eq("status", "published")
+      .neq("status", "archived")
       .order("created_at", { ascending: false });
 
     const isCurrentAuthor = currentUser && currentUser.id === creatorId;
 
     // Sanitize file_url for unauthenticated or non-author viewers
-    const sanitizedProducts = (digitalProductsData || []).map((p: any) => {
-      const { file_url, ...safeRest } = p;
-      return {
-        ...safeRest,
-        has_file: !!file_url,
-        file_url: isCurrentAuthor ? file_url : undefined,
-      };
-    });
+    const sanitizedProducts = (digitalProductsData || [])
+      .filter((p: any) => String(p.status || "").toLowerCase() !== "archived")
+      .map((p: any) => {
+        const { file_url, ...safeRest } = p;
+        return {
+          ...safeRest,
+          has_file: !!file_url,
+          file_url: isCurrentAuthor ? file_url : undefined,
+        };
+      });
 
     return NextResponse.json({
       creator,
-      courses: coursesData || [],
+      courses: formattedCourses,
       digitalProducts: sanitizedProducts,
     });
   } catch (err: any) {
