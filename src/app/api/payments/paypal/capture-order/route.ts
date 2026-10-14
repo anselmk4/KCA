@@ -446,7 +446,7 @@ export async function POST(req: NextRequest) {
 
       // Enregistrer dans la table transactions générale
       try {
-        await dbClient.from("transactions").insert({
+        await (dbClient as any).from("transactions").insert({
           user_id: buyerId,
           amount: amountCaptured || product.price,
           course_id: itemId,
