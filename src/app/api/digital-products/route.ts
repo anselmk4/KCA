@@ -62,10 +62,27 @@ export async function GET(req: NextRequest) {
       }
 
       const { data: fallbackData } = await fallbackQuery;
-      return NextResponse.json({ products: fallbackData || [] });
+      const sanitizedFallback = (fallbackData || []).map((p: any) => {
+        const isAuthor = user && user.id === p.author_id;
+        if (!isAuthor) {
+          const { file_url, ...safeRest } = p;
+          return { ...safeRest, has_file: !!file_url };
+        }
+        return p;
+      });
+      return NextResponse.json({ products: sanitizedFallback });
     }
 
-    return NextResponse.json({ products: data || [] });
+    const sanitized = (data || []).map((p: any) => {
+      const isAuthor = user && user.id === p.author_id;
+      if (!isAuthor) {
+        const { file_url, ...safeRest } = p;
+        return { ...safeRest, has_file: !!file_url };
+      }
+      return p;
+    });
+
+    return NextResponse.json({ products: sanitized });
   } catch (err: any) {
     console.error("[DigitalProducts GET] Unexpected error:", err);
     return NextResponse.json(

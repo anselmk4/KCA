@@ -15,26 +15,48 @@ export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
 
-    // 1. Verify user session
+    // 1. Verify user session or allow guest checkout with email for digital products
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Non authentifié. Veuillez vous connecter.' }, { status: 401 });
-    }
 
     // 2. Parse request body
     const body = await req.json();
-    const { amount, phoneNumber, carrier, type, itemId, cycle, couponId, country, payInstallment, currency } = body;
+    const { 
+      amount, 
+      phoneNumber, 
+      carrier, 
+      type, 
+      itemId, 
+      cycle, 
+      couponId, 
+      country, 
+      payInstallment, 
+      currency,
+      userEmail,
+      userName
+    } = body;
 
     if (!amount || !phoneNumber || !carrier || !type || !itemId) {
       return NextResponse.json({ error: 'Paramètres manquants' }, { status: 400 });
     }
 
-    // 3. Fetch user profile to retrieve country
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('country, nationality')
-      .eq('id', user.id)
-      .maybeSingle();
+    if (!user && type !== 'DIGITAL_PRODUCT') {
+      return NextResponse.json({ error: 'Non authentifié. Veuillez vous connecter.' }, { status: 401 });
+    }
+
+    if (!user && !userEmail) {
+      return NextResponse.json({ error: 'Veuillez fournir une adresse email pour recevoir votre produit digital.' }, { status: 400 });
+    }
+
+    // 3. Fetch user profile to retrieve country if authenticated
+    let profile = null;
+    if (user) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('country, nationality')
+        .eq('id', user.id)
+        .maybeSingle();
+      profile = data;
+    }
 
     // Auto-detect country configuration (phone number prefix, operator suffix, or fallback country)
     const countryConfig = detectPawaPayCountry(phoneNumber, carrier, country || profile?.nationality || profile?.country);
@@ -143,6 +165,35 @@ export async function POST(req: NextRequest) {
         baseAmount = cycle === 'ANNUAL' ? planConfig.annual : planConfig.monthly;
         subtotal = baseAmount;
       }
+    } else if (type === 'DIGITAL_PRODUCT') {
+      const { data: product, error: prodErr } = await supabaseAdmin
+        .from('digital_products')
+        .select('id, price, title, author_id')
+        .eq('id', itemId)
+        .maybeSingle();
+
+      if (prodErr || !product) {
+        return NextResponse.json({ error: 'Produit digital introuvable.' }, { status: 404 });
+      }
+
+      baseAmount = Number(product.price);
+      subtotal = baseAmount;
+    }
+
+    // Résolution de l'identifiant utilisateur (connecté ou invité par email)
+    let effectiveUserId = user?.id;
+    if (!effectiveUserId && userEmail) {
+      const { data: existingProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('email', userEmail)
+        .maybeSingle();
+
+      if (existingProfile?.id) {
+        effectiveUserId = existingProfile.id;
+      } else {
+        effectiveUserId = crypto.randomUUID();
+      }
     }
 
     // Apply PawaPay Mobile Money fee surcharge (+2.5% standard).
@@ -152,22 +203,27 @@ export async function POST(req: NextRequest) {
     // 5. Save PENDING records in database (USD equivalent for bookkeeping and DB constraints)
     try {
       const orderNumber = `ORD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      const { error: orderError } = await dbClient.from('orders').insert({
-        id: orderId,
-        order_number: orderNumber,
-        user_id: user.id,
-        status: 'PENDING',
-        subtotal: subtotal,
-        discount_amount: discountAmount,
-        tax_amount: feeAmount, // Store PawaPay fee surcharge
-        total: calculatedAmountWithFee, // Full debited amount
-        currency: 'USD', // Standardized currency in DB to match prices
-        coupon_id: couponId || null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      } as any);
-
-      if (orderError) throw orderError;
+      
+      // Tentative d'insertion dans la table orders
+      try {
+        await dbClient.from('orders').insert({
+          id: orderId,
+          order_number: orderNumber,
+          user_id: effectiveUserId,
+          status: 'PENDING',
+          subtotal: subtotal,
+          discount_amount: discountAmount,
+          tax_amount: feeAmount, // Store PawaPay fee surcharge
+          total: calculatedAmountWithFee, // Full debited amount
+          currency: 'USD',
+          coupon_id: couponId || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        } as any);
+      } catch (orderErr: any) {
+        if (type !== 'DIGITAL_PRODUCT') throw orderErr;
+        console.warn('[pawapay-initiate] Orders insert skipped or non-critical for guest digital product:', orderErr?.message);
+      }
 
       // Insert Order Item — only for real course purchases (FK constraint on course_id)
       if (type === 'STUDENT_COURSE') {
@@ -184,23 +240,26 @@ export async function POST(req: NextRequest) {
         if (itemError) throw itemError;
       }
 
+      const encodedBuyerMeta = encodeURIComponent(userEmail || user?.email || userName || 'client');
       const { error: paymentError } = await dbClient.from('payments').insert({
         id: paymentId,
         order_id: orderId,
-        user_id: user.id,
+        user_id: effectiveUserId,
         amount: calculatedAmountWithFee, // Full debited amount
         currency: 'USD',
         status: 'PENDING',
         provider: 'MOBILE_MONEY',
-        // Encode carrier, type, itemId and cycle for webhook resolution
-        method: `${carrier}::${type}::${itemId}::${cycle || 'MONTHLY'}`,
+        // Encode carrier, type, itemId and cycle/email for webhook resolution
+        method: `${carrier}::${type}::${itemId}::${type === 'DIGITAL_PRODUCT' ? encodedBuyerMeta : (cycle || 'MONTHLY')}`,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       } as any);
 
-      if (paymentError) throw paymentError;
+      if (paymentError) {
+        console.warn('[pawapay-initiate] Payment insert warning:', paymentError.message);
+      }
 
-      if (type === 'STUDENT_COURSE') {
+      if (type === 'STUDENT_COURSE' && user) {
         const { error: enrollError } = await dbClient.from('enrollments').upsert({
           student_id: user.id,
           course_id: itemId,
@@ -213,6 +272,23 @@ export async function POST(req: NextRequest) {
 
         if (enrollError) {
           console.warn('[pawapay-initiate] Enrollment upsert warning:', enrollError.message);
+        }
+      }
+
+      // Pour les produits digitaux, pré-enregistrer la ligne d'achat en attente (PENDING)
+      if (type === 'DIGITAL_PRODUCT') {
+        try {
+          await dbClient.from('digital_product_purchases').upsert({
+            product_id: itemId,
+            user_id: effectiveUserId,
+            price_paid: calculatedAmountWithFee,
+            payment_method: 'pawapay',
+            payment_status: 'PENDING',
+            transaction_id: paymentId,
+            created_at: new Date().toISOString(),
+          } as any, { onConflict: 'product_id,user_id' });
+        } catch (purInitErr: any) {
+          console.warn('[pawapay-initiate] digital_product_purchases PENDING upsert warning:', purInitErr?.message);
         }
       }
     } catch (dbErr: any) {

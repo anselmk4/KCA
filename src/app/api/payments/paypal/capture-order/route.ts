@@ -415,8 +415,9 @@ export async function POST(req: NextRequest) {
       const buyerEmail = user?.email || (metadataUserId.startsWith("email_") ? decodeURIComponent(metadataUserId.replace("email_", "")) : "");
 
       // Enregistrer l'achat dans digital_product_purchases
+      let purchaseRecordId = captureId;
       try {
-        await dbClient.from("digital_product_purchases").upsert({
+        const { data: purRow } = await dbClient.from("digital_product_purchases").upsert({
           product_id: itemId,
           user_id: buyerId,
           price_paid: amountCaptured || product.price,
@@ -424,7 +425,11 @@ export async function POST(req: NextRequest) {
           payment_status: "COMPLETED",
           transaction_id: captureId,
           created_at: new Date().toISOString(),
-        } as any, { onConflict: "product_id,user_id" });
+        } as any, { onConflict: "product_id,user_id" }).select("id").maybeSingle();
+
+        if (purRow?.id) {
+          purchaseRecordId = purRow.id;
+        }
       } catch (purErr: any) {
         console.warn("[paypal-capture-order] digital_product_purchases upsert warning:", purErr?.message);
       }
@@ -443,6 +448,16 @@ export async function POST(req: NextRequest) {
         console.warn("[paypal-capture-order] transactions insert warning:", txErr?.message);
       }
 
+      // Génération du jeton cryptographique sécurisé (durée 48 heures)
+      const { generateDigitalProductToken } = await import("@/lib/digital-product-token");
+      const downloadToken = generateDigitalProductToken(
+        itemId,
+        purchaseRecordId,
+        buyerId,
+        48
+      );
+      const downloadUrl = `/api/digital-products/${itemId}/download?token=${downloadToken}`;
+
       // Envoi de la facture / notification
       if (buyerEmail) {
         try {
@@ -453,14 +468,28 @@ export async function POST(req: NextRequest) {
             `DP-${captureId.substring(0, 8).toUpperCase()}`,
             amountCaptured || product.price,
             product.title,
-            "Produit digital téléchargeable immédiatement."
+            "Produit digital téléchargeable immédiatement via votre lien sécurisé."
           );
         } catch (emailErr) {
           console.warn("[paypal-capture-order] Invoice email warning:", emailErr);
         }
       }
 
-      const downloadUrl = `/api/digital-products/${itemId}/download`;
+      // Notifier l'auteur / formateur
+      if (product.author_id) {
+        try {
+          const { createNotification } = await import("@/lib/supabase/notifications-helper");
+          await createNotification({
+            userId: product.author_id,
+            title: "Nouvelle vente de produit digital !",
+            message: `Un exemplaire de "${product.title}" a été vendu via PayPal (${amountCaptured || product.price} $).`,
+            type: "SUCCESS",
+            link: `/instructor/courses`
+          });
+        } catch (notifErr) {
+          console.warn("[paypal-capture-order] Instructor notification warning:", notifErr);
+        }
+      }
 
       return NextResponse.json({
         success: true,
@@ -468,7 +497,7 @@ export async function POST(req: NextRequest) {
         productId: itemId,
         productTitle: product.title,
         downloadUrl,
-        message: "Achat validé avec succès par PayPal !",
+        message: "Achat validé avec succès par PayPal ! Votre téléchargement sécurisé est prêt.",
       });
     }
 

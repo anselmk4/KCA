@@ -26,6 +26,17 @@ export async function GET(
       );
     }
 
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const isAuthor = user && user.id === product.author_id;
+    if (!isAuthor) {
+      delete product.file_url;
+      product.has_file = true;
+    }
+
     return NextResponse.json({ product });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

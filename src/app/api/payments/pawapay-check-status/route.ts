@@ -292,6 +292,112 @@ export async function GET(req: NextRequest) {
         } catch (notifErr) {
           console.error('[pawapay-check-status] Error sending course notifications:', notifErr);
         }
+      } else if (paymentType === 'DIGITAL_PRODUCT' && itemId) {
+        // Activation de l'achat du produit digital
+        let purchaseId = depositId;
+
+        try {
+          const { data: purRow } = await supabaseAdmin
+            .from('digital_product_purchases')
+            .upsert({
+              product_id: itemId,
+              user_id: payment.user_id,
+              price_paid: payment.amount,
+              payment_method: 'pawapay',
+              payment_status: 'COMPLETED',
+              transaction_id: depositId,
+              created_at: new Date().toISOString(),
+            } as any, { onConflict: 'product_id,user_id' })
+            .select('id')
+            .maybeSingle();
+
+          if (purRow?.id) {
+            purchaseId = purRow.id;
+          }
+        } catch (purErr: any) {
+          console.warn('[pawapay-check-status] digital_product_purchases upsert warning:', purErr?.message);
+        }
+
+        // Enregistrer dans la table transactions générale
+        try {
+          await supabaseAdmin.from('transactions').insert({
+            user_id: payment.user_id,
+            amount: payment.amount,
+            course_id: itemId,
+            method: 'PawaPay Mobile Money',
+            status: 'PAID',
+            date: new Date().toISOString(),
+          } as any);
+        } catch (txErr) {
+          // non bloquant
+        }
+
+        // Générer le jeton cryptographique sécurisé (durée 48 heures)
+        const { generateDigitalProductToken } = await import('@/lib/digital-product-token');
+        const downloadToken = generateDigitalProductToken(
+          itemId,
+          purchaseId,
+          payment.user_id,
+          48
+        );
+        const downloadUrl = `/api/digital-products/${itemId}/download?token=${downloadToken}`;
+
+        // Notifications et envoi d'email
+        try {
+          const { data: product } = await supabaseAdmin
+            .from('digital_products')
+            .select('id, title, author_id, price')
+            .eq('id', itemId)
+            .maybeSingle();
+
+          const productTitle = product?.title || 'Produit Digital';
+
+          // Résoudre email de l'acheteur
+          let buyerEmail = '';
+          const metaEmail = methodParts[3] ? decodeURIComponent(methodParts[3]) : '';
+          if (metaEmail && metaEmail.includes('@')) {
+            buyerEmail = metaEmail;
+          } else {
+            const { data: userProfile } = await supabaseAdmin
+              .from('profiles')
+              .select('email, full_name')
+              .eq('id', payment.user_id)
+              .maybeSingle();
+            buyerEmail = userProfile?.email || '';
+          }
+
+          if (buyerEmail) {
+            const { sendInvoiceEmail } = await import('@/lib/email');
+            await sendInvoiceEmail(
+              buyerEmail,
+              buyerEmail.split('@')[0] || 'Client',
+              `DP-${depositId.substring(0, 8).toUpperCase()}`,
+              payment.amount,
+              productTitle,
+              'Votre paiement Mobile Money PawaPay est validé. Votre ressource numérique est disponible immédiatement.'
+            );
+          }
+
+          // Notifier l'auteur du produit
+          if (product?.author_id) {
+            await createNotification({
+              userId: product.author_id,
+              title: "Nouvelle vente de produit digital !",
+              message: `Un exemplaire de "${productTitle}" a été acheté via Mobile Money (${payment.amount} $).`,
+              type: "SUCCESS",
+              link: `/instructor/courses`
+            });
+          }
+        } catch (notifErr) {
+          console.warn('[pawapay-check-status] Digital product notification error:', notifErr);
+        }
+
+        return NextResponse.json({ 
+          status: 'PAID',
+          message: 'Paiement validé avec succès !',
+          downloadUrl,
+          productId: itemId
+        });
       }
 
       return NextResponse.json({ 

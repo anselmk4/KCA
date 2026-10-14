@@ -394,6 +394,92 @@ export async function POST(req: NextRequest) {
           } catch (notifErr) {
             console.error('[webhook-pawapay] Error triggering course notifications:', notifErr);
           }
+        } else if (paymentType === 'DIGITAL_PRODUCT' && itemId) {
+          // Activation de l'achat du produit digital via webhook
+          let purchaseId = depositId;
+          try {
+            const { data: purRow } = await supabaseAdmin
+              .from('digital_product_purchases')
+              .upsert({
+                product_id: itemId,
+                user_id: payment.user_id,
+                price_paid: payment.amount,
+                payment_method: 'pawapay',
+                payment_status: 'COMPLETED',
+                transaction_id: depositId,
+                created_at: new Date().toISOString(),
+              } as any, { onConflict: 'product_id,user_id' })
+              .select('id')
+              .maybeSingle();
+
+            if (purRow?.id) {
+              purchaseId = purRow.id;
+            }
+          } catch (purErr: any) {
+            console.warn('[webhook-pawapay] digital_product_purchases upsert warning:', purErr?.message);
+          }
+
+          // Enregistrer dans la table transactions générale
+          try {
+            await supabaseAdmin.from('transactions').insert({
+              user_id: payment.user_id,
+              amount: payment.amount,
+              course_id: itemId,
+              method: 'PawaPay Mobile Money',
+              status: 'PAID',
+              date: new Date().toISOString(),
+            } as any);
+          } catch (txErr) {
+            // non bloquant
+          }
+
+          // Notifier acheteur et formateur
+          try {
+            const { data: product } = await supabaseAdmin
+              .from('digital_products')
+              .select('id, title, author_id, price')
+              .eq('id', itemId)
+              .maybeSingle();
+
+            const productTitle = product?.title || 'Produit Digital';
+
+            let buyerEmail = '';
+            const metaEmail = methodParts[3] ? decodeURIComponent(methodParts[3]) : '';
+            if (metaEmail && metaEmail.includes('@')) {
+              buyerEmail = metaEmail;
+            } else {
+              const { data: userProfile } = await supabaseAdmin
+                .from('profiles')
+                .select('email, full_name')
+                .eq('id', payment.user_id)
+                .maybeSingle();
+              buyerEmail = userProfile?.email || '';
+            }
+
+            if (buyerEmail) {
+              const { sendInvoiceEmail } = await import('@/lib/email');
+              await sendInvoiceEmail(
+                buyerEmail,
+                buyerEmail.split('@')[0] || 'Client',
+                `DP-${depositId.substring(0, 8).toUpperCase()}`,
+                payment.amount,
+                productTitle,
+                'Votre paiement Mobile Money PawaPay est validé. Votre ressource numérique est accessible.'
+              );
+            }
+
+            if (product?.author_id) {
+              await createNotification({
+                userId: product.author_id,
+                title: "Nouvelle vente de produit digital !",
+                message: `Un exemplaire de "${productTitle}" a été acheté via Mobile Money (${payment.amount} $).`,
+                type: "SUCCESS",
+                link: `/instructor/courses`
+              });
+            }
+          } catch (notifErr) {
+            console.warn('[webhook-pawapay] Digital product webhook notification error:', notifErr);
+          }
         } else {
           console.warn(`[webhook-pawapay] Unknown payment type in method field: "${payment.method}". No activation performed.`);
         }

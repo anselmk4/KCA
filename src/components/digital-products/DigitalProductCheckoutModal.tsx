@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Script from "next/script";
 import {
   X,
@@ -11,14 +11,19 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  FileText,
-  DollarSign,
   Lock,
+  ArrowRight,
+  RefreshCw,
+  Check,
+  Sparkles,
 } from "lucide-react";
-import { getPawaPayConfigForCountry, PAWAPAY_FEE_RATE } from "@/lib/pawapay";
-import { OperatorLogo, PayPalLogo } from "@/components/icons/PaymentLogos";
+import {
+  getPawaPayConfigForCountry,
+  PAWAPAY_FEE_RATE,
+  calculatePawaPayAmountWithFee,
+} from "@/lib/pawapay";
+import { PayPalLogo } from "@/components/icons/PaymentLogos";
 import { SolanaQrCode } from "@/components/ui/SolanaQrCode";
-import { BitcoinQrCode } from "@/components/ui/BitcoinQrCode";
 import { SOLANA_TREASURY_ADDRESS, getSolanaPayUri } from "@/lib/crypto";
 
 declare global {
@@ -33,7 +38,7 @@ interface DigitalProduct {
   description: string;
   price: number;
   cover_image_url: string;
-  file_url: string;
+  file_url?: string;
   file_name?: string | null;
   category?: string;
 }
@@ -51,7 +56,7 @@ export function DigitalProductCheckoutModal({
   onClose,
   onSuccess,
 }: DigitalProductCheckoutModalProps) {
-  const [method, setMethod] = useState<"momo" | "paypal" | "crypto_sol" | "crypto_btc">("momo");
+  const [method, setMethod] = useState<"momo" | "paypal" | "crypto_sol">("momo");
   const [userCountry, setUserCountry] = useState("CD");
   const [momoProvider, setMomoProvider] = useState("VODACOM_MPESA_COD");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -63,10 +68,40 @@ export function DigitalProductCheckoutModal({
   const [errorMsg, setErrorMsg] = useState("");
   const [paypalLoaded, setPaypalLoaded] = useState(false);
 
+  // États spécifiques au workflow PawaPay Mobile Money
+  const [depositId, setDepositId] = useState<string | null>(null);
+  const [isPendingPawaPay, setIsPendingPawaPay] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(false);
+  const [isSandboxMode, setIsSandboxMode] = useState(false);
+  const [countdown, setCountdown] = useState(120);
+
   const price = product ? Number(product.price) : 0;
+  const { feeAmount, totalAmount: finalAmountWithFee } = calculatePawaPayAmountWithFee(price);
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "sb";
 
-  // Rendu dynamique des boutons PayPal lorsque l'onglet PayPal est actif
+  const countryConfig =
+    getPawaPayConfigForCountry(userCountry) || getPawaPayConfigForCountry("CD")!;
+
+  // Mettre à jour l'opérateur par défaut lors du changement de pays
+  useEffect(() => {
+    if (countryConfig?.operators?.[0]?.id) {
+      setMomoProvider(countryConfig.operators[0].id);
+    }
+  }, [userCountry]);
+
+  // Réinitialiser les états lors de l'ouverture/fermeture
+  useEffect(() => {
+    if (!isOpen) {
+      setIsPendingPawaPay(false);
+      setDepositId(null);
+      setSubmitting(false);
+      setErrorMsg("");
+      setCompleted(false);
+      setDownloadUrl("");
+    }
+  }, [isOpen]);
+
+  // Rendu dynamique des boutons PayPal officiels
   useEffect(() => {
     if (method !== "paypal" || !isOpen || !product || completed) return;
 
@@ -127,9 +162,9 @@ export function DigitalProductCheckoutModal({
                   });
                   const captureData = await res.json();
                   if (captureData.error) {
-                    setErrorMsg("Erreur lors de la capture : " + captureData.error);
+                    setErrorMsg("Erreur lors de la validation PayPal : " + captureData.error);
                   } else {
-                    const url = captureData.downloadUrl || `/api/digital-products/${product.id}/download`;
+                    const url = captureData.downloadUrl;
                     setDownloadUrl(url);
                     setCompleted(true);
                     if (onSuccess) {
@@ -170,52 +205,111 @@ export function DigitalProductCheckoutModal({
     };
   }, [method, isOpen, product, email, name, completed, onSuccess]);
 
+  // Polling automatique pour PawaPay Mobile Money
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isPendingPawaPay && depositId && !completed) {
+      timer = setInterval(async () => {
+        await checkPawaPayStatus(true);
+      }, 4000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isPendingPawaPay, depositId, completed]);
+
+  // Compte à rebours du délai d'attente Mobile Money
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isPendingPawaPay && countdown > 0 && !completed) {
+      interval = setInterval(() => {
+        setCountdown((c) => c - 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isPendingPawaPay, countdown, completed]);
+
+  // Vérification manuelle ou automatique du statut PawaPay
+  const checkPawaPayStatus = async (isSilent = false) => {
+    if (!depositId) return;
+    if (!isSilent) setCheckingStatus(true);
+
+    try {
+      const res = await fetch(`/api/payments/pawapay-check-status?depositId=${depositId}`);
+      const data = await res.json();
+
+      if (data.status === "PAID") {
+        setIsPendingPawaPay(false);
+        setCompleted(true);
+        const url = data.downloadUrl || `/api/digital-products/${product?.id}/download`;
+        setDownloadUrl(url);
+        if (onSuccess) {
+          onSuccess(url);
+        }
+      } else if (data.status === "FAILED") {
+        setIsPendingPawaPay(false);
+        setErrorMsg(
+          data.failureReason ||
+            "Paiement Mobile Money refusé par l'opérateur ou expiré. Veuillez vérifier votre solde."
+        );
+      }
+    } catch (err: any) {
+      if (!isSilent) {
+        setErrorMsg("Impossible de vérifier le statut : " + (err.message || err));
+      }
+    } finally {
+      if (!isSilent) setCheckingStatus(false);
+    }
+  };
+
   if (!isOpen || !product) return null;
 
-  const countryConfig =
-    getPawaPayConfigForCountry(userCountry) || getPawaPayConfigForCountry("CD")!;
-
-  const handleSubmitPayment = async (e: React.FormEvent) => {
+  // Lancement du paiement Mobile Money PawaPay
+  const handleInitiatePawaPay = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
 
     if (!email) {
-      setErrorMsg("Veuillez renseigner votre adresse email pour recevoir votre accès.");
+      setErrorMsg("Veuillez renseigner votre adresse email pour la réception du produit.");
       return;
     }
 
-    if (method === "momo" && !phoneNumber) {
-      setErrorMsg("Veuillez saisir votre numéro Mobile Money pour la validation du paiement.");
+    if (!phoneNumber) {
+      setErrorMsg("Veuillez saisir votre numéro Mobile Money pour recevoir la demande de confirmation PIN.");
       return;
     }
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/digital-products/${product.id}/checkout`, {
+      const response = await fetch("/api/payments/pawapay-initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          paymentMethod: method === "momo" ? "momo" : method === "paypal" ? "paypal" : "crypto",
+          amount: finalAmountWithFee,
           phoneNumber,
-          operator: momoProvider,
+          carrier: momoProvider,
+          type: "DIGITAL_PRODUCT",
+          itemId: product.id,
+          country: userCountry,
+          currency: userCountry === "CD" ? "USD" : countryConfig.currency,
           userEmail: email,
           userName: name,
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Échec du paiement.");
+      const resData = await response.json();
+      if (!response.ok) {
+        throw new Error(resData.error || "Une erreur est survenue lors de l'initiation du paiement.");
       }
 
-      setCompleted(true);
-      const url = data.downloadUrl || `/api/digital-products/${product.id}/download`;
-      setDownloadUrl(url);
-      if (onSuccess) {
-        onSuccess(url);
-      }
+      setDepositId(resData.depositId);
+      setIsSandboxMode(!!resData.isSandbox);
+      setIsPendingPawaPay(true);
+      setCountdown(120);
     } catch (err: any) {
-      setErrorMsg(err.message || "Une erreur est survenue lors du paiement.");
+      setErrorMsg(err.message || "Erreur lors de la communication avec la passerelle Mobile Money.");
     } finally {
       setSubmitting(false);
     }
@@ -223,7 +317,6 @@ export function DigitalProductCheckoutModal({
 
   return (
     <>
-      {/* Script PayPal chargé de façon non bloquante */}
       <Script
         src={`https://www.paypal.com/sdk/js?client-id=${paypalClientId}&currency=USD`}
         strategy="lazyOnload"
@@ -231,16 +324,23 @@ export function DigitalProductCheckoutModal({
       />
 
       <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-zinc-900 via-teal-950 to-zinc-900 p-6 text-white flex items-center justify-between">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+          {/* Header Sécurisé */}
+          <div className="bg-gradient-to-r from-zinc-950 via-teal-950 to-zinc-950 p-5 text-white flex items-center justify-between border-b border-teal-500/20">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center text-teal-400 font-bold">
                 <Lock className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-extrabold text-white">Achat Sécurisé Immédiat</h3>
-                <p className="text-xs text-teal-200/70">Paiement fluide en Mobile Money, PayPal ou Crypto</p>
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  Achat Sécurisé & Accès Immédiat
+                  <span className="text-[10px] bg-teal-500/20 text-teal-300 font-bold px-2 py-0.5 rounded-full border border-teal-500/30">
+                    Officiel
+                  </span>
+                </h3>
+                <p className="text-xs text-teal-200/70">
+                  Paiement certifié PawaPay Mobile Money, PayPal & Crypto
+                </p>
               </div>
             </div>
             <button
@@ -251,9 +351,9 @@ export function DigitalProductCheckoutModal({
             </button>
           </div>
 
-          {/* Product Recap (Sans faux prix barré 25$) */}
-          <div className="p-5 bg-zinc-50 dark:bg-zinc-850 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-4">
-            <div className="w-14 h-16 rounded-xl overflow-hidden bg-zinc-200 shrink-0 border border-zinc-300 dark:border-zinc-700">
+          {/* Récapitulatif produit */}
+          <div className="p-4 bg-zinc-50 dark:bg-zinc-850 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-4">
+            <div className="w-14 h-16 rounded-xl overflow-hidden bg-zinc-200 shrink-0 border border-zinc-300 dark:border-zinc-700 shadow-sm">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={product.cover_image_url || "/placeholder-course.jpg"}
@@ -262,24 +362,32 @@ export function DigitalProductCheckoutModal({
               />
             </div>
             <div className="flex-1 min-w-0">
-              <span className="text-[10px] font-bold text-teal-600 uppercase tracking-wider">
-                {product.category || "Produit Digital"}
+              <span className="text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider">
+                {product.category || "E-book & Guide Numérique"}
               </span>
               <h4 className="text-sm font-bold text-zinc-900 dark:text-white truncate">
                 {product.title}
               </h4>
-              <p className="text-xs text-zinc-500 truncate">{product.file_name || "Document numérique téléchargeable"}</p>
+              <p className="text-xs text-zinc-500 truncate">
+                {product.file_name || "Document complet téléchargeable immédiatement"}
+              </p>
             </div>
             <div className="text-right shrink-0">
               <span className="text-lg font-black text-teal-600 dark:text-teal-400">
                 ${price.toFixed(2)}
               </span>
+              {method === "momo" && feeAmount > 0 && (
+                <span className="block text-[10px] text-zinc-400 font-medium">
+                  +${feeAmount.toFixed(2)} frais MoMo
+                </span>
+              )}
             </div>
           </div>
 
-          {/* Content */}
+          {/* Corps de la Modale */}
           <div className="p-6 overflow-y-auto space-y-5 flex-1">
             {completed ? (
+              /* ÉCRAN DE SUCCÈS AVEC BOUTON DE TÉLÉCHARGEMENT SÉCURISÉ */
               <div className="text-center py-6 space-y-4 animate-in zoom-in-95">
                 <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center mx-auto border-2 border-emerald-300 dark:border-emerald-700">
                   <CheckCircle2 className="w-8 h-8" />
@@ -289,7 +397,19 @@ export function DigitalProductCheckoutModal({
                     Paiement Validé avec Succès !
                   </h4>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto mt-1 leading-relaxed">
-                    Votre achat a été enregistré. Un email de confirmation a été envoyé à <strong>{email}</strong>.
+                    Votre achat a été authentifié. Un reçu avec votre lien d&apos;accès chiffré a été expédié à{" "}
+                    <strong>{email || "votre email"}</strong>.
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-900/50 rounded-2xl text-left text-xs space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-teal-800 dark:text-teal-300 font-bold">
+                    <ShieldCheck className="w-4 h-4 text-teal-600 shrink-0" />
+                    Téléchargement Privé Protégé
+                  </div>
+                  <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed text-[11px]">
+                    Votre lien de téléchargement est cryptographiquement signé et lié à votre transaction.
+                    Le fichier sera servi en flux direct sécurisé.
                   </p>
                 </div>
 
@@ -297,14 +417,77 @@ export function DigitalProductCheckoutModal({
                   <a
                     href={downloadUrl}
                     download
-                    className="w-full inline-flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white font-extrabold rounded-2xl shadow-xl shadow-teal-500/20 text-sm transition-all"
+                    className="w-full inline-flex items-center justify-center gap-2 py-4 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white font-extrabold rounded-2xl shadow-xl shadow-teal-500/25 text-sm transition-all hover:scale-[1.01] active:scale-[0.99]"
                   >
                     <Download className="w-5 h-5" /> Télécharger mon Produit Numérique
                   </a>
                 </div>
               </div>
+            ) : isPendingPawaPay ? (
+              /* ÉCRAN D'ATTENTE DE VALIDATION MOBILE MONEY (USSD / PIN) */
+              <div className="text-center py-6 space-y-5 animate-in fade-in">
+                <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
+                  <div className="absolute inset-0 rounded-full border-4 border-teal-500/20 border-t-teal-500 animate-spin" />
+                  <Smartphone className="w-8 h-8 text-teal-600 animate-pulse" />
+                </div>
+
+                <div className="space-y-1">
+                  <h4 className="text-base font-extrabold text-zinc-900 dark:text-white">
+                    Confirmation requise sur votre téléphone
+                  </h4>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed">
+                    Une notification de paiement de{" "}
+                    <strong className="text-teal-600 dark:text-teal-400">
+                      ${finalAmountWithFee.toFixed(2)} USD
+                    </strong>{" "}
+                    a été envoyée au <strong>{phoneNumber}</strong> ({momoProvider}).
+                  </p>
+                </div>
+
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-2xl text-left text-xs space-y-2">
+                  <p className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+                    Action requise :
+                  </p>
+                  <ol className="list-decimal list-inside space-y-1 text-zinc-600 dark:text-zinc-300 text-[11px] leading-relaxed">
+                    <li>Vérifiez l&apos;écran ou les SMS de votre téléphone.</li>
+                    <li>Saisissez votre code PIN secret Mobile Money pour valider.</li>
+                    <li>
+                      Cette fenêtre se mettra à jour automatiquement dès la confirmation.
+                    </li>
+                  </ol>
+                </div>
+
+                {isSandboxMode && (
+                  <div className="p-2.5 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl text-[11px] text-blue-700 dark:text-blue-300">
+                    Mode Test PawaPay (Sandbox) : Utilisez les numéros de test PawaPay pour simuler la validation.
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between text-xs text-zinc-400 pt-1">
+                  <span>Temps restant : {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, "0")}</span>
+                  <button
+                    type="button"
+                    onClick={() => checkPawaPayStatus(false)}
+                    disabled={checkingStatus}
+                    className="inline-flex items-center gap-1.5 text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${checkingStatus ? "animate-spin" : ""}`} />
+                    J&apos;ai validé mon code PIN
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsPendingPawaPay(false)}
+                  className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors pt-2 cursor-pointer"
+                >
+                  ← Changer de numéro ou de moyen de paiement
+                </button>
+              </div>
             ) : (
-              <form onSubmit={handleSubmitPayment} className="space-y-4">
+              /* FORMULAIRE DE PAIEMENT NORMAL */
+              <form onSubmit={handleInitiatePawaPay} className="space-y-4">
                 {errorMsg && (
                   <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
                     <AlertCircle className="w-4 h-4 shrink-0" />
@@ -312,7 +495,7 @@ export function DigitalProductCheckoutModal({
                   </div>
                 )}
 
-                {/* Méthodes de paiement : Mobile Money, PayPal, Crypto */}
+                {/* Choix du moyen de paiement */}
                 <div>
                   <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
                     Moyen de Paiement
@@ -321,36 +504,36 @@ export function DigitalProductCheckoutModal({
                     <button
                       type="button"
                       onClick={() => setMethod("momo")}
-                      className={`p-3 rounded-xl border-2 text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
+                      className={`p-3 rounded-2xl border-2 text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
                         method === "momo"
-                          ? "border-teal-500 bg-teal-50/50 dark:bg-teal-950/30 font-bold text-teal-700 dark:text-teal-300 shadow-sm"
-                          : "border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400"
+                          ? "border-teal-500 bg-teal-50/50 dark:bg-teal-950/30 font-bold text-teal-700 dark:text-teal-300 shadow-sm ring-2 ring-teal-500/20"
+                          : "border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300"
                       }`}
                     >
                       <Smartphone className="w-4 h-4 text-teal-600" />
-                      <span className="text-[11px]">Mobile Money</span>
+                      <span className="text-[11px]">PawaPay MoMo</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setMethod("paypal")}
-                      className={`p-3 rounded-xl border-2 text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
+                      className={`p-3 rounded-2xl border-2 text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
                         method === "paypal"
-                          ? "border-teal-500 bg-teal-50/50 dark:bg-teal-950/30 font-bold text-teal-700 dark:text-teal-300 shadow-sm"
-                          : "border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400"
+                          ? "border-teal-500 bg-teal-50/50 dark:bg-teal-950/30 font-bold text-teal-700 dark:text-teal-300 shadow-sm ring-2 ring-teal-500/20"
+                          : "border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300"
                       }`}
                     >
                       <PayPalLogo className="w-4 h-4 text-[#0070BA]" />
-                      <span className="text-[11px]">PayPal</span>
+                      <span className="text-[11px]">PayPal / Carte</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setMethod("crypto_sol")}
-                      className={`p-3 rounded-xl border-2 text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
-                        method.startsWith("crypto")
-                          ? "border-teal-500 bg-teal-50/50 dark:bg-teal-950/30 font-bold text-teal-700 dark:text-teal-300 shadow-sm"
-                          : "border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400"
+                      className={`p-3 rounded-2xl border-2 text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
+                        method === "crypto_sol"
+                          ? "border-teal-500 bg-teal-50/50 dark:bg-teal-950/30 font-bold text-teal-700 dark:text-teal-300 shadow-sm ring-2 ring-teal-500/20"
+                          : "border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300"
                       }`}
                     >
                       <Bitcoin className="w-4 h-4 text-amber-500" />
@@ -359,7 +542,7 @@ export function DigitalProductCheckoutModal({
                   </div>
                 </div>
 
-                {/* Champs Coordonnées */}
+                {/* Coordonnées Client */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
@@ -390,25 +573,7 @@ export function DigitalProductCheckoutModal({
                   </div>
                 </div>
 
-                {/* Détails Spécifiques PayPal */}
-                {method === "paypal" && (
-                  <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-zinc-800/80 border border-blue-200 dark:border-blue-900/50 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <PayPalLogo className="w-5 h-5 text-[#0070BA]" />
-                      <span className="text-xs font-bold text-zinc-900 dark:text-white">
-                        Réglement Sécurisé via PayPal
-                      </span>
-                    </div>
-                    <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                      Payez directement avec votre compte PayPal ou par carte bancaire via la passerelle sécurisée PayPal.
-                    </p>
-
-                    {/* Conteneur des Boutons PayPal officiels */}
-                    <div id="paypal-digital-button-container" className="relative z-10 w-full min-h-[48px] mt-2" />
-                  </div>
-                )}
-
-                {/* Détails Spécifiques MOMO */}
+                {/* Détails PawaPay Mobile Money */}
                 {method === "momo" && (
                   <div className="space-y-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -419,7 +584,7 @@ export function DigitalProductCheckoutModal({
                         <select
                           value={userCountry}
                           onChange={(e) => setUserCountry(e.target.value)}
-                          className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white"
+                          className="w-full px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white"
                         >
                           <option value="CD">🇨🇩 Congo (RDC)</option>
                           <option value="CG">🇨🇬 Congo (Brazzaville)</option>
@@ -440,7 +605,7 @@ export function DigitalProductCheckoutModal({
                         <select
                           value={momoProvider}
                           onChange={(e) => setMomoProvider(e.target.value)}
-                          className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white font-medium"
+                          className="w-full px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white font-medium"
                         >
                           {countryConfig?.operators?.map((op) => (
                             <option key={op.id} value={op.id}>
@@ -453,10 +618,10 @@ export function DigitalProductCheckoutModal({
 
                     <div>
                       <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
-                        Numéro de Téléphone {countryConfig.names?.[0] || countryConfig.countryCode}
+                        Numéro Mobile Money ({countryConfig.names?.[0] || countryConfig.countryCode})
                       </label>
                       <div className="flex">
-                        <span className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-r-0 border-zinc-200 dark:border-zinc-700 rounded-l-xl text-xs font-bold text-zinc-500 flex items-center">
+                        <span className="px-3.5 py-2.5 bg-zinc-100 dark:bg-zinc-800 border border-r-0 border-zinc-200 dark:border-zinc-700 rounded-l-xl text-xs font-bold text-zinc-600 dark:text-zinc-300 flex items-center">
                           {countryConfig.phonePrefix}
                         </span>
                         <input
@@ -465,50 +630,69 @@ export function DigitalProductCheckoutModal({
                           value={phoneNumber}
                           onChange={(e) => setPhoneNumber(e.target.value)}
                           placeholder="Ex: 812345678"
-                          className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-r-xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                          className="w-full px-3 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-r-xl text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                         />
                       </div>
                     </div>
                   </div>
                 )}
 
+                {/* Détails PayPal */}
+                {method === "paypal" && (
+                  <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-zinc-800/80 border border-blue-200 dark:border-blue-900/50 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <PayPalLogo className="w-5 h-5 text-[#0070BA]" />
+                      <span className="text-xs font-bold text-zinc-900 dark:text-white">
+                        Paiement Sécurisé via l&apos;API PayPal
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                      Payez directement avec votre compte PayPal ou carte bancaire. Dès l&apos;approbation, votre jeton d&apos;accès sécurisé sera débloqué.
+                    </p>
+
+                    <div id="paypal-digital-button-container" className="relative z-10 w-full min-h-[48px] mt-2" />
+                  </div>
+                )}
+
                 {/* Détails Crypto */}
-                {method.startsWith("crypto") && (
+                {method === "crypto_sol" && (
                   <div className="p-4 rounded-2xl bg-zinc-100 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 text-center space-y-3">
                     <p className="text-xs text-zinc-600 dark:text-zinc-300">
-                      Scannez ou envoyez l&apos;équivalent de <strong>${price.toFixed(2)} USD</strong> en crypto pour validation instantanée.
+                      Scannez ou envoyez l&apos;équivalent de <strong>${price.toFixed(2)} USD</strong> en Solana pour validation instantanée.
                     </p>
                     <div className="flex justify-center py-2">
                       <SolanaQrCode
-                        value={getSolanaPayUri({
-                          amount: price,
-                          label: "Ansella Digital Store",
-                          memo: `DP-${product.id.substring(0, 8).toUpperCase()}`,
-                        }) || SOLANA_TREASURY_ADDRESS}
-                        size={180}
+                        value={
+                          getSolanaPayUri({
+                            amount: price,
+                            label: "Ansella Digital Store",
+                            memo: `DP-${product.id.substring(0, 8).toUpperCase()}`,
+                          }) || SOLANA_TREASURY_ADDRESS
+                        }
+                        size={170}
                         showAnsellaLogo={true}
                       />
                     </div>
                   </div>
                 )}
 
-                {/* Bouton de paiement (uniquement affiché pour momo/crypto ou fallback) */}
-                {method !== "paypal" && (
+                {/* Bouton de confirmation PawaPay */}
+                {method === "momo" && (
                   <div className="pt-2">
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="w-full py-3.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white font-extrabold rounded-2xl shadow-xl shadow-teal-500/25 text-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      className="w-full py-4 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white font-extrabold rounded-2xl shadow-xl shadow-teal-500/25 text-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                     >
                       {submitting ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          Traitement de la commande...
+                          Initiation PawaPay en cours...
                         </>
                       ) : (
                         <>
                           <ShieldCheck className="w-4 h-4" />
-                          Payer ${price.toFixed(2)} & Télécharger
+                          Payer ${finalAmountWithFee.toFixed(2)} via Mobile Money
                         </>
                       )}
                     </button>
@@ -517,7 +701,7 @@ export function DigitalProductCheckoutModal({
 
                 <div className="text-[11px] text-zinc-400 text-center flex items-center justify-center gap-2 pt-1">
                   <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
-                  Paiement crypté SSL 256-bit · Accès immédiat garanti
+                  Passerelle certifiée SSL · Accès chiffré anti-fuite
                 </div>
               </form>
             )}
