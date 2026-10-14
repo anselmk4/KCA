@@ -8,6 +8,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Search, Loader2, BookOpen, Clock, ArrowRight, Star, Sparkles, GraduationCap } from "lucide-react";
 import { motion, Variants } from "framer-motion";
 import { supabase } from "@/lib/supabase/client";
+import { ColorfulContentCover } from "@/components/ui/ColorfulContentCover";
 
 /** Strip HTML tags and decode entities for clean text display */
 function stripHtml(html: string | null | undefined): string {
@@ -343,33 +344,21 @@ function CourseCard({ course }: { course: Course }) {
   return (
     <div className="group bg-white dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800/80 rounded-3xl overflow-hidden shadow-sm hover:border-teal-500/30 hover:shadow-[0_10px_30px_rgba(20,184,166,0.04)] transition-all duration-300 flex flex-col h-full">
       
-      {/* Banner / Image */}
-      <div className="relative h-48 w-full bg-slate-100 dark:bg-zinc-950 overflow-hidden">
-        {/* Fallback pattern */}
-        <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 via-indigo-500/10 to-blue-500/10 flex items-center justify-center">
-          <BookOpen className="w-12 h-12 text-zinc-300 dark:text-zinc-800 opacity-60" />
-        </div>
-        
-        {course.image && (
-          <Image
-            src={course.image}
-            alt={course.title}
-            fill
-            className="object-cover transition-transform duration-500 group-hover:scale-105 relative z-10"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          />
-        )}
-
-        {/* Overlay gradient */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent z-15" />
-
+      {/* Banner / Cover with Colorful Typographic Fallback */}
+      <ColorfulContentCover
+        title={course.title}
+        category={course.category}
+        coverUrl={course.image}
+        type="course"
+        heightClass="h-48"
+      >
         {/* Category badge */}
-        <span className="absolute top-4 left-4 z-20 px-3 py-1 rounded-full text-[10px] font-bold bg-white/95 dark:bg-zinc-950/90 text-teal-600 dark:text-teal-400 backdrop-blur-sm border border-zinc-200 dark:border-zinc-800 shadow-xs">
+        <span className="absolute top-4 left-4 pointer-events-auto px-3 py-1 rounded-full text-[10px] font-bold bg-white/95 dark:bg-zinc-950/90 text-teal-600 dark:text-teal-400 backdrop-blur-sm border border-zinc-200 dark:border-zinc-800 shadow-xs">
           {course.category}
         </span>
 
         {/* Level & Language badges */}
-        <div className="absolute top-4 right-4 z-20 flex items-center gap-1.5">
+        <div className="absolute top-4 right-4 pointer-events-auto flex items-center gap-1.5">
           <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-black/60 backdrop-blur-sm text-white border border-white/20 flex items-center gap-1">
             <span>{langInfo.flag}</span>
             <span>{langInfo.label}</span>
@@ -378,7 +367,7 @@ function CourseCard({ course }: { course: Course }) {
             {course.level}
           </span>
         </div>
-      </div>
+      </ColorfulContentCover>
 
       {/* Details content */}
       <div className="p-6 flex flex-col flex-1 space-y-4">

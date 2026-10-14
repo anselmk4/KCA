@@ -26,6 +26,7 @@ import {
 import { supabase } from "@/lib/supabase/client";
 import { sanitizeHtml } from "@/lib/sanitize";
 import { CourseReviewsSection } from "@/components/reviews";
+import { ColorfulContentCover } from "@/components/ui/ColorfulContentCover";
 
 // ─── Types ──────────────────────────────────────────────────
 interface CourseDetail {
@@ -300,15 +301,15 @@ export default function CourseDetailPage() {
 
             {/* Right: CTA card */}
             <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 text-center space-y-4 sticky top-24">
-              {course.thumbnail_url ? (
-                <div className="w-full h-48 rounded-xl overflow-hidden border border-white/15 shadow-lg mb-2">
-                  <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
-                </div>
-              ) : (
-                <div className="flex justify-center">
-                  <CourseHeroIcon category={course.categoryName || course.title} />
-                </div>
-              )}
+              <div className="w-full rounded-2xl overflow-hidden border border-white/15 shadow-xl mb-2">
+                <ColorfulContentCover
+                  title={course.title}
+                  category={course.categoryName}
+                  coverUrl={course.thumbnail_url}
+                  type="course"
+                  heightClass="h-48"
+                />
+              </div>
               <p className="text-zinc-400 text-xs uppercase tracking-widest font-bold">Course Price</p>
               <p className="text-4xl font-black">
                 {course.price === 0 ? "Free" : `$${course.price}`}

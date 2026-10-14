@@ -13,6 +13,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { DigitalProductCheckoutModal } from "@/components/digital-products/DigitalProductCheckoutModal";
 import { DigitalProductDetailModal } from "@/components/digital-products/DigitalProductDetailModal";
+import { ColorfulContentCover } from "@/components/ui/ColorfulContentCover";
 
 interface DigitalProductItem {
   id: string;
@@ -42,50 +43,14 @@ function ProductCover({
   category: string;
   coverUrl?: string;
 }) {
-  const [imgFailed, setImgFailed] = useState(false);
-
-  if (coverUrl && !imgFailed) {
-    return (
-      <div className="relative h-56 w-full bg-zinc-900 overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={coverUrl}
-          alt={title}
-          onError={() => setImgFailed(true)}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/80 via-transparent to-transparent pointer-events-none" />
-      </div>
-    );
-  }
-
-  // Couverture stylisée type E-book numérique de haute qualité (fallback propre sans image cassée)
   return (
-    <div className="relative h-56 w-full bg-gradient-to-br from-slate-900 via-teal-950 to-zinc-950 p-5 flex flex-col justify-between overflow-hidden border-b border-teal-500/20 select-none">
-      {/* Texture & Glow */}
-      <div className="absolute -top-10 -right-10 w-36 h-36 bg-teal-500/15 rounded-full blur-2xl pointer-events-none" />
-      <div className="absolute inset-y-0 left-0 w-3 bg-gradient-to-r from-teal-500/40 via-teal-500/10 to-transparent pointer-events-none" />
-      
-      {/* Haut : Badge icône */}
-      <div className="relative z-10 flex items-center justify-between">
-        <div className="w-9 h-9 rounded-xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center text-teal-300 shadow-inner">
-          <BookOpen className="w-5 h-5 text-teal-300" />
-        </div>
-        <span className="text-[10px] font-extrabold uppercase tracking-wider text-teal-400/80 bg-teal-950/60 px-2 py-0.5 rounded border border-teal-800/50">
-          PDF Édition
-        </span>
-      </div>
-
-      {/* Centre / Bas : Titre & catégorie de l'e-book */}
-      <div className="relative z-10 space-y-1.5 pl-2">
-        <p className="text-[10px] font-black uppercase tracking-wider text-teal-400 line-clamp-1">
-          {category}
-        </p>
-        <p className="text-sm font-bold text-white line-clamp-2 leading-snug drop-shadow-sm group-hover:text-teal-200 transition-colors">
-          {title}
-        </p>
-      </div>
-    </div>
+    <ColorfulContentCover
+      title={title}
+      category={category}
+      coverUrl={coverUrl}
+      type="digital_product"
+      heightClass="h-56"
+    />
   );
 }
 

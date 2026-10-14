@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Search, Clock, ArrowRight, Compass, Loader2, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
+import { ColorfulContentCover } from "@/components/ui/ColorfulContentCover";
 
 type DiscoverCourse = {
   id: string;
@@ -293,22 +294,21 @@ export default function DiscoverCoursesPage() {
                 href={`/dashboard/discover/${course.id}`}
                 className="group bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col cursor-pointer"
               >
-                {/* Cover Image */}
-                <div className="relative h-48 overflow-hidden">
-                  <Image
-                    src={courseImg}
-                    alt={course.title}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                  <span className="absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-semibold bg-white/90 dark:bg-zinc-900/90 text-zinc-800 dark:text-zinc-200 backdrop-blur-sm border border-zinc-200/20">
+                {/* Cover Image with Colorful Typographic Fallback */}
+                <ColorfulContentCover
+                  title={course.title}
+                  category={course.category || "Formation"}
+                  coverUrl={course.thumbnailUrl}
+                  type="course"
+                  heightClass="h-48"
+                >
+                  <span className="absolute top-4 left-4 pointer-events-auto px-3 py-1 rounded-full text-xs font-semibold bg-white/90 dark:bg-zinc-900/90 text-zinc-800 dark:text-zinc-200 backdrop-blur-sm border border-zinc-200/20">
                     {course.category || "Formation"}
                   </span>
-                  <span className="absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-bold bg-blue-600 text-white shadow-lg">
+                  <span className="absolute top-4 right-4 pointer-events-auto px-3 py-1 rounded-full text-xs font-bold bg-blue-600 text-white shadow-lg">
                     ${course.price}
                   </span>
-                </div>
+                </ColorfulContentCover>
 
                 {/* Content */}
                 <div className="p-6 flex flex-col flex-1">

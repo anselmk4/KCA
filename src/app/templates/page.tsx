@@ -9,6 +9,7 @@ import {
   BookOpen, Users, ArrowRight, Award, Flame,
   MapPin, Loader2, Sparkles, Star, GraduationCap, Globe
 } from "lucide-react";
+import { ColorfulContentCover } from "@/components/ui/ColorfulContentCover";
 
 interface Course {
   id: string;
@@ -211,30 +212,24 @@ export default function TemplatesPage() {
                     className="group bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-zinc-200/50 dark:hover:shadow-zinc-950/50 hover:-translate-y-1 transition-all duration-300 flex flex-col"
                   >
                     {/* Thumbnail */}
-                    <div className="relative aspect-video bg-zinc-100 dark:bg-zinc-800 overflow-hidden shrink-0">
-                      {course.thumbnail_url ? (
-                        <img
-                          src={course.thumbnail_url}
-                          alt={course.title}
-                          className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-teal-900/20 to-indigo-900/20">
-                          <BookOpen className="w-10 h-10 text-teal-600/40" />
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                      <div className="absolute top-3 left-3 flex gap-2">
+                    <ColorfulContentCover
+                      title={course.title}
+                      category={course.categories?.name || "General"}
+                      coverUrl={course.thumbnail_url}
+                      type="course"
+                      heightClass="h-44 sm:h-48"
+                    >
+                      <div className="absolute top-3 left-3 pointer-events-auto flex gap-2">
                         <span className="bg-white/90 dark:bg-zinc-950/90 backdrop-blur px-2.5 py-1 rounded-lg text-[10px] font-bold text-teal-700 dark:text-teal-400 border border-zinc-200/50 dark:border-zinc-700/50">
                           {course.categories?.name || "General"}
                         </span>
                       </div>
-                      <div className="absolute bottom-3 right-3">
+                      <div className="absolute bottom-3 right-3 pointer-events-auto">
                         <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${getLevelColor(course.level)} backdrop-blur`}>
                           {getLevelLabel(course.level)}
                         </span>
                       </div>
-                    </div>
+                    </ColorfulContentCover>
 
                     <div className="p-5 flex flex-col flex-1">
                       <h3 className="font-bold text-sm text-zinc-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors line-clamp-2 mb-2 leading-snug">

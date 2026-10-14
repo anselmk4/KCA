@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { DigitalProductCheckoutModal } from "@/components/digital-products/DigitalProductCheckoutModal";
 import { DigitalProductDetailModal } from "@/components/digital-products/DigitalProductDetailModal";
+import { ColorfulContentCover } from "@/components/ui/ColorfulContentCover";
 
 interface CreatorProfile {
   id: string;
@@ -505,22 +506,22 @@ export default function CreatorStorefrontPage({
                     href={`/courses/${c.slug || c.id}`}
                     className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800/90 overflow-hidden shadow-sm hover:shadow-xl hover:border-teal-500/50 transition-all flex flex-col group"
                   >
-                    <div className="relative h-48 w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={c.thumbnail_url || "/placeholder-course.jpg"}
-                        alt={c.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                      <div className="absolute top-3 left-3">
+                    <ColorfulContentCover
+                      title={c.title}
+                      category="Formation Vidéo"
+                      coverUrl={c.thumbnail_url}
+                      type="course"
+                      heightClass="h-48"
+                    >
+                      <div className="absolute top-3 left-3 pointer-events-auto">
                         <span className="px-3 py-1 rounded-full text-[10px] font-black bg-teal-600 text-white shadow-lg uppercase tracking-wider">
                           Formation Vidéo
                         </span>
                       </div>
-                      <div className="absolute top-3 right-3 bg-zinc-950/85 backdrop-blur-md text-amber-400 px-3 py-1 rounded-full text-xs font-black border border-amber-400/30">
+                      <div className="absolute top-3 right-3 pointer-events-auto bg-zinc-950/85 backdrop-blur-md text-amber-400 px-3 py-1 rounded-full text-xs font-black border border-amber-400/30">
                         ${Number(c.price).toFixed(2)} USD
                       </div>
-                    </div>
+                    </ColorfulContentCover>
 
                     <div className="p-5 flex-1 flex flex-col justify-between space-y-4 text-left">
                       <div>
@@ -581,23 +582,22 @@ export default function CreatorStorefrontPage({
                     key={prod.id}
                     className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800/90 overflow-hidden shadow-sm hover:shadow-xl hover:border-teal-500/50 transition-all flex flex-col group"
                   >
-                    {/* Cover image */}
-                    <div className="relative h-52 w-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={prod.cover_image_url || "/placeholder-course.jpg"}
-                        alt={prod.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                      <div className="absolute top-3 left-3">
+                    <ColorfulContentCover
+                      title={prod.title}
+                      category={prod.category || "E-book PDF"}
+                      coverUrl={prod.cover_image_url}
+                      type="digital_product"
+                      heightClass="h-52"
+                    >
+                      <div className="absolute top-3 left-3 pointer-events-auto">
                         <span className="px-3 py-1 rounded-full text-[10px] font-black bg-teal-600 text-white shadow-lg uppercase tracking-wider">
                           E-book PDF
                         </span>
                       </div>
-                      <div className="absolute top-3 right-3 bg-zinc-950/85 backdrop-blur-md text-amber-400 px-3 py-1 rounded-full text-xs font-black border border-amber-400/30">
+                      <div className="absolute top-3 right-3 pointer-events-auto bg-zinc-950/85 backdrop-blur-md text-amber-400 px-3 py-1 rounded-full text-xs font-black border border-amber-400/30">
                         ${Number(prod.price).toFixed(2)} USD
                       </div>
-                    </div>
+                    </ColorfulContentCover>
 
                     {/* Content */}
                     <div className="p-5 flex-1 flex flex-col justify-between space-y-4 text-left">

@@ -24,6 +24,7 @@ import {
 import { useLanguage } from "@/context/LanguageContext";
 import { DigitalProductDetailModal } from "@/components/digital-products/DigitalProductDetailModal";
 import { DigitalProductCheckoutModal } from "@/components/digital-products/DigitalProductCheckoutModal";
+import { ColorfulContentCover } from "@/components/ui/ColorfulContentCover";
 
 interface DigitalProduct {
   id: string;
@@ -78,56 +79,29 @@ function getFileBadge(product: DigitalProduct) {
 }
 
 function ProductCardCover({ product }: { product: DigitalProduct }) {
-  const [imgError, setImgError] = useState(false);
   const badge = getFileBadge(product);
   const BadgeIcon = badge.icon;
 
-  if (product.cover_image_url && !imgError) {
-    return (
-      <div className="relative h-52 w-full bg-zinc-900 overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={product.cover_image_url}
-          alt={product.title}
-          onError={() => setImgError(true)}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/80 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute top-3 left-3 z-10">
-          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-white shadow-lg ${badge.color}`}>
-            <BadgeIcon className="w-3 h-3" />
-            {badge.label}
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  // Fallback couverture numérique stylisée
   return (
-    <div className="relative h-52 w-full bg-gradient-to-br from-slate-900 via-teal-950 to-zinc-950 p-5 flex flex-col justify-between overflow-hidden border-b border-teal-500/20 select-none">
-      <div className="absolute -top-10 -right-10 w-36 h-36 bg-teal-500/15 rounded-full blur-2xl pointer-events-none" />
-      <div className="absolute inset-y-0 left-0 w-3 bg-gradient-to-r from-teal-500/40 via-teal-500/10 to-transparent pointer-events-none" />
-      
-      <div className="relative z-10 flex items-center justify-between">
+    <ColorfulContentCover
+      title={product.title}
+      category={product.category}
+      coverUrl={product.cover_image_url}
+      type="digital_product"
+      heightClass="h-52"
+    >
+      <div className="absolute top-3 left-3 pointer-events-auto">
         <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-white shadow-lg ${badge.color}`}>
           <BadgeIcon className="w-3 h-3" />
           {badge.label}
         </span>
-        <span className="text-[10px] font-bold text-teal-300 bg-teal-950/80 px-2 py-0.5 rounded border border-teal-800/60 uppercase tracking-widest">
+      </div>
+      <div className="absolute top-3 right-3 pointer-events-auto">
+        <span className="text-[10px] font-bold text-teal-300 bg-teal-950/80 px-2 py-0.5 rounded border border-teal-800/60 uppercase tracking-widest backdrop-blur-xs">
           Ressource Pro
         </span>
       </div>
-
-      <div className="relative z-10 space-y-1 pl-2">
-        <p className="text-[10px] font-black uppercase tracking-wider text-teal-400 line-clamp-1">
-          {product.category}
-        </p>
-        <p className="text-sm font-bold text-white line-clamp-2 leading-snug drop-shadow-sm group-hover:text-teal-200 transition-colors">
-          {product.title}
-        </p>
-      </div>
-    </div>
+    </ColorfulContentCover>
   );
 }
 

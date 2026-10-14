@@ -26,6 +26,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { CourseCreationWizardModal } from "@/components/courses/CourseCreationWizardModal";
 import { DigitalProductEditModal } from "@/components/digital-products/DigitalProductEditModal";
 import { DigitalProductShareModal } from "@/components/digital-products/DigitalProductShareModal";
+import { ColorfulContentCover } from "@/components/ui/ColorfulContentCover";
 
 type StatusFilter = "ALL" | "DRAFT" | "REVIEW" | "PUBLISHED" | "ARCHIVED";
 
@@ -621,14 +622,14 @@ export default function InstructorCoursesPage() {
                   key={prod.id}
                   className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col"
                 >
-                  <div className="relative h-44 w-full bg-zinc-100 dark:bg-zinc-800">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={prod.cover_image_url || "/placeholder-course.jpg"}
-                      alt={prod.title}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute top-3 left-3 flex gap-2">
+                  <ColorfulContentCover
+                    title={prod.title}
+                    category="PDF / EBOOK"
+                    coverUrl={prod.cover_image_url}
+                    type="digital_product"
+                    heightClass="h-44"
+                  >
+                    <div className="absolute top-3 left-3 pointer-events-auto flex gap-2">
                       <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-teal-600 text-white shadow-md">
                         PDF / EBOOK
                       </span>
@@ -636,10 +637,10 @@ export default function InstructorCoursesPage() {
                         {prod.status === "published" ? "Publié" : "Brouillon"}
                       </span>
                     </div>
-                    <div className="absolute top-3 right-3 bg-zinc-900/80 backdrop-blur-sm text-amber-400 px-2.5 py-1 rounded-full text-xs font-black border border-amber-400/30">
+                    <div className="absolute top-3 right-3 pointer-events-auto bg-zinc-900/80 backdrop-blur-sm text-amber-400 px-2.5 py-1 rounded-full text-xs font-black border border-amber-400/30">
                       ${Number(prod.price).toFixed(2)}
                     </div>
-                  </div>
+                  </ColorfulContentCover>
 
                   <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                     <div>
