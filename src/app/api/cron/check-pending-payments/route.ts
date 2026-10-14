@@ -266,7 +266,7 @@ export async function GET(req: NextRequest) {
                 price_paid: payment.amount,
                 payment_method: 'pawapay',
                 payment_status: 'COMPLETED',
-                transaction_id: depositId,
+                transaction_id: payment.id,
                 created_at: new Date().toISOString(),
               } as any, { onConflict: 'product_id,user_id' });
 
