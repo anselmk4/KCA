@@ -134,10 +134,32 @@ export async function GET(req: NextRequest) {
           totalRevenue += manualRev;
         }
       }
+    // 7. Fetch instructor's digital products & purchases
+    const { data: digitalProductsData } = await dbClient
+      .from('digital_products')
+      .select('id, title, price, status, sales_count')
+      .eq('author_id', user.id);
+
+    const digitalProducts = digitalProductsData || [];
+    const digitalProductIds = digitalProducts.map((p) => p.id);
+
+    let digitalPurchases: any[] = [];
+    if (digitalProductIds.length > 0) {
+      const { data: purchasesData } = await dbClient
+        .from('digital_product_purchases')
+        .select('id, product_id, user_id, price_paid, payment_status, created_at')
+        .in('product_id', digitalProductIds)
+        .eq('payment_status', 'COMPLETED');
+      digitalPurchases = purchasesData || [];
     }
 
-    const platformCommission = totalRevenue * planConfig.commissionRate;
-    const netRevenue = totalRevenue * planConfig.instructorShare;
+    const digitalSalesCount = digitalPurchases.length;
+    const digitalRevenue = digitalPurchases.reduce((sum, p) => sum + (Number(p.price_paid) || 0), 0);
+    const coursesRevenue = totalRevenue;
+    const totalCombinedRevenue = coursesRevenue + digitalRevenue;
+
+    const platformCommission = totalCombinedRevenue * planConfig.commissionRate;
+    const netRevenue = totalCombinedRevenue * planConfig.instructorShare;
 
     const hasServiceRole = !!(process.env.SUPABASE_SERVICE_ROLE_KEY && 
                               process.env.SUPABASE_SERVICE_ROLE_KEY !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
@@ -162,7 +184,12 @@ export async function GET(req: NextRequest) {
       avgRating,
       weeklyLabels: weeksLabels,
       weeklyEnrollments: weeklyInscriptions,
-      totalRevenue,
+      totalRevenue: totalCombinedRevenue,
+      coursesRevenue,
+      digitalRevenue,
+      digitalProductsCount: digitalProducts.length,
+      digitalSalesCount,
+      digitalProducts,
       platformCommission,
       netRevenue,
       hasServiceRole,

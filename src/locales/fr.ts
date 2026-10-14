@@ -58,7 +58,7 @@ export const fr = {
   },
   student: {
     sidebar: {
-      myCourses: "Mes formations",
+      myCourses: "Mes formations & achats",
       catalog: "Catalogue",
       certificates: "Certificats",
       billing: "Mes paiements",
@@ -87,8 +87,8 @@ export const fr = {
       progress: "Progression",
     },
     courses: {
-      title: "Mes Formations",
-      subtitle: "Suivez votre progression et accédez à vos cours.",
+      title: "Mes Formations & Achats",
+      subtitle: "Accédez à vos cours en ligne ainsi qu'à tous vos e-books et guides numériques acquis.",
       inProgress: "En cours",
       completed: "Terminées",
       available: "Formations disponibles",

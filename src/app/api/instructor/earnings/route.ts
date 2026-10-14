@@ -36,6 +36,18 @@ export async function GET(req: NextRequest) {
     }
 
     const courses = coursesData || [];
+    const courseIds = courses.map((c) => c.id);
+    const courseMap = new Map(courses.map((c) => [c.id, c]));
+
+    // Fetch instructor's digital products
+    const { data: digitalProductsData } = await dbClient
+      .from("digital_products")
+      .select("id, title, status, price")
+      .eq("author_id", user.id);
+
+    const digitalProducts = digitalProductsData || [];
+    const digitalProductIds = digitalProducts.map((p) => p.id);
+    const digitalProductMap = new Map(digitalProducts.map((p) => [p.id, p]));
 
     // Fetch instructor's payouts
     const { data: payoutsData } = await dbClient
@@ -46,19 +58,18 @@ export async function GET(req: NextRequest) {
 
     const payoutsList = payoutsData || [];
 
-    if (courses.length === 0) {
+    if (courses.length === 0 && digitalProducts.length === 0) {
       return NextResponse.json({
         plan: profile.plan || 'FREE',
         transactions: [],
         payouts: payoutsList,
         totalRevenue: 0,
+        coursesRevenue: 0,
+        digitalRevenue: 0,
         pendingRevenue: 0,
         uniqueStudentsCount: 0
       });
     }
-
-    const courseIds = courses.map((c) => c.id);
-    const courseMap = new Map(courses.map((c) => [c.id, c]));
 
     // 3. Fetch enrollments for these courses (including manual payments)
     const { data: enrollmentsData } = await (dbClient
@@ -124,7 +135,8 @@ export async function GET(req: NextRequest) {
             amount: Number(p.amount) || 0,
             status: normalizedStatus,
             date: p.paid_at || p.created_at || new Date().toISOString(),
-            method: p.provider || "CARTE"
+            method: p.provider || "CARTE",
+            itemType: "COURSE"
           };
         });
       }
@@ -168,24 +180,76 @@ export async function GET(req: NextRequest) {
           amount: remainingUnrecorded,
           status: "PAID",
           date: enr.enrolled_at || enr.created_at || new Date().toISOString(),
-          method: "PAIEMENT_MANUEL_DIRECT"
+          method: "PAIEMENT_MANUEL_DIRECT",
+          itemType: "COURSE"
         });
       }
     });
 
-    const allTransactions = [...recordedTransactions, ...manualTransactions];
+    // 6. Build digital product transactions from digital_product_purchases
+    let digitalTransactions: any[] = [];
+    if (digitalProductIds.length > 0) {
+      const { data: digitalPurchases } = await dbClient
+        .from('digital_product_purchases')
+        .select('id, product_id, user_id, price_paid, payment_method, payment_status, transaction_id, created_at')
+        .in('product_id', digitalProductIds)
+        .eq('payment_status', 'COMPLETED');
+
+      if (digitalPurchases && digitalPurchases.length > 0) {
+        const buyerIds = [...new Set(digitalPurchases.map((dp) => dp.user_id))];
+        const { data: buyerProfiles } = await dbClient
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', buyerIds);
+
+        const buyerMap = new Map(buyerProfiles?.map((b) => [b.id, b.full_name || b.email]) || []);
+
+        digitalTransactions = digitalPurchases.map((dp) => {
+          const product = digitalProductMap.get(dp.product_id);
+          const buyerName = buyerMap.get(dp.user_id) || "Client Acheteur";
+          return {
+            id: dp.id,
+            orderId: dp.transaction_id || `DIG-${dp.id.substring(0, 8)}`,
+            courseId: dp.product_id,
+            courseTitle: product?.title || "Produit Digital",
+            userId: dp.user_id,
+            studentName: buyerName,
+            amount: Number(dp.price_paid) || 0,
+            status: "PAID",
+            date: dp.created_at || new Date().toISOString(),
+            method: dp.payment_method || "MOBILE_MONEY",
+            itemType: "DIGITAL_PRODUCT"
+          };
+        });
+      }
+    }
+
+    const allTransactions = [...recordedTransactions, ...manualTransactions, ...digitalTransactions];
+    allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     // Keep ONLY transactions that are "PAID"
     const cleanTransactions = allTransactions.filter((t) => t.status === "PAID");
 
-    const totalRevenue = cleanTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
-    const uniqueStudentsCount = new Set(enrollmentsList.map((e: any) => e.student_id)).size;
+    const coursesRevenue = cleanTransactions
+      .filter((t) => t.itemType !== "DIGITAL_PRODUCT")
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+    const digitalRevenue = cleanTransactions
+      .filter((t) => t.itemType === "DIGITAL_PRODUCT")
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalRevenue = coursesRevenue + digitalRevenue;
+
+    const uniqueStudentsCount = new Set([
+      ...enrollmentsList.map((e: any) => e.student_id),
+      ...digitalTransactions.map((dt) => dt.userId)
+    ]).size;
 
     return NextResponse.json({
       plan: profile.plan || 'FREE',
       transactions: cleanTransactions,
       payouts: payoutsList,
       totalRevenue,
+      coursesRevenue,
+      digitalRevenue,
       pendingRevenue: 0,
       uniqueStudentsCount
     });

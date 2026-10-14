@@ -14,7 +14,10 @@ import {
   Loader2,
   Calendar,
   Award,
-  AlertCircle
+  AlertCircle,
+  FileText,
+  ShoppingBag,
+  ArrowUpRight
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
@@ -29,6 +32,14 @@ interface CourseStat {
   rating: number | null;
 }
 
+interface DigitalProductStat {
+  id: string;
+  title: string;
+  price: number;
+  status: string;
+  sales_count: number;
+}
+
 interface AnalyticsData {
   plan: string;
   courses: CourseStat[];
@@ -40,6 +51,11 @@ interface AnalyticsData {
   weeklyLabels: string[];
   weeklyEnrollments: number[];
   totalRevenue: number;
+  coursesRevenue?: number;
+  digitalRevenue?: number;
+  digitalProductsCount?: number;
+  digitalSalesCount?: number;
+  digitalProducts?: DigitalProductStat[];
   platformCommission: number;
   netRevenue: number;
 }
@@ -127,46 +143,46 @@ export default function AnalyticsPage() {
 
   const kpis = [
     {
-      label: "Chiffre d'Affaires",
+      label: "Chiffre d'Affaires Total",
       value: `${data.totalRevenue.toLocaleString("fr-FR")} $`,
       icon: CircleDollarSign,
       color: "text-blue-600 dark:text-blue-400",
       bg: "bg-blue-50 dark:bg-blue-900/20",
     },
     {
-      label: "Commission Plateforme",
-      value: `${data.platformCommission.toLocaleString("fr-FR")} $`,
-      icon: BadgePercent,
-      color: "text-amber-600 dark:text-amber-400",
-      bg: "bg-amber-50 dark:bg-amber-900/20",
+      label: "Revenu Formations",
+      value: `${(data.coursesRevenue ?? (data.totalRevenue - (data.digitalRevenue || 0))).toLocaleString("fr-FR")} $`,
+      icon: BookOpen,
+      color: "text-indigo-600 dark:text-indigo-400",
+      bg: "bg-indigo-50 dark:bg-indigo-900/20",
     },
     {
-      label: "Revenu Net",
-      value: `${data.netRevenue.toLocaleString("fr-FR")} $`,
-      icon: Wallet,
+      label: "Revenu Produits Digitaux",
+      value: `${(data.digitalRevenue || 0).toLocaleString("fr-FR")} $`,
+      icon: ShoppingBag,
       color: "text-emerald-600 dark:text-emerald-400",
       bg: "bg-emerald-50 dark:bg-emerald-900/20",
     },
     {
-      label: "Apprenants total",
-      value: data.totalStudents,
-      icon: Users,
+      label: "Revenu Net (après com.)",
+      value: `${data.netRevenue.toLocaleString("fr-FR")} $`,
+      icon: Wallet,
       color: "text-teal-600 dark:text-teal-400",
       bg: "bg-teal-50 dark:bg-teal-900/20",
     },
     {
-      label: "Cours créés",
-      value: data.courses.length,
-      icon: BookOpen,
-      color: "text-indigo-650 dark:text-indigo-400",
-      bg: "bg-indigo-50 dark:bg-indigo-900/20",
+      label: "Ventes Produits Digitaux",
+      value: `${data.digitalSalesCount || 0} vente${(data.digitalSalesCount || 0) > 1 ? "s" : ""}`,
+      icon: FileText,
+      color: "text-purple-600 dark:text-purple-400",
+      bg: "bg-purple-50 dark:bg-purple-900/20",
     },
     {
-      label: "Certifications",
-      value: data.completedCount,
-      icon: Award,
-      color: "text-rose-650 dark:text-rose-450",
-      bg: "bg-rose-50 dark:bg-rose-900/20",
+      label: "Apprenants inscrits",
+      value: data.totalStudents,
+      icon: Users,
+      color: "text-amber-600 dark:text-amber-400",
+      bg: "bg-amber-50 dark:bg-amber-900/20",
     },
   ];
 
@@ -181,7 +197,7 @@ export default function AnalyticsPage() {
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
             Compte : <span className="font-bold text-zinc-900 dark:text-zinc-200">{session?.name}</span> ({session?.email})
           </p>
-           <p className="text-xs text-zinc-450 dark:text-zinc-500 mt-0.5">Suivez les performances de vos formations et vos revenus en temps réel.</p>
+           <p className="text-xs text-zinc-450 dark:text-zinc-500 mt-0.5">Suivez les performances de vos formations, e-books et produits digitaux en temps réel.</p>
         </div>
         <span className="self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-850">
           Forfait actuel : {data.plan}
@@ -226,16 +242,16 @@ export default function AnalyticsPage() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-teal-650" />
-            <h2 className="font-semibold text-zinc-900 dark:text-white text-base">{t("student.payment.applyCoupon", "Inscriptions par semaine").toLowerCase().includes("appliqu") ? "Enrollments per week" : "Inscriptions par semaine"}</h2>
+            <h2 className="font-semibold text-zinc-900 dark:text-white text-base">Inscriptions aux formations par semaine</h2>
           </div>
           <span className="text-xs bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 px-2.5 py-1 rounded-full font-medium">
-            {t("student.payment.applyCoupon", "Dernières 7 semaines").toLowerCase().includes("appliqu") ? "Last 7 weeks" : "Dernières 7 semaines"}
+            Dernières 7 semaines
           </span>
         </div>
         
         {data.enrollmentsCount === 0 ? (
           <div className="py-12 text-center text-zinc-400 text-sm">
-            {t("student.payment.applyCoupon", "Aucune inscription").toLowerCase().includes("appliqu") ? "No enrollments recorded during this period." : "Aucune inscription enregistrée sur cette période."}
+            Aucune inscription enregistrée sur cette période.
           </div>
         ) : (
           <div className="flex items-end gap-1.5 sm:gap-3 h-40 pt-4">
@@ -255,20 +271,76 @@ export default function AnalyticsPage() {
         )}
       </div>
 
+      {/* Digital Products Performance Section */}
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-250 dark:border-zinc-800 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-zinc-150 dark:border-zinc-850 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-purple-600" />
+            <h2 className="font-semibold text-zinc-900 dark:text-white text-base">Performance des Produits Digitaux & E-books</h2>
+          </div>
+          <span className="text-xs bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2.5 py-1 rounded-full font-bold">
+            {data.digitalProducts?.length || 0} produit{(data.digitalProducts?.length || 0) > 1 ? "s" : ""}
+          </span>
+        </div>
+
+        {(!data.digitalProducts || data.digitalProducts.length === 0) ? (
+          <div className="py-12 text-center">
+            <ShoppingBag className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
+            <p className="text-zinc-500 text-sm">Aucun produit digital créé pour l&apos;instant.</p>
+            <p className="text-zinc-400 text-xs mt-1">Publiez des e-books, templates ou guides PDF pour générer des revenus passifs directs.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-zinc-150 dark:divide-zinc-850">
+            {data.digitalProducts.map((prod) => {
+              const productRev = (prod.sales_count || 0) * (prod.price || 0);
+              return (
+                <div key={prod.id} className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-zinc-900 dark:text-white text-sm truncate">{prod.title}</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      Prix unitaire : <span className="font-semibold text-zinc-700 dark:text-zinc-300">{prod.price} $</span>
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center gap-6 self-start sm:self-auto flex-wrap">
+                    <div className="text-right">
+                      <p className="text-xs font-bold text-zinc-900 dark:text-white">
+                        {prod.sales_count || 0} vente{(prod.sales_count || 0) > 1 ? "s" : ""}
+                      </p>
+                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                        {productRev.toLocaleString("fr-FR")} $ générés
+                      </p>
+                    </div>
+
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                      prod.status === "published" || prod.status === "PUBLISHED"
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                        : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                    }`}>
+                      {prod.status === "published" || prod.status === "PUBLISHED" ? "Publié" : "Brouillon"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Course performance table */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-250 dark:border-zinc-800 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-zinc-150 dark:border-zinc-850 flex items-center justify-between">
-          <h2 className="font-semibold text-zinc-900 dark:text-white text-base">{t("student.payment.applyCoupon", "Performance par cours").toLowerCase().includes("appliqu") ? "Course Performance" : "Performance par cours"}</h2>
+          <h2 className="font-semibold text-zinc-900 dark:text-white text-base">Performance par cours vidéo</h2>
           <span className="text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 px-2 py-0.5 rounded-full font-medium">
-            {data.courses.length} {t("student.payment.applyCoupon", "cours").toLowerCase().includes("appliqu") ? "courses" : "cours"}
+            {data.courses.length} cours
           </span>
         </div>
         
         {data.courses.length === 0 ? (
           <div className="py-12 text-center">
             <BookOpen className="w-10 h-10 text-zinc-300 mx-auto mb-3" />
-            <p className="text-zinc-505 text-sm">{t("student.payment.applyCoupon", "Aucun cours").toLowerCase().includes("appliqu") ? "No courses created yet." : "Aucun cours créé pour le moment."}</p>
-            <p className="text-zinc-400 text-xs mt-1">{t("student.payment.applyCoupon", "Créez votre première").toLowerCase().includes("appliqu") ? "Create your first course to view its statistics." : "Créez votre première formation pour voir ses statistiques."}</p>
+            <p className="text-zinc-500 text-sm">Aucun cours créé pour le moment.</p>
+            <p className="text-zinc-400 text-xs mt-1">Créez votre première formation pour voir ses statistiques.</p>
           </div>
         ) : (
           <div className="divide-y divide-zinc-150 dark:divide-zinc-855">
@@ -277,14 +349,14 @@ export default function AnalyticsPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-zinc-900 dark:text-white text-sm truncate">{course.title}</p>
                   <p className="text-xs text-zinc-400 mt-0.5">
-                    {course.category || "Général"} · {course.level || (t("student.payment.applyCoupon", "Tous niveaux").toLowerCase().includes("appliqu") ? "All levels" : "Tous niveaux")}
+                    {course.category || "Général"} · {course.level || "Tous niveaux"}
                   </p>
                 </div>
                 
                 <div className="flex items-center gap-6 self-start sm:self-auto flex-wrap">
                   <div className="flex items-center gap-1.5 text-xs text-zinc-505 dark:text-zinc-450">
                     <Users className="w-4 h-4 text-zinc-400" />
-                    <span>{t("student.payment.applyCoupon", "Inscrits").toLowerCase().includes("appliqu") ? "Enrolled" : "Inscrits"}</span>
+                    <span>Inscrits</span>
                   </div>
                   
                   <div className="flex items-center gap-1.5 text-xs text-zinc-505 dark:text-zinc-450">
@@ -299,7 +371,7 @@ export default function AnalyticsPage() {
                       ? "bg-zinc-100 text-zinc-505 dark:bg-zinc-850 dark:text-zinc-450"
                       : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                   }`}>
-                    {course.status === "PUBLISHED" ? (t("student.payment.applyCoupon", "Publé").toLowerCase().includes("appliqu") ? "Published" : "Publié") : course.status === "DRAFT" ? (t("student.payment.applyCoupon", "Brouillon").toLowerCase().includes("appliqu") ? "Draft" : "Brouillon") : (t("student.payment.applyCoupon", "Revue").toLowerCase().includes("appliqu") ? "Review" : "Revue")}
+                    {course.status === "PUBLISHED" ? "Publié" : course.status === "DRAFT" ? "Brouillon" : "Revue"}
                   </span>
                 </div>
               </div>

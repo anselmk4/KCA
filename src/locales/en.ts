@@ -60,7 +60,7 @@ export const en: LocaleType = {
   },
   student: {
     sidebar: {
-      myCourses: "My Courses",
+      myCourses: "My Courses & Purchases",
       catalog: "Catalog",
       certificates: "Certificates",
       billing: "My Payments",
@@ -89,8 +89,8 @@ export const en: LocaleType = {
       progress: "Progress",
     },
     courses: {
-      title: "My Formations",
-      subtitle: "Track your progress and access your courses.",
+      title: "My Courses & Purchases",
+      subtitle: "Access your online courses as well as all your purchased digital products.",
       inProgress: "In Progress",
       completed: "Completed",
       available: "Available Courses",

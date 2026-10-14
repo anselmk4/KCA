@@ -106,6 +106,7 @@ export const ALL_ADMIN_SIDEBAR_ITEMS: AdminSidebarItem[] = [
   { key: "team",         label: "Équipe Admin",          href: "/admin/team",            icon: "Users2",           requiredPermission: "admin:manageTeam" },
   { key: "users",        label: "Utilisateurs",          href: "/admin/users",           icon: "Users",            requiredPermission: "user:read" },
   { key: "courses",      label: "Validation Cours",      href: "/admin/courses",         icon: "BookOpen",         requiredPermission: "course:moderate" },
+  { key: "digital-products", label: "Produits Digitaux", href: "/admin/digital-products", icon: "FileText", requiredPermission: "course:moderate" },
   { key: "transactions", label: "Transactions",          href: "/admin/transactions",    icon: "CreditCard",       requiredPermission: "finance:read" },
   { key: "payouts",      label: "Commissions & Payouts", href: "/admin/payouts",         icon: "Coins",            requiredPermission: "payout:manage" },
   { key: "coupons",      label: "Coupons",               href: "/admin/coupons",         icon: "Ticket",           requiredPermission: "finance:write" },

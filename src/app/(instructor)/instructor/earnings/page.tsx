@@ -20,7 +20,10 @@ import {
   CheckCircle2,
   AlertCircle,
   Edit2,
-  Trash2
+  Trash2,
+  FileText,
+  ShoppingBag,
+  BookOpen
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { OperatorLogo } from "@/components/icons/PaymentLogos";
@@ -36,6 +39,7 @@ interface LocalTransaction {
   method: string;
   date: string;
   status: string;
+  itemType?: "COURSE" | "DIGITAL_PRODUCT";
 }
 
 interface LocalPayout {
@@ -144,10 +148,11 @@ export default function EarningsPage() {
   const [session, setSession] = useState<{ name: string; email: string; supabaseUrl?: string } | null>(null);
   const [hasServiceRole, setHasServiceRole] = useState(true);
   
-  // Date filtering state
+  // Date and type filtering state
   const [filterType, setFilterType] = useState<"daily" | "weekly" | "monthly" | "custom">("monthly");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  const [itemTypeFilter, setItemTypeFilter] = useState<"ALL" | "COURSE" | "DIGITAL_PRODUCT">("ALL");
 
   // Withdrawal modal state
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
@@ -238,6 +243,23 @@ export default function EarningsPage() {
 
   const platformFee = totalRevenue * commissionRate;
   const netRevenue = totalRevenue * instructorShare;
+
+  const coursesRevenue = useMemo(() => {
+    return paidTransactions
+      .filter((t) => t.itemType !== "DIGITAL_PRODUCT")
+      .reduce((acc, t) => acc + t.amount, 0);
+  }, [paidTransactions]);
+
+  const digitalRevenue = useMemo(() => {
+    return paidTransactions
+      .filter((t) => t.itemType === "DIGITAL_PRODUCT")
+      .reduce((acc, t) => acc + t.amount, 0);
+  }, [paidTransactions]);
+
+  const displayedTransactions = useMemo(() => {
+    if (itemTypeFilter === "ALL") return transactions;
+    return transactions.filter((t) => (t.itemType || "COURSE") === itemTypeFilter);
+  }, [transactions, itemTypeFilter]);
 
   // Pending revenue metric clean (set to 0 as pending transactions are cleaned)
   const pendingRevenue = 0;
@@ -625,14 +647,28 @@ export default function EarningsPage() {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {[
           {
-            label: "Revenus bruts",
+            label: "Revenus bruts totaux",
             value: `${totalRevenue.toLocaleString("fr-FR")} $`,
             icon: CircleDollarSign,
             color: "text-teal-650 dark:text-teal-400",
             bg: "bg-teal-50 dark:bg-teal-900/20",
+          },
+          {
+            label: "Ventes Formations",
+            value: `${coursesRevenue.toLocaleString("fr-FR")} $`,
+            icon: BookOpen,
+            color: "text-blue-600 dark:text-blue-400",
+            bg: "bg-blue-50 dark:bg-blue-900/20",
+          },
+          {
+            label: "Produits Digitaux",
+            value: `${digitalRevenue.toLocaleString("fr-FR")} $`,
+            icon: ShoppingBag,
+            color: "text-purple-600 dark:text-purple-400",
+            bg: "bg-purple-50 dark:bg-purple-900/20",
           },
           {
             label: `Commission (${Math.round(commissionRate * 100)}%)`,
@@ -645,33 +681,26 @@ export default function EarningsPage() {
             label: `Revenus nets`,
             value: `${netRevenue.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} $`,
             icon: Wallet,
-            color: "text-blue-650 dark:text-blue-400",
-            bg: "bg-blue-50 dark:bg-blue-900/20",
-          },
-          {
-            label: "En attente (Net)",
-            value: `${pendingRevenue.toLocaleString("fr-FR")} $`,
-            icon: Clock,
-            color: "text-amber-650 dark:text-amber-400",
-            bg: "bg-amber-50 dark:bg-amber-900/20",
-          },
-          {
-            label: "Inscriptions payantes",
-            value: uniqueStudentsCount,
-            icon: Users,
             color: "text-emerald-600 dark:text-emerald-450",
             bg: "bg-emerald-50 dark:bg-emerald-900/20",
+          },
+          {
+            label: "Clients & Apprenants",
+            value: uniqueStudentsCount,
+            icon: Users,
+            color: "text-amber-600 dark:text-amber-450",
+            bg: "bg-amber-50 dark:bg-amber-900/20",
           },
         ].map((kpi, i) => {
           const Icon = kpi.icon;
           return (
-            <div key={i} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-5">
-              <div className="flex items-start justify-between mb-3">
-                <div className={`p-2.5 rounded-xl ${kpi.bg}`}>
-                  <Icon className="w-5 h-5" />
+            <div key={i} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-4">
+              <div className="flex items-start justify-between mb-2.5">
+                <div className={`p-2 rounded-xl ${kpi.bg}`}>
+                  <Icon className="w-4 h-4" />
                 </div>
               </div>
-              <p className={`text-xl font-black ${kpi.color}`}>{kpi.value}</p>
+              <p className={`text-lg font-black ${kpi.color}`}>{kpi.value}</p>
               <p className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 dark:text-zinc-500 mt-1">{kpi.label}</p>
             </div>
           );
@@ -840,24 +869,61 @@ export default function EarningsPage() {
 
       {/* Transactions list */}
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-zinc-150 dark:border-zinc-850 flex items-center justify-between">
-          <h2 className="font-semibold text-zinc-900 dark:text-white text-base">Historique des ventes</h2>
-          <span className="text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-550 dark:text-zinc-400 px-2 py-0.5 rounded-full font-medium">
-            {transactions.length} transaction{transactions.length > 1 ? "s" : ""}
-          </span>
+        <div className="px-6 py-4 border-b border-zinc-150 dark:border-zinc-850 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="font-semibold text-zinc-900 dark:text-white text-base">Historique des ventes</h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Détail des achats de vos formations et produits digitaux.</p>
+          </div>
+          
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="inline-flex p-1 bg-zinc-100 dark:bg-zinc-800/80 rounded-xl text-xs font-semibold">
+              <button
+                onClick={() => setItemTypeFilter("ALL")}
+                className={`px-3 py-1.5 rounded-lg transition-all ${
+                  itemTypeFilter === "ALL"
+                    ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-xs font-bold"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                }`}
+              >
+                Tous ({transactions.length})
+              </button>
+              <button
+                onClick={() => setItemTypeFilter("COURSE")}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  itemTypeFilter === "COURSE"
+                    ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-xs font-bold"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5 text-blue-500" />
+                Formations ({transactions.filter(t => t.itemType !== "DIGITAL_PRODUCT").length})
+              </button>
+              <button
+                onClick={() => setItemTypeFilter("DIGITAL_PRODUCT")}
+                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  itemTypeFilter === "DIGITAL_PRODUCT"
+                    ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-xs font-bold"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5 text-purple-500" />
+                Produits Digitaux ({transactions.filter(t => t.itemType === "DIGITAL_PRODUCT").length})
+              </button>
+            </div>
+          </div>
         </div>
         
-        {transactions.length === 0 ? (
+        {displayedTransactions.length === 0 ? (
           <div className="py-12 text-center text-zinc-400 text-sm">
-            Aucun paiement enregistré pour l&apos;instant.
+            Aucun paiement enregistré pour ce filtre.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm min-w-[750px]">
               <thead className="bg-zinc-50 dark:bg-zinc-800/30 text-zinc-500 dark:text-zinc-400 text-xs font-semibold uppercase border-b border-zinc-100 dark:border-zinc-800">
                 <tr>
-                  <th className="px-6 py-3">Apprenant</th>
-                  <th className="px-6 py-3">Cours</th>
+                  <th className="px-6 py-3">Client / Apprenant</th>
+                  <th className="px-6 py-3">Article acheté</th>
                   <th className="px-6 py-3">Méthode</th>
                   <th className="px-6 py-3">Date</th>
                   <th className="px-6 py-3 text-right">Montant brut</th>
@@ -866,13 +932,29 @@ export default function EarningsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                {transactions.map((tx) => {
+                {displayedTransactions.map((tx) => {
                   const fee = tx.amount * commissionRate;
                   const net = tx.amount * instructorShare;
+                  const isDigital = tx.itemType === "DIGITAL_PRODUCT";
                   return (
                     <tr key={tx.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/10 transition-colors">
                       <td className="px-6 py-4 font-semibold text-zinc-900 dark:text-white">{tx.studentName}</td>
-                      <td className="px-6 py-4 text-xs text-zinc-500 truncate max-w-[200px]">{tx.courseTitle}</td>
+                      <td className="px-6 py-4 text-xs text-zinc-500 max-w-[280px]">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {isDigital ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                              <FileText className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                              Produit Digital
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                              <BookOpen className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                              Formation
+                            </span>
+                          )}
+                          <span className="font-medium text-zinc-800 dark:text-zinc-200 truncate">{tx.courseTitle}</span>
+                        </div>
+                      </td>
                       <td className="px-6 py-4 text-xs text-zinc-550 font-bold">{tx.method}</td>
                       <td className="px-6 py-4 text-xs text-zinc-500">{new Date(tx.date).toLocaleDateString("fr-FR")}</td>
                       <td className="px-6 py-4 text-right">${tx.amount.toFixed(2)}</td>
