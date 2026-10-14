@@ -148,18 +148,27 @@ export const ROLE_META: Record<string, RoleMeta> = {
 
 export const ADMIN_ROLES: Role[] = ["SUPER_ADMIN", "ADMIN", "MODERATOR", "ACADEMIC_ADMIN", "FINANCE_ADMIN", "SUPPORT_AGENT"];
 
-export const AUTHORIZED_SUPER_ADMIN_EMAILS = [
-  "ansel@kuettu.com",
-  "anselmk4@gmail.com",
-  (process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL || "").toLowerCase(),
-  (process.env.SUPER_ADMIN_EMAIL || "").toLowerCase(),
-  ...(process.env.SUPER_ADMIN_EMAILS || "").toLowerCase().split(",").map(e => e.trim()),
-].filter(Boolean);
+export const AUTHORIZED_SUPER_ADMIN_EMAILS: string[] = [];
 
 export function isAuthorizedSuperAdmin(email?: string | null): boolean {
   if (!email) return false;
   const cleanEmail = email.toLowerCase().trim();
-  return AUTHORIZED_SUPER_ADMIN_EMAILS.includes(cleanEmail);
+  const allowed = [
+    (process.env.SUPER_ADMIN_EMAIL || "").toLowerCase().trim(),
+    ...(process.env.SUPER_ADMIN_EMAILS || "")
+      .toLowerCase()
+      .split(",")
+      .map((e) => e.trim()),
+  ].filter(Boolean);
+
+  if (allowed.length > 0) {
+    return allowed.includes(cleanEmail);
+  }
+  // Safe fallback in development only
+  if (process.env.NODE_ENV !== "production") {
+    return ["admin@ansella.app", "ansel@kuettu.com"].includes(cleanEmail);
+  }
+  return false;
 }
 
 export type CourseStatus = "DRAFT" | "REVIEW" | "PUBLISHED" | "ARCHIVED";

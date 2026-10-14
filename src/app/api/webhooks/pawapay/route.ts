@@ -10,7 +10,18 @@ export async function POST(req: NextRequest) {
   try {
     // 1. Authenticate webhook request via secret token header or query parameter
     const webhookSecret = process.env.PAWAPAY_WEBHOOK_SECRET;
-    if (webhookSecret && webhookSecret !== 'your_pawapay_webhook_secret_here' && webhookSecret.trim() !== '') {
+    const isSecretConfigured = Boolean(
+      webhookSecret &&
+      webhookSecret !== 'your_pawapay_webhook_secret_here' &&
+      webhookSecret.trim() !== ''
+    );
+
+    if (process.env.NODE_ENV === 'production' && !isSecretConfigured) {
+      console.error('[webhook-pawapay] CRITICAL: PAWAPAY_WEBHOOK_SECRET is not configured in production. Rejecting unauthenticated webhook.');
+      return NextResponse.json({ error: 'Configuration de sécurité du serveur requise' }, { status: 500 });
+    }
+
+    if (isSecretConfigured) {
       const authHeader = req.headers.get('authorization') || req.headers.get('x-pawapay-token');
       const querySecret = req.nextUrl.searchParams.get('secret');
       const isValid =

@@ -6,6 +6,12 @@ export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
+
+    if (process.env.NODE_ENV === 'production' && !cronSecret) {
+      console.error('[cron-subscriptions] CRITICAL: CRON_SECRET is not configured in production.');
+      return NextResponse.json({ error: 'Configuration serveur incomplète' }, { status: 500 });
+    }
+
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
       console.warn('[cron-subscriptions] Unauthorized cron execution attempt blocked.');
       return NextResponse.json({ error: 'Accès non autorisé' }, { status: 401 });

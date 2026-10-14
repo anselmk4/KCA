@@ -116,6 +116,7 @@ function RegisterForm() {
   const { language } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryNext = searchParams.get("next");
 
   const [role, setRole] = useState<"INSTRUCTOR" | "STUDENT" | null>(null);
   const [step, setStep] = useState(1); // Steps 1–4
@@ -197,7 +198,6 @@ function RegisterForm() {
     const queryModule = searchParams.get("module")?.toLowerCase();
     const queryRole = searchParams.get("role")?.toUpperCase();
     const queryRef = searchParams.get("ref");
-    const queryNext = searchParams.get("next");
 
     // Store referral code in localStorage for use after signup
     if (queryRef) {
