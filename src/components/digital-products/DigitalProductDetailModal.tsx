@@ -13,8 +13,10 @@ import {
   Calendar,
   User,
   Sparkles,
+  Share2,
 } from "lucide-react";
 import { DigitalProductCheckoutModal } from "./DigitalProductCheckoutModal";
+import { DigitalProductShareModal } from "./DigitalProductShareModal";
 
 interface DigitalProduct {
   id: string;
@@ -51,6 +53,7 @@ export function DigitalProductDetailModal({
   onBuy,
 }: DigitalProductDetailModalProps) {
   const [showCheckout, setShowCheckout] = useState(false);
+  const [showShare, setShowShare] = useState(false);
 
   if (!isOpen || !product) return null;
 
@@ -197,16 +200,24 @@ export function DigitalProductDetailModal({
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowShare(true)}
+                className="px-3.5 py-2.5 rounded-2xl border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+                title="Partager ce produit"
+              >
+                <Share2 className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                <span>Partager</span>
+              </button>
               <button
                 onClick={onClose}
-                className="px-4 py-2.5 text-xs font-bold text-zinc-500 hover:text-zinc-800 dark:hover:text-white transition-colors cursor-pointer"
+                className="px-3.5 py-2.5 text-xs font-bold text-zinc-500 hover:text-zinc-800 dark:hover:text-white transition-colors cursor-pointer"
               >
                 Fermer
               </button>
               <button
                 onClick={handleOpenCheckout}
-                className="px-6 py-3 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white font-extrabold rounded-2xl shadow-xl shadow-teal-500/25 text-xs transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.02]"
+                className="px-5 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white font-extrabold rounded-2xl shadow-xl shadow-teal-500/25 text-xs transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.02]"
               >
                 <Download className="w-4 h-4" /> Acheter & Télécharger
               </button>
@@ -219,6 +230,12 @@ export function DigitalProductDetailModal({
         product={product}
         isOpen={showCheckout}
         onClose={() => setShowCheckout(false)}
+      />
+
+      <DigitalProductShareModal
+        product={product}
+        isOpen={showShare}
+        onClose={() => setShowShare(false)}
       />
     </>
   );

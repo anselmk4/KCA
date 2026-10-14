@@ -17,12 +17,15 @@ import {
   FileText,
   Download,
   ExternalLink,
+  Share2,
 } from "lucide-react";
 import Link from "next/link";
 import { getSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 import { CourseCreationWizardModal } from "@/components/courses/CourseCreationWizardModal";
+import { DigitalProductEditModal } from "@/components/digital-products/DigitalProductEditModal";
+import { DigitalProductShareModal } from "@/components/digital-products/DigitalProductShareModal";
 
 type StatusFilter = "ALL" | "DRAFT" | "REVIEW" | "PUBLISHED" | "ARCHIVED";
 
@@ -61,6 +64,8 @@ export default function InstructorCoursesPage() {
   const [myCourses, setMyCourses] = useState<any[]>([]);
   const [myDigitalProducts, setMyDigitalProducts] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<"courses" | "digital_products">("courses");
+  const [editingDigitalProduct, setEditingDigitalProduct] = useState<any>(null);
+  const [sharingDigitalProduct, setSharingDigitalProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
@@ -650,7 +655,21 @@ export default function InstructorCoursesPage() {
                         <ExternalLink className="w-3.5 h-3.5" /> Voir en boutique
                       </Link>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setSharingDigitalProduct(prod)}
+                          className="p-2 text-zinc-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20 rounded-lg transition-colors cursor-pointer"
+                          title="Partager (Lien direct & Réseaux sociaux)"
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setEditingDigitalProduct(prod)}
+                          className="p-2 text-zinc-500 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950/20 rounded-lg transition-colors cursor-pointer"
+                          title="Modifier les métadonnées (titre, prix, couverture, description)"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
                         <a
                           href={prod.file_url}
                           target="_blank"
@@ -904,6 +923,25 @@ export default function InstructorCoursesPage() {
           </div>
         </div>
       )}
+
+      {/* Digital Product Edit Modal */}
+      <DigitalProductEditModal
+        product={editingDigitalProduct}
+        isOpen={!!editingDigitalProduct}
+        onClose={() => setEditingDigitalProduct(null)}
+        onSuccess={(updated) => {
+          setMyDigitalProducts((prev) =>
+            prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
+          );
+        }}
+      />
+
+      {/* Digital Product Share Modal */}
+      <DigitalProductShareModal
+        product={sharingDigitalProduct}
+        isOpen={!!sharingDigitalProduct}
+        onClose={() => setSharingDigitalProduct(null)}
+      />
     </div>
   );
 }

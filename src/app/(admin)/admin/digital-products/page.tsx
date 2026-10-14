@@ -18,8 +18,12 @@ import {
   User,
   Layers,
   Sparkles,
-  AlertTriangle
+  AlertTriangle,
+  Share2,
+  Edit3
 } from "lucide-react";
+import { DigitalProductEditModal } from "@/components/digital-products/DigitalProductEditModal";
+import { DigitalProductShareModal } from "@/components/digital-products/DigitalProductShareModal";
 
 interface AuthorInfo {
   full_name: string;
@@ -61,6 +65,8 @@ export default function AdminDigitalProductsPage() {
   const [activeTab, setActiveTab] = useState<"ALL" | "PUBLISHED" | "DRAFT">("ALL");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [editingProduct, setEditingProduct] = useState<AdminDigitalProduct | null>(null);
+  const [sharingProduct, setSharingProduct] = useState<AdminDigitalProduct | null>(null);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -485,6 +491,24 @@ export default function AdminDigitalProductsPage() {
                       {/* Actions */}
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Share button */}
+                          <button
+                            onClick={() => setSharingProduct(p)}
+                            className="p-1.5 rounded-lg text-zinc-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20 transition-colors"
+                            title="Partager (Lien direct & Réseaux sociaux)"
+                          >
+                            <Share2 className="w-4 h-4" />
+                          </button>
+
+                          {/* Edit button */}
+                          <button
+                            onClick={() => setEditingProduct(p)}
+                            className="p-1.5 rounded-lg text-zinc-500 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950/20 transition-colors"
+                            title="Modifier (Titre, prix, couverture, description)"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+
                           {/* Toggle publish button */}
                           <button
                             onClick={() => handleToggleStatus(p)}
@@ -528,6 +552,25 @@ export default function AdminDigitalProductsPage() {
           </div>
         )}
       </div>
+
+      {/* Digital Product Edit Modal */}
+      <DigitalProductEditModal
+        product={editingProduct}
+        isOpen={!!editingProduct}
+        onClose={() => setEditingProduct(null)}
+        onSuccess={(updated) => {
+          setProducts((prev) =>
+            prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
+          );
+        }}
+      />
+
+      {/* Digital Product Share Modal */}
+      <DigitalProductShareModal
+        product={sharingProduct}
+        isOpen={!!sharingProduct}
+        onClose={() => setSharingProduct(null)}
+      />
     </div>
   );
 }

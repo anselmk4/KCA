@@ -162,6 +162,24 @@ export default function StoreCatalogPage() {
     fetchProducts();
   }, []);
 
+  // Auto-open product detail when opened via a shared link (?product=... or ?id=...)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const targetId = params.get("product") || params.get("id");
+      if (targetId) {
+        fetch(`/api/digital-products/${targetId}`)
+          .then((r) => r.json())
+          .then((data) => {
+            if (data?.product) {
+              setSelectedDetail(data.product);
+            }
+          })
+          .catch((err) => console.warn("[Store] Error loading direct product:", err));
+      }
+    }
+  }, []);
+
   const filteredProducts = useMemo(() => {
     return products
       .filter((p) => {
