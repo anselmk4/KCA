@@ -134,6 +134,8 @@ export async function GET(req: NextRequest) {
           totalRevenue += manualRev;
         }
       }
+    }
+
     // 7. Fetch instructor's digital products & purchases
     const { data: digitalProductsData } = await dbClient
       .from('digital_products')
