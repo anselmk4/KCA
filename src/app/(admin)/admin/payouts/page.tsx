@@ -281,14 +281,16 @@ export default function AdminPayoutsPage() {
             .select('id, title, author_id')
             .in('id', dpIds);
 
-          const dpProductMap = new Map((dpProducts || []).map((p: any) => [p.id, p]));
+          const dpProductMap = new Map<string, any>(
+            ((dpProducts as any[]) || []).map((p: any) => [p.id, p])
+          );
 
           dpPurchases.forEach((dp: any) => {
             const amount = Number(dp.price_paid) || 0;
             computedTotalSales += amount;
 
-            const product = dpProductMap.get(dp.product_id);
-            const authorId = product?.author_id || "";
+            const product: any = dpProductMap.get(dp.product_id);
+            const authorId: string = product?.author_id || "";
             const instPlan = planMap.get(authorId) || "FREE";
             const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;
 
