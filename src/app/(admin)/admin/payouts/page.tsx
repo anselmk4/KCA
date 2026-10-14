@@ -269,8 +269,14 @@ export default function AdminPayoutsPage() {
           .eq('payment_status', 'COMPLETED');
 
         if (dpPurchases && dpPurchases.length > 0) {
-          const dpIds = [...new Set(dpPurchases.map((dp: any) => dp.product_id).filter(Boolean))];
-          const { data: dpProducts } = await supabase
+          const dpIds: string[] = [
+            ...new Set(
+              dpPurchases
+                .map((dp: any) => dp.product_id)
+                .filter((id: any): id is string => Boolean(id))
+            ),
+          ];
+          const { data: dpProducts } = await (supabase as any)
             .from('digital_products')
             .select('id, title, author_id')
             .in('id', dpIds);

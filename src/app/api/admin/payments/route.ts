@@ -137,31 +137,39 @@ export async function GET(req: NextRequest) {
       : { data: [] };
 
     const courseMap = new Map(courses?.map((c) => [c.id, c]) || []);
-    const instructorIds = [...new Set(courses?.map((c) => c.instructor_id).filter(Boolean) || [])];
+    const instructorIds: string[] = [
+      ...new Set(
+        (courses?.map((c) => c.instructor_id) || []).filter((id): id is string => Boolean(id))
+      ),
+    ];
 
     // 4b. Fetch Digital Products for payments where method contains DIGITAL_PRODUCT
-    const digitalProductIds = [
+    const digitalProductIds: string[] = [
       ...new Set(
         rawPayments
           .map((p) => {
             const parts = (p.method || "").split("::");
             return parts[1] === "DIGITAL_PRODUCT" ? parts[2] : null;
           })
-          .filter(Boolean)
+          .filter((id): id is string => Boolean(id))
       ),
     ];
 
     const { data: digitalProducts } = digitalProductIds.length > 0
-      ? await supabaseAdmin
+      ? await (supabaseAdmin as any)
           .from("digital_products")
           .select("id, title, author_id, price")
           .in("id", digitalProductIds)
       : { data: [] };
 
     const digitalProductMap = new Map((digitalProducts || []).map((dp: any) => [dp.id, dp]));
-    const dpAuthorIds = (digitalProducts || []).map((dp: any) => dp.author_id).filter(Boolean);
+    const dpAuthorIds: string[] = (digitalProducts || [])
+      .map((dp: any) => dp.author_id)
+      .filter((id: any): id is string => Boolean(id));
 
-    const allInstructorIds = [...new Set([...instructorIds, ...dpAuthorIds])];
+    const allInstructorIds: string[] = [
+      ...new Set([...instructorIds, ...dpAuthorIds]),
+    ].filter((id): id is string => Boolean(id));
 
     const { data: instProfiles } = allInstructorIds.length > 0
       ? await supabaseAdmin
