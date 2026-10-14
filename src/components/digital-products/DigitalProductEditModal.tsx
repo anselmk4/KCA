@@ -1,17 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Image from "next/image";
 import {
   X,
   FileText,
-  DollarSign,
-  Image as ImageIcon,
-  CheckCircle2,
   AlertCircle,
   Loader2,
-  Sparkles,
-  Layers,
   Save,
 } from "lucide-react";
 import { CATEGORIES_LIST, validateDigitalProductPrice } from "@/lib/digital-products-pricing";

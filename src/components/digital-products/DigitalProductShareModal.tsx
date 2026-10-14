@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Image from "next/image";
 import {
   X,
   Share2,
@@ -9,10 +8,8 @@ import {
   Check,
   Send,
   MessageCircle,
-  ExternalLink,
   Mail,
   FileText,
-  DollarSign
 } from "lucide-react";
 
 export interface DigitalProductToShare {

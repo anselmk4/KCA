@@ -9,6 +9,22 @@
 
 export const MAX_EBOOK_PRICE = 25.0;
 
+export const CATEGORIES_LIST = [
+  "E-books & Guides PDF",
+  "Logiciels & Scripts (ZIP / Code)",
+  "Modèles & Templates (Notion, Figma, Canva, Excel)",
+  "Prompts & Datasets IA",
+  "Packs Graphiques & Médias",
+  "Blockchain, Web3 & Crypto",
+  "Intelligence Artificielle & Data",
+  "Développement Web & Mobile",
+  "Fintech, Trading & Économie",
+  "Marketing & Entrepreneuriat",
+  "Autre Ressource Digitale",
+];
+
+export const DIGITAL_PRODUCT_CATEGORIES = CATEGORIES_LIST;
+
 /**
  * Détecte si le produit digital est un E-book ou un guide PDF
  */
