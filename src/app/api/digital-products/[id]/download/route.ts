@@ -228,7 +228,8 @@ export async function GET(
     }
 
     // 6. Renvoyer le fichier en flux binaire direct avec en-têtes stricts anti-fuite
-    return new NextResponse(fileBuffer, {
+    const uint8Array = new Uint8Array(fileBuffer);
+    return new NextResponse(uint8Array, {
       status: 200,
       headers: {
         "Content-Type": detectedMimeType,
