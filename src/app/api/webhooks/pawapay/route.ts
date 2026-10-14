@@ -421,7 +421,7 @@ export async function POST(req: NextRequest) {
 
           // Enregistrer dans la table transactions générale
           try {
-            await supabaseAdmin.from('transactions').insert({
+            await (supabaseAdmin as any).from('transactions').insert({
               user_id: payment.user_id,
               amount: payment.amount,
               course_id: itemId,
