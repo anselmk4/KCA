@@ -104,9 +104,11 @@ export async function POST(req: NextRequest) {
     console.log(`[paypal-capture-order] Parsed customId metadata -> Type: ${type}, ItemID: ${itemId}, MetadataUserID: ${metadataUserId}`);
 
     // If type is COURSE or INSTRUCTOR_PLAN, a user session is strictly required
-    if (type !== "DIGITAL_PRODUCT" && (!user || metadataUserId !== user.id)) {
-      console.error(`[paypal-capture-order] Security violation. metadataUserId (${metadataUserId}) !== authenticated user.id (${user?.id})`);
-      return NextResponse.json({ error: "Conflit d'utilisateur de transaction détecté." }, { status: 403 });
+    if (type !== "DIGITAL_PRODUCT") {
+      if (!user || metadataUserId !== user.id) {
+        console.error(`[paypal-capture-order] Security violation. metadataUserId (${metadataUserId}) !== authenticated user.id (${user?.id})`);
+        return NextResponse.json({ error: "Conflit d'utilisateur de transaction détecté." }, { status: 403 });
+      }
     }
 
     const captureId = purchaseUnit?.payments?.captures?.[0]?.id || crypto.randomUUID();
@@ -115,6 +117,9 @@ export async function POST(req: NextRequest) {
 
     // 1. Process COURSE Payment
     if (type === "COURSE") {
+      if (!user) {
+        return NextResponse.json({ error: "Non authentifié pour l'achat de formation." }, { status: 401 });
+      }
       const dbOrderId = crypto.randomUUID();
       const paymentId = crypto.randomUUID();
 
@@ -281,6 +286,9 @@ export async function POST(req: NextRequest) {
 
     // 2. Process INSTRUCTOR_PLAN Subscription Upgrade
     if (type === "INSTRUCTOR_PLAN") {
+      if (!user) {
+        return NextResponse.json({ error: "Non authentifié pour l'abonnement formateur." }, { status: 401 });
+      }
       const planName = itemId.toUpperCase();
       const dbOrderId = crypto.randomUUID();
       const paymentId = crypto.randomUUID();
