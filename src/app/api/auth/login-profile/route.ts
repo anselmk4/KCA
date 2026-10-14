@@ -75,7 +75,29 @@ export async function POST(req: NextRequest) {
       if (name) roleNames.push(name);
     });
 
-    if (roleNames.includes('SUPER_ADMIN')) role = 'SUPER_ADMIN';
+    const userEmail = profile.email || email || '';
+    const { isAuthorizedSuperAdmin } = await import("@/lib/rbac");
+    const isOwner = isAuthorizedSuperAdmin(userEmail);
+
+    if (isOwner) {
+      role = 'SUPER_ADMIN';
+      needsRole = false;
+      try {
+        const { data: superAdminRole } = await supabaseAdmin
+          .from('roles')
+          .select('id')
+          .eq('name', 'SUPER_ADMIN')
+          .single();
+        if (superAdminRole && !userRoles?.some((ur: any) => ur.role_id === superAdminRole.id)) {
+          await supabaseAdmin.from('user_roles').upsert(
+            { user_id: userId, role_id: superAdminRole.id },
+            { onConflict: 'user_id,role_id', ignoreDuplicates: true }
+          );
+        }
+      } catch (e) {
+        console.warn('[login-profile] auto-assign super admin error:', e);
+      }
+    } else if (roleNames.includes('SUPER_ADMIN')) role = 'SUPER_ADMIN';
     else if (roleNames.includes('ADMIN')) role = 'ADMIN';
     else if (roleNames.includes('FINANCE_ADMIN')) role = 'FINANCE_ADMIN';
     else if (roleNames.includes('ACADEMIC_ADMIN')) role = 'ACADEMIC_ADMIN';

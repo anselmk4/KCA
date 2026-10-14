@@ -16,6 +16,14 @@ BEGIN
   END IF;
 END $$;
 
+-- La table ROLES doit être lisible pour permettre les jointures de vérification de session
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'roles' AND policyname = 'Authenticated users can read roles') THEN
+    CREATE POLICY "Authenticated users can read roles" ON public.roles FOR SELECT TO authenticated USING (true);
+  END IF;
+END $$;
+
 
 -- 2. Sécurisation de la table CERTIFICATES
 -- Empêche la génération directe et frauduleuse de certificats par les étudiants

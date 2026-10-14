@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isAuthorizedSuperAdmin } from '@/lib/rbac';
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -66,7 +67,8 @@ export async function proxy(request: NextRequest) {
 
       const roleNames: string[] = (userRoles || []).map((ur: any) => ur.roles?.name).filter(Boolean);
 
-      const isAdmin = roleNames.some(r =>
+      const isSuperAdmin = isAuthorizedSuperAdmin(user.email);
+      const isAdmin = isSuperAdmin || roleNames.some(r =>
         ['SUPER_ADMIN', 'ADMIN', 'FINANCE_ADMIN', 'ACADEMIC_ADMIN', 'SUPPORT_AGENT'].includes(r)
       );
       const isInstructor = roleNames.some(r =>
@@ -92,7 +94,8 @@ export async function proxy(request: NextRequest) {
 
       const roleNames: string[] = (userRoles || []).map((ur: any) => ur.roles?.name).filter(Boolean);
 
-      const isAdmin = roleNames.some(r =>
+      const isSuperAdmin = isAuthorizedSuperAdmin(user.email);
+      const isAdmin = isSuperAdmin || roleNames.some(r =>
         ['SUPER_ADMIN', 'ADMIN', 'FINANCE_ADMIN', 'ACADEMIC_ADMIN', 'SUPPORT_AGENT'].includes(r)
       );
       const isInstructor = roleNames.some(r =>

@@ -154,21 +154,19 @@ export function isAuthorizedSuperAdmin(email?: string | null): boolean {
   if (!email) return false;
   const cleanEmail = email.toLowerCase().trim();
   const allowed = [
+    "ansel@kuettu.com",
+    "anselmk4@gmail.com",
+    "admin@kuettu.com",
+    "admin@ansella.app",
     (process.env.SUPER_ADMIN_EMAIL || "").toLowerCase().trim(),
+    (process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL || "").toLowerCase().trim(),
     ...(process.env.SUPER_ADMIN_EMAILS || "")
       .toLowerCase()
       .split(",")
       .map((e) => e.trim()),
   ].filter(Boolean);
 
-  if (allowed.length > 0) {
-    return allowed.includes(cleanEmail);
-  }
-  // Safe fallback in development only
-  if (process.env.NODE_ENV !== "production") {
-    return ["admin@ansella.app", "ansel@kuettu.com"].includes(cleanEmail);
-  }
-  return false;
+  return allowed.includes(cleanEmail);
 }
 
 export type CourseStatus = "DRAFT" | "REVIEW" | "PUBLISHED" | "ARCHIVED";

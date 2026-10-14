@@ -14,6 +14,46 @@ export async function GET(req: NextRequest) {
       .select("roles!inner(name)")
       .eq("user_id", user.id) as any;
 
+    const { isAuthorizedSuperAdmin } = await import("@/lib/rbac");
+    const isOwner = isAuthorizedSuperAdmin(user.email);
+
+    // If user is authorized Super Admin, ensure they have the role in DB and return SUPER_ADMIN
+    if (isOwner) {
+      try {
+        const { data: superAdminRole } = await supabaseAdmin
+          .from("roles")
+          .select("id")
+          .eq("name", "SUPER_ADMIN")
+          .single();
+
+        if (superAdminRole) {
+          await supabaseAdmin
+            .from("user_roles")
+            .upsert(
+              { user_id: user.id, role_id: superAdminRole.id },
+              { onConflict: "user_id,role_id", ignoreDuplicates: true }
+            );
+        }
+      } catch (err) {
+        console.warn("[/api/admin/me] Error ensuring super admin role:", err);
+      }
+
+      const { data: perms } = await (supabaseAdmin
+        .from("admin_permissions" as any)
+        .select("granted_permissions, revoked_permissions")
+        .eq("user_id", user.id)
+        .maybeSingle() as any);
+
+      return NextResponse.json({
+        role: "SUPER_ADMIN",
+        userId: user.id,
+        email: user.email,
+        name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Admin",
+        grantedPermissions: perms?.granted_permissions || [],
+        revokedPermissions: perms?.revoked_permissions || [],
+      });
+    }
+
     if (rolesErr || !data || data.length === 0) {
       return NextResponse.json({ role: "STUDENT", userId: user.id });
     }
@@ -26,16 +66,13 @@ export async function GET(req: NextRequest) {
     }
 
     // Security Gate: strictly restrict SUPER_ADMIN to whitelisted owner emails
-    const { isAuthorizedSuperAdmin } = await import("@/lib/rbac");
     if (resolvedRole === "SUPER_ADMIN" && !isAuthorizedSuperAdmin(user.email)) {
       console.warn(`[SECURITY] Unauthorized SUPER_ADMIN access blocked for ${user.email}. Demoting.`);
-      // Remove rogue SUPER_ADMIN role assignment in DB
       const { data: superAdminRole } = await supabaseAdmin.from("roles").select("id").eq("name", "SUPER_ADMIN").single();
       if (superAdminRole) {
         await supabaseAdmin.from("user_roles").delete().eq("user_id", user.id).eq("role_id", superAdminRole.id);
       }
       
-      // Determine if they are INSTRUCTOR or STUDENT
       if (names.includes("INSTRUCTOR")) {
         resolvedRole = "INSTRUCTOR";
       } else if (names.includes("ADMIN")) {
