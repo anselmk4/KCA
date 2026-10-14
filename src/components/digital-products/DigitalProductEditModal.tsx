@@ -1,12 +1,17 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   X,
   FileText,
   AlertCircle,
   Loader2,
   Save,
+  Upload,
+  Image as ImageIcon,
+  Trash2,
+  Check,
+  RefreshCw,
 } from "lucide-react";
 import { CATEGORIES_LIST, validateDigitalProductPrice } from "@/lib/digital-products-pricing";
 
@@ -43,8 +48,12 @@ export function DigitalProductEditModal({
   const [status, setStatus] = useState<"published" | "draft">("published");
   const [tagsStr, setTagsStr] = useState("");
   const [loading, setLoading] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [coverError, setCoverError] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (product) {
@@ -57,6 +66,8 @@ export function DigitalProductEditModal({
       setTagsStr(Array.isArray(product.tags) ? product.tags.join(", ") : "");
       setErrorMsg(null);
       setCoverError(false);
+      setUploadingCover(false);
+      setShowUrlInput(false);
     }
   }, [product]);
 
@@ -65,6 +76,61 @@ export function DigitalProductEditModal({
   const isEbookCategory =
     category === "E-books & Guides PDF" ||
     (product.file_name && product.file_name.toLowerCase().endsWith(".pdf"));
+
+  const handleCoverFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setErrorMsg("Veuillez sélectionner un fichier image valide (JPG, PNG, WebP, GIF).");
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      setErrorMsg("L'image est trop volumineuse (taille maximale autorisée : 15 Mo).");
+      return;
+    }
+
+    setUploadingCover(true);
+    setErrorMsg(null);
+    setCoverError(false);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "image");
+
+      const res = await fetch("/api/upload/file", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Échec de l'upload de l'image de couverture.");
+      }
+
+      if (data.url) {
+        setCoverImageUrl(data.url);
+      } else {
+        throw new Error("Aucune URL renvoyée par le serveur.");
+      }
+    } catch (err: any) {
+      console.warn("[DigitalProductEdit] Upload error, falling back to base64 preview:", err);
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        if (evt.target?.result) {
+          setCoverImageUrl(evt.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setUploadingCover(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,33 +312,123 @@ export function DigitalProductEditModal({
           </div>
 
           {/* Image de Couverture */}
-          <div>
-            <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
-              URL de la Couverture (Image)
-            </label>
-            <div className="flex gap-3 items-center">
-              <input
-                type="url"
-                value={coverImageUrl}
-                onChange={(e) => {
-                  setCoverImageUrl(e.target.value);
-                  setCoverError(false);
-                }}
-                placeholder="https://images.unsplash.com/... ou URL Cloudinary / Supabase"
-                className="flex-1 px-4 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500"
-              />
-              {coverImageUrl && !coverError && (
-                <div className="relative w-12 h-14 rounded-lg overflow-hidden bg-zinc-100 border border-zinc-300 dark:border-zinc-700 shrink-0">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                Image de Couverture
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowUrlInput(!showUrlInput)}
+                className="text-[11px] font-semibold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer"
+              >
+                {showUrlInput ? "Masquer le champ URL" : "Coller une URL web"}
+              </button>
+            </div>
+
+            {/* Hidden native file input */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleCoverFileUpload}
+              accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+              className="hidden"
+            />
+
+            {/* Preview & Upload Zone */}
+            <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/60 border border-dashed border-zinc-300 dark:border-zinc-700 hover:border-teal-500 transition-colors">
+              {coverImageUrl && !coverError ? (
+                <div className="relative w-24 h-32 rounded-xl overflow-hidden bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-md shrink-0 group">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={coverImageUrl}
-                    alt="Aperçu"
+                    alt="Aperçu couverture"
                     onError={() => setCoverError(true)}
                     className="w-full h-full object-cover"
                   />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingCover}
+                      className="p-1.5 bg-white/90 text-zinc-900 rounded-lg hover:bg-white text-xs font-bold cursor-pointer"
+                      title="Changer d'image"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCoverImageUrl("")}
+                      className="p-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xs font-bold cursor-pointer"
+                      title="Supprimer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="w-24 h-32 rounded-xl bg-zinc-200/80 dark:bg-zinc-800 flex flex-col items-center justify-center text-zinc-400 border border-zinc-300 dark:border-zinc-700 shrink-0">
+                  <ImageIcon className="w-8 h-8 mb-1 opacity-60" />
+                  <span className="text-[10px] font-bold">Sans visuel</span>
                 </div>
               )}
+
+              <div className="flex-1 text-center sm:text-left space-y-2">
+                <div>
+                  <h4 className="text-xs font-bold text-zinc-900 dark:text-white">
+                    {coverImageUrl ? "Changer l'image de couverture" : "Ajouter une image de couverture"}
+                  </h4>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5 leading-relaxed">
+                    JPG, PNG, WebP (max 15 Mo). Choisissez un fichier depuis votre appareil pour remplacer la couverture actuelle.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingCover}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    {uploadingCover ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Téléversement en cours...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-3.5 h-3.5" /> Téléverser une image
+                      </>
+                    )}
+                  </button>
+
+                  {coverImageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setCoverImageUrl("")}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-zinc-600 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl text-xs font-medium hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Retirer
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
+
+            {/* Optional Direct URL Input */}
+            {showUrlInput && (
+              <div className="pt-2 animate-in fade-in duration-150">
+                <input
+                  type="url"
+                  value={coverImageUrl}
+                  onChange={(e) => {
+                    setCoverImageUrl(e.target.value);
+                    setCoverError(false);
+                  }}
+                  placeholder="https://... ou coller directement l'URL d'une image"
+                  className="w-full px-3.5 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+            )}
           </div>
 
           {/* Description */}
