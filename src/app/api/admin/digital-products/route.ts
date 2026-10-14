@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     // 1. Fetch all digital products
     const { data: productsData, error: productsErr } = await supabaseAdmin
       .from("digital_products")
-      .select("id, author_id, title, description, price, cover_image_url, file_name, file_size_bytes, status, category, sales_count, created_at, updated_at")
+      .select("id, author_id, title, description, price, cover_image_url, file_name, file_size_bytes, status, category, created_at, updated_at")
       .order("created_at", { ascending: false });
 
     if (productsErr) {
@@ -92,8 +92,8 @@ export async function GET(req: NextRequest) {
       };
 
       const purStats = purchasesByProduct.get(prod.id) || {
-        count: prod.sales_count || 0,
-        revenue: (prod.sales_count || 0) * (Number(prod.price) || 0),
+        count: 0,
+        revenue: 0,
       };
 
       totalPlatformRevenue += purStats.revenue;

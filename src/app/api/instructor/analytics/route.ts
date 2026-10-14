@@ -139,7 +139,7 @@ export async function GET(req: NextRequest) {
     // 7. Fetch instructor's digital products & purchases
     const { data: digitalProductsData } = await dbClient
       .from('digital_products')
-      .select('id, title, price, status, sales_count')
+      .select('id, title, price, status')
       .eq('author_id', user.id);
 
     const digitalProducts = digitalProductsData || [];
@@ -154,6 +154,16 @@ export async function GET(req: NextRequest) {
         .eq('payment_status', 'COMPLETED');
       digitalPurchases = purchasesData || [];
     }
+
+    const salesCountByProduct = new Map<string, number>();
+    digitalPurchases.forEach((dp) => {
+      salesCountByProduct.set(dp.product_id, (salesCountByProduct.get(dp.product_id) || 0) + 1);
+    });
+
+    const mappedDigitalProducts = digitalProducts.map((p) => ({
+      ...p,
+      sales_count: salesCountByProduct.get(p.id) || 0,
+    }));
 
     const digitalSalesCount = digitalPurchases.length;
     const digitalRevenue = digitalPurchases.reduce((sum, p) => sum + (Number(p.price_paid) || 0), 0);
@@ -191,7 +201,7 @@ export async function GET(req: NextRequest) {
       digitalRevenue,
       digitalProductsCount: digitalProducts.length,
       digitalSalesCount,
-      digitalProducts,
+      digitalProducts: mappedDigitalProducts,
       platformCommission,
       netRevenue,
       hasServiceRole,
