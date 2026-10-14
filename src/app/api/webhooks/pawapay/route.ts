@@ -469,10 +469,21 @@ export async function POST(req: NextRequest) {
             }
 
             if (product?.author_id) {
+              const { data: authorProfile } = await supabaseAdmin
+                .from('profiles')
+                .select('email, full_name, plan')
+                .eq('id', product.author_id)
+                .maybeSingle();
+
+              const instPlan = authorProfile?.plan || 'FREE';
+              const commissionRate = instPlan === 'FREE' ? 0.20 : (instPlan === 'BASE' ? 0.10 : (instPlan === 'PRO' ? 0.05 : 0.0));
+              const platformFee = payment.amount * commissionRate;
+              const instructorEarnings = payment.amount - platformFee;
+
               await createNotification({
                 userId: product.author_id,
                 title: "Nouvelle vente de produit digital !",
-                message: `Un exemplaire de "${productTitle}" a été acheté via Mobile Money (${payment.amount} $).`,
+                message: `Un exemplaire de "${productTitle}" a été acheté via Mobile Money (${payment.amount} $). Vos gains nets : $${instructorEarnings.toFixed(2)} (Commission : ${(commissionRate * 100).toFixed(0)}%).`,
                 type: "SUCCESS",
                 link: `/instructor/courses`
               });

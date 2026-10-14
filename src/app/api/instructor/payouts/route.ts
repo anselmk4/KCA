@@ -57,15 +57,14 @@ export async function POST(req: NextRequest) {
     // 2. Fetch instructor's courses to identify earnings
     const { data: courses } = await dbClient
       .from("courses")
-      .select("id")
+      .select("id, price")
       .eq("instructor_id", user.id);
 
     const courseIds = courses?.map((c) => c.id) || [];
-
-    let totalNetRevenue = 0;
+    let coursesRevenue = 0;
 
     if (courseIds.length > 0) {
-      // Fetch matching order items
+      // A. Recorded online payments via orders
       const { data: orderItems } = await dbClient
         .from("order_items")
         .select("order_id")
@@ -74,17 +73,55 @@ export async function POST(req: NextRequest) {
       const orderIds = orderItems?.map((oi) => oi.order_id) || [];
 
       if (orderIds.length > 0) {
-        // Fetch paid payments
         const { data: payments } = await dbClient
           .from("payments")
           .select("amount, status")
           .in("order_id", orderIds)
           .eq("status", "PAID");
 
-        const totalRevenue = payments?.reduce((acc, p) => acc + (p.amount || 0), 0) || 0;
-        totalNetRevenue = totalRevenue * instructorShare;
+        coursesRevenue += payments?.reduce((acc, p) => acc + (p.amount || 0), 0) || 0;
+      }
+
+      // B. Approved manual cash / direct payments from enrollments
+      const { data: manualEnrollments } = await dbClient
+        .from("enrollments")
+        .select("manual_amount_paid, manual_payment_status, enrollment_type, course_id")
+        .in("course_id", courseIds)
+        .eq("manual_payment_status", "APPROVED");
+
+      if (manualEnrollments && manualEnrollments.length > 0) {
+        const coursePriceMap = new Map(courses?.map((c) => [c.id, Number(c.price) || 0]) || []);
+        manualEnrollments.forEach((enr: any) => {
+          if (enr.enrollment_type !== "FREE" && enr.enrollment_type !== "FREE_SCHOLARSHIP") {
+            const manualAmt = enr.manual_amount_paid != null ? Number(enr.manual_amount_paid) : (coursePriceMap.get(enr.course_id) || 0);
+            coursesRevenue += manualAmt;
+          }
+        });
       }
     }
+
+    // 2b. Fetch instructor's digital products & completed purchases
+    let digitalRevenue = 0;
+    const { data: digitalProducts } = await dbClient
+      .from("digital_products")
+      .select("id")
+      .eq("author_id", user.id);
+
+    const digitalProductIds = digitalProducts?.map((p) => p.id) || [];
+
+    if (digitalProductIds.length > 0) {
+      const { data: digitalPurchases } = await dbClient
+        .from("digital_product_purchases")
+        .select("price_paid")
+        .in("product_id", digitalProductIds)
+        .eq("payment_status", "COMPLETED");
+
+      digitalRevenue = digitalPurchases?.reduce((acc, dp) => acc + (Number(dp.price_paid) || 0), 0) || 0;
+    }
+
+    // Total gross and net revenue across both courses and digital products
+    const totalGrossRevenue = coursesRevenue + digitalRevenue;
+    const totalNetRevenue = totalGrossRevenue * instructorShare;
 
     // 3. Fetch existing payouts to calculate already withdrawn / pending amount
     const { data: payouts, error: payoutsErr } = await dbClient

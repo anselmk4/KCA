@@ -256,6 +256,77 @@ export async function GET(req: NextRequest) {
           } catch (notifErr) {
             console.error('[cron-pending-payments] Error sending course notifications:', notifErr);
           }
+        } else if (paymentType === 'DIGITAL_PRODUCT' && itemId) {
+          try {
+            await supabaseAdmin
+              .from('digital_product_purchases')
+              .upsert({
+                product_id: itemId,
+                user_id: payment.user_id,
+                price_paid: payment.amount,
+                payment_method: 'pawapay',
+                payment_status: 'COMPLETED',
+                transaction_id: depositId,
+                created_at: new Date().toISOString(),
+              } as any, { onConflict: 'product_id,user_id' });
+
+            // Enregistrer dans transactions générale
+            await (supabaseAdmin as any).from('transactions').insert({
+              user_id: payment.user_id,
+              amount: payment.amount,
+              course_id: itemId,
+              method: 'PawaPay Mobile Money',
+              status: 'PAID',
+              date: new Date().toISOString(),
+            } as any);
+
+            // Fetch product and author to notify and calculate commission
+            const { data: product } = await supabaseAdmin
+              .from('digital_products')
+              .select('id, title, author_id, price')
+              .eq('id', itemId)
+              .maybeSingle();
+
+            const productTitle = product?.title || 'Produit Digital';
+
+            if (product?.author_id) {
+              const { data: authorProfile } = await supabaseAdmin
+                .from('profiles')
+                .select('email, full_name, plan')
+                .eq('id', product.author_id)
+                .maybeSingle();
+
+              const instPlan = authorProfile?.plan || 'FREE';
+              const commissionRate = instPlan === 'FREE' ? 0.20 : (instPlan === 'BASE' ? 0.10 : (instPlan === 'PRO' ? 0.05 : 0.0));
+              const platformFee = payment.amount * commissionRate;
+              const instructorEarnings = payment.amount - platformFee;
+
+              await createNotification({
+                userId: product.author_id,
+                title: "Nouvelle vente de produit digital !",
+                message: `"${productTitle}" a été acheté (${payment.amount} $). Vos gains nets : $${instructorEarnings.toFixed(2)} (Commission plateforme : ${(commissionRate * 100).toFixed(0)}%).`,
+                type: "SUCCESS",
+                link: `/instructor/courses`
+              });
+            }
+
+            // Buyer notification & invoice
+            const metaEmail = methodParts[3] ? decodeURIComponent(methodParts[3]) : '';
+            const buyerEmail = (metaEmail && metaEmail.includes('@')) ? metaEmail : studentEmail;
+            if (buyerEmail) {
+              const { sendInvoiceEmail } = await import("@/lib/email");
+              await sendInvoiceEmail(
+                buyerEmail,
+                buyerEmail.split('@')[0] || "Client",
+                `DP-${depositId.substring(0, 8).toUpperCase()}`,
+                payment.amount,
+                productTitle,
+                "Votre paiement Mobile Money PawaPay est validé. Votre ressource numérique est disponible immédiatement."
+              );
+            }
+          } catch (dpCronErr) {
+            console.error('[cron-pending-payments] Error activating digital product:', dpCronErr);
+          }
         }
 
         completedCount++;

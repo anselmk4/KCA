@@ -37,7 +37,7 @@ interface AdminPayoutItem {
 interface FundSourceItem {
   id: string;
   date: string;
-  type: 'COURSE_SALE' | 'PLAN_SALE';
+  type: 'COURSE_SALE' | 'PLAN_SALE' | 'DIGITAL_PRODUCT_SALE';
   itemName: string;
   sourceName: string;
   amount: number;
@@ -260,6 +260,56 @@ export default function AdminPayoutsPage() {
           });
         }
       });
+
+      // 4b. Fetch and process completed digital product purchases
+      try {
+        const { data: dpPurchases } = await supabase
+          .from('digital_product_purchases')
+          .select('id, product_id, user_id, price_paid, created_at, payment_status')
+          .eq('payment_status', 'COMPLETED');
+
+        if (dpPurchases && dpPurchases.length > 0) {
+          const dpIds = [...new Set(dpPurchases.map((dp: any) => dp.product_id).filter(Boolean))];
+          const { data: dpProducts } = await supabase
+            .from('digital_products')
+            .select('id, title, author_id')
+            .in('id', dpIds);
+
+          const dpProductMap = new Map((dpProducts || []).map((p: any) => [p.id, p]));
+
+          dpPurchases.forEach((dp: any) => {
+            const amount = Number(dp.price_paid) || 0;
+            computedTotalSales += amount;
+
+            const product = dpProductMap.get(dp.product_id);
+            const authorId = product?.author_id || "";
+            const instPlan = planMap.get(authorId) || "FREE";
+            const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;
+
+            const siteShare = amount * commConfig.commissionRate;
+            const instShare = amount * commConfig.instructorShare;
+
+            computedPlatformCommissions += siteShare;
+            computedCourseCommissions += siteShare;
+            computedInstructorShare += instShare;
+
+            const buyerName = profileMap.get(dp.user_id) || "Client Acheteur";
+
+            computedSources.push({
+              id: dp.id,
+              date: dp.created_at || new Date().toISOString(),
+              type: 'DIGITAL_PRODUCT_SALE',
+              itemName: product?.title || 'Produit Digital / E-book',
+              sourceName: `${buyerName} (Client)`,
+              amount,
+              siteShare,
+              instructorShare: instShare
+            });
+          });
+        }
+      } catch (dpErr) {
+        console.warn("[AdminPayouts] digital_product_purchases load note:", dpErr);
+      }
 
       setTotalSales(Math.round(computedTotalSales));
       setPlatformCommissions(Math.round(computedPlatformCommissions));
@@ -526,9 +576,11 @@ export default function AdminPayoutsPage() {
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xxs font-bold uppercase tracking-wider ${
                           fs.type === 'PLAN_SALE'
                             ? "bg-amber-100 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400"
+                            : fs.type === 'DIGITAL_PRODUCT_SALE'
+                            ? "bg-teal-100 dark:bg-teal-950/20 text-teal-700 dark:text-teal-400"
                             : "bg-blue-100 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400"
                         }`}>
-                          {fs.type === 'PLAN_SALE' ? "Abonnement Prof" : "Vente Cours"}
+                          {fs.type === 'PLAN_SALE' ? "Abonnement Prof" : fs.type === 'DIGITAL_PRODUCT_SALE' ? "Produit Digital" : "Vente Cours"}
                         </span>
                       </td>
                       <td className="px-6 py-3 font-medium truncate max-w-[200px]">{fs.itemName}</td>

@@ -139,11 +139,35 @@ export async function GET(req: NextRequest) {
     const courseMap = new Map(courses?.map((c) => [c.id, c]) || []);
     const instructorIds = [...new Set(courses?.map((c) => c.instructor_id).filter(Boolean) || [])];
 
-    const { data: instProfiles } = instructorIds.length > 0
+    // 4b. Fetch Digital Products for payments where method contains DIGITAL_PRODUCT
+    const digitalProductIds = [
+      ...new Set(
+        rawPayments
+          .map((p) => {
+            const parts = (p.method || "").split("::");
+            return parts[1] === "DIGITAL_PRODUCT" ? parts[2] : null;
+          })
+          .filter(Boolean)
+      ),
+    ];
+
+    const { data: digitalProducts } = digitalProductIds.length > 0
+      ? await supabaseAdmin
+          .from("digital_products")
+          .select("id, title, author_id, price")
+          .in("id", digitalProductIds)
+      : { data: [] };
+
+    const digitalProductMap = new Map((digitalProducts || []).map((dp: any) => [dp.id, dp]));
+    const dpAuthorIds = (digitalProducts || []).map((dp: any) => dp.author_id).filter(Boolean);
+
+    const allInstructorIds = [...new Set([...instructorIds, ...dpAuthorIds])];
+
+    const { data: instProfiles } = allInstructorIds.length > 0
       ? await supabaseAdmin
           .from("profiles")
           .select("id, full_name, plan")
-          .in("id", instructorIds)
+          .in("id", allInstructorIds)
       : { data: [] };
 
     const instructorMap = new Map(instProfiles?.map((p) => [p.id, p]) || []);
@@ -174,6 +198,19 @@ export async function GET(req: NextRequest) {
         siteAmount = p.amount || 0;
         commissionAmount = 0;
         instructorShareAmount = 0;
+      } else if (methodParts[1] === "DIGITAL_PRODUCT") {
+        const dpId = methodParts[2];
+        const dp = digitalProductMap.get(dpId);
+        courseTitle = `Produit Digital : ${dp?.title || "E-book / Guide"}`;
+        const instructor = instructorMap.get(dp?.author_id || "");
+        instName = instructor?.full_name || "Formateur";
+        instPlan = instructor?.plan || "FREE";
+
+        const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;
+        const baseRev = p.amount || dp?.price || 0;
+        commissionAmount = baseRev * commConfig.commissionRate;
+        instructorShareAmount = baseRev * commConfig.instructorShare;
+        siteAmount = commissionAmount;
       } else {
         const course = courseMap.get(courseId);
         courseTitle = course?.title || "Formation / Cours";
