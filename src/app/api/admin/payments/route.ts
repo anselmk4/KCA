@@ -162,7 +162,9 @@ export async function GET(req: NextRequest) {
           .in("id", digitalProductIds)
       : { data: [] };
 
-    const digitalProductMap = new Map((digitalProducts || []).map((dp: any) => [dp.id, dp]));
+    const digitalProductMap = new Map<string, any>(
+      (digitalProducts || []).map((dp: any) => [dp.id, dp])
+    );
     const dpAuthorIds: string[] = (digitalProducts || [])
       .map((dp: any) => dp.author_id)
       .filter((id: any): id is string => Boolean(id));
@@ -178,7 +180,7 @@ export async function GET(req: NextRequest) {
           .in("id", allInstructorIds)
       : { data: [] };
 
-    const instructorMap = new Map(instProfiles?.map((p) => [p.id, p]) || []);
+    const instructorMap = new Map<string, any>(instProfiles?.map((p) => [p.id, p]) || []);
 
     // 5. Enrich Payments
     const enriched = rawPayments.map((p) => {
@@ -208,9 +210,9 @@ export async function GET(req: NextRequest) {
         instructorShareAmount = 0;
       } else if (methodParts[1] === "DIGITAL_PRODUCT") {
         const dpId = methodParts[2];
-        const dp = digitalProductMap.get(dpId);
+        const dp: any = digitalProductMap.get(dpId);
         courseTitle = `Produit Digital : ${dp?.title || "E-book / Guide"}`;
-        const instructor = instructorMap.get(dp?.author_id || "");
+        const instructor: any = instructorMap.get(dp?.author_id || "");
         instName = instructor?.full_name || "Formateur";
         instPlan = instructor?.plan || "FREE";
 
