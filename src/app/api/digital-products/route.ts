@@ -19,15 +19,17 @@ export async function GET(req: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    let query = (supabase as any)
+    // Use admin client to reliably bypass anonymous RLS for public storefront browsing
+    const admin = getSupabaseAdmin();
+    let query = (admin as any)
       .from("digital_products")
-      .select("*, profiles:author_id(id, full_name, avatar_url, specialty, academy_name)")
+      .select("id, author_id, title, description, cover_image_url, price, category, tags, status, file_name, file_size_bytes, preview_url, created_at, file_url")
       .order("created_at", { ascending: false })
       .limit(limit);
 
     if (authorId) {
       query = query.eq("author_id", authorId);
-      // If user is not the author, only return published
+      // If viewer is not the author, only return published
       if (!user || user.id !== authorId) {
         query = query.eq("status", "published");
       }
@@ -43,43 +45,41 @@ export async function GET(req: NextRequest) {
       query = query.ilike("title", `%${search}%`);
     }
 
-    const { data, error } = await query;
+    const { data: productsData, error } = await query;
 
     if (error) {
-      console.warn("[DigitalProducts GET] Supabase query error, fallback to admin:", error.message);
-      // Fallback using admin client if public select had schema caching delay
-      const admin = getSupabaseAdmin();
-      let fallbackQuery = (admin as any)
-        .from("digital_products")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(limit);
-
-      if (authorId) {
-        fallbackQuery = fallbackQuery.eq("author_id", authorId);
-      } else {
-        fallbackQuery = fallbackQuery.eq("status", "published");
-      }
-
-      const { data: fallbackData } = await fallbackQuery;
-      const sanitizedFallback = (fallbackData || []).map((p: any) => {
-        const isAuthor = user && user.id === p.author_id;
-        if (!isAuthor) {
-          const { file_url, ...safeRest } = p;
-          return { ...safeRest, has_file: !!file_url };
-        }
-        return p;
-      });
-      return NextResponse.json({ products: sanitizedFallback });
+      console.error("[DigitalProducts GET] Query error:", error.message);
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    const sanitized = (data || []).map((p: any) => {
+    const products = productsData || [];
+    const authorIds = [...new Set(products.map((p: any) => p.author_id).filter(Boolean))];
+
+    // Fetch author profiles to attach securely
+    const authorMap = new Map<string, any>();
+    if (authorIds.length > 0) {
+      const { data: profiles } = await (admin as any)
+        .from("profiles")
+        .select("id, full_name, avatar_url, specialty, academy_name")
+        .in("id", authorIds);
+
+      (profiles || []).forEach((prof: any) => {
+        authorMap.set(prof.id, prof);
+      });
+    }
+
+    const sanitized = products.map((p: any) => {
       const isAuthor = user && user.id === p.author_id;
+      const productWithProfile = {
+        ...p,
+        profiles: authorMap.get(p.author_id) || undefined,
+      };
+
       if (!isAuthor) {
-        const { file_url, ...safeRest } = p;
+        const { file_url, ...safeRest } = productWithProfile;
         return { ...safeRest, has_file: !!file_url };
       }
-      return p;
+      return productWithProfile;
     });
 
     return NextResponse.json({ products: sanitized });

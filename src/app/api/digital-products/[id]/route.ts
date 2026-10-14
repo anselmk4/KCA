@@ -13,9 +13,10 @@ export async function GET(
     const { id } = await params;
     const admin = getSupabaseAdmin();
 
-    const { data: product, error } = await (admin as any)
+    // 1. Fetch product directly
+    let { data: product, error } = await (admin as any)
       .from("digital_products")
-      .select("*, profiles:author_id(id, full_name, avatar_url, specialty, academy_name, bio, website, twitter, linkedin)")
+      .select("*")
       .eq("id", id)
       .maybeSingle();
 
@@ -24,6 +25,17 @@ export async function GET(
         { error: "Produit digital introuvable." },
         { status: 404 }
       );
+    }
+
+    // 2. Fetch author profile separately
+    if (product.author_id) {
+      const { data: profile } = await (admin as any)
+        .from("profiles")
+        .select("id, full_name, avatar_url, specialty, academy_name, bio, website, twitter, linkedin")
+        .eq("id", product.author_id)
+        .maybeSingle();
+
+      product.profiles = profile || undefined;
     }
 
     const supabase = await createClient();

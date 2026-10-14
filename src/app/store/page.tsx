@@ -364,6 +364,8 @@ export default function StoreCatalogPage() {
                 const authorUsername =
                   product.profiles?.username ||
                   product.profiles?.slug ||
+                  product.author_id ||
+                  product.profiles?.id ||
                   (product.profiles?.full_name ? product.profiles.full_name.toLowerCase().replace(/\s+/g, "-") : "");
 
                 return (

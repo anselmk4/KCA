@@ -85,10 +85,18 @@ export default function InstructorCoursesPage() {
 
   const loadDashboardData = useCallback(async () => {
     const activeSession = getSimulatedSession();
-    if (!activeSession) return;
+    if (activeSession) {
+      setSession(activeSession);
+    }
 
     try {
-      const instructorId = activeSession.userId;
+      const { data: { user } } = await supabase.auth.getUser();
+      const instructorId = user?.id || activeSession?.userId;
+      if (user) {
+        setSession((prev: any) => ({ ...(prev || {}), userId: user.id }));
+      }
+
+      if (!instructorId) return;
       
       // Fetch digital products owned by instructor
       try {
@@ -648,7 +656,7 @@ export default function InstructorCoursesPage() {
 
                     <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-2">
                       <Link
-                        href={`/store/${session?.userId || "me"}`}
+                        href={`/store/${prod.author_id || session?.userId}`}
                         target="_blank"
                         className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-600 hover:text-teal-700"
                       >

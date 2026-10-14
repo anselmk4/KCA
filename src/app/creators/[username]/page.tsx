@@ -91,65 +91,16 @@ export default function CreatorStorefrontPage({
     async function loadStorefront() {
       setLoading(true);
       try {
-        // 1. Trouver le profil du créateur (par ID, username ou nom)
-        let profileData: any = null;
-
-        // A. Essayer par ID UUID direct
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(username);
-        if (isUUID) {
-          const { data } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", username)
-            .maybeSingle();
-          profileData = data;
-        }
-
-        // B. Essayer par nom ou pseudo
-        if (!profileData) {
-          const cleanName = username.replace(/[-_]/g, " ").trim();
-          const { data } = await supabase
-            .from("profiles")
-            .select("*")
-            .ilike("full_name", `%${cleanName}%`)
-            .maybeSingle();
-          profileData = data;
-        }
-
-        // C. Fallback: premier profil formateur actif si non trouvé
-        if (!profileData) {
-          const { data: firstProfiles } = await supabase
-            .from("profiles")
-            .select("*")
-            .limit(1);
-          if (firstProfiles && firstProfiles.length > 0) {
-            profileData = firstProfiles[0];
+        const res = await fetch(`/api/creators/${encodeURIComponent(username)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.creator) {
+            setCreator(data.creator);
+            setDigitalProducts(data.digitalProducts || []);
+            setCourses(data.courses || []);
           }
-        }
-
-        if (profileData) {
-          setCreator(profileData);
-          const creatorId = profileData.id;
-
-          // 2. Charger les produits digitaux du créateur
-          try {
-            const dpRes = await fetch(`/api/digital-products?authorId=${creatorId}`);
-            if (dpRes.ok) {
-              const dpData = await dpRes.json();
-              setDigitalProducts(dpData.products || []);
-            }
-          } catch (dpErr) {
-            console.warn("Storefront digital products load error:", dpErr);
-          }
-
-          // 3. Charger les cours du créateur
-          const { data: coursesData } = await supabase
-            .from("courses")
-            .select("id, title, slug, description, price, level, thumbnail_url, type")
-            .eq("instructor_id", creatorId)
-            .eq("status", "PUBLISHED");
-
-          setCourses((coursesData as any) || []);
+        } else {
+          console.warn("[CreatorStorefront] Storefront response status:", res.status);
         }
       } catch (err) {
         console.error("Error loading storefront:", err);
@@ -158,7 +109,9 @@ export default function CreatorStorefrontPage({
       }
     }
 
-    loadStorefront();
+    if (username) {
+      loadStorefront();
+    }
   }, [username]);
 
   const initials = (name?: string | null) =>
@@ -171,8 +124,21 @@ export default function CreatorStorefrontPage({
 
   const handleShare = () => {
     if (typeof window !== "undefined") {
-      navigator.clipboard?.writeText(window.location.href);
-      alert("Lien de la boutique copié dans le presse-papier !");
+      const canonicalUrl = creator?.id
+        ? `${window.location.origin}/store/${creator.id}`
+        : window.location.href.replace(/\/store\/me$/i, "");
+      
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(canonicalUrl);
+      } else {
+        const input = document.createElement("input");
+        input.value = canonicalUrl;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        document.body.removeChild(input);
+      }
+      alert(`Lien de la boutique copié dans le presse-papier :\n${canonicalUrl}`);
     }
   };
 

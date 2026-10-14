@@ -14,6 +14,7 @@ import {
 
 export interface DigitalProductToShare {
   id: string;
+  author_id?: string;
   title: string;
   description?: string;
   price?: number;
@@ -32,7 +33,8 @@ export function DigitalProductShareModal({
   isOpen,
   onClose,
 }: DigitalProductShareModalProps) {
-  const [copied, setCopied] = useState(false);
+  const [copiedProduct, setCopiedProduct] = useState(false);
+  const [copiedStore, setCopiedStore] = useState(false);
   const [origin, setOrigin] = useState("");
 
   useEffect(() => {
@@ -44,9 +46,10 @@ export function DigitalProductShareModal({
   if (!isOpen || !product) return null;
 
   const shareUrl = `${origin}/store?product=${product.id}`;
+  const storeUrl = product.author_id ? `${origin}/store/${product.author_id}` : "";
   const shareText = `Découvrez « ${product.title} » sur KCA Digital Store : ${shareUrl}`;
 
-  const handleCopy = async () => {
+  const handleCopyProduct = async () => {
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(shareUrl);
@@ -58,10 +61,30 @@ export function DigitalProductShareModal({
         document.execCommand("copy");
         document.body.removeChild(input);
       }
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      setCopiedProduct(true);
+      setTimeout(() => setCopiedProduct(false), 2500);
     } catch (err) {
       console.error("Failed to copy URL:", err);
+    }
+  };
+
+  const handleCopyStore = async () => {
+    if (!storeUrl) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(storeUrl);
+      } else {
+        const input = document.createElement("input");
+        input.value = storeUrl;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        document.body.removeChild(input);
+      }
+      setCopiedStore(true);
+      setTimeout(() => setCopiedStore(false), 2500);
+    } catch (err) {
+      console.error("Failed to copy Store URL:", err);
     }
   };
 
@@ -177,10 +200,10 @@ export function DigitalProductShareModal({
             </div>
           </div>
 
-          {/* Direct Copy Link */}
+          {/* Direct Copy Link Product */}
           <div>
             <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">
-              Lien direct vers la ressource
+              Lien direct vers ce produit
             </label>
             <div className="flex items-center gap-2">
               <input
@@ -190,14 +213,14 @@ export function DigitalProductShareModal({
                 className="flex-1 px-3.5 py-2.5 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono text-zinc-700 dark:text-zinc-300 focus:outline-hidden select-all"
               />
               <button
-                onClick={handleCopy}
+                onClick={handleCopyProduct}
                 className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                  copied
+                  copiedProduct
                     ? "bg-emerald-600 text-white shadow-sm"
                     : "bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-white"
                 }`}
               >
-                {copied ? (
+                {copiedProduct ? (
                   <>
                     <Check className="w-4 h-4" /> Copié !
                   </>
@@ -209,6 +232,41 @@ export function DigitalProductShareModal({
               </button>
             </div>
           </div>
+
+          {/* Direct Copy Link Storefront if author_id is present */}
+          {storeUrl && (
+            <div>
+              <label className="block text-xs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider mb-2">
+                Lien de votre vitrine / boutique créateur complète
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={storeUrl}
+                  className="flex-1 px-3.5 py-2.5 bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800 rounded-xl text-xs font-mono text-teal-800 dark:text-teal-300 focus:outline-hidden select-all"
+                />
+                <button
+                  onClick={handleCopyStore}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                    copiedStore
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "bg-teal-600 hover:bg-teal-700 text-white"
+                  }`}
+                >
+                  {copiedStore ? (
+                    <>
+                      <Check className="w-4 h-4" /> Copié !
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" /> Copier la boutique
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Social Share Grid */}
           <div>
