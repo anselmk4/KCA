@@ -312,13 +312,27 @@ export async function GET(req: NextRequest) {
 
             // Buyer notification & invoice
             const metaEmail = methodParts[3] ? decodeURIComponent(methodParts[3]) : '';
-            const buyerEmail = (metaEmail && metaEmail.includes('@')) ? metaEmail : studentEmail;
+            let buyerEmail = (metaEmail && metaEmail.includes('@')) ? metaEmail : '';
+            let buyerName = buyerEmail ? (buyerEmail.split('@')[0] || "Client") : "Client";
+
+            if (!buyerEmail && payment.user_id) {
+              const { data: buyerProfile } = await supabaseAdmin
+                .from('profiles')
+                .select('full_name, email')
+                .eq('id', payment.user_id)
+                .maybeSingle();
+              if (buyerProfile?.email) {
+                buyerEmail = buyerProfile.email;
+                buyerName = buyerProfile.full_name || buyerName;
+              }
+            }
+
             if (buyerEmail) {
               const { sendInvoiceEmail } = await import("@/lib/email");
               await sendInvoiceEmail(
                 buyerEmail,
-                buyerEmail.split('@')[0] || "Client",
-                `DP-${depositId.substring(0, 8).toUpperCase()}`,
+                buyerName,
+                `DP-${payment.id.substring(0, 8).toUpperCase()}`,
                 payment.amount,
                 productTitle,
                 "Votre paiement Mobile Money PawaPay est validé. Votre ressource numérique est disponible immédiatement."
