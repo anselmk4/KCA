@@ -197,6 +197,7 @@ function RegisterForm() {
     const queryModule = searchParams.get("module")?.toLowerCase();
     const queryRole = searchParams.get("role")?.toUpperCase();
     const queryRef = searchParams.get("ref");
+    const queryNext = searchParams.get("next");
 
     // Store referral code in localStorage for use after signup
     if (queryRef) {
@@ -492,11 +493,12 @@ function RegisterForm() {
       }
 
       // If email confirmation is required (session is null), redirect to login with query params.
-      // Otherwise, log in immediately and redirect directly to their dashboard.
+      // Otherwise, log in immediately and redirect directly to their destination or dashboard.
       if (!authData.session) {
-        router.push(`/login?registered=true&email=${encodeURIComponent(email)}&role=${role}`);
+        const nextQuery = queryNext ? `&next=${encodeURIComponent(queryNext)}` : "";
+        router.push(`/login?registered=true&email=${encodeURIComponent(email)}&role=${role}${nextQuery}`);
       } else {
-        router.push(role === "INSTRUCTOR" ? "/instructor" : "/dashboard");
+        router.push(queryNext || (role === "INSTRUCTOR" ? "/instructor" : "/dashboard"));
       }
     } catch (err: any) {
       setFormError(err.message || "Une erreur est survenue.");

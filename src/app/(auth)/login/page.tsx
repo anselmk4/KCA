@@ -19,6 +19,7 @@ function LoginForm() {
   const registered = searchParams.get("registered") === "true";
   const registeredEmail = searchParams.get("email") || "";
   const roleParam = searchParams.get("role") || "STUDENT";
+  const nextParam = searchParams.get("next");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +125,7 @@ function LoginForm() {
       }
 
       const { redirectTo } = await loginWithEmail(email, password);
-      router.push(redirectTo);
+      router.push(nextParam || redirectTo);
     } catch (err: any) {
       setError(err.message || "An error occurred.");
       setLoading(false);
@@ -153,10 +154,11 @@ function LoginForm() {
     setError(null);
     setGoogleLoading(true);
     try {
+      const callbackNext = nextParam ? encodeURIComponent(nextParam) : "/auth/confirmed";
       const { error: authErr } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=/auth/confirmed`,
+          redirectTo: `${window.location.origin}/auth/callback?next=${callbackNext}`,
           queryParams: {
             access_type: "offline",
             prompt: "select_account",
@@ -181,7 +183,7 @@ function LoginForm() {
     setPassword(testPassword);
     try {
       const { redirectTo } = await loginWithEmail(testEmail, testPassword);
-      router.push(redirectTo);
+      router.push(nextParam || redirectTo);
     } catch (err: any) {
       setError(err.message || "An error occurred.");
       setLoading(false);

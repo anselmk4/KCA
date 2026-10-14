@@ -332,14 +332,14 @@ export default function CourseDetailPage() {
                 </Link>
               ) : isLoggedIn ? (
                 <Link
-                  href={`/dashboard/payment?courseId=${course.id}`}
+                  href={course.price > 0 ? `/dashboard/payment/${course.id}` : `/dashboard/courses/${course.id}/learn`}
                   className="block w-full py-3.5 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-teal-500/20 text-sm"
                 >
                   {course.price > 0 ? `Enroll for $${course.price}` : "Enroll for Free"}
                 </Link>
               ) : (
                 <Link
-                  href={`/register?next=/dashboard/payment?courseId=${course.id}`}
+                  href={`/register?next=${encodeURIComponent(course.price > 0 ? `/dashboard/payment/${course.id}` : `/dashboard/courses/${course.id}/learn`)}`}
                   className="block w-full py-3.5 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-teal-500/20 text-sm"
                 >
                   {course.price > 0 ? `Enroll for $${course.price}` : "Start for Free"}
@@ -349,7 +349,7 @@ export default function CourseDetailPage() {
               {!isLoggedIn && (
                 <p className="text-xs text-zinc-400">
                   Already have an account?{" "}
-                  <Link href={`/login?next=/courses/${courseId}`} className="text-teal-400 hover:text-teal-300 font-semibold">
+                  <Link href={`/login?next=${encodeURIComponent(course.price > 0 ? `/dashboard/payment/${course.id}` : `/dashboard/courses/${course.id}/learn`)}`} className="text-teal-400 hover:text-teal-300 font-semibold">
                     Log in
                   </Link>
                 </p>
@@ -456,7 +456,14 @@ export default function CourseDetailPage() {
                 <PlayCircle className="w-5 h-5" /> Resume Course
               </Link>
             ) : (
-              <Link href={isLoggedIn ? `/dashboard/payment?courseId=${course.id}` : `/register?next=/courses/${courseId}`} className="inline-flex items-center gap-2 px-8 py-3 bg-white text-teal-700 hover:bg-teal-50 font-bold rounded-xl transition-all shadow-md">
+              <Link
+                href={
+                  isLoggedIn
+                    ? (course.price > 0 ? `/dashboard/payment/${course.id}` : `/dashboard/courses/${course.id}/learn`)
+                    : `/register?next=${encodeURIComponent(course.price > 0 ? `/dashboard/payment/${course.id}` : `/dashboard/courses/${course.id}/learn`)}`
+                }
+                className="inline-flex items-center gap-2 px-8 py-3 bg-white text-teal-700 hover:bg-teal-50 font-bold rounded-xl transition-all shadow-md"
+              >
                 Enroll Now · {course.price === 0 ? "Free" : `$${course.price}`}
               </Link>
             )}
