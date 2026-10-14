@@ -9,6 +9,7 @@ interface ColorfulContentCoverProps {
   category?: string | null;
   coverUrl?: string | null;
   type?: "course" | "digital_product";
+  variant?: "card" | "hero" | "thumbnail";
   className?: string;
   heightClass?: string;
   children?: React.ReactNode;
@@ -93,8 +94,9 @@ export function ColorfulContentCover({
   category,
   coverUrl,
   type = "course",
+  variant = "card",
   className = "",
-  heightClass = "h-48 sm:h-52",
+  heightClass,
   children,
 }: ColorfulContentCoverProps) {
   const [hasError, setHasError] = useState(false);
@@ -110,9 +112,18 @@ export function ColorfulContentCover({
   const Icon =
     type === "digital_product" ? FileText : GraduationCap;
 
+  const defaultHeightClass =
+    heightClass !== undefined
+      ? heightClass
+      : variant === "hero"
+      ? "h-full min-h-[280px] sm:min-h-[360px]"
+      : variant === "thumbnail"
+      ? "h-full w-full"
+      : "h-48 sm:h-52";
+
   return (
     <div
-      className={`relative w-full ${heightClass} overflow-hidden select-none ${className}`}
+      className={`relative w-full ${defaultHeightClass} overflow-hidden select-none ${className}`}
     >
       {isValidUrl ? (
         <div className="relative w-full h-full bg-zinc-900">
@@ -126,8 +137,97 @@ export function ColorfulContentCover({
           {/* Subtle bottom gradient to ensure text/badges contrast */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
         </div>
+      ) : variant === "hero" ? (
+        /* Grand Hero Banner Typographic Fallback */
+        <div
+          className={`relative w-full h-full bg-gradient-to-br ${theme.bg} p-6 sm:p-10 flex flex-col justify-between overflow-hidden border ${theme.border}`}
+        >
+          {/* Glowing Ambient Blobs */}
+          <div
+            className={`absolute -top-20 -right-20 w-80 h-80 ${theme.glow1} rounded-full blur-3xl pointer-events-none`}
+          />
+          <div
+            className={`absolute -bottom-20 -left-20 w-80 h-80 ${theme.glow2} rounded-full blur-3xl pointer-events-none`}
+          />
+
+          {/* Left accent bar */}
+          <div
+            className={`absolute inset-y-0 left-0 w-3 bg-gradient-to-r ${theme.bar} opacity-80 pointer-events-none`}
+          />
+
+          {/* Watermark Icon in background */}
+          <div className="absolute right-6 bottom-4 pointer-events-none opacity-15">
+            <Icon className={`w-56 h-56 ${theme.iconColor}`} />
+          </div>
+
+          {/* Top Brand & Category Tag */}
+          <div className="relative z-10 flex items-center justify-between pointer-events-none">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black uppercase tracking-widest text-zinc-300">
+                ANSELLA
+              </span>
+              <span className="text-xs font-semibold text-zinc-400">
+                • {type === "digital_product" ? "RESSOURCE DIGITALE" : "FORMATION CERTIFIANTE"}
+              </span>
+            </div>
+            {category && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] font-bold text-white uppercase tracking-wider">
+                <Sparkles className="w-3 h-3 text-amber-300 fill-amber-300" />
+                {category}
+              </span>
+            )}
+          </div>
+
+          {/* Center Prominent Title */}
+          <div className="relative z-10 my-auto text-center px-4 py-3 flex flex-col items-center">
+            <div
+              className={`w-16 h-1.5 rounded-full bg-gradient-to-r ${theme.bar} mb-4 shadow-lg`}
+            />
+            <h2
+              className="text-white font-black text-2xl sm:text-3xl md:text-4xl leading-tight sm:leading-snug max-w-3xl drop-shadow-xl tracking-tight"
+              title={title}
+            >
+              {title}
+            </h2>
+            {category && (
+              <p
+                className={`text-xs sm:text-sm font-extrabold uppercase tracking-widest ${theme.accentText} mt-3 opacity-90`}
+              >
+                Parcours certifiant et pratique
+              </p>
+            )}
+          </div>
+
+          {/* Bottom subtle bar */}
+          <div className="relative z-10 flex justify-between items-center opacity-40">
+            <span className="text-[10px] uppercase font-mono tracking-widest text-zinc-400">
+              Ansella Learning Platform
+            </span>
+            <div className="flex gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-white/70" />
+              <span className="w-2 h-2 rounded-full bg-white/50" />
+              <span className="w-2 h-2 rounded-full bg-white/30" />
+            </div>
+          </div>
+        </div>
+      ) : variant === "thumbnail" ? (
+        /* Compact Luxury Thumbnail Avatar Fallback */
+        <div
+          className={`relative w-full h-full bg-gradient-to-br ${theme.bg} p-2 flex flex-col items-center justify-center text-center overflow-hidden border ${theme.border}`}
+        >
+          {/* Glowing Ambient Blob */}
+          <div
+            className={`absolute inset-0 ${theme.glow1} rounded-full blur-xl pointer-events-none`}
+          />
+          <div className="relative z-10 flex flex-col items-center justify-center">
+            <Icon className={`w-8 h-8 ${theme.accentText} drop-shadow-md`} />
+            <span className="text-[9px] font-black uppercase tracking-wider text-white/90 mt-1 line-clamp-1 max-w-full px-1">
+              {category || "ANSELLA"}
+            </span>
+          </div>
+        </div>
       ) : (
-        /* Typographic Colorful Card Fallback */
+        /* Standard Typographic Card Fallback */
         <div
           className={`relative w-full h-full bg-gradient-to-br ${theme.bg} p-5 flex flex-col justify-between overflow-hidden border-b ${theme.border}`}
         >

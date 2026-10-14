@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import { Lock, Users, Tag, User, ChevronLeft, Loader2, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
 import { CourseReviewsSection } from "@/components/reviews";
+import { ColorfulContentCover } from "@/components/ui/ColorfulContentCover";
 
 // ─── Local Types ──────────────────────────────────────────
 interface Course {
@@ -216,18 +216,6 @@ export default function CoursePreviewPage() {
     );
   }
 
-  // Cover image fallback
-  let courseImg = course.thumbnailUrl || `/images/courses/web3.png`;
-  if (!course.thumbnailUrl) {
-    if (course.id === "blockchain") courseImg = `/images/courses/blockchain-dev.png`;
-    else if (course.id === "trading") courseImg = `/images/courses/trading.png`;
-    else if (course.id === "ai") courseImg = `/images/courses/ai.png`;
-    else if (course.id === "web3") courseImg = `/images/courses/web3.png`;
-    else if (course.id === "blockchain-consulting") courseImg = `/images/courses/blockchain-consulting.png`;
-    else if (course.id === "blockchain-dev") courseImg = `/images/courses/blockchain-dev.png`;
-    else if (course.id === "defi") courseImg = `/images/courses/defi.png`;
-  }
-
   const handleActionClick = () => {
     if (isEnrolled) {
       router.push(`/dashboard/courses/${course.id}/learn`);
@@ -254,24 +242,16 @@ export default function CoursePreviewPage() {
         {/* Main Content Area (Left) */}
         <div className="lg:col-span-2 space-y-6">
           {/* Cover image banner container */}
-          <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-900 shadow-lg">
-            <Image
-              src={courseImg}
-              alt={course.title}
-              fill
-              className="object-cover"
-              priority
+          <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-xl bg-zinc-950">
+            <ColorfulContentCover
+              title={course.title}
+              category={course.category}
+              coverUrl={course.thumbnailUrl}
+              type="course"
+              variant="hero"
+              heightClass="h-full"
+              className="w-full h-full"
             />
-          </div>
-
-          {/* Mini thumbnails */}
-          <div className="flex gap-3">
-            <div className="relative w-20 h-12 rounded-lg overflow-hidden border border-zinc-300 dark:border-zinc-700 bg-zinc-100 cursor-pointer hover:border-teal-500 transition-colors">
-              <Image src={courseImg} alt="attachment" fill className="object-cover" />
-            </div>
-            <div className="relative w-20 h-12 rounded-lg overflow-hidden border border-zinc-300 dark:border-zinc-700 bg-zinc-100 cursor-pointer hover:border-teal-500 transition-colors opacity-60">
-              <Image src={courseImg} alt="attachment" fill className="object-cover grayscale" />
-            </div>
           </div>
 
           {/* Metadata icons bar */}
@@ -350,8 +330,16 @@ export default function CoursePreviewPage() {
             
             {/* Logo Card Top Header */}
             <div className="flex flex-col items-center text-center">
-              <div className="relative w-24 h-24 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 shadow-sm mb-4">
-                <Image src={courseImg} alt="Thumbnail" fill className="object-cover" />
+              <div className="relative w-24 h-24 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-700 shadow-sm mb-4">
+                <ColorfulContentCover
+                  title={course.title}
+                  category={course.category}
+                  coverUrl={course.thumbnailUrl}
+                  type="course"
+                  variant="thumbnail"
+                  heightClass="h-full"
+                  className="w-full h-full"
+                />
               </div>
               <h3 className="font-extrabold text-lg text-zinc-900 dark:text-white leading-tight">{course.title}</h3>
               <Link 
