@@ -120,6 +120,7 @@ export async function POST(req: NextRequest) {
       if (!user) {
         return NextResponse.json({ error: "Non authentifié pour l'achat de formation." }, { status: 401 });
       }
+      const activeUserId = user.id;
       const dbOrderId = crypto.randomUUID();
       const paymentId = crypto.randomUUID();
 
@@ -140,7 +141,7 @@ export async function POST(req: NextRequest) {
       const { error: orderInsertErr } = await dbClient.from("orders").insert({
         id: dbOrderId,
         order_number: orderNumber,
-        user_id: user.id,
+        user_id: activeUserId,
         status: "COMPLETED",
         subtotal: amountCaptured,
         discount_amount: 0,
@@ -179,7 +180,7 @@ export async function POST(req: NextRequest) {
       const { error: paymentInsertErr } = await dbClient.from("payments").insert({
         id: paymentId,
         order_id: dbOrderId,
-        user_id: user.id,
+        user_id: activeUserId,
         amount: amountCaptured,
         currency: "USD",
         provider: "PAYPAL",
@@ -197,9 +198,9 @@ export async function POST(req: NextRequest) {
       }
 
       // Create ACTIVE enrollment
-      console.log(`[paypal-capture-order] Upserting enrollment for user: ${user.id}, course: ${course.id}`);
+      console.log(`[paypal-capture-order] Upserting enrollment for user: ${activeUserId}, course: ${course.id}`);
       const { error: enrollErr } = await dbClient.from("enrollments").upsert({
-        student_id: user.id,
+        student_id: activeUserId,
         course_id: course.id,
         progress_percent: 0,
         status: "ACTIVE",
@@ -217,7 +218,7 @@ export async function POST(req: NextRequest) {
         
         // Student Notification
         await createNotification({
-          userId: user.id,
+          userId: activeUserId,
           title: "Paiement validé !",
           message: `Votre paiement de ${amountCaptured}$ pour le cours "${course.title}" a été validé.`,
           type: "SUCCESS",
@@ -235,7 +236,7 @@ export async function POST(req: NextRequest) {
           const { data: studentProfile } = await dbClient
             .from("profiles")
             .select("full_name")
-            .eq("id", user.id)
+            .eq("id", activeUserId)
             .maybeSingle();
 
           const studentName = studentProfile?.full_name || "Un apprenant";
@@ -264,8 +265,8 @@ export async function POST(req: NextRequest) {
         // Send invoice to student
         const { sendInvoiceEmail } = await import("@/lib/email");
         await sendInvoiceEmail(
-          user.email || "",
-          user.user_metadata?.full_name || user.email?.split("@")[0] || "Apprenant",
+          user?.email || "",
+          user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Apprenant",
           orderNumber,
           amountCaptured,
           course.title,
@@ -289,6 +290,7 @@ export async function POST(req: NextRequest) {
       if (!user) {
         return NextResponse.json({ error: "Non authentifié pour l'abonnement formateur." }, { status: 401 });
       }
+      const activeInstructorId = user.id;
       const planName = itemId.toUpperCase();
       const dbOrderId = crypto.randomUUID();
       const paymentId = crypto.randomUUID();
@@ -300,7 +302,7 @@ export async function POST(req: NextRequest) {
       const { error: orderInsertErr } = await dbClient.from("orders").insert({
         id: dbOrderId,
         order_number: orderNumber,
-        user_id: user.id,
+        user_id: activeInstructorId,
         status: "COMPLETED",
         subtotal: amountCaptured,
         discount_amount: 0,
@@ -341,7 +343,7 @@ export async function POST(req: NextRequest) {
       const { error: paymentInsertErr } = await dbClient.from("payments").insert({
         id: paymentId,
         order_id: dbOrderId,
-        user_id: user.id,
+        user_id: activeInstructorId,
         amount: amountCaptured,
         currency: "USD",
         provider: "PAYPAL",
@@ -359,11 +361,11 @@ export async function POST(req: NextRequest) {
       }
 
       // Update the instructor profile's plan in Supabase
-      console.log(`[paypal-capture-order] Upgrading profile plan to: ${planName} for user: ${user.id}`);
+      console.log(`[paypal-capture-order] Upgrading profile plan to: ${planName} for user: ${activeInstructorId}`);
       const { error: profileErr } = await dbClient
         .from("profiles")
         .update({ plan: planName })
-        .eq("id", user.id);
+        .eq("id", activeInstructorId);
 
       if (profileErr) {
         console.error("[paypal-capture-order] Error updating profile plan:", profileErr.message);
@@ -374,7 +376,7 @@ export async function POST(req: NextRequest) {
       try {
         const { createNotification } = await import("@/lib/supabase/notifications-helper");
         await createNotification({
-          userId: user.id,
+          userId: activeInstructorId,
           title: "Plan mis à jour !",
           message: `Votre abonnement de formateur a été mis à jour vers le plan "${planName}".`,
           type: "SUCCESS",
@@ -384,8 +386,8 @@ export async function POST(req: NextRequest) {
         // Send invoice to instructor
         const { sendInvoiceEmail } = await import("@/lib/email");
         await sendInvoiceEmail(
-          user.email || "",
-          user.user_metadata?.full_name || user.email?.split("@")[0] || "Formateur",
+          user?.email || "",
+          user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Formateur",
           orderNumber,
           amountCaptured,
           `Abonnement Formateur — Plan ${planName}`,
