@@ -93,13 +93,15 @@ export async function GET(req: NextRequest) {
 
       // Auto-repair profile if fields were in user_metadata but missing in profiles table
       if ((!p.phone && resolvedPhone) || (!p.country && resolvedCountry) || (!p.gender && resolvedGender)) {
-        supabaseAdmin.from('profiles').update({
-          phone: resolvedPhone || undefined,
-          phone_number: resolvedPhone || undefined,
-          country: resolvedCountry || undefined,
-          nationality: resolvedNationality || undefined,
-          gender: resolvedGender || undefined,
-        }).eq('id', p.id).then().catch(() => {});
+        Promise.resolve(
+          supabaseAdmin.from('profiles').update({
+            phone: resolvedPhone || undefined,
+            phone_number: resolvedPhone || undefined,
+            country: resolvedCountry || undefined,
+            nationality: resolvedNationality || undefined,
+            gender: resolvedGender || undefined,
+          }).eq('id', p.id)
+        ).catch(() => {});
       }
 
       return {
