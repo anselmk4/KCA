@@ -56,8 +56,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Upsert into profiles using supabaseAdmin
-    const { data: updatedProfile, error: profileErr } = await supabaseAdmin
-      .from("profiles")
+    const { data: updatedProfile, error: profileErr } = await (supabaseAdmin
+      .from("profiles") as any)
       .upsert({
         id: user.id,
         email: user.email!,
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     if (profileErr) {
       console.error("[profile/complete] Error updating profiles table:", profileErr.message);
       // Fallback update
-      await supabaseAdmin.from("profiles").update(profileUpdates).eq("id", user.id);
+      await (supabaseAdmin.from("profiles") as any).update(profileUpdates).eq("id", user.id);
     }
 
     // 2. Synchronize user_metadata in auth.users
