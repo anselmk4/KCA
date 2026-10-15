@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { verifyDigitalProductToken } from "@/lib/digital-product-token";
+import { applyDynamicWatermark } from "@/lib/pdf-watermark";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,13 @@ export async function GET(
     let hasAccess = isFree;
     let accessReason = isFree ? "Produit gratuit" : "";
 
+    // Métadonnées d'identification pour le filigrane anti-partage
+    let buyerEmail = user?.email || "";
+    let buyerName = user?.user_metadata?.full_name || user?.user_metadata?.name || "";
+    let buyerPhone = user?.user_metadata?.phone_number || user?.user_metadata?.phone || "";
+    let orderId = "";
+    let purchaseDate = "";
+
     // 2. Vérification A : L'utilisateur connecté est-il l'auteur ?
     if (!hasAccess && user && product.author_id === user.id) {
       hasAccess = true;
@@ -46,18 +54,37 @@ export async function GET(
     }
 
     // 3. Vérification B : L'utilisateur connecté a-t-il acheté ce produit ?
-    if (!hasAccess && user) {
+    if (user) {
       const { data: purchase } = await (admin as any)
         .from("digital_product_purchases")
-        .select("id, payment_status")
+        .select("id, payment_status, created_at")
         .eq("product_id", productId)
         .eq("user_id", user.id)
         .eq("payment_status", "COMPLETED")
         .maybeSingle();
 
       if (purchase) {
-        hasAccess = true;
-        accessReason = "Achat vérifié (compte connecté)";
+        if (!hasAccess) {
+          hasAccess = true;
+          accessReason = "Achat vérifié (compte connecté)";
+        }
+        orderId = purchase.id;
+        purchaseDate = purchase.created_at;
+      }
+
+      // Compléter les coordonnées de l'acheteur depuis son profil
+      const { data: userProfile } = await (admin as any)
+        .from("profiles")
+        .select("full_name, email, phone, phone_number")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (userProfile) {
+        if (userProfile.full_name) buyerName = userProfile.full_name;
+        if (userProfile.email && !buyerEmail) buyerEmail = userProfile.email;
+        if (userProfile.phone || userProfile.phone_number) {
+          buyerPhone = userProfile.phone || userProfile.phone_number;
+        }
       }
     }
 
@@ -67,11 +94,18 @@ export async function GET(
 
       if (tokenResult.valid && tokenResult.payload) {
         const { purchaseId, buyerIdentifier } = tokenResult.payload;
+        orderId = purchaseId || "";
+
+        if (buyerIdentifier?.includes("@")) {
+          buyerEmail = buyerIdentifier;
+        } else if (buyerIdentifier) {
+          buyerName = buyerIdentifier;
+        }
 
         // Contrôle d'intégrité en base de données : vérifier que l'achat est réellement COMPLETED
         const { data: purchaseRow, error: purchaseErr } = await (admin as any)
           .from("digital_product_purchases")
-          .select("id, payment_status, product_id")
+          .select("id, payment_status, product_id, user_id, created_at")
           .eq("id", purchaseId)
           .eq("product_id", productId)
           .eq("payment_status", "COMPLETED")
@@ -80,6 +114,23 @@ export async function GET(
         if (purchaseRow && !purchaseErr) {
           hasAccess = true;
           accessReason = `Jeton d'achat vérifié (${buyerIdentifier})`;
+          purchaseDate = purchaseRow.created_at;
+
+          if (purchaseRow.user_id) {
+            const { data: userProfile } = await (admin as any)
+              .from("profiles")
+              .select("full_name, email, phone, phone_number")
+              .eq("id", purchaseRow.user_id)
+              .maybeSingle();
+
+            if (userProfile) {
+              if (userProfile.full_name && !buyerName) buyerName = userProfile.full_name;
+              if (userProfile.email && !buyerEmail) buyerEmail = userProfile.email;
+              if (userProfile.phone || userProfile.phone_number) {
+                buyerPhone = userProfile.phone || userProfile.phone_number;
+              }
+            }
+          }
         } else {
           return NextResponse.json(
             {
@@ -227,14 +278,34 @@ export async function GET(
       );
     }
 
-    // 6. Renvoyer le fichier en flux binaire direct avec en-têtes stricts anti-fuite
-    const uint8Array = new Uint8Array(fileBuffer);
-    return new NextResponse(uint8Array, {
+    // 6. SÉCURITÉ ANTI-FUITE : Application du filigrane dynamique personnalisé sur les PDFs
+    let finalPayload: Uint8Array = new Uint8Array(fileBuffer);
+    const isPdf =
+      detectedMimeType === "application/pdf" ||
+      rawFileName.toLowerCase().endsWith(".pdf");
+
+    if (isPdf) {
+      const stampEmail = buyerEmail || user?.email || "acheteur-kca@ansella.app";
+      try {
+        finalPayload = await applyDynamicWatermark(fileBuffer, {
+          buyerName,
+          buyerEmail: stampEmail,
+          buyerPhone,
+          orderId,
+          purchaseDate,
+        });
+      } catch (watermarkErr) {
+        console.error("[Download] Watermarking exception:", watermarkErr);
+      }
+    }
+
+    // 7. Renvoyer le fichier sécurisé en flux binaire direct avec en-têtes stricts anti-fuite
+    return new NextResponse(finalPayload as any, {
       status: 200,
       headers: {
         "Content-Type": detectedMimeType,
         "Content-Disposition": `attachment; filename="${rawFileName}"; filename*=UTF-8''${safeFileName}`,
-        "Content-Length": fileBuffer.length.toString(),
+        "Content-Length": finalPayload.length.toString(),
         "Cache-Control": "private, no-cache, no-store, must-revalidate",
         Pragma: "no-cache",
         Expires: "0",
