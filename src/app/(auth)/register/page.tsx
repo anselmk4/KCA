@@ -120,6 +120,7 @@ function RegisterForm() {
 
   const [role, setRole] = useState<"INSTRUCTOR" | "STUDENT" | null>(null);
   const [step, setStep] = useState(1); // Steps 1–4
+  const ENABLE_GOOGLE_AUTH = false; // Désactivé temporairement pour garantir la collecte obligatoire des informations (pays, téléphone, genre)
 
   // Step 1 — Personal info
   const [name, setName] = useState("");
@@ -297,6 +298,10 @@ function RegisterForm() {
   // ── Google OAuth ──────────────────────────────────────────────────────────
 
   const handleGoogleRegister = async () => {
+    if (!ENABLE_GOOGLE_AUTH) {
+      setFormError("L'inscription via Google est temporairement désactivée. Veuillez renseigner le formulaire ci-dessous.");
+      return;
+    }
     setFormError(null);
     setGoogleLoading(true);
     try {
@@ -739,38 +744,42 @@ function RegisterForm() {
                 )}
               </div>
 
-              {/* Google signup divider */}
-              <div className="relative my-4">
-                <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                  <div className="w-full border-t border-zinc-200 dark:border-zinc-800" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white dark:bg-zinc-900 px-3 text-zinc-400 font-bold">{language === "en" ? "Or use" : "Ou utiliser"}</span>
-                </div>
-              </div>
+              {/* Google signup divider (Temporairement désactivé) */}
+              {ENABLE_GOOGLE_AUTH && (
+                <>
+                  <div className="relative my-4">
+                    <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                      <div className="w-full border-t border-zinc-200 dark:border-zinc-800" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-white dark:bg-zinc-900 px-3 text-zinc-400 font-bold">{language === "en" ? "Or use" : "Ou utiliser"}</span>
+                    </div>
+                  </div>
 
-              <button
-                type="button"
-                disabled={loading || checkingEmail || googleLoading}
-                onClick={handleGoogleRegister}
-                className="w-full py-3 px-4 bg-white hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-bold rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-70 cursor-pointer text-xs"
-              >
-                {googleLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.47 15.01 1 12 1 7.21 1 3.19 3.78 1.28 7.82l3.86 3C6.07 7.78 8.81 5.04 12 5.04z" />
-                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.92c2.2-2.03 3.67-5.02 3.67-8.65z" />
-                    <path fill="#FBBC05" d="M5.14 14.82c-.25-.74-.39-1.53-.39-2.35s.14-1.61.39-2.35L1.28 7.12C.46 8.78 0 10.63 0 12.5s.46 3.72 1.28 5.38l3.86-3.06z" />
-                    <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.92c-1.04.7-2.38 1.12-3.83 1.12-3.19 0-5.93-2.74-6.86-5.78l-3.86 3C3.19 20.22 7.21 23 12 23z" />
-                  </svg>
-                )}
-                <span>
-                  {role === "INSTRUCTOR"
-                    ? (language === "en" ? "Sign up with Google (Instructor Profile)" : "S'inscrire avec Google (Profil Formateur)")
-                    : (language === "en" ? "Sign up with Google (Learner Profile)" : "S'inscrire avec Google (Profil Apprenant)")}
-                </span>
-              </button>
+                  <button
+                    type="button"
+                    disabled={loading || checkingEmail || googleLoading}
+                    onClick={handleGoogleRegister}
+                    className="w-full py-3 px-4 bg-white hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-bold rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-70 cursor-pointer text-xs"
+                  >
+                    {googleLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <svg className="w-4 h-4" viewBox="0 0 24 24">
+                        <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.47 15.01 1 12 1 7.21 1 3.19 3.78 1.28 7.82l3.86 3C6.07 7.78 8.81 5.04 12 5.04z" />
+                        <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.92c2.2-2.03 3.67-5.02 3.67-8.65z" />
+                        <path fill="#FBBC05" d="M5.14 14.82c-.25-.74-.39-1.53-.39-2.35s.14-1.61.39-2.35L1.28 7.12C.46 8.78 0 10.63 0 12.5s.46 3.72 1.28 5.38l3.86-3.06z" />
+                        <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.92c-1.04.7-2.38 1.12-3.83 1.12-3.19 0-5.93-2.74-6.86-5.78l-3.86 3C3.19 20.22 7.21 23 12 23z" />
+                      </svg>
+                    )}
+                    <span>
+                      {role === "INSTRUCTOR"
+                        ? (language === "en" ? "Sign up with Google (Instructor Profile)" : "S'inscrire avec Google (Profil Formateur)")
+                        : (language === "en" ? "Sign up with Google (Learner Profile)" : "S'inscrire avec Google (Profil Apprenant)")}
+                    </span>
+                  </button>
+                </>
+              )}
             </div>
           )}
 
