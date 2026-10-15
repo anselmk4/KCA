@@ -49,19 +49,21 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    // 3. Fetch Auth Users to check email_confirmed_at
-    const authUserMap = new Map<string, { email_confirmed_at: string | null }>();
+    // 3. Fetch Auth Users with full metadata
+    const authUserMap = new Map<string, any>();
     try {
-      const { data: authData } = await supabaseAdmin.auth.admin.listUsers();
+      const { data: authData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
       authData?.users?.forEach(u => {
-        authUserMap.set(u.id, { email_confirmed_at: u.email_confirmed_at || null });
+        authUserMap.set(u.id, u);
       });
     } catch (authErr) {
       console.warn("[admin/users/list] Auth user list warning:", authErr);
     }
 
     // 4. Map profiles to admin user items
+    const profileIds = new Set<string>();
     const users = (profiles || []).map((p: any) => {
+      profileIds.add(p.id);
       const userRolesList = roleMap.get(p.id) || [];
       let role = 'STUDENT';
       if (userRolesList.includes('SUPER_ADMIN')) role = 'SUPER_ADMIN';
@@ -69,6 +71,7 @@ export async function GET(req: NextRequest) {
       else if (userRolesList.includes('INSTRUCTOR')) role = 'INSTRUCTOR';
 
       const authUser = authUserMap.get(p.id);
+      const meta = authUser?.user_metadata || {};
       const isEmailConfirmed = !!authUser?.email_confirmed_at;
 
       let status: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE' = 'ACTIVE';
@@ -78,27 +81,48 @@ export async function GET(req: NextRequest) {
         status = 'INACTIVE';
       }
 
+      // Merge data from both profiles and auth user_metadata (covering both column naming conventions)
+      const resolvedPhone = p.phone || p.phone_number || meta.phone_number || meta.phone || authUser?.phone || '';
+      const resolvedCountry = p.country || meta.country || p.nationality || meta.nationality || '';
+      const resolvedNationality = p.nationality || meta.nationality || p.country || meta.country || '';
+      const resolvedGender = p.gender || meta.gender || '';
+      const resolvedBio = p.bio || meta.bio || '';
+      const resolvedAcademy = p.academy_name || meta.academy_name || '';
+      const resolvedSpecialty = p.specialty || meta.thematic || meta.specialty || '';
+      const resolvedLevel = p.level || meta.student_level || 'Débutant';
+
+      // Auto-repair profile if fields were in user_metadata but missing in profiles table
+      if ((!p.phone && resolvedPhone) || (!p.country && resolvedCountry) || (!p.gender && resolvedGender)) {
+        supabaseAdmin.from('profiles').update({
+          phone: resolvedPhone || undefined,
+          phone_number: resolvedPhone || undefined,
+          country: resolvedCountry || undefined,
+          nationality: resolvedNationality || undefined,
+          gender: resolvedGender || undefined,
+        }).eq('id', p.id).then().catch(() => {});
+      }
+
       return {
         id: p.id,
-        name: p.full_name || 'Utilisateur anonyme',
-        email: p.email || '',
+        name: p.full_name || meta.full_name || meta.name || 'Utilisateur anonyme',
+        email: p.email || authUser?.email || '',
         role,
         status,
         plan: p.plan || 'FREE',
-        level: p.level || 'Débutant',
-        joinedAt: p.created_at || new Date().toISOString(),
-        phoneNumber: p.phone || '',
-        country: p.nationality || '',
-        gender: p.gender || '',
-        bio: p.bio || '',
-        nationality: p.nationality || '',
+        level: resolvedLevel,
+        joinedAt: p.created_at || authUser?.created_at || new Date().toISOString(),
+        phoneNumber: resolvedPhone,
+        country: resolvedCountry,
+        gender: resolvedGender,
+        bio: resolvedBio,
+        nationality: resolvedNationality,
         website: p.website || '',
         twitter: p.twitter || '',
         linkedin: p.linkedin || '',
         youtube: p.youtube || '',
         instagram: p.instagram || '',
-        specialty: p.specialty || '',
-        academyName: p.academy_name || '',
+        specialty: resolvedSpecialty,
+        academyName: resolvedAcademy,
         academyTagline: p.academy_tagline || '',
         academicBackground: p.academic_background || '',
         certifications: p.certifications || '',
@@ -107,6 +131,52 @@ export async function GET(req: NextRequest) {
         isEmailConfirmed
       };
     });
+
+    // Also include any auth users that do not yet have a row in profiles
+    for (const [authId, authU] of authUserMap.entries()) {
+      if (!profileIds.has(authId)) {
+        const meta = authU.user_metadata || {};
+        const userRolesList = roleMap.get(authId) || [];
+        let role = 'STUDENT';
+        if (userRolesList.includes('SUPER_ADMIN')) role = 'SUPER_ADMIN';
+        else if (userRolesList.includes('ADMIN')) role = 'ADMIN';
+        else if (userRolesList.includes('INSTRUCTOR')) role = 'INSTRUCTOR';
+
+        const resolvedPhone = meta.phone_number || meta.phone || authU.phone || '';
+        const resolvedCountry = meta.country || meta.nationality || '';
+        const resolvedNationality = meta.nationality || meta.country || '';
+        const resolvedGender = meta.gender || '';
+
+        users.push({
+          id: authId,
+          name: meta.full_name || meta.name || authU.email?.split('@')[0] || 'Utilisateur',
+          email: authU.email || '',
+          role: role as any,
+          status: authU.email_confirmed_at ? 'ACTIVE' : 'INACTIVE',
+          plan: 'FREE',
+          level: meta.student_level || 'Débutant',
+          joinedAt: authU.created_at || new Date().toISOString(),
+          phoneNumber: resolvedPhone,
+          country: resolvedCountry,
+          gender: resolvedGender,
+          bio: meta.bio || '',
+          nationality: resolvedNationality,
+          website: '',
+          twitter: '',
+          linkedin: '',
+          youtube: '',
+          instagram: '',
+          specialty: meta.thematic || '',
+          academyName: meta.academy_name || '',
+          academyTagline: '',
+          academicBackground: '',
+          certifications: '',
+          referralCode: '',
+          affiliatePoints: 0,
+          isEmailConfirmed: !!authU.email_confirmed_at,
+        });
+      }
+    }
 
     users.sort((a: any, b: any) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime());
 

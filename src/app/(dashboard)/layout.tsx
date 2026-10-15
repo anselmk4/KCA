@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { DashboardHeader } from "@/components/layout/DashboardHeader";
 import { getSimulatedSession } from "@/lib/rbac";
 import { OnboardingTour } from "@/components/layout/OnboardingTour";
+import { CompleteProfileModal } from "@/components/auth/CompleteProfileModal";
 import Chatbot from "@/components/Chatbot";
 import { AlertTriangle, X } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
@@ -100,6 +101,7 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
+      <CompleteProfileModal />
       <OnboardingTour />
       <Chatbot />
     </div>

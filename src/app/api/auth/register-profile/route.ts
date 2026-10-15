@@ -60,7 +60,9 @@ export async function POST(req: NextRequest) {
       status: initialStatus,
       plan: "FREE",
       nationality: country || null,
+      country: country || null,
       phone: phone || null,
+      phone_number: phone || null,
       gender: gender || null,
     };
 

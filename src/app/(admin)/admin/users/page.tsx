@@ -27,6 +27,26 @@ import {
   Trash2,
   AlertCircle
 } from "lucide-react";
+import { COUNTRIES } from "@/lib/countries";
+
+function formatCountryDisplay(val?: string) {
+  if (!val || !val.trim()) return "Non renseigné";
+  const trimmed = val.trim();
+  const found = COUNTRIES.find(
+    (c) => c.code.toLowerCase() === trimmed.toLowerCase() || c.name.toLowerCase() === trimmed.toLowerCase()
+  );
+  if (found) return `${found.flag} ${found.name}`;
+  return trimmed;
+}
+
+function formatGenderDisplay(val?: string) {
+  if (!val || !val.trim()) return "Non renseigné";
+  const g = val.toLowerCase().trim();
+  if (g === "m" || g === "male" || g === "homme") return "Masculin";
+  if (g === "f" || g === "female" || g === "femme") return "Féminin";
+  return val;
+}
+
 
 type RoleName = 'STUDENT' | 'INSTRUCTOR' | 'ADMIN' | 'SUPER_ADMIN';
 
@@ -228,11 +248,11 @@ export default function AdminUsersPage() {
             plan: p.plan || 'FREE',
             level: p.level || 'Débutant',
             joinedAt: p.created_at || new Date().toISOString(),
-            phoneNumber: p.phone || '',
-            country: p.nationality || '',
+            phoneNumber: p.phone || p.phone_number || '',
+            country: p.country || p.nationality || '',
             gender: p.gender || '',
             bio: p.bio || '',
-            nationality: p.nationality || '',
+            nationality: p.nationality || p.country || '',
             website: p.website || '',
             twitter: p.twitter || '',
             linkedin: p.linkedin || '',
@@ -974,11 +994,11 @@ export default function AdminUsersPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Pays de résidence</span>
-                        <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">{openUser.country || "Non renseigné"}</span>
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">{formatCountryDisplay(openUser.country)}</span>
                       </div>
                       <div>
                         <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Nationalité / Origine</span>
-                        <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">{openUser.nationality || "Non renseigné"}</span>
+                        <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">{formatCountryDisplay(openUser.nationality)}</span>
                       </div>
                     </div>
 
@@ -991,12 +1011,7 @@ export default function AdminUsersPage() {
                       <div>
                         <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Genre</span>
                         <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">
-                          {(() => {
-                            const g = (openUser.gender || '').toLowerCase();
-                            if (g === 'm' || g === 'male' || g === 'homme') return 'Masculin';
-                            if (g === 'f' || g === 'female' || g === 'femme') return 'Féminin';
-                            return openUser.gender || 'Non renseigné';
-                          })()}
+                          {formatGenderDisplay(openUser.gender)}
                         </span>
                       </div>
                     </div>

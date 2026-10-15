@@ -42,6 +42,7 @@ import { getSimulatedSession, setSimulatedSession, clearSimulatedSession } from 
 import { getConversationsForUser } from "@/lib/chat";
 import { supabase } from "@/lib/supabase/client";
 import { OnboardingTour } from "@/components/layout/OnboardingTour";
+import { CompleteProfileModal } from "@/components/auth/CompleteProfileModal";
 import { InstructorAcademySetupModal } from "@/components/instructor/InstructorAcademySetupModal";
 import Chatbot from "@/components/Chatbot";
 import { useLanguage } from "@/context/LanguageContext";
@@ -729,6 +730,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
           </div>
         </div>
       )}
+      <CompleteProfileModal />
       <OnboardingTour />
       <InstructorAcademySetupModal onCompleted={(data) => setAcademyName(data.academy_name)} />
       <Chatbot />

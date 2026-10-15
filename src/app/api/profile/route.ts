@@ -40,9 +40,12 @@ export async function PUT(req: NextRequest) {
     // All supported profile fields
     const allowedFields: Record<string, string> = {
       name: 'full_name',
+      full_name: 'full_name',
       bio: 'bio',
       nationality: 'nationality',
+      country: 'country',
       phone: 'phone',
+      phone_number: 'phone_number',
       gender: 'gender',
       website: 'website',
       twitter: 'twitter',
@@ -65,6 +68,12 @@ export async function PUT(req: NextRequest) {
         updates[dbCol] = body[bodyKey];
       }
     }
+
+    // Ensure reciprocal column synchronization (country <-> nationality, phone <-> phone_number)
+    if (updates.country && !updates.nationality) updates.nationality = updates.country;
+    if (updates.nationality && !updates.country) updates.country = updates.nationality;
+    if (updates.phone && !updates.phone_number) updates.phone_number = updates.phone;
+    if (updates.phone_number && !updates.phone) updates.phone = updates.phone_number;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'Aucune donnée à mettre à jour' }, { status: 400 });
