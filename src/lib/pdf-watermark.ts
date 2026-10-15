@@ -42,8 +42,8 @@ export async function applyDynamicWatermark(
     const phoneRef = info.buyerPhone ? ` • Tél : ${info.buyerPhone}` : "";
 
     const footerLine1 = `Document certifié et sous licence exclusive pour : ${recipientString}${phoneRef}${orderRef}`;
-    const footerLine2 = `Acheté le ${formattedDate} sur KCA. Reproduction, revente ou diffusion non autorisée strictement interdite (Art. L.335-2 CPI).`;
-    const diagonalText = `LICENCE : ${cleanEmail} • KCA`;
+    const footerLine2 = `Acheté le ${formattedDate} sur Ansella. Reproduction, revente ou diffusion non autorisée strictement interdite (Art. L.335-2 CPI).`;
+    const diagonalText = `LICENCE : ${cleanEmail} • Ansella`;
 
     for (let i = 0; i < totalPages; i++) {
       const page = pages[i];
@@ -106,11 +106,11 @@ export async function applyDynamicWatermark(
     }
 
     // Métadonnées du PDF
-    pdfDoc.setAuthor("KCA Digital Platform");
+    pdfDoc.setAuthor("Ansella Platform");
     pdfDoc.setSubject(`Exemplaire certifié et attribué à ${cleanEmail}`);
-    pdfDoc.setProducer("KCA Secure Dynamic Watermarking Engine");
+    pdfDoc.setProducer("Ansella Secure Dynamic Watermarking Engine");
     if (info.orderId) {
-      pdfDoc.setKeywords(["KCA", "Licence", cleanEmail, info.orderId]);
+      pdfDoc.setKeywords(["Ansella", "Licence", cleanEmail, info.orderId]);
     }
 
     return await pdfDoc.save();
