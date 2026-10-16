@@ -72,13 +72,28 @@ export async function GET(req: NextRequest) {
 
       const authUser = authUserMap.get(p.id);
       const meta = authUser?.user_metadata || {};
+      const hasLoggedIn = !!authUser?.last_sign_in_at;
       const isEmailConfirmed = !!authUser?.email_confirmed_at;
 
+      // Status resolution:
+      // SUSPENDED stays SUSPENDED.
+      // All other accounts (active, connected, or registered) are ACTIVE.
+      // Auto-heal any profiles that were mistakenly set to INACTIVE.
       let status: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE' = 'ACTIVE';
       if (p.status === 'SUSPENDED') {
         status = 'SUSPENDED';
-      } else if (p.status === 'INACTIVE' || !isEmailConfirmed) {
-        status = 'INACTIVE';
+      } else {
+        status = 'ACTIVE';
+        if (p.status === 'INACTIVE' || !p.status) {
+          Promise.resolve(
+            supabaseAdmin.from('profiles').update({ status: 'ACTIVE' }).eq('id', p.id)
+          ).catch(() => {});
+          if (!isEmailConfirmed) {
+            Promise.resolve(
+              supabaseAdmin.auth.admin.updateUserById(p.id, { email_confirm: true })
+            ).catch(() => {});
+          }
+        }
       }
 
       // Merge data from both profiles and auth user_metadata (covering both column naming conventions)
@@ -109,7 +124,7 @@ export async function GET(req: NextRequest) {
         name: p.full_name || meta.full_name || meta.name || 'Utilisateur anonyme',
         email: p.email || authUser?.email || '',
         role,
-        status,
+        status: status as 'ACTIVE' | 'SUSPENDED' | 'INACTIVE',
         plan: p.plan || 'FREE',
         level: resolvedLevel,
         joinedAt: p.created_at || authUser?.created_at || new Date().toISOString(),
@@ -154,7 +169,7 @@ export async function GET(req: NextRequest) {
           name: meta.full_name || meta.name || authU.email?.split('@')[0] || 'Utilisateur',
           email: authU.email || '',
           role: role as any,
-          status: authU.email_confirmed_at ? 'ACTIVE' : 'INACTIVE',
+          status: (authU.last_sign_in_at || authU.email_confirmed_at || authU.created_at) ? 'ACTIVE' : 'INACTIVE',
           plan: 'FREE',
           level: meta.student_level || 'Débutant',
           joinedAt: authU.created_at || new Date().toISOString(),

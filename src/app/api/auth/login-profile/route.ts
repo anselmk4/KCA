@@ -24,13 +24,20 @@ export async function POST(req: NextRequest) {
       console.warn('[login-profile] Could not fetch auth user:', authErr);
     }
 
-    // 3. Auto-repair / Auto-activate: if email is confirmed in Auth but profile status is INACTIVE, activate it!
-    if (profile && isEmailConfirmed && profile.status === 'INACTIVE') {
-      await supabaseAdmin
-        .from('profiles')
-        .update({ status: 'ACTIVE' })
-        .eq('id', userId);
-      profile.status = 'ACTIVE';
+    // 3. Auto-repair / Auto-activate: upon login, ensure profile is ACTIVE if not SUSPENDED
+    if (profile && profile.status !== 'SUSPENDED') {
+      if (profile.status !== 'ACTIVE') {
+        await supabaseAdmin
+          .from('profiles')
+          .update({ status: 'ACTIVE' })
+          .eq('id', userId);
+        profile.status = 'ACTIVE';
+      }
+      if (!isEmailConfirmed) {
+        try {
+          await supabaseAdmin.auth.admin.updateUserById(userId, { email_confirm: true });
+        } catch (e) {}
+      }
     }
 
     // 4. If profile is missing, auto-create it (repair)

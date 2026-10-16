@@ -244,7 +244,7 @@ export default function AdminUsersPage() {
             name: p.full_name || 'Utilisateur anonyme',
             email: p.email || '',
             role,
-            status: p.status === 'SUSPENDED' ? 'SUSPENDED' : (p.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE'),
+            status: p.status === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE',
             plan: p.plan || 'FREE',
             level: p.level || 'Débutant',
             joinedAt: p.created_at || new Date().toISOString(),

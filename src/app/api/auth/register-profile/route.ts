@@ -33,15 +33,15 @@ export async function POST(req: NextRequest) {
       finalRole = "STUDENT";
     }
 
-    // Verify user exists in Auth
-    let initialStatus = "INACTIVE";
+    // Verify user exists in Auth and mark active
+    let initialStatus = "ACTIVE";
     try {
       const { data: authUserData, error: authUserErr } = await supabaseAdmin.auth.admin.getUserById(userId);
       if (authUserErr || !authUserData?.user) {
         return NextResponse.json({ error: "Utilisateur d'authentification introuvable." }, { status: 404 });
       }
-      if (authUserData.user.email_confirmed_at) {
-        initialStatus = "ACTIVE";
+      if (!authUserData.user.email_confirmed_at) {
+        await supabaseAdmin.auth.admin.updateUserById(userId, { email_confirm: true }).catch(() => {});
       }
     } catch (e) {
       console.warn("[register-profile] Auth user lookup check:", e);

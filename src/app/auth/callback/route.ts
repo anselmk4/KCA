@@ -185,13 +185,13 @@ async function bootstrapUserAndGetRole(
       id: user.id,
       email: user.email!,
       full_name: fullName,
-      status: isConfirmed ? 'ACTIVE' : 'INACTIVE',
+      status: 'ACTIVE',
       plan: 'FREE',
     });
     if (insertError) {
       console.error('[callback] profile insert error:', insertError.message);
     }
-  } else if (isConfirmed && profile.status === 'INACTIVE') {
+  } else if (profile.status !== 'SUSPENDED' && profile.status !== 'ACTIVE') {
     await supabaseAdmin
       .from('profiles')
       .update({ status: 'ACTIVE' })
