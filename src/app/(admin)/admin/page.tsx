@@ -171,26 +171,36 @@ export default function AdminDashboardPage() {
       let filterEnd = new Date();
 
       if (timeFilter === "DAY") {
-        filterStart = new Date(now.setHours(0, 0, 0, 0));
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        filterStart = d;
       } else if (timeFilter === "WEEK") {
-        const first = now.getDate() - now.getDay();
-        filterStart = new Date(now.setDate(first));
-        filterStart.setHours(0, 0, 0, 0);
+        const d = new Date();
+        const first = d.getDate() - d.getDay();
+        d.setDate(first);
+        d.setHours(0, 0, 0, 0);
+        filterStart = d;
       } else if (timeFilter === "MONTH") {
         filterStart = new Date(now.getFullYear(), now.getMonth(), 1);
       } else if (timeFilter === "YEAR") {
         filterStart = new Date(now.getFullYear(), 0, 1);
       } else if (timeFilter === "CUSTOM" && startDate) {
         filterStart = new Date(startDate);
-        if (endDate) filterEnd = new Date(endDate);
+        if (endDate) {
+          const endD = new Date(endDate);
+          endD.setHours(23, 59, 59, 999);
+          filterEnd = endD;
+        }
       }
 
       // Filter PAID payments based on date range for revenue, commissions, & charts
-      const paidPayments = (payments || []).filter(p => p.status === "PAID");
+      const paidPayments = (payments || []).filter(p => (p.status || "").toUpperCase() === "PAID");
       const filteredPayments = paidPayments.filter(p => {
-        if (!p.paid_at) return false;
-        const pDate = new Date(p.paid_at);
-        return pDate >= filterStart && pDate <= filterEnd;
+        const dateVal = p.paid_at || p.paidAt || p.date || p.created_at || p.createdAt;
+        if (!dateVal) return true;
+        const pDate = new Date(dateVal);
+        const endWithGrace = new Date(filterEnd.getTime() + 86400000);
+        return pDate >= filterStart && pDate <= endWithGrace;
       });
 
       // Calculate Revenue, Commissions & Instructor shares
@@ -202,27 +212,31 @@ export default function AdminDashboardPage() {
       let planCounts = { BASE: 0, PRO: 0, MAX: 0 };
 
       filteredPayments.forEach(p => {
-        const amount = p.amount || 0;
+        const amount = Number(p.amount) || 0;
         totalRevenue += amount;
 
         // Decode method field: CARRIER::TYPE::ITEM_ID
-        const methodParts = (p.method || '').split('::');
-        const paymentType = methodParts[1] || '';
-        const itemId = methodParts[2] || '';
+        const rawMethod = p.rawMethod || p.method || "";
+        const methodParts = rawMethod.split("::");
+        const paymentType = methodParts[1] || p.paymentType || "";
+        const itemId = methodParts[2] || p.courseId || p.course_id || "";
 
-        const isPlan = paymentType === 'INSTRUCTOR_PLAN';
+        const isPlan = paymentType === "INSTRUCTOR_PLAN" ||
+          rawMethod.includes("INSTRUCTOR_PLAN") ||
+          (p.courseTitle || "").includes("Abonnement Formateur") ||
+          (p.courseTitle || "").includes("Forfait Formateur");
 
-        if (isPlan && itemId) {
+        if (isPlan) {
           // Plan purchase → 100% platform revenue
           plansRevenue += amount;
-          const planKey = itemId.toUpperCase() as "BASE" | "PRO" | "MAX";
+          const planKey = (itemId || "PRO").toUpperCase() as "BASE" | "PRO" | "MAX";
           if (planKey in planCounts) planCounts[planKey] += 1;
         } else {
           // Course purchase → split by instructor plan commission rate
-          const courseId = itemId || '';
+          const courseId = itemId || "";
           const courseObj = courses?.find(c => c.id === courseId);
-          const instructorId = courseObj?.instructor_id || '';
-          const instPlan = instructorPlans[instructorId] || 'FREE';
+          const instructorId = courseObj?.instructor_id || "";
+          const instPlan = instructorPlans[instructorId] || "FREE";
           const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;
 
           commissions += amount * commConfig.commissionRate;
@@ -277,35 +291,40 @@ export default function AdminDashboardPage() {
       }
 
       filteredPayments.forEach(p => {
-        if (!p.paid_at) return;
-        const pDate = new Date(p.paid_at);
+        const dateVal = p.paid_at || p.paidAt || p.date || p.created_at || p.createdAt;
+        const pDate = dateVal ? new Date(dateVal) : new Date();
         const label = timeFilter === "YEAR"
           ? pDate.toLocaleDateString("fr-FR", { month: "short" })
           : pDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
 
         // Decode method field: CARRIER::TYPE::ITEM_ID
-        const methodParts = (p.method || '').split('::');
-        const paymentType = methodParts[1] || '';
-        const itemId = methodParts[2] || '';
-        const isPlan = paymentType === 'INSTRUCTOR_PLAN';
+        const rawMethod = p.rawMethod || p.method || "";
+        const methodParts = rawMethod.split("::");
+        const paymentType = methodParts[1] || p.paymentType || "";
+        const itemId = methodParts[2] || p.courseId || p.course_id || "";
+        const isPlan = paymentType === "INSTRUCTOR_PLAN" ||
+          rawMethod.includes("INSTRUCTOR_PLAN") ||
+          (p.courseTitle || "").includes("Abonnement Formateur") ||
+          (p.courseTitle || "").includes("Forfait Formateur");
 
         let commAmount = 0;
-        if (!isPlan && itemId) {
+        const amount = Number(p.amount) || 0;
+        if (!isPlan) {
           const courseObj = courses?.find(c => c.id === itemId);
           const instructorId = courseObj?.instructor_id || "";
           const instPlan = instructorPlans[instructorId] || "FREE";
           const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;
-          commAmount = (p.amount || 0) * commConfig.commissionRate;
+          commAmount = amount * commConfig.commissionRate;
         }
 
         if (chartMap[label]) {
-          chartMap[label].amount += p.amount || 0;
+          chartMap[label].amount += amount;
           chartMap[label].commission += commAmount;
         } else {
           // If label wasn't pre-filled, dynamically add it
           chartMap[label] = {
             label,
-            amount: p.amount || 0,
+            amount: amount,
             commission: commAmount
           };
         }
@@ -344,7 +363,7 @@ export default function AdminDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [timeFilter, startDate, endDate, stats]);
+  }, [timeFilter, startDate, endDate]);
 
   useEffect(() => {
     calculateStats();

@@ -27,21 +27,22 @@ async function verifyAdminAuth() {
   }
 
   // Super admin email bypass
-  if (user.email && process.env.SUPER_ADMIN_EMAIL && user.email.toLowerCase() === process.env.SUPER_ADMIN_EMAIL.toLowerCase()) {
+  const { isAuthorizedSuperAdmin } = await import("@/lib/rbac");
+  if (isAuthorizedSuperAdmin(user.email)) {
     return { authorized: true, user };
   }
 
   // Role verification (SUPER_ADMIN, ADMIN, or FINANCE_ADMIN)
   const { data: userRoles, error: rolesErr } = await supabaseAdmin
     .from("user_roles")
-    .select("roles!inner(name)")
-    .eq("user_id", user.id) as any;
+    .select("roles(name)")
+    .eq("user_id", user.id);
 
-  if (rolesErr || !userRoles || userRoles.length === 0) {
-    return { authorized: false, status: 403, error: "Non autorisé" };
+  if (rolesErr) {
+    console.warn("[verifyAdminAuth] roles check warning:", rolesErr.message);
   }
 
-  const roleNames = userRoles.map((ur: any) => ur.roles?.name);
+  const roleNames = userRoles?.map((ur: any) => ur.roles?.name) || [];
   const hasAdminAccess = roleNames.some((name: string) => 
     name === "SUPER_ADMIN" || name === "ADMIN" || name === "FINANCE_ADMIN"
   );
@@ -270,29 +271,36 @@ export async function GET(req: NextRequest) {
       return {
         id: p.id,
         orderId: p.order_id,
+        order_id: p.order_id,
         userId: p.user_id,
+        user_id: p.user_id,
         studentName: profile?.full_name || "Utilisateur",
         studentEmail: profile?.email || "Non renseigné",
         studentPhone: manualPhone,
         courseId,
+        course_id: courseId,
         courseTitle,
         amount: p.amount || 0,
         currency: p.currency || "USD",
         status: p.status,
         provider: p.provider,
         rawMethod: p.method,
+        method: p.method,
         formattedMethod,
         paymentType,
         isManual: isManualMethod,
         manualReference,
         failureReason: p.failure_reason,
+        failure_reason: p.failure_reason,
         instructorName: instName,
         instructorPlan: instPlan,
         commissionAmount,
         instructorShareAmount,
         siteAmount,
         paidAt: p.paid_at,
+        paid_at: p.paid_at,
         createdAt: p.created_at,
+        created_at: p.created_at,
         date: p.paid_at || p.created_at,
       };
     });
