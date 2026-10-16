@@ -392,7 +392,7 @@ export default function AdminDashboardPage() {
   const maxChartVal = Math.max(...(stats?.chartData?.map(d => d.amount) || []), 50) * 1.15;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in">
+    <div className="w-full max-w-7xl mx-auto min-w-0 space-y-6 animate-in fade-in">
       {/* Header & Date Filters */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
@@ -403,8 +403,8 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Time Filters */}
-        <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2 rounded-2xl shadow-sm">
-          <div className="bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-xl flex">
+        <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2 rounded-2xl shadow-sm max-w-full overflow-x-auto min-w-0">
+          <div className="bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-xl flex overflow-x-auto max-w-full shrink-0">
             {[
               { id: "DAY", label: "Jour" },
               { id: "WEEK", label: "Semaine" },
@@ -418,7 +418,7 @@ export default function AdminDashboardPage() {
                   setTimeFilter(tab.id as any);
                   if (tab.id === "CUSTOM") initCustomDates();
                 }}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   timeFilter === tab.id
                     ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm"
                     : "text-zinc-500 hover:text-zinc-850 dark:hover:text-zinc-200"
@@ -549,10 +549,10 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Finance Grid (Commissions & Instructor shares) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-w-0">
         {/* SVG Sales Trend Chart */}
-        <div className="lg:col-span-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="lg:col-span-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4 min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h2 className="text-base font-bold text-zinc-900 dark:text-white">Évolution des Ventes & Commissions</h2>
               <p className="text-xxs text-zinc-500">Flux financiers en dollar ($)</p>
@@ -570,13 +570,14 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Interactive SVG Bar Chart */}
-          <div className="h-60 relative w-full flex items-end pt-4 pb-2">
-            {stats.chartData.length === 0 ? (
-              <div className="absolute inset-0 flex items-center justify-center text-zinc-550 text-xs">
-                Aucune donnée à afficher.
-              </div>
-            ) : (
-              <div className="w-full h-full flex justify-between items-end gap-2 px-2">
+          <div className="w-full overflow-x-auto min-w-0 pb-1">
+            <div className="h-60 relative min-w-[320px] sm:min-w-0 w-full flex items-end pt-4 pb-2">
+              {stats.chartData.length === 0 ? (
+                <div className="absolute inset-0 flex items-center justify-center text-zinc-550 text-xs">
+                  Aucune donnée à afficher.
+                </div>
+              ) : (
+                <div className="w-full h-full flex justify-between items-end gap-2 px-2">
                 {stats.chartData.map((d, index) => {
                   const revenueHeight = (d.amount / maxChartVal) * 100;
                   const commissionHeight = (d.commission / maxChartVal) * 100;
@@ -613,6 +614,7 @@ export default function AdminDashboardPage() {
             )}
           </div>
         </div>
+      </div>
 
         {/* Financial Distribution summary */}
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-5 flex flex-col justify-between">

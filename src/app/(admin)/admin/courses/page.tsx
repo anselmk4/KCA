@@ -204,7 +204,7 @@ export default function AdminCoursesPage() {
   });
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in">
+    <div className="w-full max-w-6xl mx-auto min-w-0 space-y-8 animate-in fade-in">
       <div>
         <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Validation des Formations</h1>
         <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">

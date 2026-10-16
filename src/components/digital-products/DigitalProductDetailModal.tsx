@@ -189,37 +189,64 @@ export function DigitalProductDetailModal({
           </div>
 
           {/* Footer Bar */}
-          <div className="p-4 sm:p-6 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-4 shrink-0">
-            <div>
-              <span className="text-[10px] text-zinc-400 block font-bold uppercase">Tarif officiel</span>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-black text-teal-600 dark:text-teal-400">
-                  ${price.toFixed(2)}
-                </span>
-                <span className="text-xs text-zinc-400">USD</span>
+          <div className="p-3.5 sm:p-5 md:p-6 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+            {/* Top row on mobile: Price & Quick Action buttons */}
+            <div className="flex items-center justify-between w-full sm:w-auto">
+              <div>
+                <span className="text-[10px] text-zinc-400 block font-bold uppercase tracking-wider">Tarif officiel</span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-xl sm:text-2xl font-black text-teal-600 dark:text-teal-400">
+                    ${price.toFixed(2)}
+                  </span>
+                  <span className="text-xs text-zinc-400 font-semibold">USD</span>
+                </div>
+              </div>
+
+              {/* Mobile-only secondary buttons */}
+              <div className="flex sm:hidden items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setShowShare(true)}
+                  className="p-2 rounded-xl border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                  title="Partager"
+                >
+                  <Share2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-3 py-1.5 text-xs font-bold text-zinc-500 hover:text-zinc-800 dark:hover:text-white transition-colors cursor-pointer"
+                >
+                  Fermer
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Desktop secondary buttons + Primary CTA */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
+                type="button"
                 onClick={() => setShowShare(true)}
-                className="px-3.5 py-2.5 rounded-2xl border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+                className="hidden sm:inline-flex px-3.5 py-2.5 rounded-2xl border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors items-center gap-1.5 text-xs font-bold cursor-pointer"
                 title="Partager ce produit"
               >
                 <Share2 className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                 <span>Partager</span>
               </button>
               <button
+                type="button"
                 onClick={onClose}
-                className="px-3.5 py-2.5 text-xs font-bold text-zinc-500 hover:text-zinc-800 dark:hover:text-white transition-colors cursor-pointer"
+                className="hidden sm:inline-block px-3.5 py-2.5 text-xs font-bold text-zinc-500 hover:text-zinc-800 dark:hover:text-white transition-colors cursor-pointer"
               >
                 Fermer
               </button>
               <button
+                type="button"
                 onClick={handleOpenCheckout}
-                className="px-5 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white font-extrabold rounded-2xl shadow-xl shadow-teal-500/25 text-xs transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.02]"
+                className="w-full sm:w-auto flex-1 sm:flex-initial justify-center px-5 py-3 sm:py-2.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white font-extrabold rounded-xl sm:rounded-2xl shadow-xl shadow-teal-500/25 text-sm sm:text-xs transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
               >
-                <Download className="w-4 h-4" /> Acheter & Télécharger
+                <Download className="w-4 h-4 shrink-0" />
+                <span>Acheter & Télécharger</span>
               </button>
             </div>
           </div>

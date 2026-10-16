@@ -198,7 +198,7 @@ export default function AdminDigitalProductsPage() {
   };
 
   return (
-    <div className="space-y-6 pb-12 animate-in fade-in duration-300">
+    <div className="w-full max-w-full min-w-0 space-y-6 pb-12 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

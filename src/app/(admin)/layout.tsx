@@ -93,7 +93,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     .split(" ").slice(0, 2).map(w => w[0]?.toUpperCase() || "").join("");
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[#0a0a0b] flex font-sans">
+    <div className="min-h-screen bg-zinc-50 dark:bg-[#0a0a0b] flex flex-col lg:flex-row w-full max-w-full overflow-x-hidden font-sans">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -118,7 +118,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </span>
           </Link>
           <button
-            className="lg:hidden p-1.5 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg"
+            className="lg:hidden p-1.5 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg cursor-pointer"
             onClick={() => setSidebarOpen(false)}
           >
             <X className="w-4 h-4" />
@@ -198,32 +198,33 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* ── Main content ── */}
-      <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
+      <div className="flex-1 min-w-0 w-full max-w-full lg:ml-64 flex flex-col min-h-screen overflow-x-hidden">
         <header className="h-14 bg-white dark:bg-zinc-900 flex items-center justify-between
-          px-4 md:px-6 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-30">
-          <div className="flex items-center gap-3">
+          px-3 sm:px-4 md:px-6 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-30 w-full max-w-full shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
-              className="lg:hidden p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              className="lg:hidden p-2 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               onClick={() => setSidebarOpen(true)}
+              aria-label="Ouvrir le menu"
             >
               <Menu className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-2">
               <ShieldAlert className="w-4 h-4 text-red-500" />
-              <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 hidden sm:block">
+              <span className="text-xs sm:text-sm font-semibold text-zinc-700 dark:text-zinc-200">
                 Mode Administrateur
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <ThemeToggle />
-            <div className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${roleMeta.color}`}>
+            <div className={`px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-semibold ${roleMeta.color}`}>
               {roleMeta.label}
             </div>
           </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-6 overflow-auto">
+        <main className="flex-1 p-3 sm:p-4 md:p-6 w-full max-w-full overflow-x-auto min-w-0">
           {children}
         </main>
       </div>
