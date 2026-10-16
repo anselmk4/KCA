@@ -134,6 +134,7 @@ export async function GET(
       let courseQuery = (admin as any)
         .from("courses")
         .select("*")
+        .eq("status", "PUBLISHED")
         .order("created_at", { ascending: false });
 
       if (collabCourseIds.length > 0) {
@@ -150,7 +151,8 @@ export async function GET(
         const { data: fallbackCourses } = await (admin as any)
           .from("courses")
           .select("id, title, description, price, thumbnail_url, status, instructor_id")
-          .eq("instructor_id", creatorId);
+          .eq("instructor_id", creatorId)
+          .eq("status", "PUBLISHED");
         coursesData = fallbackCourses || [];
       } else {
         coursesData = fetchedCourses || [];
@@ -159,11 +161,11 @@ export async function GET(
       console.error("[CreatorStorefront API] Error fetching courses:", err);
     }
 
-    // Filter out ARCHIVED courses, keep all published/active/draft courses by this author
+    // Strictly keep only PUBLISHED courses for the public store
     const formattedCourses = (coursesData || [])
       .filter((c: any) => {
-        const s = String(c.status || "").toUpperCase();
-        return s !== "ARCHIVED";
+        const s = String(c.status || "").toUpperCase().trim();
+        return s === "PUBLISHED";
       })
       .map((c: any) => ({
         id: c.id,
@@ -174,7 +176,7 @@ export async function GET(
         level: c.level || "Tous niveaux",
         thumbnail_url: c.thumbnail_url || c.cover_image_url || "/placeholder-course.jpg",
         type: c.type || "course",
-        status: c.status || "PUBLISHED",
+        status: "PUBLISHED",
       }));
 
     // 6. Fetch published digital products
@@ -184,14 +186,14 @@ export async function GET(
         "id, author_id, title, description, cover_image_url, price, category, tags, status, file_name, file_size_bytes, preview_url, created_at, file_url"
       )
       .eq("author_id", creatorId)
-      .neq("status", "archived")
+      .eq("status", "published")
       .order("created_at", { ascending: false });
 
     const isCurrentAuthor = currentUser && currentUser.id === creatorId;
 
-    // Sanitize file_url for unauthenticated or non-author viewers
+    // Sanitize file_url and ensure only published digital products are visible to public
     const sanitizedProducts = (digitalProductsData || [])
-      .filter((p: any) => String(p.status || "").toLowerCase() !== "archived")
+      .filter((p: any) => String(p.status || "").toLowerCase().trim() === "published")
       .map((p: any) => {
         const { file_url, ...safeRest } = p;
         return {

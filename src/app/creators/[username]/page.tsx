@@ -108,8 +108,16 @@ export default function CreatorStorefrontPage({
           const data = await res.json();
           if (data.creator) {
             setCreator(data.creator);
-            setDigitalProducts(data.digitalProducts || []);
-            setCourses(data.courses || []);
+            setDigitalProducts(
+              (data.digitalProducts || []).filter(
+                (p: any) => String(p.status || "").toLowerCase().trim() === "published"
+              )
+            );
+            setCourses(
+              (data.courses || []).filter(
+                (c: any) => String(c.status || "").toUpperCase().trim() === "PUBLISHED"
+              )
+            );
           }
         } else {
           console.warn("[CreatorStorefront] Storefront response status:", res.status);
@@ -155,11 +163,12 @@ export default function CreatorStorefrontPage({
     }
   };
 
-  // Filtered courses and digital products
+  // Filtered courses and digital products (strictly PUBLISHED)
   const filteredCourses = useMemo(() => {
-    if (!searchQuery.trim()) return courses;
+    const list = courses.filter((c) => String(c.status || "").toUpperCase().trim() === "PUBLISHED");
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase();
-    return courses.filter(
+    return list.filter(
       (c) =>
         c.title.toLowerCase().includes(q) ||
         (c.description && c.description.toLowerCase().includes(q)) ||
@@ -168,9 +177,10 @@ export default function CreatorStorefrontPage({
   }, [courses, searchQuery]);
 
   const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return digitalProducts;
+    const list = digitalProducts.filter((p) => String(p.status || "").toLowerCase().trim() === "published");
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase();
-    return digitalProducts.filter(
+    return list.filter(
       (p) =>
         p.title.toLowerCase().includes(q) ||
         (p.description && p.description.toLowerCase().includes(q)) ||
