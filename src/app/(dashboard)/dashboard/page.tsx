@@ -19,6 +19,7 @@ import {
   GraduationCap,
   ArrowRight,
   UserCheck,
+  Video,
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
@@ -61,15 +62,54 @@ interface CertificateData {
   issued_at: string;
 }
 
+function SafeThumbnail({
+  src,
+  alt,
+  className = "",
+  fallbackIcon,
+  fallbackBg = "bg-zinc-100 dark:bg-zinc-800",
+}: {
+  src?: string | null;
+  alt: string;
+  className?: string;
+  fallbackIcon: React.ReactNode;
+  fallbackBg?: string;
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
+
+  if (!src || hasError) {
+    return (
+      <div className={`w-full h-full flex items-center justify-center ${fallbackBg}`}>
+        {fallbackIcon}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setHasError(true)}
+      className={`w-full h-full object-cover ${className}`}
+    />
+  );
+}
+
 function getCourseStyles(category: string) {
   const c = (category || "").toLowerCase();
-  if (c.includes("blockchain") || c.includes("web3") || c.includes("nft"))
-    return { color: "text-blue-600", bgColor: "bg-blue-100 dark:bg-blue-900/30", barColor: "bg-blue-500", borderHover: "hover:border-blue-400", icon: <Bitcoin className="w-8 h-8 text-blue-600" /> };
-  if (c.includes("trading") || c.includes("defi") || c.includes("finance"))
-    return { color: "text-emerald-600", bgColor: "bg-emerald-100 dark:bg-emerald-900/30", barColor: "bg-emerald-500", borderHover: "hover:border-emerald-400", icon: <TrendingUp className="w-8 h-8 text-emerald-600" /> };
-  if (c.includes("intelligence") || c.includes("ia") || c.includes("ai"))
-    return { color: "text-purple-600", bgColor: "bg-purple-100 dark:bg-purple-900/30", barColor: "bg-purple-500", borderHover: "hover:border-purple-400", icon: <BrainCircuit className="w-8 h-8 text-purple-600" /> };
-  return { color: "text-teal-600", bgColor: "bg-teal-100 dark:bg-teal-900/30", barColor: "bg-teal-500", borderHover: "hover:border-teal-400", icon: <Code2 className="w-8 h-8 text-teal-600" /> };
+  if (c.includes("blockchain") || c.includes("web3") || c.includes("nft") || c.includes("crypto"))
+    return { color: "text-blue-600 dark:text-blue-450", bgColor: "bg-blue-50 dark:bg-blue-950/30", barColor: "bg-blue-500", borderHover: "hover:border-blue-400", icon: <Bitcoin className="w-8 h-8 text-blue-600 dark:text-blue-450" /> };
+  if (c.includes("trading") || c.includes("defi") || c.includes("finance") || c.includes("bourse"))
+    return { color: "text-emerald-600 dark:text-emerald-450", bgColor: "bg-emerald-50 dark:bg-emerald-950/30", barColor: "bg-emerald-500", borderHover: "hover:border-emerald-400", icon: <TrendingUp className="w-8 h-8 text-emerald-600 dark:text-emerald-450" /> };
+  if (c.includes("intelligence") || c.includes("ia") || c.includes("ai") || c.includes("data"))
+    return { color: "text-purple-600 dark:text-purple-450", bgColor: "bg-purple-50 dark:bg-purple-950/30", barColor: "bg-purple-500", borderHover: "hover:border-purple-400", icon: <BrainCircuit className="w-8 h-8 text-purple-600 dark:text-purple-450" /> };
+  if (c.includes("créat") || c.includes("creat") || c.includes("tiktok") || c.includes("facebook") || c.includes("marketing") || c.includes("youtube") || c.includes("audience") || c.includes("social"))
+    return { color: "text-rose-600 dark:text-rose-450", bgColor: "bg-rose-50 dark:bg-rose-950/30", barColor: "bg-rose-500", borderHover: "hover:border-rose-400", icon: <Video className="w-8 h-8 text-rose-600 dark:text-rose-450" /> };
+  return { color: "text-teal-600 dark:text-teal-450", bgColor: "bg-teal-50 dark:bg-teal-950/30", barColor: "bg-teal-500", borderHover: "hover:border-teal-400", icon: <Code2 className="w-8 h-8 text-teal-600 dark:text-teal-450" /> };
 }
 
 export default function DashboardPage() {
@@ -324,42 +364,48 @@ export default function DashboardPage() {
                   return (
                     <div
                       key={enr.id}
-                      className={`bg-white dark:bg-zinc-900 rounded-2xl p-5 border shadow-sm hover:shadow-md transition-all ${
+                      className={`bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border shadow-sm hover:shadow-md transition-all ${
                         isCurrent ? "border-teal-400 dark:border-teal-700 ring-1 ring-teal-500/20" : "border-zinc-200 dark:border-zinc-800"
                       }`}
                     >
-                      <div className="flex items-start gap-4">
-                        {course.thumbnail_url ? (
-                          <div className="w-16 h-10 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 shrink-0 relative bg-zinc-150">
-                            <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
-                          </div>
-                        ) : (
-                          <div className={`w-12 h-12 ${styles.bgColor} rounded-xl flex items-center justify-center shrink-0`}>
-                            {styles.icon}
-                          </div>
-                        )}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                        <div className="w-full sm:w-28 md:w-36 aspect-video rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shrink-0 relative bg-zinc-100 dark:bg-zinc-800 shadow-xs">
+                          <SafeThumbnail
+                            src={course.thumbnail_url}
+                            alt={course.title}
+                            fallbackIcon={styles.icon}
+                            fallbackBg={styles.bgColor}
+                          />
+                        </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <h3 className="font-bold text-sm text-zinc-900 dark:text-white line-clamp-1">{course.title}</h3>
+                          <div className="flex items-start justify-between gap-2 mb-1.5">
+                            <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-white line-clamp-1">{course.title}</h3>
                             {isCurrent && (
                               <span className="shrink-0 text-[10px] bg-teal-50 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400 font-bold px-2 py-0.5 rounded-full border border-teal-200 dark:border-teal-900/40">
-                                Actif
+                                En cours
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-zinc-400 mb-3">{course.category} · {course.level}</p>
+                          <div className="flex items-center gap-2 text-[11px] text-zinc-500 dark:text-zinc-400 mb-3">
+                            <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-semibold text-[10px]">
+                              {course.category}
+                            </span>
+                            <span>•</span>
+                            <span className="capitalize">{course.level}</span>
+                          </div>
                           <div className="flex items-center gap-3">
-                            <div className="flex-1 bg-zinc-100 dark:bg-zinc-800 rounded-full h-2 overflow-hidden">
-                              <div className={`h-2 rounded-full ${styles.barColor} transition-all duration-700`} style={{ width: `${enr.progress_percent}%` }} />
+                            <div className="flex-1 bg-zinc-100 dark:bg-zinc-800 rounded-full h-2.5 overflow-hidden">
+                              <div className={`h-2.5 rounded-full ${styles.barColor} transition-all duration-700`} style={{ width: `${enr.progress_percent}%` }} />
                             </div>
-                            <span className={`text-xs font-bold ${styles.color} shrink-0 w-10 text-right`}>{enr.progress_percent}%</span>
+                            <span className={`text-xs font-bold ${styles.color} shrink-0 w-12 text-right`}>{enr.progress_percent}%</span>
                           </div>
                         </div>
                         <Link
                           href={`/dashboard/courses/${course.id}/learn`}
-                          className="shrink-0 flex items-center justify-center w-10 h-10 bg-teal-600 hover:bg-teal-700 text-white rounded-xl transition-colors"
+                          className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold shadow-md shadow-teal-500/20 transition-all hover:scale-105"
                         >
-                          <PlayCircle className="w-5 h-5" />
+                          <PlayCircle className="w-4 h-4" />
+                          <span>Continuer</span>
                         </Link>
                       </div>
                     </div>
@@ -386,17 +432,16 @@ export default function DashboardPage() {
                   if (!course) return null;
                   const styles = getCourseStyles(course.category);
                   return (
-                    <div key={enr.id} className="bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="flex items-center gap-3 min-w-0">
-                        {course.thumbnail_url ? (
-                          <div className="w-14 h-9 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 shrink-0 relative bg-zinc-150">
-                            <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
-                          </div>
-                        ) : (
-                          <div className={`w-11 h-11 ${styles.bgColor} rounded-xl flex items-center justify-center shrink-0`}>
-                            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                          </div>
-                        )}
+                    <div key={enr.id} className="bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-20 sm:w-24 aspect-video rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shrink-0 relative bg-zinc-100 dark:bg-zinc-800">
+                          <SafeThumbnail
+                            src={course.thumbnail_url}
+                            alt={course.title}
+                            fallbackIcon={<CheckCircle2 className="w-6 h-6 text-emerald-600" />}
+                            fallbackBg={styles.bgColor}
+                          />
+                        </div>
                         <div className="min-w-0">
                           <h3 className="font-bold text-sm text-zinc-900 dark:text-white truncate">{course.title}</h3>
                           <p className="text-[11px] text-zinc-400 mt-0.5">{course.category} · 100%</p>
@@ -430,24 +475,35 @@ export default function DashboardPage() {
                   <Link
                     key={course.id}
                     href={`/dashboard/discover/${course.id}`}
-                    className={`block bg-white dark:bg-zinc-900 rounded-2xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all group ${styles.borderHover}`}
+                    className={`block bg-white dark:bg-zinc-900 rounded-2xl p-4 sm:p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all group ${styles.borderHover}`}
                   >
-                    <div className="h-24 rounded-xl mb-4 overflow-hidden relative bg-zinc-100 dark:bg-zinc-800">
-                      {course.thumbnail_url ? (
-                        <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className={`w-full h-full ${styles.bgColor} flex items-center justify-center`}>
-                          {styles.icon}
-                        </div>
-                      )}
+                    <div className="aspect-video w-full rounded-xl mb-3.5 overflow-hidden relative bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/50 dark:border-zinc-700/50">
+                      <SafeThumbnail
+                        src={course.thumbnail_url}
+                        alt={course.title}
+                        className="group-hover:scale-105 transition-transform duration-300"
+                        fallbackIcon={styles.icon}
+                        fallbackBg={styles.bgColor}
+                      />
                     </div>
-                    <h4 className="font-bold text-zinc-900 dark:text-white mb-1 line-clamp-2 text-sm">{course.title}</h4>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4 line-clamp-2">{stripHtml(course.description)}</p>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="font-bold text-zinc-900 dark:text-white">
-                        {course.price > 0 ? `$${course.price}` : "Gratuit"}
+                    <div className="mb-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/30 px-2 py-0.5 rounded-md">
+                        {course.category}
                       </span>
-                      <span className={`${styles.color} font-semibold flex items-center text-xs group-hover:translate-x-0.5 transition-transform`}>
+                    </div>
+                    <h4 className="font-bold text-zinc-900 dark:text-white mb-1.5 line-clamp-2 text-sm leading-snug group-hover:text-teal-600 transition-colors">
+                      {course.title}
+                    </h4>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3.5 line-clamp-2 leading-relaxed">
+                      {stripHtml(course.description)}
+                    </p>
+                    <div className="flex justify-between items-center text-sm pt-3 border-t border-zinc-100 dark:border-zinc-800/80">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-black text-sm text-zinc-900 dark:text-white">
+                          {course.price > 0 ? `$${course.price}` : "Gratuit"}
+                        </span>
+                      </div>
+                      <span className={`${styles.color} font-bold text-xs flex items-center group-hover:translate-x-0.5 transition-transform`}>
                         Découvrir <ChevronRight className="w-4 h-4 ml-0.5" />
                       </span>
                     </div>
