@@ -185,7 +185,7 @@ async function bootstrapUserAndGetRole(
   const metaGender = meta.gender || null;
 
   if (!profile) {
-    const { error: insertError } = await supabaseAdmin.from('profiles').insert({
+    const { error: insertError } = await (supabaseAdmin.from('profiles') as any).insert({
       id: user.id,
       email: user.email!,
       full_name: fullName,
@@ -213,8 +213,7 @@ async function bootstrapUserAndGetRole(
       profileUpdates.gender = metaGender;
     }
     if (Object.keys(profileUpdates).length > 0) {
-      await supabaseAdmin
-        .from('profiles')
+      await (supabaseAdmin.from('profiles') as any)
         .update(profileUpdates)
         .eq('id', user.id);
     }
