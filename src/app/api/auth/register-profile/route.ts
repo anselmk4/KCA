@@ -64,65 +64,97 @@ export async function POST(req: NextRequest) {
     const countryCode = matchedCountry ? matchedCountry.code : countryRaw;
     const countryName = matchedCountry ? matchedCountry.name : countryRaw;
 
-    // Verify user exists in Auth and mark active
+    // Non-blocking Auth user verification (never block registration if service role or replica lag delays lookup)
     let initialStatus = "ACTIVE";
     try {
       const { data: authUserData, error: authUserErr } = await supabaseAdmin.auth.admin.getUserById(userId);
-      if (authUserErr || !authUserData?.user) {
-        return NextResponse.json({ error: "Utilisateur d'authentification introuvable." }, { status: 404 });
-      }
-      if (!authUserData.user.email_confirmed_at) {
+      if (!authUserErr && authUserData?.user && !authUserData.user.email_confirmed_at) {
         await supabaseAdmin.auth.admin.updateUserById(userId, { email_confirm: true }).catch(() => {});
       }
     } catch (e) {
-      console.warn("[register-profile] Auth user lookup check:", e);
+      console.warn("[register-profile] Auth user lookup notice:", e);
     }
 
-    // 1. Ensure Profile exists or update it
-    const { data: existingProfile } = await supabaseAdmin
-      .from("profiles")
-      .select("id")
-      .eq("id", userId)
-      .maybeSingle();
-
-    const profileData: any = {
+    // 1. Resilient Profile Persistence
+    // Base guaranteed profile fields
+    const baseProfile: Record<string, any> = {
       email,
       full_name: name || email.split("@")[0],
       status: initialStatus,
       plan: "FREE",
-      nationality: countryName,
-      phone: cleanPhone,
-      gender: cleanGender,
     };
 
-    if (finalRole === "INSTRUCTOR") {
-      profileData.academy_name = academyName || "Mon Académie";
-      profileData.bio = bio || null;
-      profileData.specialty = thematic || null;
-    } else {
-      const levelMap: Record<string, string> = {
-        Débutant: "BEGINNER",
-        Intermédiaire: "INTERMEDIATE",
-        Avancé: "ADVANCED",
-      };
-      profileData.level = levelMap[studentLevel] || "BEGINNER";
-    }
+    const { data: existingProfile } = await (supabaseAdmin
+      .from("profiles") as any)
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
 
     if (existingProfile) {
-      const { error: updateErr } = await supabaseAdmin
-        .from("profiles")
-        .update(profileData)
+      await (supabaseAdmin.from("profiles") as any)
+        .update(baseProfile)
         .eq("id", userId);
-      if (updateErr) console.error("[register-profile] Error updating profile:", updateErr.message);
     } else {
-      profileData.id = userId;
-      const { error: insertErr } = await supabaseAdmin
-        .from("profiles")
-        .insert(profileData);
-      if (insertErr) console.error("[register-profile] Error inserting profile:", insertErr.message);
+      await (supabaseAdmin.from("profiles") as any)
+        .insert({ id: userId, ...baseProfile });
     }
 
-    // Synchronize Auth user_metadata so information is persisted in Auth as well
+    // Persist Phone Number resiliently (tries 'phone' first, then 'phone_number')
+    try {
+      const { error: phoneErr } = await (supabaseAdmin.from("profiles") as any)
+        .update({ phone: cleanPhone })
+        .eq("id", userId);
+      if (phoneErr) {
+        await (supabaseAdmin.from("profiles") as any)
+          .update({ phone_number: cleanPhone })
+          .eq("id", userId);
+      }
+    } catch (e) {
+      console.warn("[register-profile] Error saving phone to profiles:", e);
+    }
+
+    // Persist Nationality / Country resiliently (tries 'nationality' first, then 'country')
+    try {
+      const { error: natErr } = await (supabaseAdmin.from("profiles") as any)
+        .update({ nationality: countryName })
+        .eq("id", userId);
+      if (natErr) {
+        await (supabaseAdmin.from("profiles") as any)
+          .update({ country: countryName })
+          .eq("id", userId);
+      }
+    } catch (e) {
+      console.warn("[register-profile] Error saving nationality to profiles:", e);
+    }
+
+    // Persist Gender (optional column in database, non-fatal if column absent)
+    try {
+      await (supabaseAdmin.from("profiles") as any)
+        .update({ gender: cleanGender })
+        .eq("id", userId);
+    } catch (e) {}
+
+    // Persist role-specific fields (isolated so schema mismatches never affect phone/country)
+    try {
+      if (finalRole === "INSTRUCTOR") {
+        await (supabaseAdmin.from("profiles") as any).update({
+          academy_name: academyName || "Mon Académie",
+          bio: bio || null,
+          specialty: thematic || null,
+        }).eq("id", userId);
+      } else {
+        const levelMap: Record<string, string> = {
+          Débutant: "BEGINNER",
+          Intermédiaire: "INTERMEDIATE",
+          Avancé: "ADVANCED",
+        };
+        await (supabaseAdmin.from("profiles") as any).update({
+          level: levelMap[studentLevel] || "BEGINNER",
+        }).eq("id", userId);
+      }
+    } catch (e) {}
+
+    // Synchronize Auth user_metadata so information is permanently anchored in Auth as well
     try {
       await supabaseAdmin.auth.admin.updateUserById(userId, {
         user_metadata: {

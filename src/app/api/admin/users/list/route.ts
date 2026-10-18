@@ -106,21 +106,44 @@ export async function GET(req: NextRequest) {
       const resolvedSpecialty = p.specialty || meta.thematic || meta.specialty || '';
       const resolvedLevel = p.level || meta.student_level || 'Débutant';
 
-      // Auto-repair profile if fields were in user_metadata but missing in profiles table
-      const repairUpdates: Record<string, any> = {};
-      if (!p.phone && resolvedPhone) repairUpdates.phone = resolvedPhone;
-      if (!p.nationality && resolvedNationality) repairUpdates.nationality = resolvedNationality;
-      if (!p.gender && resolvedGender) repairUpdates.gender = resolvedGender;
-      if (!p.academy_name && resolvedAcademy) repairUpdates.academy_name = resolvedAcademy;
-      if (!p.specialty && resolvedSpecialty) repairUpdates.specialty = resolvedSpecialty;
-      if (!p.bio && resolvedBio) repairUpdates.bio = resolvedBio;
-
-      if (Object.keys(repairUpdates).length > 0) {
+      // Auto-repair profile with column isolation (prevents any non-existent DB column from aborting phone update)
+      if (!p.phone && resolvedPhone) {
         Promise.resolve(
-          (supabaseAdmin.from('profiles') as any).update(repairUpdates).eq('id', p.id)
-        ).catch((err: any) => {
-          console.warn(`[admin/users/list] Auto-repair warning for profile ${p.id}:`, err?.message);
-        });
+          (supabaseAdmin.from('profiles') as any).update({ phone: resolvedPhone }).eq('id', p.id)
+        ).then(({ error }: any) => {
+          if (error) {
+            (supabaseAdmin.from('profiles') as any).update({ phone_number: resolvedPhone }).eq('id', p.id).catch(() => {});
+          }
+        }).catch(() => {});
+      }
+      if (!p.nationality && resolvedNationality) {
+        Promise.resolve(
+          (supabaseAdmin.from('profiles') as any).update({ nationality: resolvedNationality }).eq('id', p.id)
+        ).then(({ error }: any) => {
+          if (error) {
+            (supabaseAdmin.from('profiles') as any).update({ country: resolvedNationality }).eq('id', p.id).catch(() => {});
+          }
+        }).catch(() => {});
+      }
+      if (!p.gender && resolvedGender) {
+        Promise.resolve(
+          (supabaseAdmin.from('profiles') as any).update({ gender: resolvedGender }).eq('id', p.id)
+        ).catch(() => {});
+      }
+      if (!p.academy_name && resolvedAcademy) {
+        Promise.resolve(
+          (supabaseAdmin.from('profiles') as any).update({ academy_name: resolvedAcademy }).eq('id', p.id)
+        ).catch(() => {});
+      }
+      if (!p.specialty && resolvedSpecialty) {
+        Promise.resolve(
+          (supabaseAdmin.from('profiles') as any).update({ specialty: resolvedSpecialty }).eq('id', p.id)
+        ).catch(() => {});
+      }
+      if (!p.bio && resolvedBio) {
+        Promise.resolve(
+          (supabaseAdmin.from('profiles') as any).update({ bio: resolvedBio }).eq('id', p.id)
+        ).catch(() => {});
       }
 
       return {

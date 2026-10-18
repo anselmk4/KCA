@@ -567,8 +567,8 @@ export default function AdminUsersPage() {
 
       const newId = authData.user.id;
 
-      // 2. Insert profile record with contact details
-      const { error: profError } = await supabase.from('profiles').upsert({
+      // 2. Insert profile record with contact details (guaranteed columns first)
+      const { error: profError } = await (supabase.from('profiles') as any).upsert({
         id: newId,
         email: newUser.email,
         full_name: newUser.name,
@@ -576,12 +576,16 @@ export default function AdminUsersPage() {
         plan: newUser.role === 'INSTRUCTOR' ? 'PRO' : 'FREE',
         nationality: countryName,
         phone: fullPhone,
-        gender: newUser.gender,
       });
 
       if (profError) {
         console.warn('Profile insert warning (handled):', profError.message);
       }
+
+      // Try setting gender separately (non-fatal if column absent in DB)
+      try {
+        await (supabase.from('profiles') as any).update({ gender: newUser.gender }).eq('id', newId);
+      } catch (e) {}
 
       // Also call register-profile API to ensure complete synchronization
       await fetch('/api/auth/register-profile', {

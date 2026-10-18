@@ -503,28 +503,53 @@ function RegisterForm() {
       // Store the registration role selection for robust confirmed page lookup
       localStorage.setItem("kuettu_registration_role", role || "STUDENT");
 
-      // Call register-profile API to build DB records
-      const storedRef = localStorage.getItem("ansella_referral_code");
+      // Direct client fallback to ensure profiles table gets phone and nationality immediately
       try {
-        const regProfileRes = await fetch("/api/auth/register-profile", {
+        await (supabase.from("profiles") as any)
+          .update({
+            phone: fullPhone,
+            nationality: selectedCountry?.name || country,
+          })
+          .eq("id", sessionUser.id);
+      } catch (clientErr) {
+        // Ignored if RLS requires service role, register-profile API will handle it
+      }
+
+      // Call register-profile API to build DB records with retry
+      const storedRef = localStorage.getItem("ansella_referral_code");
+      const registerPayload = {
+        userId: sessionUser.id,
+        email,
+        name,
+        role: role || "STUDENT",
+        country,
+        phone: fullPhone,
+        gender,
+        academyName: academyName || null,
+        bio: bio || null,
+        thematic: role === "INSTRUCTOR" ? (thematic === "other" ? customThematic : thematic) : null,
+        studentLevel: studentLevel || null,
+        interestCourse: interestCourse || null,
+        referralCode: storedRef || null,
+      };
+
+      try {
+        let regProfileRes = await fetch("/api/auth/register-profile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: sessionUser.id,
-            email,
-            name,
-            role: role || "STUDENT",
-            country,
-            phone: fullPhone,
-            gender,
-            academyName: academyName || null,
-            bio: bio || null,
-            thematic: role === "INSTRUCTOR" ? (thematic === "other" ? customThematic : thematic) : null,
-            studentLevel: studentLevel || null,
-            interestCourse: interestCourse || null,
-            referralCode: storedRef || null,
-          }),
+          body: JSON.stringify(registerPayload),
         });
+
+        // Retry once on failure
+        if (!regProfileRes.ok) {
+          await new Promise((r) => setTimeout(r, 600));
+          regProfileRes = await fetch("/api/auth/register-profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(registerPayload),
+          });
+        }
+
         if (!regProfileRes.ok) {
           const errData = await regProfileRes.json().catch(() => ({}));
           console.error("[register] register-profile API error:", errData);

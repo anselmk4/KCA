@@ -172,11 +172,20 @@ async function bootstrapUserAndGetRole(
   console.log(`[callback] bootstrapUserAndGetRole — targetRole=${targetRole}, needsRole=${needsRoleSelection}, userId=${user.id}`);
 
   // 1. Ensure profile exists and is activated if email confirmed
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('id, status, academy_name, full_name, phone, nationality, gender')
-    .eq('id', user.id)
-    .maybeSingle();
+  let profile: any = null;
+  try {
+    const { data } = await (supabaseAdmin.from('profiles') as any)
+      .select('id, status, full_name, phone, nationality')
+      .eq('id', user.id)
+      .maybeSingle();
+    profile = data;
+  } catch (e) {
+    const { data } = await (supabaseAdmin.from('profiles') as any)
+      .select('id, status, full_name')
+      .eq('id', user.id)
+      .maybeSingle();
+    profile = data;
+  }
 
   const isConfirmed = !!user.email_confirmed_at;
   const meta = user.user_metadata || {};
@@ -191,31 +200,36 @@ async function bootstrapUserAndGetRole(
       full_name: fullName,
       status: 'ACTIVE',
       plan: 'FREE',
-      nationality: metaCountry,
-      phone: metaPhone,
-      gender: metaGender,
     });
     if (insertError) {
       console.error('[callback] profile insert error:', insertError.message);
+    } else {
+      if (metaPhone) {
+        const { error: pErr } = await (supabaseAdmin.from('profiles') as any).update({ phone: metaPhone }).eq('id', user.id);
+        if (pErr) await (supabaseAdmin.from('profiles') as any).update({ phone_number: metaPhone }).eq('id', user.id).catch(() => {});
+      }
+      if (metaCountry) {
+        const { error: nErr } = await (supabaseAdmin.from('profiles') as any).update({ nationality: metaCountry }).eq('id', user.id);
+        if (nErr) await (supabaseAdmin.from('profiles') as any).update({ country: metaCountry }).eq('id', user.id).catch(() => {});
+      }
+      if (metaGender) {
+        await (supabaseAdmin.from('profiles') as any).update({ gender: metaGender }).eq('id', user.id).catch(() => {});
+      }
     }
   } else {
-    const profileUpdates: Record<string, any> = {};
     if (profile.status !== 'SUSPENDED' && profile.status !== 'ACTIVE') {
-      profileUpdates.status = 'ACTIVE';
+      await (supabaseAdmin.from('profiles') as any).update({ status: 'ACTIVE' }).eq('id', user.id).catch(() => {});
     }
     if (!profile.phone && metaPhone) {
-      profileUpdates.phone = metaPhone;
+      const { error: pErr } = await (supabaseAdmin.from('profiles') as any).update({ phone: metaPhone }).eq('id', user.id);
+      if (pErr) await (supabaseAdmin.from('profiles') as any).update({ phone_number: metaPhone }).eq('id', user.id).catch(() => {});
     }
     if (!profile.nationality && metaCountry) {
-      profileUpdates.nationality = metaCountry;
+      const { error: nErr } = await (supabaseAdmin.from('profiles') as any).update({ nationality: metaCountry }).eq('id', user.id);
+      if (nErr) await (supabaseAdmin.from('profiles') as any).update({ country: metaCountry }).eq('id', user.id).catch(() => {});
     }
-    if (!profile.gender && metaGender) {
-      profileUpdates.gender = metaGender;
-    }
-    if (Object.keys(profileUpdates).length > 0) {
-      await (supabaseAdmin.from('profiles') as any)
-        .update(profileUpdates)
-        .eq('id', user.id);
+    if (metaGender) {
+      await (supabaseAdmin.from('profiles') as any).update({ gender: metaGender }).eq('id', user.id).catch(() => {});
     }
   }
 

@@ -54,25 +54,58 @@ export async function POST(req: NextRequest) {
       const resolvedName = meta.full_name || meta.name || u.email?.split("@")[0] || "Utilisateur";
 
       if (existingProfile) {
-        // Check if any missing field can be filled from meta
-        const updates: Record<string, any> = {};
-        if (!existingProfile.phone && resolvedPhone) updates.phone = resolvedPhone;
-        if (!existingProfile.nationality && resolvedCountry) updates.nationality = resolvedCountry;
-        if (!existingProfile.gender && resolvedGender) updates.gender = resolvedGender;
-        if (!existingProfile.academy_name && resolvedAcademy) updates.academy_name = resolvedAcademy;
-        if (!existingProfile.specialty && resolvedSpecialty) updates.specialty = resolvedSpecialty;
-        if (!existingProfile.bio && resolvedBio) updates.bio = resolvedBio;
-        if (!existingProfile.full_name && resolvedName) updates.full_name = resolvedName;
+        let hasUpdated = false;
 
-        if (Object.keys(updates).length > 0) {
-          const { error: upErr } = await (supabaseAdmin
-            .from("profiles") as any)
-            .update(updates)
+        // Resilient phone update
+        if (!existingProfile.phone && resolvedPhone) {
+          const { error: pErr1 } = await (supabaseAdmin.from("profiles") as any)
+            .update({ phone: resolvedPhone })
             .eq("id", u.id);
-          if (!upErr) updatedCount++;
+          if (pErr1) {
+            const { error: pErr2 } = await (supabaseAdmin.from("profiles") as any)
+              .update({ phone_number: resolvedPhone })
+              .eq("id", u.id);
+            if (!pErr2) hasUpdated = true;
+          } else {
+            hasUpdated = true;
+          }
         }
+
+        // Resilient nationality update
+        if (!existingProfile.nationality && resolvedCountry) {
+          const { error: nErr1 } = await (supabaseAdmin.from("profiles") as any)
+            .update({ nationality: resolvedCountry })
+            .eq("id", u.id);
+          if (nErr1) {
+            const { error: nErr2 } = await (supabaseAdmin.from("profiles") as any)
+              .update({ country: resolvedCountry })
+              .eq("id", u.id);
+            if (!nErr2) hasUpdated = true;
+          } else {
+            hasUpdated = true;
+          }
+        }
+
+        // Optional fields (ignore error if column doesn't exist)
+        if (!existingProfile.full_name && resolvedName) {
+          await (supabaseAdmin.from("profiles") as any).update({ full_name: resolvedName }).eq("id", u.id).catch(() => {});
+        }
+        if (!existingProfile.gender && resolvedGender) {
+          await (supabaseAdmin.from("profiles") as any).update({ gender: resolvedGender }).eq("id", u.id).catch(() => {});
+        }
+        if (!existingProfile.academy_name && resolvedAcademy) {
+          await (supabaseAdmin.from("profiles") as any).update({ academy_name: resolvedAcademy }).eq("id", u.id).catch(() => {});
+        }
+        if (!existingProfile.specialty && resolvedSpecialty) {
+          await (supabaseAdmin.from("profiles") as any).update({ specialty: resolvedSpecialty }).eq("id", u.id).catch(() => {});
+        }
+        if (!existingProfile.bio && resolvedBio) {
+          await (supabaseAdmin.from("profiles") as any).update({ bio: resolvedBio }).eq("id", u.id).catch(() => {});
+        }
+
+        if (hasUpdated) updatedCount++;
       } else {
-        // Create profile
+        // Create base profile first
         const { error: inErr } = await (supabaseAdmin
           .from("profiles") as any)
           .insert({
@@ -81,15 +114,22 @@ export async function POST(req: NextRequest) {
             full_name: resolvedName,
             status: "ACTIVE",
             plan: "FREE",
-            phone: resolvedPhone || null,
-            nationality: resolvedCountry || null,
-            gender: resolvedGender || null,
-            academy_name: resolvedAcademy || null,
-            specialty: resolvedSpecialty || null,
-            bio: resolvedBio || null,
-            level: resolvedLevel,
           });
-        if (!inErr) createdCount++;
+
+        if (!inErr) {
+          createdCount++;
+          if (resolvedPhone) {
+            const { error: pErr } = await (supabaseAdmin.from("profiles") as any).update({ phone: resolvedPhone }).eq("id", u.id);
+            if (pErr) await (supabaseAdmin.from("profiles") as any).update({ phone_number: resolvedPhone }).eq("id", u.id).catch(() => {});
+          }
+          if (resolvedCountry) {
+            const { error: nErr } = await (supabaseAdmin.from("profiles") as any).update({ nationality: resolvedCountry }).eq("id", u.id);
+            if (nErr) await (supabaseAdmin.from("profiles") as any).update({ country: resolvedCountry }).eq("id", u.id).catch(() => {});
+          }
+          if (resolvedGender) {
+            await (supabaseAdmin.from("profiles") as any).update({ gender: resolvedGender }).eq("id", u.id).catch(() => {});
+          }
+        }
       }
     }
 

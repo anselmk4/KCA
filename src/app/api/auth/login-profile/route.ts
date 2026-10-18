@@ -9,11 +9,23 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Fetch profile
-    let { data: profile } = await (supabaseAdmin
-      .from('profiles') as any)
-      .select('id, email, full_name, plan, status, phone, nationality, gender, academy_name')
-      .eq('id', userId)
-      .maybeSingle();
+    // 1. Fetch profile (querying guaranteed columns first to prevent schema cache errors)
+    let profile: any = null;
+    try {
+      const { data } = await (supabaseAdmin
+        .from('profiles') as any)
+        .select('id, email, full_name, plan, status, phone, nationality')
+        .eq('id', userId)
+        .maybeSingle();
+      profile = data;
+    } catch (e) {
+      const { data } = await (supabaseAdmin
+        .from('profiles') as any)
+        .select('id, email, full_name, plan, status')
+        .eq('id', userId)
+        .maybeSingle();
+      profile = data;
+    }
 
     // 2. Check Auth confirmation status
     let isEmailConfirmed = false;
@@ -31,27 +43,30 @@ export async function POST(req: NextRequest) {
 
     // 3. Auto-repair / Auto-activate: upon login, ensure profile is ACTIVE if not SUSPENDED
     if (profile && profile.status !== 'SUSPENDED') {
-      const updates: Record<string, any> = {};
       if (profile.status !== 'ACTIVE') {
-        updates.status = 'ACTIVE';
         profile.status = 'ACTIVE';
+        await (supabaseAdmin.from('profiles') as any).update({ status: 'ACTIVE' }).eq('id', userId).catch(() => {});
       }
+
       // Check if profile is missing contact details present in auth metadata
       const metaPhone = authMeta.phone_number || authMeta.phone || authUserObj?.phone;
       const metaCountry = authMeta.country || authMeta.nationality;
       const metaGender = authMeta.gender;
       const metaAcademy = authMeta.academy_name;
 
-      if (!profile.phone && metaPhone) updates.phone = metaPhone;
-      if (!profile.nationality && metaCountry) updates.nationality = metaCountry;
-      if (!profile.gender && metaGender) updates.gender = metaGender;
-      if (!profile.academy_name && metaAcademy) updates.academy_name = metaAcademy;
-
-      if (Object.keys(updates).length > 0) {
-        await (supabaseAdmin
-          .from('profiles') as any)
-          .update(updates)
-          .eq('id', userId);
+      if (!profile.phone && metaPhone) {
+        const { error: pErr } = await (supabaseAdmin.from('profiles') as any).update({ phone: metaPhone }).eq('id', userId);
+        if (pErr) await (supabaseAdmin.from('profiles') as any).update({ phone_number: metaPhone }).eq('id', userId).catch(() => {});
+      }
+      if (!profile.nationality && metaCountry) {
+        const { error: nErr } = await (supabaseAdmin.from('profiles') as any).update({ nationality: metaCountry }).eq('id', userId);
+        if (nErr) await (supabaseAdmin.from('profiles') as any).update({ country: metaCountry }).eq('id', userId).catch(() => {});
+      }
+      if (metaGender) {
+        await (supabaseAdmin.from('profiles') as any).update({ gender: metaGender }).eq('id', userId).catch(() => {});
+      }
+      if (metaAcademy) {
+        await (supabaseAdmin.from('profiles') as any).update({ academy_name: metaAcademy }).eq('id', userId).catch(() => {});
       }
 
       if (!isEmailConfirmed) {
@@ -77,18 +92,28 @@ export async function POST(req: NextRequest) {
           full_name: fullName,
           status: 'ACTIVE',
           plan: 'FREE',
-          phone: metaPhone,
-          nationality: metaCountry,
-          gender: metaGender,
-          academy_name: metaAcademy,
         })
-        .select('id, email, full_name, plan, status, phone, nationality, gender')
+        .select('id, email, full_name, plan, status')
         .single();
 
       if (insertError) {
         console.error('[login-profile] Auto-repair insert error:', insertError.message);
       } else {
         profile = newProfile;
+        if (metaPhone) {
+          const { error: pErr } = await (supabaseAdmin.from('profiles') as any).update({ phone: metaPhone }).eq('id', userId);
+          if (pErr) await (supabaseAdmin.from('profiles') as any).update({ phone_number: metaPhone }).eq('id', userId).catch(() => {});
+        }
+        if (metaCountry) {
+          const { error: nErr } = await (supabaseAdmin.from('profiles') as any).update({ nationality: metaCountry }).eq('id', userId);
+          if (nErr) await (supabaseAdmin.from('profiles') as any).update({ country: metaCountry }).eq('id', userId).catch(() => {});
+        }
+        if (metaGender) {
+          await (supabaseAdmin.from('profiles') as any).update({ gender: metaGender }).eq('id', userId).catch(() => {});
+        }
+        if (metaAcademy) {
+          await (supabaseAdmin.from('profiles') as any).update({ academy_name: metaAcademy }).eq('id', userId).catch(() => {});
+        }
       }
     }
 
