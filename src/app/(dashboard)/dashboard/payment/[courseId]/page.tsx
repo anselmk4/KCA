@@ -306,15 +306,15 @@ export default function PaymentPage() {
       if (user?.email) {
         setPaypalEmail(user.email);
         
-        // Fetch profile to get country, phone_number, nationality, phone & payment preferences
+        // Fetch profile to get country, phone & payment preferences
         const { data: profile } = await (supabase
           .from("profiles")
-          .select("country, phone_number, nationality, phone, payment_methods, preferred_payment_method") as any)
+          .select("nationality, phone, payment_methods, preferred_payment_method") as any)
           .eq("id", user.id)
           .maybeSingle();
 
-        const resolvedCountry = profile?.nationality || profile?.country;
-        const resolvedPhone = profile?.phone || profile?.phone_number;
+        const resolvedCountry = profile?.nationality;
+        const resolvedPhone = profile?.phone;
 
         // 1. Check if user has a preferred payment method
         const preferredId = profile?.preferred_payment_method;

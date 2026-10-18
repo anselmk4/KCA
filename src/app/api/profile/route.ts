@@ -37,15 +37,15 @@ export async function PUT(req: NextRequest) {
 
     const body = await req.json();
 
-    // All supported profile fields
+    // Map incoming fields strictly to verified database column names
     const allowedFields: Record<string, string> = {
       name: 'full_name',
       full_name: 'full_name',
       bio: 'bio',
       nationality: 'nationality',
-      country: 'country',
+      country: 'nationality', // Map to verified DB column 'nationality'
       phone: 'phone',
-      phone_number: 'phone_number',
+      phone_number: 'phone', // Map to verified DB column 'phone'
       gender: 'gender',
       website: 'website',
       twitter: 'twitter',
@@ -69,26 +69,74 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    // Ensure reciprocal column synchronization (country <-> nationality, phone <-> phone_number)
-    if (updates.country && !updates.nationality) updates.nationality = updates.country;
-    if (updates.nationality && !updates.country) updates.country = updates.nationality;
-    if (updates.phone && !updates.phone_number) updates.phone_number = updates.phone;
-    if (updates.phone_number && !updates.phone) updates.phone = updates.phone_number;
+    // Ensure non-existent columns are never passed to profiles table
+    delete updates.country;
+    delete updates.phone_number;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'Aucune donnée à mettre à jour' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('profiles')
       .update(updates as any)
       .eq('id', user.id)
       .select()
-      .single();
+      .maybeSingle();
+
+    if (error) {
+      console.warn('[API /api/profile PUT] Trying with supabaseAdmin fallback:', error.message);
+      const { supabaseAdmin } = await import('@/lib/supabase/admin');
+      const adminRes = await supabaseAdmin
+        .from('profiles')
+        .update(updates as any)
+        .eq('id', user.id)
+        .select()
+        .maybeSingle();
+
+      data = adminRes.data;
+      error = adminRes.error;
+    }
 
     if (error) {
       console.error('[API /api/profile PUT] Supabase error:', error.message);
       return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    // Sync Auth user_metadata as well
+    try {
+      const { supabaseAdmin } = await import('@/lib/supabase/admin');
+      const currentMeta = user.user_metadata || {};
+      const metaUpdates: Record<string, any> = {};
+      if (updates.full_name) {
+        metaUpdates.full_name = updates.full_name;
+        metaUpdates.name = updates.full_name;
+      }
+      if (updates.nationality) {
+        metaUpdates.nationality = updates.nationality;
+        metaUpdates.country = updates.nationality;
+      }
+      if (updates.phone) {
+        metaUpdates.phone = updates.phone;
+        metaUpdates.phone_number = updates.phone;
+      }
+      if (updates.gender) {
+        metaUpdates.gender = updates.gender;
+      }
+      if (updates.academy_name) {
+        metaUpdates.academy_name = updates.academy_name;
+      }
+
+      if (Object.keys(metaUpdates).length > 0) {
+        await supabaseAdmin.auth.admin.updateUserById(user.id, {
+          user_metadata: {
+            ...currentMeta,
+            ...metaUpdates,
+          },
+        });
+      }
+    } catch (metaErr) {
+      console.warn('[API /api/profile PUT] user_metadata sync warning:', metaErr);
     }
 
     return NextResponse.json({ profile: data }, { status: 200 });

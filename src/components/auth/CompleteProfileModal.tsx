@@ -59,24 +59,24 @@ export function CompleteProfileModal({ onCompleted }: CompleteProfileModalProps)
         const instructorRole = roleNames.includes("INSTRUCTOR") || roleNames.includes("TEACHING_ASSISTANT");
         if (isMounted) setIsInstructor(instructorRole);
 
-        // Fetch current profile from profiles table
+        // Fetch current profile from profiles table (querying only valid DB columns)
         const { data: profile } = await supabase
           .from("profiles")
-          .select("country, nationality, phone, phone_number, gender, academy_name")
+          .select("id, nationality, phone, gender, academy_name")
           .eq("id", user.id)
           .maybeSingle();
 
         const meta = user.user_metadata || {};
 
-        const hasCountry = !!(profile?.country || profile?.nationality || meta.country || meta.nationality);
-        const hasPhone = !!(profile?.phone || profile?.phone_number || meta.phone_number || meta.phone || user.phone);
+        const hasCountry = !!(profile?.nationality || meta.country || meta.nationality);
+        const hasPhone = !!(profile?.phone || meta.phone_number || meta.phone || user.phone);
         const hasGender = !!(profile?.gender || meta.gender);
         const needsAcademy = instructorRole && !(profile?.academy_name || meta.academy_name);
 
         // If ANY mandatory info is missing, show the modal!
         if (!hasCountry || !hasPhone || !hasGender || needsAcademy) {
           // Prepopulate if partial data exists
-          const existingCountryCode = profile?.country || meta.country;
+          const existingCountryCode = profile?.nationality || meta.country || meta.nationality;
           if (existingCountryCode) {
             const found = COUNTRIES.find(
               (c) =>
@@ -86,7 +86,7 @@ export function CompleteProfileModal({ onCompleted }: CompleteProfileModalProps)
             if (found && isMounted) setSelectedCountry(found);
           }
 
-          const existingPhone = profile?.phone || profile?.phone_number || meta.phone_number || meta.phone;
+          const existingPhone = profile?.phone || meta.phone_number || meta.phone;
           if (existingPhone && isMounted) {
             setPhoneNumber(existingPhone.replace(/^\+\d+\s*/, ""));
           }
