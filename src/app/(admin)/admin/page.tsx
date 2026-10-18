@@ -886,7 +886,6 @@ export default function AdminDashboardPage() {
             </div>
           </div>
         </div>
-      </div>
 
         {/* Financial Distribution summary */}
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm space-y-5 flex flex-col justify-between">
