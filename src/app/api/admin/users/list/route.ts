@@ -49,15 +49,57 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    // 3. Fetch Auth Users with full metadata
+    // 3. Fetch Auth Users safely (with safe page size and getUserById fallback)
     const authUserMap = new Map<string, any>();
     try {
-      const { data: authData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-      authData?.users?.forEach(u => {
-        authUserMap.set(u.id, u);
-      });
+      let page = 1;
+      let hasMore = true;
+      while (hasMore && page <= 20) {
+        const { data: pageData, error: pageErr } = await supabaseAdmin.auth.admin.listUsers({
+          page,
+          perPage: 50,
+        });
+
+        if (pageErr) {
+          console.warn(`[admin/users/list] listUsers warning on page ${page}:`, pageErr.message);
+          break;
+        }
+
+        const pageUsers = pageData?.users || [];
+        pageUsers.forEach((u) => authUserMap.set(u.id, u));
+
+        if (pageUsers.length < 50) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      }
     } catch (authErr) {
       console.warn("[admin/users/list] Auth user list warning:", authErr);
+    }
+
+    // Fallback: For any profile missing contact details not yet in authUserMap, query getUserById directly
+    const profilesNeedingMeta = (profiles || []).filter(
+      (p: any) => (!p.phone && !p.phone_number) || (!p.nationality && !p.country)
+    );
+
+    if (profilesNeedingMeta.length > 0) {
+      const BATCH_SIZE = 10;
+      for (let i = 0; i < profilesNeedingMeta.length; i += BATCH_SIZE) {
+        const batch = profilesNeedingMeta.slice(i, i + BATCH_SIZE);
+        await Promise.allSettled(
+          batch.map(async (p: any) => {
+            if (!authUserMap.has(p.id)) {
+              try {
+                const { data: uData, error: uErr } = await supabaseAdmin.auth.admin.getUserById(p.id);
+                if (!uErr && uData?.user) {
+                  authUserMap.set(p.id, uData.user);
+                }
+              } catch (e) {}
+            }
+          })
+        );
+      }
     }
 
     // 4. Map profiles to admin user items
