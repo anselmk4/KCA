@@ -13,6 +13,16 @@ const PLAN_COMMISSION_CONFIG: Record<string, { commissionRate: number; instructo
   MAX: { commissionRate: 0.00, instructorShare: 1.00 },
 };
 
+export interface ChartPoint {
+  key: string;
+  label: string;
+  fullDate: string;
+  amount: number;
+  commission: number;
+  instructorShare: number;
+  salesCount: number;
+}
+
 interface OverviewData {
   totalMembers: number;
   activeStudents: number;
@@ -27,12 +37,15 @@ interface OverviewData {
   coursesInReview: number;
   topCourseTitle: string;
   topCourseStudentCount: number;
-  chartData: Array<{ label: string; amount: number; commission: number }>;
+  chartData: ChartPoint[];
   plansRevenue: number;
   planProportions: { BASE: number; PRO: number; MAX: number; total: number };
   mostPurchasedPlan: string;
   pendingPaymentsCount: number;
   pendingPaymentsAmount: number;
+  totalSalesCount: number;
+  bestDayLabel: string;
+  bestDayAmount: number;
 }
 
 export default function AdminDashboardPage() {
@@ -43,6 +56,7 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState<OverviewData | null>(null);
   const [recentRegistrations, setRecentRegistrations] = useState<any[]>([]);
   const [rolesMap, setRolesMap] = useState<Record<string, string>>({});
+  const [activePoint, setActivePoint] = useState<ChartPoint | null>(null);
 
   const calculateStats = useCallback(async () => {
     if (!stats) {
@@ -260,44 +274,164 @@ export default function AdminDashboardPage() {
       const mrr = totalRevenue; // Revenue in active filter window
       const arr = mrr * 12;
 
-      // Group payments by date for the chart (daily or monthly depending on time filter)
-      const chartMap: Record<string, { label: string; amount: number; commission: number }> = {};
-      
-      // Initialize recent dates or months
-      if (timeFilter === "MONTH" || timeFilter === "WEEK") {
-        // Last 7 days or weeks
-        for (let i = 6; i >= 0; i--) {
-          const d = new Date();
-          d.setDate(d.getDate() - i);
-          const label = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
-          chartMap[label] = { label, amount: 0, commission: 0 };
+      // Group payments by date for the chart with strict chronological ordering
+      const pointsMap = new Map<string, ChartPoint>();
+
+      if (timeFilter === "DAY") {
+        // 6 slots of 4 hours for today
+        const slots = [
+          { label: "00h-04h", hStart: 0, hEnd: 4 },
+          { label: "04h-08h", hStart: 4, hEnd: 8 },
+          { label: "08h-12h", hStart: 8, hEnd: 12 },
+          { label: "12h-16h", hStart: 12, hEnd: 16 },
+          { label: "16h-20h", hStart: 16, hEnd: 20 },
+          { label: "20h-24h", hStart: 20, hEnd: 24 },
+        ];
+        slots.forEach((s, idx) => {
+          const key = `slot_${idx}`;
+          pointsMap.set(key, {
+            key,
+            label: s.label,
+            fullDate: `Aujourd'hui (${s.label})`,
+            amount: 0,
+            commission: 0,
+            instructorShare: 0,
+            salesCount: 0,
+          });
+        });
+      } else if (timeFilter === "WEEK") {
+        // 7 days of current week from Monday to Sunday in strict order
+        const d = new Date();
+        const dayOfWeek = d.getDay();
+        const distanceToMonday = (dayOfWeek + 6) % 7;
+        const monday = new Date(d);
+        monday.setDate(d.getDate() - distanceToMonday);
+        monday.setHours(0, 0, 0, 0);
+
+        for (let i = 0; i < 7; i++) {
+          const cur = new Date(monday);
+          cur.setDate(monday.getDate() + i);
+          const key = cur.toISOString().split("T")[0];
+          const label = cur.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit" });
+          const fullDate = cur.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+          pointsMap.set(key, {
+            key,
+            label,
+            fullDate,
+            amount: 0,
+            commission: 0,
+            instructorShare: 0,
+            salesCount: 0,
+          });
+        }
+      } else if (timeFilter === "MONTH") {
+        // All days of the current month from day 1 to today in strict chronological order
+        const year = now.getFullYear();
+        const month = now.getMonth();
+        const maxDay = Math.max(now.getDate(), 1);
+
+        for (let day = 1; day <= maxDay; day++) {
+          const cur = new Date(year, month, day);
+          const key = cur.toISOString().split("T")[0];
+          const label = cur.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
+          const fullDate = cur.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+          pointsMap.set(key, {
+            key,
+            label,
+            fullDate,
+            amount: 0,
+            commission: 0,
+            instructorShare: 0,
+            salesCount: 0,
+          });
         }
       } else if (timeFilter === "YEAR") {
-        // 12 months
-        for (let i = 11; i >= 0; i--) {
-          const d = new Date();
-          d.setMonth(d.getMonth() - i);
-          const label = d.toLocaleDateString("fr-FR", { month: "short" });
-          chartMap[label] = { label, amount: 0, commission: 0 };
+        // 12 months in strict order from Jan to Dec
+        const year = now.getFullYear();
+        for (let m = 0; m < 12; m++) {
+          const cur = new Date(year, m, 1);
+          const key = `${year}-${String(m + 1).padStart(2, "0")}`;
+          const label = cur.toLocaleDateString("fr-FR", { month: "short" });
+          const fullDate = cur.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+          pointsMap.set(key, {
+            key,
+            label,
+            fullDate,
+            amount: 0,
+            commission: 0,
+            instructorShare: 0,
+            salesCount: 0,
+          });
         }
-      } else {
-        // Default last 5 periods
-        for (let i = 4; i >= 0; i--) {
-          const d = new Date();
-          d.setDate(d.getDate() - i);
-          const label = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
-          chartMap[label] = { label, amount: 0, commission: 0 };
+      } else if (timeFilter === "CUSTOM" && startDate && endDate) {
+        // Custom dates in strict chronological order
+        const s = new Date(startDate);
+        const e = new Date(endDate);
+        const diffDays = Math.max(1, Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)));
+
+        if (diffDays <= 45) {
+          for (let i = 0; i <= diffDays; i++) {
+            const cur = new Date(s);
+            cur.setDate(s.getDate() + i);
+            const key = cur.toISOString().split("T")[0];
+            const label = cur.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
+            const fullDate = cur.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+            pointsMap.set(key, {
+              key,
+              label,
+              fullDate,
+              amount: 0,
+              commission: 0,
+              instructorShare: 0,
+              salesCount: 0,
+            });
+          }
+        } else {
+          const cur = new Date(s);
+          while (cur <= e) {
+            const key = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`;
+            const label = cur.toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
+            const fullDate = cur.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+            if (!pointsMap.has(key)) {
+              pointsMap.set(key, {
+                key,
+                label,
+                fullDate,
+                amount: 0,
+                commission: 0,
+                instructorShare: 0,
+                salesCount: 0,
+              });
+            }
+            cur.setMonth(cur.getMonth() + 1);
+          }
         }
       }
 
-      filteredPayments.forEach(p => {
+      let totalSalesCount = 0;
+
+      filteredPayments.forEach((p) => {
+        const amount = Number(p.amount) || 0;
+        if (amount <= 0) return;
+
+        totalSalesCount++;
+
         const dateVal = p.paid_at || p.paidAt || p.date || p.created_at || p.createdAt;
         const pDate = dateVal ? new Date(dateVal) : new Date();
-        const label = timeFilter === "YEAR"
-          ? pDate.toLocaleDateString("fr-FR", { month: "short" })
-          : pDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
 
-        // Decode method field: CARRIER::TYPE::ITEM_ID
+        let targetKey = "";
+        if (timeFilter === "DAY") {
+          const slotIdx = Math.min(5, Math.floor(pDate.getHours() / 4));
+          targetKey = `slot_${slotIdx}`;
+        } else if (timeFilter === "YEAR") {
+          targetKey = `${pDate.getFullYear()}-${String(pDate.getMonth() + 1).padStart(2, "0")}`;
+        } else if (timeFilter === "CUSTOM" && pointsMap.size > 0 && !pointsMap.has(pDate.toISOString().split("T")[0])) {
+          targetKey = `${pDate.getFullYear()}-${String(pDate.getMonth() + 1).padStart(2, "0")}`;
+        } else {
+          targetKey = pDate.toISOString().split("T")[0];
+        }
+
+        // Decode method or pre-calculated commissions from /api/admin/payments
         const rawMethod = p.rawMethod || p.method || "";
         const methodParts = rawMethod.split("::");
         const paymentType = methodParts[1] || p.paymentType || "";
@@ -307,30 +441,53 @@ export default function AdminDashboardPage() {
           (p.courseTitle || "").includes("Abonnement Formateur") ||
           (p.courseTitle || "").includes("Forfait Formateur");
 
-        let commAmount = 0;
-        const amount = Number(p.amount) || 0;
-        if (!isPlan) {
-          const courseObj = courses?.find(c => c.id === itemId);
+        let comm = p.commissionAmount != null ? Number(p.commissionAmount) : 0;
+        let inst = p.instructorShareAmount != null ? Number(p.instructorShareAmount) : 0;
+
+        if (comm === 0 && !isPlan) {
+          const courseObj = courses?.find((c) => c.id === itemId);
           const instructorId = courseObj?.instructor_id || "";
           const instPlan = instructorPlans[instructorId] || "FREE";
           const commConfig = PLAN_COMMISSION_CONFIG[instPlan] || PLAN_COMMISSION_CONFIG.FREE;
-          commAmount = amount * commConfig.commissionRate;
+          comm = amount * commConfig.commissionRate;
+          inst = amount * commConfig.instructorShare;
+        } else if (isPlan) {
+          comm = amount;
+          inst = 0;
         }
 
-        if (chartMap[label]) {
-          chartMap[label].amount += amount;
-          chartMap[label].commission += commAmount;
+        const point = pointsMap.get(targetKey);
+        if (point) {
+          point.amount += amount;
+          point.commission += comm;
+          point.instructorShare += inst;
+          point.salesCount += 1;
         } else {
-          // If label wasn't pre-filled, dynamically add it
-          chartMap[label] = {
+          const label = pDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
+          const fullDate = pDate.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+          pointsMap.set(targetKey, {
+            key: targetKey,
             label,
-            amount: amount,
-            commission: commAmount
-          };
+            fullDate,
+            amount,
+            commission: comm,
+            instructorShare: inst,
+            salesCount: 1,
+          });
         }
       });
 
-      const chartData = Object.values(chartMap);
+      // Sort strictly chronologically by key
+      const chartData = Array.from(pointsMap.values()).sort((a, b) => a.key.localeCompare(b.key));
+
+      let bestDayLabel = "N/A";
+      let bestDayAmount = 0;
+      chartData.forEach((d) => {
+        if (d.amount > bestDayAmount) {
+          bestDayAmount = d.amount;
+          bestDayLabel = d.label;
+        }
+      });
 
       setStats({
         totalMembers,
@@ -352,12 +509,19 @@ export default function AdminDashboardPage() {
           BASE: planCounts.BASE,
           PRO: planCounts.PRO,
           MAX: planCounts.MAX,
-          total: totalPlansCount
+          total: totalPlansCount,
         },
         mostPurchasedPlan,
         pendingPaymentsCount,
-        pendingPaymentsAmount
+        pendingPaymentsAmount,
+        totalSalesCount,
+        bestDayLabel,
+        bestDayAmount,
       });
+
+      // Default active point to the best day or the last active point with sales
+      const activeDefault = chartData.filter((d) => d.amount > 0).pop() || chartData[chartData.length - 1] || null;
+      setActivePoint(activeDefault);
     } catch (err) {
       console.error("Error generating overview stats:", err);
     } finally {
@@ -550,68 +714,176 @@ export default function AdminDashboardPage() {
 
       {/* Finance Grid (Commissions & Instructor shares) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-w-0">
-        {/* SVG Sales Trend Chart */}
-        <div className="lg:col-span-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4 min-w-0">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        {/* Dynamic & Interactive Sales Trend Chart */}
+        <div className="lg:col-span-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 sm:p-6 shadow-sm space-y-4 min-w-0">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-bold text-zinc-900 dark:text-white">Évolution des Ventes & Commissions</h2>
-              <p className="text-xxs text-zinc-500">Flux financiers en dollar ($)</p>
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <BarChart3 className="w-4 h-4" />
+                </div>
+                <h2 className="text-base font-bold text-zinc-900 dark:text-white">Évolution des Ventes & Commissions</h2>
+              </div>
+              <p className="text-xxs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Ventes réelles en dollar ($) • Survolez ou cliquez sur une barre pour inspecter les détails
+              </p>
             </div>
-            <div className="flex gap-4 text-xxs font-bold uppercase tracking-wider">
+            
+            {/* Legend */}
+            <div className="flex items-center gap-3 text-xxs font-bold uppercase tracking-wider bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 px-3 py-1.5 rounded-xl shrink-0">
               <div className="flex items-center gap-1.5">
-                <div className="h-2 w-2 bg-blue-500 rounded-full" />
-                <span className="text-zinc-550 dark:text-zinc-400">Revenus</span>
+                <div className="h-2.5 w-2.5 bg-blue-500 rounded-full shadow-sm shadow-blue-500/50" />
+                <span className="text-zinc-700 dark:text-zinc-300">Revenus Ventes</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="h-2 w-2 bg-amber-500 rounded-full" />
-                <span className="text-zinc-550 dark:text-zinc-400">Commission Site</span>
+                <div className="h-2.5 w-2.5 bg-amber-500 rounded-full shadow-sm shadow-amber-500/50" />
+                <span className="text-zinc-700 dark:text-zinc-300">Commission Site</span>
               </div>
             </div>
           </div>
 
-          {/* Interactive SVG Bar Chart */}
-          <div className="w-full overflow-x-auto min-w-0 pb-1">
-            <div className="h-60 relative min-w-[320px] sm:min-w-0 w-full flex items-end pt-4 pb-2">
-              {stats.chartData.length === 0 ? (
-                <div className="absolute inset-0 flex items-center justify-center text-zinc-550 text-xs">
-                  Aucune donnée à afficher.
+          {/* Dynamic Inspector Banner (shows exact details of hovered or clicked date) */}
+          {activePoint ? (
+            <div className="bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-amber-500/10 border border-blue-500/20 dark:border-blue-500/30 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 transition-all animate-in fade-in duration-200">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-xs font-bold text-zinc-900 dark:text-white capitalize">
+                  {activePoint.fullDate}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+                  {activePoint.salesCount} transaction{activePoint.salesCount > 1 ? "s" : ""}
+                </span>
+              </div>
+              <div className="flex items-center gap-4 text-xs font-bold">
+                <div>
+                  <span className="text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-semibold mr-1.5">Ventes :</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-extrabold text-sm">{activePoint.amount.toFixed(2)}$</span>
                 </div>
-              ) : (
-                <div className="w-full h-full flex justify-between items-end gap-2 px-2">
-                {stats.chartData.map((d, index) => {
-                  const revenueHeight = (d.amount / maxChartVal) * 100;
-                  const commissionHeight = (d.commission / maxChartVal) * 100;
+                <div>
+                  <span className="text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-semibold mr-1.5">Commission :</span>
+                  <span className="text-amber-600 dark:text-amber-400 font-extrabold text-sm">+{activePoint.commission.toFixed(2)}$</span>
+                </div>
+                <div>
+                  <span className="text-zinc-500 dark:text-zinc-400 text-[10px] uppercase font-semibold mr-1.5">Part Prof :</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-extrabold text-sm">{activePoint.instructorShare.toFixed(2)}$</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-800 rounded-xl p-3 flex items-center justify-between text-xs text-zinc-500">
+              <span>Sélectionnez ou survolez une date sur le graphique ci-dessous.</span>
+              <span className="font-bold text-zinc-800 dark:text-zinc-200">Total : {stats.totalRevenue.toFixed(2)}$</span>
+            </div>
+          )}
 
-                  return (
-                    <div key={index} className="flex-1 flex flex-col items-center group relative h-full justify-end">
-                      {/* Tooltip */}
-                      <div className="absolute bottom-full mb-2 bg-zinc-900 text-white text-[9px] font-bold p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-md flex flex-col gap-0.5 whitespace-nowrap">
-                        <span>Période: {d.label}</span>
-                        <span className="text-blue-400">Ventes: {d.amount.toFixed(2)}$</span>
-                        <span className="text-amber-400">Comm: {d.commission.toFixed(2)}$</span>
-                      </div>
+          {/* Interactive Chart Canvas */}
+          <div className="relative pt-6 pb-2 select-none">
+            {stats.chartData.length === 0 ? (
+              <div className="h-64 flex flex-col items-center justify-center text-zinc-450 dark:text-zinc-500 text-xs">
+                <BarChart3 className="w-8 h-8 opacity-40 mb-2" />
+                Aucune vente enregistrée sur cette période.
+              </div>
+            ) : (
+              <div className="relative h-64 w-full flex flex-col justify-end">
+                {/* Horizontal reference grid lines */}
+                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20 dark:opacity-15">
+                  <div className="border-b border-zinc-500 border-dashed w-full" />
+                  <div className="border-b border-zinc-500 border-dashed w-full" />
+                  <div className="border-b border-zinc-500 border-dashed w-full" />
+                  <div className="border-b border-zinc-400 w-full" />
+                </div>
 
-                      {/* Bar tracks */}
-                      <div className="w-full flex justify-center items-end h-[90%] gap-1 select-none">
-                        {/* Revenue Bar */}
-                        <div
-                          style={{ height: `${Math.max(revenueHeight, 3)}%` }}
-                          className="w-4 sm:w-6 bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-sm group-hover:shadow-lg group-hover:shadow-blue-500/10 transition-all duration-300"
-                        />
-                        {/* Commission Bar */}
-                        <div
-                          style={{ height: `${Math.max(commissionHeight, 3)}%` }}
-                          className="w-4 sm:w-6 bg-gradient-to-t from-amber-500 to-amber-300 rounded-t-sm group-hover:shadow-lg group-hover:shadow-amber-500/10 transition-all duration-300"
-                        />
+                {/* Bars track */}
+                <div className="w-full h-full flex items-end justify-between gap-1 sm:gap-2 px-1 relative z-10">
+                  {stats.chartData.map((d, index) => {
+                    const revenueHeight = Math.min(100, (d.amount / maxChartVal) * 100);
+                    const commissionHeight = Math.min(100, (d.commission / maxChartVal) * 100);
+                    const isActive = activePoint?.key === d.key;
+                    const hasSales = d.amount > 0;
+
+                    return (
+                      <div
+                        key={d.key || index}
+                        onClick={() => setActivePoint(d)}
+                        onMouseEnter={() => setActivePoint(d)}
+                        className="flex-1 flex flex-col items-center justify-end h-full group cursor-pointer relative"
+                      >
+                        {/* Floating exact amount tag */}
+                        {hasSales && (
+                          <div className={`mb-1 transition-all duration-200 text-center ${
+                            isActive ? "opacity-100 scale-105" : "opacity-0 group-hover:opacity-100"
+                          }`}>
+                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm whitespace-nowrap">
+                              {Math.round(d.amount)}$
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Bar columns */}
+                        <div className="w-full flex justify-center items-end gap-0.5 sm:gap-1 h-[80%] pb-1">
+                          {/* Revenue Bar */}
+                          <div
+                            style={{ height: `${hasSales ? Math.max(revenueHeight, 8) : 3}%` }}
+                            className={`w-full max-w-[18px] sm:max-w-[24px] rounded-t-md transition-all duration-300 ${
+                              hasSales
+                                ? isActive
+                                  ? "bg-gradient-to-t from-blue-600 via-blue-500 to-cyan-300 shadow-md shadow-blue-500/50 scale-y-105"
+                                  : "bg-gradient-to-t from-blue-600 to-blue-400 group-hover:from-blue-500 group-hover:to-cyan-400"
+                                : "bg-zinc-200 dark:bg-zinc-800 opacity-60"
+                            }`}
+                          />
+                          {/* Commission Bar (if sales present) */}
+                          {hasSales && (
+                            <div
+                              style={{ height: `${Math.max(commissionHeight, 5)}%` }}
+                              className={`w-full max-w-[12px] sm:max-w-[16px] rounded-t-md transition-all duration-300 ${
+                                isActive
+                                  ? "bg-gradient-to-t from-amber-600 via-amber-500 to-yellow-300 shadow-md shadow-amber-500/50 scale-y-105"
+                                  : "bg-gradient-to-t from-amber-500 to-amber-300 group-hover:from-amber-400 group-hover:to-yellow-300"
+                              }`}
+                            />
+                          )}
+                        </div>
+
+                        {/* Date label */}
+                        <span className={`text-[9px] sm:text-[10px] font-semibold mt-1 truncate w-full text-center transition-colors ${
+                          isActive
+                            ? "text-blue-600 dark:text-blue-400 font-bold"
+                            : hasSales
+                            ? "text-zinc-800 dark:text-zinc-200 font-semibold"
+                            : "text-zinc-400 dark:text-zinc-600"
+                        }`}>
+                          {d.label}
+                        </span>
                       </div>
-                      <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-semibold mt-2 truncate w-full text-center">
-                        {d.label}
-                      </span>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             )}
+          </div>
+
+          {/* Bottom Insights Footer */}
+          <div className="pt-3 border-t border-zinc-150 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-500 dark:text-zinc-400 font-medium">🏆 Meilleur jour :</span>
+              <strong className="text-zinc-900 dark:text-white font-bold">
+                {stats.bestDayLabel} ({stats.bestDayAmount.toFixed(2)}$)
+              </strong>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-500 dark:text-zinc-400 font-medium">📊 Transactions :</span>
+              <strong className="text-blue-600 dark:text-blue-400 font-bold">
+                {stats.totalSalesCount} ventes validées
+              </strong>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-500 dark:text-zinc-400 font-medium">💰 Moyenne / jour :</span>
+              <strong className="text-emerald-600 dark:text-emerald-400 font-bold">
+                {(stats.totalRevenue / Math.max(1, stats.chartData.length)).toFixed(2)}$/j
+              </strong>
+            </div>
           </div>
         </div>
       </div>
