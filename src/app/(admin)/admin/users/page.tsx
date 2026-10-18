@@ -25,7 +25,9 @@ import {
   Activity,
   Lock,
   Trash2,
-  AlertCircle
+  AlertCircle,
+  RefreshCw,
+  Edit3
 } from "lucide-react";
 import { COUNTRIES } from "@/lib/countries";
 
@@ -89,6 +91,10 @@ export default function AdminUsersPage() {
     email: "",
     role: "STUDENT" as RoleName,
     password: "Password123!",
+    country: "CD",
+    dialCode: "+243",
+    phoneNumber: "",
+    gender: "male" as "male" | "female",
   });
   const [passwordUser, setPasswordUser] = useState<AdminUserItem | null>(null);
   const [newPasswordVal, setNewPasswordVal] = useState("");
@@ -104,6 +110,22 @@ export default function AdminUsersPage() {
   const [drawerEnrollments, setDrawerEnrollments] = useState<any[]>([]);
   const [drawerPayments, setDrawerPayments] = useState<any[]>([]);
 
+  // Profile editing inside Drawer
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    country: "",
+    phoneNumber: "",
+    gender: "male",
+    academyName: "",
+    academyTagline: "",
+    specialty: "",
+    bio: "",
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [syncingProfiles, setSyncingProfiles] = useState(false);
+  const [syncSuccessMsg, setSyncSuccessMsg] = useState<string | null>(null);
+
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -112,6 +134,22 @@ export default function AdminUsersPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [search, activeTab]);
+
+  useEffect(() => {
+    if (selectedUser) {
+      setEditingProfile(false);
+      setEditFormData({
+        name: selectedUser.name || "",
+        country: selectedUser.country || selectedUser.nationality || "",
+        phoneNumber: selectedUser.phoneNumber || "",
+        gender: selectedUser.gender === "female" ? "female" : "male",
+        academyName: selectedUser.academyName || "",
+        academyTagline: selectedUser.academyTagline || "",
+        specialty: selectedUser.specialty || "",
+        bio: selectedUser.bio || "",
+      });
+    }
+  }, [selectedUser]);
 
   useEffect(() => {
     if (!selectedUser) {
@@ -207,6 +245,92 @@ export default function AdminUsersPage() {
       alert("Erreur de modification du mot de passe : " + err.message);
     } finally {
       setModalLoading(false);
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+    setSavingProfile(true);
+    try {
+      const res = await fetch("/api/admin/users/update-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetUserId: selectedUser.id,
+          name: editFormData.name,
+          phoneNumber: editFormData.phoneNumber,
+          country: editFormData.country,
+          gender: editFormData.gender,
+          academyName: editFormData.academyName,
+          academyTagline: editFormData.academyTagline,
+          specialty: editFormData.specialty,
+          bio: editFormData.bio,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur de mise à jour du profil.");
+
+      // Update state locally
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === selectedUser.id
+            ? {
+                ...u,
+                name: editFormData.name || u.name,
+                phoneNumber: editFormData.phoneNumber,
+                country: editFormData.country,
+                nationality: editFormData.country,
+                gender: editFormData.gender,
+                academyName: editFormData.academyName,
+                academyTagline: editFormData.academyTagline,
+                specialty: editFormData.specialty,
+                bio: editFormData.bio,
+              }
+            : u
+        )
+      );
+
+      setSelectedUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              name: editFormData.name || prev.name,
+              phoneNumber: editFormData.phoneNumber,
+              country: editFormData.country,
+              nationality: editFormData.country,
+              gender: editFormData.gender,
+              academyName: editFormData.academyName,
+              academyTagline: editFormData.academyTagline,
+              specialty: editFormData.specialty,
+              bio: editFormData.bio,
+            }
+          : null
+      );
+
+      setEditingProfile(false);
+      alert("Informations de l'utilisateur mises à jour avec succès !");
+    } catch (err: any) {
+      alert("Erreur lors de la mise à jour : " + err.message);
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleSyncProfiles = async () => {
+    setSyncingProfiles(true);
+    setSyncSuccessMsg(null);
+    try {
+      const res = await fetch("/api/admin/users/sync-profiles", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur de synchronisation.");
+      setSyncSuccessMsg(data.message || "Profils synchronisés avec succès !");
+      await fetchUsers();
+      setTimeout(() => setSyncSuccessMsg(null), 7000);
+    } catch (err: any) {
+      alert("Erreur de synchronisation : " + err.message);
+    } finally {
+      setSyncingProfiles(false);
     }
   };
 
@@ -393,17 +517,48 @@ export default function AdminUsersPage() {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUser.email || !newUser.name) return;
+    if (!newUser.email || !newUser.name) {
+      setErrorMsg("Le nom complet et l'adresse email sont requis.");
+      return;
+    }
+    if (!newUser.country) {
+      setErrorMsg("Le pays de résidence est obligatoire.");
+      return;
+    }
+    const cleanPhoneDigits = newUser.phoneNumber.replace(/[^0-9]/g, "");
+    if (!newUser.phoneNumber.trim() || cleanPhoneDigits.length < 6) {
+      setErrorMsg("Le numéro de téléphone est obligatoire (minimum 6 chiffres).");
+      return;
+    }
+    if (!newUser.gender) {
+      setErrorMsg("Le genre est obligatoire.");
+      return;
+    }
+
     setModalLoading(true);
     setErrorMsg(null);
 
+    const fullPhone = `${newUser.dialCode}${cleanPhoneDigits}`;
+    const matchedCountry = COUNTRIES.find(c => c.code === newUser.country);
+    const countryName = matchedCountry ? matchedCountry.name : newUser.country;
+
     try {
-      // 1. Sign up user via auth
+      // 1. Sign up user via auth with full metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: newUser.email,
         password: newUser.password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            full_name: newUser.name,
+            name: newUser.name,
+            role: newUser.role,
+            country: newUser.country,
+            nationality: countryName,
+            phone: fullPhone,
+            phone_number: fullPhone,
+            gender: newUser.gender,
+          }
         }
       });
 
@@ -412,18 +567,36 @@ export default function AdminUsersPage() {
 
       const newId = authData.user.id;
 
-      // 2. Insert profile record (if not auto-created by trigger)
+      // 2. Insert profile record with contact details
       const { error: profError } = await supabase.from('profiles').upsert({
         id: newId,
         email: newUser.email,
         full_name: newUser.name,
         status: 'ACTIVE',
-        plan: newUser.role === 'INSTRUCTOR' ? 'PRO' : 'FREE'
+        plan: newUser.role === 'INSTRUCTOR' ? 'PRO' : 'FREE',
+        nationality: countryName,
+        phone: fullPhone,
+        gender: newUser.gender,
       });
 
       if (profError) {
         console.warn('Profile insert warning (handled):', profError.message);
       }
+
+      // Also call register-profile API to ensure complete synchronization
+      await fetch('/api/auth/register-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: newId,
+          email: newUser.email,
+          name: newUser.name,
+          role: newUser.role,
+          country: newUser.country,
+          phone: fullPhone,
+          gender: newUser.gender,
+        })
+      }).catch(() => {});
 
       // 3. Set the target role
       const { data: roles } = await supabase.from('roles').select('id, name');
@@ -442,7 +615,16 @@ export default function AdminUsersPage() {
       }
 
       setShowAddModal(false);
-      setNewUser({ name: "", email: "", role: "STUDENT", password: "Password123!" });
+      setNewUser({
+        name: "",
+        email: "",
+        role: "STUDENT",
+        password: "Password123!",
+        country: "CD",
+        dialCode: "+243",
+        phoneNumber: "",
+        gender: "male",
+      });
       fetchUsers();
     } catch (err: any) {
       console.error('Error creating user:', err);
@@ -482,13 +664,31 @@ export default function AdminUsersPage() {
             Gérez les comptes, les statuts d'accès et attribuez les rôles instructeurs.
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium text-sm transition-colors shadow-sm cursor-pointer shrink-0"
-        >
-          <UserPlus className="w-4 h-4" /> Nouvel Utilisateur
-        </button>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={handleSyncProfiles}
+            disabled={syncingProfiles}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-xl font-bold text-xs transition-colors shadow-sm cursor-pointer shrink-0 disabled:opacity-50"
+            title="Synchroniser et récupérer les métadonnées (téléphone, pays, genre) de tous les utilisateurs"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${syncingProfiles ? "animate-spin text-red-600" : ""}`} />
+            <span>{syncingProfiles ? "Synchronisation en cours..." : "Synchroniser les profils"}</span>
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium text-sm transition-colors shadow-sm cursor-pointer shrink-0"
+          >
+            <UserPlus className="w-4 h-4" /> Nouvel Utilisateur
+          </button>
+        </div>
       </div>
+
+      {syncSuccessMsg && (
+        <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 rounded-2xl text-xs flex items-center gap-3 animate-in fade-in">
+          <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+          <span className="font-semibold">{syncSuccessMsg}</span>
+        </div>
+      )}
 
       {/* Tabs & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 min-w-0">
@@ -800,6 +1000,85 @@ export default function AdminUsersPage() {
                 </select>
               </div>
 
+              {/* Mandatory Contact Details */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 flex items-center justify-between">
+                  <span>Pays de résidence</span>
+                  <span className="text-[10px] text-red-500 font-bold">* Requis</span>
+                </label>
+                <select
+                  required
+                  value={newUser.country}
+                  onChange={(e) => {
+                    const cCode = e.target.value;
+                    const found = COUNTRIES.find(c => c.code === cCode);
+                    setNewUser(prev => ({
+                      ...prev,
+                      country: cCode,
+                      dialCode: found ? found.dial : prev.dialCode,
+                    }));
+                  }}
+                  className="w-full px-4 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 text-zinc-900 dark:text-white"
+                >
+                  {COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.flag} {c.name} ({c.dial})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 flex items-center justify-between">
+                  <span>Numéro de téléphone</span>
+                  <span className="text-[10px] text-red-500 font-bold">* Requis</span>
+                </label>
+                <div className="flex gap-2">
+                  <div className="w-24 shrink-0 px-3 py-2.5 text-sm bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl font-mono text-zinc-700 dark:text-zinc-300 flex items-center justify-center font-bold">
+                    {newUser.dialCode}
+                  </div>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="81 234 5678"
+                    value={newUser.phoneNumber}
+                    onChange={(e) => setNewUser(prev => ({ ...prev, phoneNumber: e.target.value.replace(/[^0-9\s]/g, "") }))}
+                    className="flex-1 px-4 py-2.5 text-sm bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/20 text-zinc-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 flex items-center justify-between">
+                  <span>Genre</span>
+                  <span className="text-[10px] text-red-500 font-bold">* Requis</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewUser(prev => ({ ...prev, gender: "male" }))}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                      newUser.gender === "male"
+                        ? "bg-red-50 dark:bg-red-950/20 border-red-500 text-red-600 dark:text-red-400"
+                        : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400"
+                    }`}
+                  >
+                    👨 Masculin
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewUser(prev => ({ ...prev, gender: "female" }))}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                      newUser.gender === "female"
+                        ? "bg-red-50 dark:bg-red-950/20 border-red-500 text-red-600 dark:text-red-400"
+                        : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400"
+                    }`}
+                  >
+                    👩 Féminin
+                  </button>
+                </div>
+              </div>
+
               <button
                 type="submit"
                 disabled={modalLoading}
@@ -987,34 +1266,168 @@ export default function AdminUsersPage() {
 
                 {/* Personal & Contact Info Grid */}
                 <div className="space-y-3">
-                  <h5 className="text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-550">Informations & Contacts</h5>
-                  <div className="bg-zinc-50 dark:bg-zinc-900/30 rounded-2xl border border-zinc-155 dark:border-zinc-800 p-4 space-y-3.5 text-xs">
-                    
-                    {/* Country & Nationality */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Pays de résidence</span>
-                        <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">{formatCountryDisplay(openUser.country)}</span>
-                      </div>
-                      <div>
-                        <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Nationalité / Origine</span>
-                        <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">{formatCountryDisplay(openUser.nationality)}</span>
-                      </div>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-550">Informations & Contacts</h5>
+                    <button
+                      onClick={() => setEditingProfile(!editingProfile)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 text-xxs font-bold transition-colors cursor-pointer"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                      <span>{editingProfile ? "Fermer l'édition" : "Modifier / Renseigner"}</span>
+                    </button>
+                  </div>
 
-                    {/* Phone & Gender */}
-                    <div className="grid grid-cols-2 gap-4 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80">
-                      <div>
-                        <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Téléphone / Contact</span>
-                        <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block font-mono">{openUser.phoneNumber || "Non renseigné"}</span>
-                      </div>
-                      <div>
-                        <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Genre</span>
-                        <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">
-                          {formatGenderDisplay(openUser.gender)}
-                        </span>
-                      </div>
+                  {editingProfile ? (
+                    <div className="bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-red-200 dark:border-red-900/40 p-4 animate-in fade-in">
+                      <form onSubmit={handleSaveProfile} className="space-y-3.5 text-xs">
+                        <div>
+                          <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Nom Complet</label>
+                          <input
+                            type="text"
+                            required
+                            value={editFormData.name}
+                            onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                            className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-semibold text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-red-500/20"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Pays de résidence</label>
+                            <select
+                              value={editFormData.country}
+                              onChange={(e) => setEditFormData({ ...editFormData, country: e.target.value })}
+                              className="w-full px-2.5 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-medium text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-red-500/20"
+                            >
+                              <option value="">Non renseigné</option>
+                              {COUNTRIES.map((c) => (
+                                <option key={c.code} value={c.name}>
+                                  {c.flag} {c.name} ({c.dial})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Téléphone / Contact</label>
+                            <input
+                              type="tel"
+                              placeholder="Ex: +243812345678"
+                              value={editFormData.phoneNumber}
+                              onChange={(e) => setEditFormData({ ...editFormData, phoneNumber: e.target.value })}
+                              className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs font-mono text-zinc-900 dark:text-white outline-none focus:ring-2 focus:ring-red-500/20"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Genre</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setEditFormData({ ...editFormData, gender: "male" })}
+                              className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                                editFormData.gender === "male"
+                                  ? "bg-red-50 dark:bg-red-950/20 border-red-500 text-red-600 dark:text-red-400"
+                                  : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400"
+                              }`}
+                            >
+                              👨 Masculin
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditFormData({ ...editFormData, gender: "female" })}
+                              className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                                editFormData.gender === "female"
+                                  ? "bg-red-50 dark:bg-red-950/20 border-red-500 text-red-600 dark:text-red-400"
+                                  : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400"
+                              }`}
+                            >
+                              👩 Féminin
+                            </button>
+                          </div>
+                        </div>
+
+                        {openUser.role === "INSTRUCTOR" && (
+                          <div className="space-y-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                            <div>
+                              <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Nom de l&apos;Académie</label>
+                              <input
+                                type="text"
+                                value={editFormData.academyName}
+                                onChange={(e) => setEditFormData({ ...editFormData, academyName: e.target.value })}
+                                className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-blue-500/20"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Spécialité / Thématique</label>
+                              <input
+                                type="text"
+                                value={editFormData.specialty}
+                                onChange={(e) => setEditFormData({ ...editFormData, specialty: e.target.value })}
+                                className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white outline-none"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">Biographie</label>
+                          <textarea
+                            rows={2}
+                            value={editFormData.bio}
+                            onChange={(e) => setEditFormData({ ...editFormData, bio: e.target.value })}
+                            className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white resize-none outline-none"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-2">
+                          <button
+                            type="submit"
+                            disabled={savingProfile}
+                            className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
+                          >
+                            {savingProfile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                            <span>{savingProfile ? "Enregistrement..." : "Enregistrer les modifications"}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingProfile(false)}
+                            className="py-2.5 px-4 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                      </form>
                     </div>
+                  ) : (
+                    <div className="bg-zinc-50 dark:bg-zinc-900/30 rounded-2xl border border-zinc-155 dark:border-zinc-800 p-4 space-y-3.5 text-xs">
+                      
+                      {/* Country & Nationality */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Pays de résidence</span>
+                          <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">{formatCountryDisplay(openUser.country || openUser.nationality)}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Nationalité / Origine</span>
+                          <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">{formatCountryDisplay(openUser.nationality || openUser.country)}</span>
+                        </div>
+                      </div>
+
+                      {/* Phone & Gender */}
+                      <div className="grid grid-cols-2 gap-4 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80">
+                        <div>
+                          <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Téléphone / Contact</span>
+                          <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block font-mono">{openUser.phoneNumber || "Non renseigné"}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] text-zinc-400 uppercase font-semibold">Genre</span>
+                          <span className="font-bold text-zinc-800 dark:text-zinc-200 mt-0.5 block">
+                            {formatGenderDisplay(openUser.gender)}
+                          </span>
+                        </div>
+                      </div>
 
                     {/* Bio (if present) */}
                     {openUser.bio && (
@@ -1115,6 +1528,7 @@ export default function AdminUsersPage() {
                     )}
 
                   </div>
+                )}
                 </div>
 
                 {/* Quick actions Panel */}

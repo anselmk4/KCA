@@ -174,11 +174,15 @@ async function bootstrapUserAndGetRole(
   // 1. Ensure profile exists and is activated if email confirmed
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('id, status, academy_name, full_name')
+    .select('id, status, academy_name, full_name, phone, nationality, gender')
     .eq('id', user.id)
     .maybeSingle();
 
   const isConfirmed = !!user.email_confirmed_at;
+  const meta = user.user_metadata || {};
+  const metaPhone = meta.phone_number || meta.phone || user.phone || null;
+  const metaCountry = meta.nationality || meta.country || null;
+  const metaGender = meta.gender || null;
 
   if (!profile) {
     const { error: insertError } = await supabaseAdmin.from('profiles').insert({
@@ -187,15 +191,33 @@ async function bootstrapUserAndGetRole(
       full_name: fullName,
       status: 'ACTIVE',
       plan: 'FREE',
+      nationality: metaCountry,
+      phone: metaPhone,
+      gender: metaGender,
     });
     if (insertError) {
       console.error('[callback] profile insert error:', insertError.message);
     }
-  } else if (profile.status !== 'SUSPENDED' && profile.status !== 'ACTIVE') {
-    await supabaseAdmin
-      .from('profiles')
-      .update({ status: 'ACTIVE' })
-      .eq('id', user.id);
+  } else {
+    const profileUpdates: Record<string, any> = {};
+    if (profile.status !== 'SUSPENDED' && profile.status !== 'ACTIVE') {
+      profileUpdates.status = 'ACTIVE';
+    }
+    if (!profile.phone && metaPhone) {
+      profileUpdates.phone = metaPhone;
+    }
+    if (!profile.nationality && metaCountry) {
+      profileUpdates.nationality = metaCountry;
+    }
+    if (!profile.gender && metaGender) {
+      profileUpdates.gender = metaGender;
+    }
+    if (Object.keys(profileUpdates).length > 0) {
+      await supabaseAdmin
+        .from('profiles')
+        .update(profileUpdates)
+        .eq('id', user.id);
+    }
   }
 
   if (needsRoleSelection) {

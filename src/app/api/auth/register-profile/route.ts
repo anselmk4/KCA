@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { COUNTRIES } from "@/lib/countries";
 
 const ALLOWED_REGISTRATION_ROLES = ["STUDENT", "INSTRUCTOR"];
 
@@ -26,12 +27,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "userId et email requis" }, { status: 400 });
     }
 
+    // Strict validation of mandatory contact details
+    if (!country || !String(country).trim()) {
+      return NextResponse.json({ error: "Le pays de résidence est obligatoire." }, { status: 400 });
+    }
+
+    const cleanPhone = String(phone || "").trim();
+    if (!cleanPhone || cleanPhone.replace(/[^0-9]/g, "").length < 6) {
+      return NextResponse.json({ error: "Le numéro de téléphone est obligatoire et doit être valide (minimum 6 chiffres)." }, { status: 400 });
+    }
+
+    const cleanGenderRaw = String(gender || "").trim().toLowerCase();
+    if (!cleanGenderRaw || !["male", "female", "homme", "femme", "m", "f"].includes(cleanGenderRaw)) {
+      return NextResponse.json({ error: "Le genre est obligatoire (Masculin ou Féminin)." }, { status: 400 });
+    }
+    const cleanGender = cleanGenderRaw === "female" || cleanGenderRaw === "femme" || cleanGenderRaw === "f" ? "female" : "male";
+
     // Security check: restrict registration role strictly to STUDENT or INSTRUCTOR
     let finalRole = (role || "STUDENT").toString().trim().toUpperCase();
     if (!ALLOWED_REGISTRATION_ROLES.includes(finalRole)) {
       console.warn(`[register-profile] Unauthorized role requested: ${finalRole}. Clamping to STUDENT.`);
       finalRole = "STUDENT";
     }
+
+    if (finalRole === "INSTRUCTOR" && (!academyName || !String(academyName).trim())) {
+      return NextResponse.json({ error: "Le nom de l'académie est obligatoire pour les formateurs." }, { status: 400 });
+    }
+
+    // Resolve country name & code
+    const countryRaw = String(country).trim();
+    const matchedCountry = COUNTRIES.find(
+      (c) =>
+        c.code.toLowerCase() === countryRaw.toLowerCase() ||
+        c.name.toLowerCase() === countryRaw.toLowerCase()
+    );
+    const countryCode = matchedCountry ? matchedCountry.code : countryRaw;
+    const countryName = matchedCountry ? matchedCountry.name : countryRaw;
 
     // Verify user exists in Auth and mark active
     let initialStatus = "ACTIVE";
@@ -59,11 +90,9 @@ export async function POST(req: NextRequest) {
       full_name: name || email.split("@")[0],
       status: initialStatus,
       plan: "FREE",
-      nationality: country || null,
-      country: country || null,
-      phone: phone || null,
-      phone_number: phone || null,
-      gender: gender || null,
+      nationality: countryName,
+      phone: cleanPhone,
+      gender: cleanGender,
     };
 
     if (finalRole === "INSTRUCTOR") {
@@ -91,6 +120,26 @@ export async function POST(req: NextRequest) {
         .from("profiles")
         .insert(profileData);
       if (insertErr) console.error("[register-profile] Error inserting profile:", insertErr.message);
+    }
+
+    // Synchronize Auth user_metadata so information is persisted in Auth as well
+    try {
+      await supabaseAdmin.auth.admin.updateUserById(userId, {
+        user_metadata: {
+          full_name: name || email.split("@")[0],
+          name: name || email.split("@")[0],
+          country: countryCode,
+          nationality: countryName,
+          phone: cleanPhone,
+          phone_number: cleanPhone,
+          gender: cleanGender,
+          ...(finalRole === "INSTRUCTOR"
+            ? { academy_name: academyName || "Mon Académie", bio: bio || null, thematic: thematic || null }
+            : { student_level: studentLevel || null }),
+        },
+      });
+    } catch (metaErr: any) {
+      console.warn("[register-profile] Auth user_metadata sync warning:", metaErr?.message);
     }
 
     // 2. Ensure role assignment in user_roles (strictly STUDENT or INSTRUCTOR)

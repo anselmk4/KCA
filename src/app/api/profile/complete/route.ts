@@ -42,12 +42,10 @@ export async function POST(req: NextRequest) {
       ? "female"
       : "male";
 
-    // 1. Prepare profile updates for profiles table
+    // 1. Prepare profile updates for profiles table (using existing DB columns: nationality, phone, gender)
     const profileUpdates: Record<string, any> = {
-      country: countryCode,
-      nationality: countryName,
+      nationality: countryName || countryCode,
       phone: cleanPhone,
-      phone_number: cleanPhone,
       gender: cleanGender,
     };
 

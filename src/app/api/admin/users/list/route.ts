@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
 
       // Merge data from both profiles and auth user_metadata (covering both column naming conventions)
       const resolvedPhone = p.phone || p.phone_number || meta.phone_number || meta.phone || authUser?.phone || '';
-      const resolvedCountry = p.country || meta.country || p.nationality || meta.nationality || '';
+      const resolvedCountry = p.nationality || p.country || meta.country || meta.nationality || '';
       const resolvedNationality = p.nationality || meta.nationality || p.country || meta.country || '';
       const resolvedGender = p.gender || meta.gender || '';
       const resolvedBio = p.bio || meta.bio || '';
@@ -107,16 +107,20 @@ export async function GET(req: NextRequest) {
       const resolvedLevel = p.level || meta.student_level || 'Débutant';
 
       // Auto-repair profile if fields were in user_metadata but missing in profiles table
-      if ((!p.phone && resolvedPhone) || (!p.country && resolvedCountry) || (!p.gender && resolvedGender)) {
+      const repairUpdates: Record<string, any> = {};
+      if (!p.phone && resolvedPhone) repairUpdates.phone = resolvedPhone;
+      if (!p.nationality && resolvedNationality) repairUpdates.nationality = resolvedNationality;
+      if (!p.gender && resolvedGender) repairUpdates.gender = resolvedGender;
+      if (!p.academy_name && resolvedAcademy) repairUpdates.academy_name = resolvedAcademy;
+      if (!p.specialty && resolvedSpecialty) repairUpdates.specialty = resolvedSpecialty;
+      if (!p.bio && resolvedBio) repairUpdates.bio = resolvedBio;
+
+      if (Object.keys(repairUpdates).length > 0) {
         Promise.resolve(
-          supabaseAdmin.from('profiles').update({
-            phone: resolvedPhone || undefined,
-            phone_number: resolvedPhone || undefined,
-            country: resolvedCountry || undefined,
-            nationality: resolvedNationality || undefined,
-            gender: resolvedGender || undefined,
-          }).eq('id', p.id)
-        ).catch(() => {});
+          (supabaseAdmin.from('profiles') as any).update(repairUpdates).eq('id', p.id)
+        ).catch((err: any) => {
+          console.warn(`[admin/users/list] Auto-repair warning for profile ${p.id}:`, err?.message);
+        });
       }
 
       return {

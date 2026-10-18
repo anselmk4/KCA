@@ -343,6 +343,58 @@ function RegisterForm() {
     e.preventDefault();
     setFormError(null);
 
+    // ── Enforce strict validation of all mandatory fields across all steps ──
+    if (!name.trim()) {
+      setFormError("Le nom complet est requis.");
+      setStep(1);
+      return;
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      setFormError("Adresse email invalide.");
+      setStep(1);
+      return;
+    }
+    if (password.length < 8) {
+      setFormError("Le mot de passe doit contenir au moins 8 caractères.");
+      setStep(1);
+      return;
+    }
+
+    if (!country) {
+      setFormError("Le pays de résidence est obligatoire. Veuillez sélectionner votre pays.");
+      setStep(2);
+      return;
+    }
+    const cleanDigits = phoneNumber.replace(/[^0-9]/g, "");
+    if (!phoneNumber.trim() || cleanDigits.length < 6) {
+      setFormError("Le numéro de téléphone est obligatoire (minimum 6 chiffres).");
+      setStep(2);
+      return;
+    }
+    if (!gender) {
+      setFormError("Veuillez sélectionner votre genre (Homme ou Femme).");
+      setStep(2);
+      return;
+    }
+
+    if (role === "INSTRUCTOR") {
+      if (!academyName.trim()) {
+        setFormError("Le nom de votre académie est requis.");
+        setStep(3);
+        return;
+      }
+      if (thematic === "other" && !customThematic.trim()) {
+        setFormError("Veuillez spécifier votre domaine d'enseignement.");
+        setStep(3);
+        return;
+      }
+      if (!bio.trim()) {
+        setFormError("Une courte biographie est requise.");
+        setStep(3);
+        return;
+      }
+    }
+
     if (!captchaToken) {
       setFormError("Veuillez valider le test de sécurité (CAPTCHA).");
       return;
@@ -385,7 +437,9 @@ function RegisterForm() {
             full_name: name,
             role: role || "STUDENT",
             country,
+            nationality: selectedCountry?.name || country,
             phone_number: fullPhone,
+            phone: fullPhone,
             gender,
             // Instructor
             academy_name: academyName || null,
@@ -449,9 +503,7 @@ function RegisterForm() {
       // Store the registration role selection for robust confirmed page lookup
       localStorage.setItem("kuettu_registration_role", role || "STUDENT");
 
-      // Call register-profile API to build DB records (non-blocking — does NOT
-      // prevent dashboard access if it fails; profile will be auto-created on
-      // next login via the auth-helpers fallback).
+      // Call register-profile API to build DB records
       const storedRef = localStorage.getItem("ansella_referral_code");
       try {
         const regProfileRes = await fetch("/api/auth/register-profile", {
@@ -476,11 +528,14 @@ function RegisterForm() {
         if (!regProfileRes.ok) {
           const errData = await regProfileRes.json().catch(() => ({}));
           console.error("[register] register-profile API error:", errData);
-          // Non-blocking: the session is already written, continue to redirect
+          if (errData.error) {
+            setFormError(errData.error);
+            setLoading(false);
+            return;
+          }
         }
       } catch (apiErr) {
         console.error("[register] register-profile fetch failed:", apiErr);
-        // Non-blocking: still redirect to dashboard
       }
 
       if (storedRef) {

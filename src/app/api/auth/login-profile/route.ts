@@ -9,30 +9,51 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Fetch profile
-    let { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('id, email, full_name, plan, status')
+    let { data: profile } = await (supabaseAdmin
+      .from('profiles') as any)
+      .select('id, email, full_name, plan, status, phone, nationality, gender, academy_name')
       .eq('id', userId)
       .maybeSingle();
 
     // 2. Check Auth confirmation status
     let isEmailConfirmed = false;
+    let authUser: any = null;
     try {
-      const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+      const { data } = await supabaseAdmin.auth.admin.getUserById(userId);
+      authUser = data;
       isEmailConfirmed = !!authUser?.user?.email_confirmed_at;
     } catch (authErr) {
       console.warn('[login-profile] Could not fetch auth user:', authErr);
     }
 
+    const authUserObj = authUser?.user;
+    const authMeta = authUserObj?.user_metadata || {};
+
     // 3. Auto-repair / Auto-activate: upon login, ensure profile is ACTIVE if not SUSPENDED
     if (profile && profile.status !== 'SUSPENDED') {
+      const updates: Record<string, any> = {};
       if (profile.status !== 'ACTIVE') {
-        await supabaseAdmin
-          .from('profiles')
-          .update({ status: 'ACTIVE' })
-          .eq('id', userId);
+        updates.status = 'ACTIVE';
         profile.status = 'ACTIVE';
       }
+      // Check if profile is missing contact details present in auth metadata
+      const metaPhone = authMeta.phone_number || authMeta.phone || authUserObj?.phone;
+      const metaCountry = authMeta.country || authMeta.nationality;
+      const metaGender = authMeta.gender;
+      const metaAcademy = authMeta.academy_name;
+
+      if (!profile.phone && metaPhone) updates.phone = metaPhone;
+      if (!profile.nationality && metaCountry) updates.nationality = metaCountry;
+      if (!profile.gender && metaGender) updates.gender = metaGender;
+      if (!profile.academy_name && metaAcademy) updates.academy_name = metaAcademy;
+
+      if (Object.keys(updates).length > 0) {
+        await (supabaseAdmin
+          .from('profiles') as any)
+          .update(updates)
+          .eq('id', userId);
+      }
+
       if (!isEmailConfirmed) {
         try {
           await supabaseAdmin.auth.admin.updateUserById(userId, { email_confirm: true });
@@ -42,18 +63,26 @@ export async function POST(req: NextRequest) {
 
     // 4. If profile is missing, auto-create it (repair)
     if (!profile && email) {
-      const fullName = email.split('@')[0] || 'Utilisateur';
+      const fullName = authMeta.full_name || authMeta.name || email.split('@')[0] || 'Utilisateur';
+      const metaPhone = authMeta.phone_number || authMeta.phone || authUserObj?.phone || null;
+      const metaCountry = authMeta.country || authMeta.nationality || null;
+      const metaGender = authMeta.gender || null;
+      const metaAcademy = authMeta.academy_name || null;
       
-      const { data: newProfile, error: insertError } = await supabaseAdmin
-        .from('profiles')
+      const { data: newProfile, error: insertError } = await (supabaseAdmin
+        .from('profiles') as any)
         .insert({
           id: userId,
           email,
           full_name: fullName,
           status: 'ACTIVE',
           plan: 'FREE',
+          phone: metaPhone,
+          nationality: metaCountry,
+          gender: metaGender,
+          academy_name: metaAcademy,
         })
-        .select('id, email, full_name, plan, status')
+        .select('id, email, full_name, plan, status, phone, nationality, gender')
         .single();
 
       if (insertError) {
@@ -61,7 +90,6 @@ export async function POST(req: NextRequest) {
       } else {
         profile = newProfile;
       }
-      
     }
 
     if (!profile) {

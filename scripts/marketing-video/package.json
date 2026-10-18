@@ -1,0 +1,13 @@
+{
+  "name": "ansella-marketing-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "npm install && npx playwright install chromium",
+    "record": "node record-demo.mjs",
+    "record:mobile": "node record-demo.mjs --mobile"
+  },
+  "devDependencies": {
+    "playwright": "^1.48.0"
+  }
+}
