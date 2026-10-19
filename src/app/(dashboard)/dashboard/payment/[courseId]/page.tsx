@@ -387,6 +387,14 @@ export default function PaymentPage() {
   const feeSurchargeAmount = Number((discountedAmount * feeRate).toFixed(2));
   const finalAmountWithFee = Number((discountedAmount * (1 + feeRate)).toFixed(2));
 
+  // Local currency formatted helper (FCFA, CDF, etc.)
+  const getLocalFormatted = (usd: number) => {
+    if (!countryConfig || !countryConfig.exchangeRate) return null;
+    const localVal = Math.round(usd * countryConfig.exchangeRate);
+    const curr = countryConfig.currency === "XOF" || countryConfig.currency === "XAF" ? "FCFA" : countryConfig.currency;
+    return `${localVal.toLocaleString("fr-FR")} ${curr}`;
+  };
+
   const checkPaymentStatus = async (isSilent = false) => {
     if (!paymentId) return;
     if (!isSilent) setVerifying(true);
@@ -512,6 +520,7 @@ export default function PaymentPage() {
             label:  'paypal'
           },
           createOrder: async () => {
+            setPaymentError(null);
             try {
                const res = await fetch("/api/payments/paypal/create-order", {
                  method: "POST",
@@ -527,12 +536,13 @@ export default function PaymentPage() {
               if (data.error) throw new Error(data.error);
               return data.orderId;
             } catch (err: any) {
-              alert("Erreur lors de la création de la commande PayPal : " + err.message);
+              setPaymentError("Erreur lors de la création de la commande PayPal : " + (err.message || "Échec de connexion."));
               throw err;
             }
           },
           onApprove: async (data: any) => {
             setSubmitting(true);
+            setPaymentError(null);
             try {
               const res = await fetch("/api/payments/paypal/capture-order", {
                 method: "POST",
@@ -541,7 +551,10 @@ export default function PaymentPage() {
               });
               const captureData = await res.json();
               if (captureData.error) {
-                alert("Erreur lors de la capture : " + captureData.error);
+                setPaymentError(captureData.error);
+                if (typeof window !== "undefined") {
+                  window.scrollTo({ top: 120, behavior: "smooth" });
+                }
               } else {
                 setSuccess(true);
                 router.refresh();
@@ -550,14 +563,20 @@ export default function PaymentPage() {
                 }, 3000);
               }
             } catch (err: any) {
-              alert("Erreur de capture du paiement : " + err.message);
+              setPaymentError("Erreur de capture du paiement : " + (err.message || "Une erreur inattendue est survenue."));
+              if (typeof window !== "undefined") {
+                window.scrollTo({ top: 120, behavior: "smooth" });
+              }
             } finally {
               setSubmitting(false);
             }
           },
           onError: (err: any) => {
             console.error("PayPal Error:", err);
-            alert("La transaction PayPal a échoué ou a été annulée.");
+            setPaymentError("La transaction PayPal a été annulée ou n'a pas pu aboutir. Si votre carte bancaire a été rejetée, privilégiez le règlement par Mobile Money.");
+            if (typeof window !== "undefined") {
+              window.scrollTo({ top: 120, behavior: "smooth" });
+            }
           }
         }).render("#paypal-button-container");
         return true;
@@ -863,24 +882,47 @@ export default function PaymentPage() {
         <div className="md:col-span-2 space-y-6">
           
           {paymentError && (
-            <div className="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-2xl text-red-700 dark:text-red-300 text-xs font-semibold space-y-2 animate-in fade-in">
-              <div className="font-extrabold text-sm flex items-center gap-2 text-red-800 dark:text-red-200">
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                <span>Paiement non validé par l'opérateur</span>
+            <div className="p-5 bg-red-50/90 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-2xl text-red-800 dark:text-red-200 text-xs font-semibold space-y-3 shadow-sm animate-in fade-in duration-300">
+              <div className="font-extrabold text-sm flex items-center justify-between text-red-900 dark:text-red-100">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+                  <span>Paiement non validé</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPaymentError(null)}
+                  className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 p-1 text-xs cursor-pointer font-bold"
+                  title="Fermer"
+                >
+                  ✕
+                </button>
               </div>
-              <p className="leading-relaxed">{paymentError}</p>
-              <div className="pt-2 border-t border-red-200 dark:border-red-900/50 flex flex-wrap gap-2">
+              <p className="leading-relaxed font-normal text-zinc-700 dark:text-zinc-300">
+                {paymentError}
+              </p>
+              <div className="pt-2 border-t border-red-200/80 dark:border-red-900/60 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     setMethod("momo");
-                    setMomoSubMode("manual");
                     setPaymentError(null);
                   }}
-                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  className="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs transition-colors cursor-pointer flex items-center gap-2 shadow-sm"
                 >
-                  <span>📲 Utiliser le virement direct MoMo / Code USSD</span>
+                  <span>📲 Payer en monnaie locale via Mobile Money</span>
                 </button>
+                {method === "momo" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMomoSubMode("manual");
+                      setPaymentError(null);
+                    }}
+                    className="px-3 py-2 bg-zinc-800 hover:bg-zinc-900 text-white rounded-xl font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  >
+                    <span>💳 Utiliser le virement direct MoMo / Code USSD</span>
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1152,6 +1194,16 @@ export default function PaymentPage() {
                     <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">{t("student.payment.applyCoupon", "PayPal").toLowerCase().includes("appliqu") ? "Pay securely with PayPal" : "Payer en toute sécurité avec PayPal"}</p>
                     <p className="text-xxs text-zinc-400">{t("student.payment.applyCoupon", "PayPal").toLowerCase().includes("appliqu") ? "Click the button below to open the PayPal payment window." : "Cliquez sur le bouton ci-dessous pour ouvrir la fenêtre de paiement PayPal."}</p>
                   </div>
+
+                  {/* African Card / Forex Educational Notice */}
+                  <div className="p-3.5 bg-amber-50/80 dark:bg-amber-950/30 rounded-xl border border-amber-200/80 dark:border-amber-900/40 text-amber-900 dark:text-amber-200 text-xs space-y-1">
+                    <p className="font-extrabold flex items-center gap-1.5 text-xs">
+                      <span>💡 Carte bancaire émise en Afrique ?</span>
+                    </p>
+                    <p className="text-[11px] leading-relaxed text-amber-800/90 dark:text-amber-300/90">
+                      Beaucoup de banques africaines restreignent les achats en devises ($ USD) ou les prélèvements récurrents. En cas de refus, privilégiez le règlement direct en {countryConfig.currency === "XOF" || countryConfig.currency === "XAF" ? "FCFA" : countryConfig.currency} via l'onglet <strong>Mobile Money</strong>.
+                    </p>
+                  </div>
                   
                   {paypalError && (
                     <div className="p-4 bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-900/30 text-xs text-center font-bold">
@@ -1415,6 +1467,11 @@ export default function PaymentPage() {
                     >
                       <span>{t("student.payment.applyCoupon", "Paiement unique").toLowerCase().includes("appliqu") ? "One-time payment" : "Paiement unique"}</span>
                       <span className="text-[11px] opacity-90 font-bold">${discountedTotalCoursePrice} USD</span>
+                      {getLocalFormatted(discountedTotalCoursePrice) && (
+                        <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-semibold">
+                          ≈ {getLocalFormatted(discountedTotalCoursePrice)}
+                        </span>
+                      )}
                     </button>
 
                     {/* Option 2: Payer en 2 tranches */}
@@ -1433,6 +1490,11 @@ export default function PaymentPage() {
                       <span className="text-xs font-black">
                         ${Math.round(discountedTotalCoursePrice / 2)} USD / {t("student.payment.applyCoupon", "mois").toLowerCase().includes("appliqu") ? "month" : "mois"}
                       </span>
+                      {getLocalFormatted(Math.round(discountedTotalCoursePrice / 2)) && (
+                        <span className="text-[10px] font-semibold opacity-90">
+                          ≈ {getLocalFormatted(Math.round(discountedTotalCoursePrice / 2))} / mois
+                        </span>
+                      )}
                     </button>
 
                     {/* Option 3: Payer en 3 tranches */}
@@ -1451,6 +1513,11 @@ export default function PaymentPage() {
                       <span className="text-xs font-black text-white">
                         ${Math.round(discountedTotalCoursePrice / 3)} USD / {t("student.payment.applyCoupon", "mois").toLowerCase().includes("appliqu") ? "month" : "mois"}
                       </span>
+                      {getLocalFormatted(Math.round(discountedTotalCoursePrice / 3)) && (
+                        <span className="text-[10px] font-bold text-red-100">
+                          ≈ {getLocalFormatted(Math.round(discountedTotalCoursePrice / 3))} / mois
+                        </span>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -1527,6 +1594,12 @@ export default function PaymentPage() {
                 <span className="text-zinc-950 dark:text-white">Montant Total :</span>
                 <span className="text-blue-600 dark:text-blue-400">${finalAmountWithFee.toFixed(2)} USD</span>
               </div>
+              {getLocalFormatted(finalAmountWithFee) && (
+                <div className="flex justify-between items-center text-xs font-extrabold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 px-3 py-2 rounded-xl border border-emerald-200 dark:border-emerald-900/40">
+                  <span>🌍 Équivalent monnaie locale :</span>
+                  <span>≈ {getLocalFormatted(finalAmountWithFee)}</span>
+                </div>
+              )}
             </div>
 
             {/* Code Promo Input */}

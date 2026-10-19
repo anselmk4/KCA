@@ -374,6 +374,7 @@ function PaymentContent() {
             label:  'paypal'
           },
           createOrder: async () => {
+            setPaypalError(null);
             try {
               const res = await fetch("/api/payments/paypal/create-order", {
                 method: "POST",
@@ -387,12 +388,13 @@ function PaymentContent() {
               if (data.error) throw new Error(data.error);
               return data.orderId;
             } catch (err: any) {
-              alert("Erreur lors de la création de la commande PayPal : " + err.message);
+              setPaypalError("Erreur lors de la création de la commande PayPal : " + (err.message || "Échec de connexion."));
               throw err;
             }
           },
           onApprove: async (data: any) => {
             setLoading(true);
+            setPaypalError(null);
             try {
               const res = await fetch("/api/payments/paypal/capture-order", {
                 method: "POST",
@@ -401,20 +403,20 @@ function PaymentContent() {
               });
               const captureData = await res.json();
               if (captureData.error) {
-                alert("Erreur lors de la capture : " + captureData.error);
+                setPaypalError(captureData.error);
               } else {
                 // Plan already updated in Supabase by the server-side capture handler
                 handlePaymentSuccess();
               }
             } catch (err: any) {
-              alert("Erreur de capture du paiement : " + err.message);
+              setPaypalError("Erreur de capture du paiement : " + (err.message || "Une erreur est survenue."));
             } finally {
               setLoading(false);
             }
           },
           onError: (err: any) => {
             console.error("PayPal Error:", err);
-            alert("La transaction PayPal a échoué ou a été annulée.");
+            setPaypalError("La transaction PayPal a été annulée ou n'a pas pu être complétée. Si votre carte bancaire est refusée, privilégiez le règlement par Mobile Money.");
           }
         }).render("#paypal-button-container");
         return true;
@@ -743,10 +745,29 @@ function PaymentContent() {
                   <p className="text-xs text-zinc-500 max-w-sm mx-auto">Cliquez sur le bouton PayPal ci-dessous pour finaliser votre abonnement.</p>
                   
                   {paypalError && (
-                    <div className="p-4 bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-900/30 text-xs text-center font-bold">
-                      {paypalError}
+                    <div className="p-4 bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-900/30 text-xs text-center font-bold space-y-2">
+                      <p>{paypalError}</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMethod("momo");
+                          setPaypalError(null);
+                        }}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors inline-block"
+                      >
+                        📲 Passer au règlement Mobile Money
+                      </button>
                     </div>
                   )}
+
+                  <div className="p-3 bg-amber-50/80 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-900/40 text-amber-900 dark:text-amber-200 text-xs text-left space-y-1">
+                    <p className="font-extrabold flex items-center gap-1.5 text-xs">
+                      <span>💡 Carte bancaire émise en Afrique ?</span>
+                    </p>
+                    <p className="text-[11px] leading-relaxed text-amber-800/90 dark:text-amber-300/90">
+                      Beaucoup de banques locales limitent les paiements en devises ($ USD). En cas de rejet, privilégiez le règlement en monnaie locale via l'onglet <strong>Mobile Money</strong>.
+                    </p>
+                  </div>
 
                   {process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ? (
                     <>

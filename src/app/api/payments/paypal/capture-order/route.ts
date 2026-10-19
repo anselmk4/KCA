@@ -526,6 +526,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Type de transaction non identifié." }, { status: 400 });
   } catch (err: any) {
     console.error("[paypal-capture-order] Critical exception:", err);
-    return NextResponse.json({ error: err.message || "Erreur lors de la capture de la commande PayPal." }, { status: 500 });
+
+    const issue = err?.code || err?.details?.[0]?.issue;
+    let message = err.message || "Erreur lors de la capture de la commande PayPal.";
+
+    // If message contains unparsed JSON or raw PayPal 422
+    if (typeof message === "string" && (message.includes("INSTRUMENT_DECLINED") || issue === "INSTRUMENT_DECLINED")) {
+      message = "Votre carte bancaire a été refusée par votre banque ou ne prend pas en charge les paiements internationaux en devises (USD). Nous vous conseillons d'effectuer votre règlement en monnaie locale via Mobile Money (Orange Money, Wave, M-Pesa, MTN).";
+    }
+
+    return NextResponse.json({ 
+      error: message,
+      code: issue || "CAPTURE_FAILED",
+      suggestion: issue === "INSTRUMENT_DECLINED" ? "MOMO" : undefined
+    }, { status: 400 });
   }
 }

@@ -82,7 +82,27 @@ export async function capturePayPalOrder(orderId: string) {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Failed to capture PayPal order: ${response.status} ${errorText}`);
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(errorText);
+    } catch {}
+
+    const issue = parsed?.details?.[0]?.issue || parsed?.name;
+    const desc = parsed?.details?.[0]?.description || parsed?.message;
+
+    let friendlyMessage = `Échec de la capture PayPal : ${response.status}`;
+    if (issue === "INSTRUMENT_DECLINED") {
+      friendlyMessage = "Votre moyen de paiement (carte ou compte) a été refusé par votre banque ou n'autorise pas les paiements internationaux en devises (USD).";
+    } else if (desc) {
+      friendlyMessage = desc;
+    }
+
+    const error: any = new Error(friendlyMessage);
+    error.status = response.status;
+    error.code = issue;
+    error.details = parsed?.details;
+    error.raw = errorText;
+    throw error;
   }
 
   return response.json();
