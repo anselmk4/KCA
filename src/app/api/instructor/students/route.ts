@@ -583,9 +583,22 @@ export async function POST(req: NextRequest) {
           await supabaseAdmin.from("profiles").upsert({
             id: effectiveStudentId,
             email: targetStudentEmail,
-            full_name: targetStudentName,
-            role: "STUDENT"
+            full_name: targetStudentName
           });
+
+          // Ensure STUDENT role in user_roles
+          const { data: studentRole } = await supabaseAdmin
+            .from("roles")
+            .select("id")
+            .eq("name", "STUDENT")
+            .maybeSingle();
+
+          if (studentRole) {
+            await supabaseAdmin.from("user_roles").upsert({
+              user_id: effectiveStudentId,
+              role_id: studentRole.id
+            });
+          }
         } else {
           // Create new user account in Supabase Auth
           const { data: newUser, error: createAuthErr } = await supabaseAdmin.auth.admin.createUser({
@@ -612,7 +625,6 @@ export async function POST(req: NextRequest) {
             id: effectiveStudentId,
             email: targetStudentEmail,
             full_name: targetStudentName,
-            role: "STUDENT",
             created_at: new Date().toISOString()
           });
 
