@@ -750,7 +750,7 @@ function PaymentContent() {
                       <button
                         type="button"
                         onClick={() => {
-                          setMethod("momo");
+                          setMethod("mobile_money");
                           setPaypalError(null);
                         }}
                         className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors inline-block"
