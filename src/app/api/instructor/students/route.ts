@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createNotification } from "@/lib/supabase/notifications-helper";
+import { sendEmail } from "@/lib/email";
 
 export async function GET(req: NextRequest) {
   try {
@@ -510,118 +511,240 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { studentId, courseId, sessionId, paymentOption, paidAmount } = body;
+    const {
+      studentId,
+      studentEmail,
+      studentName,
+      courseId,
+      sessionId,
+      paymentOption,
+      paidAmount,
+      notifyEmail = true
+    } = body;
 
-    if (!studentId || !courseId) {
-      return NextResponse.json({ error: "Données manquantes (studentId ou courseId)." }, { status: 400 });
+    if ((!studentId && !studentEmail) || !courseId) {
+      return NextResponse.json({ error: "Données manquantes (l'identifiant ou l'email de l'étudiant ainsi que le cours sont requis)." }, { status: 400 });
     }
 
     const isAdmin = roles.some((r: any) => ["SUPER_ADMIN", "ADMIN"].includes(r));
     let targetCoursePrice = 0;
-    if (!isAdmin) {
-      const { data: course, error: courseErr } = await supabaseAdmin
-        .from("courses")
-        .select("instructor_id, price")
-        .eq("id", courseId)
-        .maybeSingle();
+    let courseTitle = "Formation";
+    
+    // Fetch course details & verify authorization
+    const { data: course, error: courseErr } = await supabaseAdmin
+      .from("courses")
+      .select("id, title, instructor_id, price")
+      .eq("id", courseId)
+      .maybeSingle();
 
-      if (courseErr || !course) {
-        return NextResponse.json({ error: "Cours introuvable." }, { status: 404 });
-      }
-
-      if (course.instructor_id !== user.id) {
-        return NextResponse.json({ error: "Vous n'êtes pas le formateur de ce cours." }, { status: 403 });
-      }
-      targetCoursePrice = Number(course.price) || 0;
-    } else {
-      const { data: course } = await supabaseAdmin.from("courses").select("price").eq("id", courseId).maybeSingle();
-      targetCoursePrice = Number(course?.price) || 0;
+    if (courseErr || !course) {
+      return NextResponse.json({ error: "Cours introuvable." }, { status: 404 });
     }
 
+    if (!isAdmin && course.instructor_id !== user.id) {
+      return NextResponse.json({ error: "Vous n'êtes pas le formateur de ce cours." }, { status: 403 });
+    }
+
+    targetCoursePrice = Number(course.price) || 0;
+    courseTitle = course.title || "Formation";
+
+    // 1. Resolve student ID and Profile
+    let effectiveStudentId = studentId;
+    let targetStudentEmail = studentEmail ? studentEmail.trim().toLowerCase() : "";
+    let targetStudentName = studentName ? studentName.trim() : "";
+
+    if (!effectiveStudentId && targetStudentEmail) {
+      // Find in profiles
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("id, email, full_name")
+        .ilike("email", targetStudentEmail)
+        .maybeSingle();
+
+      if (profile) {
+        effectiveStudentId = profile.id;
+        if (!targetStudentName && profile.full_name) {
+          targetStudentName = profile.full_name;
+        }
+      } else {
+        // Find in auth.users
+        const { data: authList } = await supabaseAdmin.auth.admin.listUsers();
+        const existingAuth = authList?.users?.find(
+          (u) => u.email?.toLowerCase() === targetStudentEmail
+        );
+
+        if (existingAuth) {
+          effectiveStudentId = existingAuth.id;
+          if (!targetStudentName) {
+            targetStudentName = existingAuth.user_metadata?.full_name || targetStudentEmail.split("@")[0];
+          }
+          // Ensure profile exists
+          await supabaseAdmin.from("profiles").upsert({
+            id: effectiveStudentId,
+            email: targetStudentEmail,
+            full_name: targetStudentName,
+            role: "STUDENT"
+          });
+        } else {
+          // Create new user account in Supabase Auth
+          const { data: newUser, error: createAuthErr } = await supabaseAdmin.auth.admin.createUser({
+            email: targetStudentEmail,
+            email_confirm: true,
+            user_metadata: {
+              full_name: targetStudentName || targetStudentEmail.split("@")[0]
+            }
+          });
+
+          if (createAuthErr || !newUser?.user) {
+            return NextResponse.json({
+              error: "Impossible de créer le compte pour cet email : " + (createAuthErr?.message || "Erreur auth.")
+            }, { status: 400 });
+          }
+
+          effectiveStudentId = newUser.user.id;
+          if (!targetStudentName) {
+            targetStudentName = targetStudentEmail.split("@")[0];
+          }
+
+          // Create student profile
+          await supabaseAdmin.from("profiles").upsert({
+            id: effectiveStudentId,
+            email: targetStudentEmail,
+            full_name: targetStudentName,
+            role: "STUDENT",
+            created_at: new Date().toISOString()
+          });
+
+          // Assign STUDENT role in user_roles
+          const { data: studentRole } = await supabaseAdmin
+            .from("roles")
+            .select("id")
+            .eq("name", "STUDENT")
+            .maybeSingle();
+
+          if (studentRole) {
+            await supabaseAdmin.from("user_roles").upsert({
+              user_id: effectiveStudentId,
+              role_id: studentRole.id
+            });
+          }
+        }
+      }
+    }
+
+    if (!effectiveStudentId) {
+      return NextResponse.json({ error: "Impossible de résoudre l'identifiant de l'étudiant." }, { status: 400 });
+    }
+
+    // Retrieve email and name if not already set
+    if (!targetStudentEmail || !targetStudentName) {
+      const { data: prof } = await supabaseAdmin
+        .from("profiles")
+        .select("email, full_name")
+        .eq("id", effectiveStudentId)
+        .maybeSingle();
+      if (prof) {
+        if (!targetStudentEmail) targetStudentEmail = prof.email || "";
+        if (!targetStudentName) targetStudentName = prof.full_name || "";
+      }
+    }
+
+    // 2. Check existing enrollment
     const { data: existing } = await supabaseAdmin
       .from("enrollments")
-      .select("id")
-      .eq("student_id", studentId)
+      .select("id, status")
+      .eq("student_id", effectiveStudentId)
       .eq("course_id", courseId)
       .maybeSingle();
 
     if (existing) {
-      return NextResponse.json({ error: "Cet étudiant est déjà inscrit à ce cours." }, { status: 400 });
-    }
+      if (existing.status === "ACTIVE") {
+        return NextResponse.json({ error: `Cet apprenant (${targetStudentEmail || targetStudentName}) est déjà inscrit et actif à ce cours.` }, { status: 400 });
+      } else {
+        // Re-activate suspended / inactive enrollment
+        const manualStatus = paymentOption === "CASH_FULL" ? "CASH_FULL" : paymentOption === "CASH_INSTALLMENT" ? "CASH_INSTALLMENT" : "FREE_SCHOLARSHIP";
+        const manualAmount = paymentOption === "FREE" ? 0 : (Number(paidAmount) || (paymentOption === "CASH_FULL" ? targetCoursePrice : 0));
 
-    const manualStatus = paymentOption === "CASH_FULL" ? "CASH_FULL" : paymentOption === "CASH_INSTALLMENT" ? "CASH_INSTALLMENT" : "FREE_SCHOLARSHIP";
-    const manualAmount = paymentOption === "FREE" ? 0 : (Number(paidAmount) || (paymentOption === "CASH_FULL" ? targetCoursePrice : 0));
+        await (supabaseAdmin.from("enrollments" as any) as any)
+          .update({
+            status: "ACTIVE",
+            session_id: sessionId || null,
+            manual_payment_status: manualStatus,
+            manual_amount_paid: manualAmount,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", existing.id);
+      }
+    } else {
+      const manualStatus = paymentOption === "CASH_FULL" ? "CASH_FULL" : paymentOption === "CASH_INSTALLMENT" ? "CASH_INSTALLMENT" : "FREE_SCHOLARSHIP";
+      const manualAmount = paymentOption === "FREE" ? 0 : (Number(paidAmount) || (paymentOption === "CASH_FULL" ? targetCoursePrice : 0));
 
-    const { error: insertErr } = await (supabaseAdmin
-      .from("enrollments" as any) as any)
-      .insert({
-        student_id: studentId,
-        course_id: courseId,
-        session_id: sessionId || null,
-        status: "ACTIVE",
-        progress_percent: 0,
-        created_at: new Date().toISOString(),
-        enrollment_type: "MANUAL_INSTRUCTOR",
-        manual_payment_status: manualStatus,
-        manual_amount_paid: manualAmount
-      });
-
-    if (insertErr) {
-      console.error("[students-api POST] error inserting enrollment:", insertErr);
-      return NextResponse.json({ error: insertErr.message }, { status: 400 });
-    }
-
-    // If there is a manual paid amount, generate order & payment record for receipt/invoice generation
-    if (manualAmount > 0) {
-      try {
-        const orderId = crypto.randomUUID();
-        await (supabaseAdmin.from("orders") as any).insert({
-          id: orderId,
-          user_id: studentId,
-          order_number: `MAN-${Date.now()}`,
-          subtotal: manualAmount,
-          total: manualAmount,
-          total_amount: manualAmount,
-          status: "COMPLETED",
-          created_at: new Date().toISOString(),
-        });
-
-        await supabaseAdmin.from("order_items").insert({
-          id: crypto.randomUUID(),
-          order_id: orderId,
+      const { error: insertErr } = await (supabaseAdmin
+        .from("enrollments" as any) as any)
+        .insert({
+          student_id: effectiveStudentId,
           course_id: courseId,
-          unit_price: targetCoursePrice || manualAmount,
-          final_price: manualAmount,
+          session_id: sessionId || null,
+          status: "ACTIVE",
+          progress_percent: 0,
+          created_at: new Date().toISOString(),
+          enrollment_type: "MANUAL_INSTRUCTOR",
+          manual_payment_status: manualStatus,
+          manual_amount_paid: manualAmount
         });
 
-        await supabaseAdmin.from("payments").insert({
-          id: crypto.randomUUID(),
-          order_id: orderId,
-          user_id: studentId,
-          amount: manualAmount,
-          currency: "USD",
-          status: "PAID",
-          provider: "MANUAL",
-          method: manualStatus === "CASH_FULL" ? "MANUAL::CASH_FULL" : "MANUAL::CASH_INSTALLMENT",
-          paid_at: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-        });
-      } catch (payErr) {
-        console.warn("[students-api POST] Could not create manual order/payment record:", payErr);
+      if (insertErr) {
+        console.error("[students-api POST] error inserting enrollment:", insertErr);
+        return NextResponse.json({ error: insertErr.message }, { status: 400 });
+      }
+
+      // If manual payment > 0, generate order & payment record for audit and invoices
+      if (manualAmount > 0) {
+        try {
+          const orderId = crypto.randomUUID();
+          await (supabaseAdmin.from("orders") as any).insert({
+            id: orderId,
+            user_id: effectiveStudentId,
+            order_number: `MAN-${Date.now()}`,
+            subtotal: manualAmount,
+            total: manualAmount,
+            total_amount: manualAmount,
+            status: "COMPLETED",
+            created_at: new Date().toISOString(),
+          });
+
+          await supabaseAdmin.from("order_items").insert({
+            id: crypto.randomUUID(),
+            order_id: orderId,
+            course_id: courseId,
+            unit_price: targetCoursePrice || manualAmount,
+            final_price: manualAmount,
+          });
+
+          await supabaseAdmin.from("payments").insert({
+            id: crypto.randomUUID(),
+            order_id: orderId,
+            user_id: effectiveStudentId,
+            amount: manualAmount,
+            currency: "USD",
+            status: "PAID",
+            provider: "MANUAL",
+            method: manualStatus === "CASH_FULL" ? "MANUAL::CASH_FULL" : "MANUAL::CASH_INSTALLMENT",
+            paid_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+          });
+        } catch (payErr) {
+          console.warn("[students-api POST] Could not create manual order/payment record:", payErr);
+        }
       }
     }
 
+    // 3. In-App Notification
     try {
-      const { data: courseData } = await supabaseAdmin
-        .from("courses")
-        .select("title")
-        .eq("id", courseId)
-        .maybeSingle();
-
       await createNotification({
-        userId: studentId,
-        title: "Invitation à un cours !",
-        message: `Le formateur vous a invité à rejoindre le cours "${courseData?.title || 'Formation'}".`,
+        userId: effectiveStudentId,
+        title: "Nouvelle inscription à une formation !",
+        message: `Votre formateur vous a inscrit avec succès au cours "${courseTitle}". Vos cours sont immédiatement accessibles.`,
         type: "INFO",
         link: `/dashboard/courses`
       });
@@ -629,9 +752,45 @@ export async function POST(req: NextRequest) {
       console.error("Error creating student invite notification:", notifErr);
     }
 
-    return NextResponse.json({ success: true });
+    // 4. Welcome Email Notification
+    if (notifyEmail && targetStudentEmail) {
+      try {
+        const studentGreeting = targetStudentName ? `Bonjour ${targetStudentName},` : "Bonjour,";
+        const emailContent = `
+          <h2>Félicitations ! Vous êtes inscrit à une formation</h2>
+          <p>${studentGreeting}</p>
+          <p>Votre formateur vient de valider votre inscription au cours <strong>"${courseTitle}"</strong> sur la plateforme Ansella.</p>
+          <div style="background-color: #f1f5f9; padding: 16px; border-radius: 12px; margin: 20px 0;">
+            <p style="margin: 0; font-weight: bold; color: #1e293b;">Détails de l'inscription :</p>
+            <p style="margin: 4px 0 0 0; color: #475569;">• Cours : <strong>${courseTitle}</strong></p>
+            <p style="margin: 4px 0 0 0; color: #475569;">• Statut : <strong style="color: #16a34a;">Actif &amp; Débloqué</strong></p>
+          </div>
+          <p>Vous pouvez dès maintenant vous connecter à votre espace étudiant et commencer à suivre vos cours :</p>
+          <div style="text-align: center; margin: 28px 0;">
+            <a href="https://ansella.app/dashboard/courses" style="display: inline-block; background-color: #0d9488; color: #ffffff; padding: 12px 28px; border-radius: 10px; font-weight: bold; text-decoration: none;">
+              Accéder à mes cours
+            </a>
+          </div>
+          <p style="font-size: 13px; color: #64748b;">Si vous n'avez pas encore défini votre mot de passe, vous pouvez utiliser la fonction "Mot de passe oublié" avec cet email (${targetStudentEmail}).</p>
+        `;
+
+        await sendEmail(
+          targetStudentEmail,
+          `Accès accordé : ${courseTitle}`,
+          emailContent
+        );
+      } catch (emailErr) {
+        console.warn("[students-api POST] Email dispatch error:", emailErr);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `L'apprenant ${targetStudentName || targetStudentEmail} a été enrôlé avec succès au cours "${courseTitle}".`
+    });
   } catch (err: any) {
     console.error("[students-api POST] Error:", err);
     return NextResponse.json({ error: err.message || "Erreur interne du serveur." }, { status: 500 });
+  }
   }
 }

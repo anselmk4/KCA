@@ -28,6 +28,7 @@ import { stripHtml } from "@/lib/utils";
 import { supabase } from "@/lib/supabase/client";
 import { getVideoEmbedInfo, getVideoThumbnail } from "@/lib/video";
 import { CourseReviewsSection } from "@/components/reviews";
+import { viewOrDownloadSubmission } from "@/lib/file-utils";
 
 // ─────────────────────────────────────────────────────────
 // Types locaux (sync avec sync.ts)
@@ -1190,15 +1191,13 @@ export default function CourseLearnPage() {
                         <p className="text-[10px] text-zinc-400">Cliquez pour télécharger le document d'instructions.</p>
                       </div>
                     </div>
-                    <a
-                      href={activeHomework.file_url}
-                      download={`sujet-${activeHomework.title}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => viewOrDownloadSubmission(activeHomework.file_url, `sujet-${activeHomework.title}.pdf`, "view")}
                       className="px-4 py-2 bg-indigo-600 hover:bg-indigo-750 text-white rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer"
                     >
-                      Télécharger
-                    </a>
+                      Télécharger / Voir
+                    </button>
                   </div>
                 )}
 
@@ -1226,14 +1225,13 @@ export default function CourseLearnPage() {
                               </div>
                               {sub.status !== "GRADED" ? (
                                 <div className="pt-2 flex justify-center gap-3">
-                                  <a
-                                    href={sub.file_url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                  <button
+                                    type="button"
+                                    onClick={() => viewOrDownloadSubmission(sub.file_url, "ma-soumission.pdf", "view")}
                                     className="px-3.5 py-1.5 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 text-zinc-855 dark:text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
                                   >
                                     Visualiser ma soumission
-                                  </a>
+                                  </button>
                                   <button
                                     onClick={() => {
                                       if (confirm("Voulez-vous remplacer votre soumission actuelle ?")) {
@@ -1246,14 +1244,13 @@ export default function CourseLearnPage() {
                                   </button>
                                 </div>
                               ) : (
-                                <a
-                                  href={sub.file_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                <button
+                                  type="button"
+                                  onClick={() => viewOrDownloadSubmission(sub.file_url, "ma-soumission-corrigee.pdf", "view")}
                                   className="inline-block px-3.5 py-1.5 bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 text-zinc-855 dark:text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
                                 >
                                   Visualiser ma soumission corrigée
-                                </a>
+                                </button>
                               )}
                             </div>
                           ) : (

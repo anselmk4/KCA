@@ -7,12 +7,13 @@ import {
   ArrowLeft, BookOpen, TrendingUp, DollarSign, Award, Clock,
   CheckCircle2, Circle, PlayCircle, AlertTriangle, Mail,
   Calendar, BarChart3, ExternalLink, Loader2, User, Lock, Unlock,
-  Coins, GraduationCap, Zap
+  Coins, GraduationCap, Zap, Eye, Download, FileText, X
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { getSimulatedSession } from "@/lib/rbac";
 import { AddInstallmentModal } from "@/components/instructor/AddInstallmentModal";
 import { AssignSessionModal } from "@/components/instructor/AssignSessionModal";
+import { viewOrDownloadSubmission, dataUrlToBlobUrl } from "@/lib/file-utils";
 
 type CourseDetail = {
   courseId: string;
@@ -99,6 +100,7 @@ export default function StudentDetailPage() {
   const [unlockingCertCourseId, setUnlockingCertCourseId] = useState<string | null>(null);
   const [revokingCourseId, setRevokingCourseId] = useState<string | null>(null);
   const [blockingCourseId, setBlockingCourseId] = useState<string | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; title: string; blobUrl?: string | null } | null>(null);
 
   // Installment modal state
   const [installmentTarget, setInstallmentTarget] = useState<{
@@ -795,17 +797,50 @@ export default function StudentDetailPage() {
 
                                     {sub && (
                                       <div className="space-y-3">
-                                        {/* Submission link */}
-                                        <div className="flex items-center justify-between p-2 bg-zinc-50 dark:bg-zinc-800/40 rounded-lg text-xs">
-                                          <span className="text-zinc-500 font-mono text-[10px] truncate max-w-[200px] sm:max-w-md">Soumission : {sub.file_url.slice(0, 50)}...</span>
-                                          <a
-                                            href={sub.file_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded text-[10px] font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1"
-                                          >
-                                            <ExternalLink className="w-3 h-3" /> Télécharger / Voir
-                                          </a>
+                                        {/* Submission link & actions */}
+                                        <div className="flex flex-wrap items-center justify-between p-2.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-800 rounded-xl gap-2 text-xs">
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            <FileText className="w-4 h-4 text-teal-600 shrink-0" />
+                                            <span className="text-zinc-600 dark:text-zinc-300 font-medium text-[11px] truncate max-w-[180px] sm:max-w-xs">
+                                              Devoir soumis {sub.file_url.startsWith("data:") ? "(Document joint)" : ""}
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center gap-1.5 shrink-0">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const bUrl = dataUrlToBlobUrl(sub.file_url);
+                                                setPreviewDoc({
+                                                  url: sub.file_url,
+                                                  title: `Devoir - ${hw.title}`,
+                                                  blobUrl: bUrl
+                                                });
+                                              }}
+                                              className="px-2.5 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                                              title="Aperçu direct dans l'interface"
+                                            >
+                                              <Eye className="w-3 h-3 text-zinc-500" />
+                                              <span>Aperçu</span>
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => viewOrDownloadSubmission(sub.file_url, `Devoir_${student?.name || "etudiant"}_${hw.title}.pdf`, "view")}
+                                              className="px-2.5 py-1.5 bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                                              title="Ouvrir dans un nouvel onglet"
+                                            >
+                                              <ExternalLink className="w-3 h-3 text-teal-600" />
+                                              <span>Ouvrir</span>
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => viewOrDownloadSubmission(sub.file_url, `Devoir_${student?.name || "etudiant"}_${hw.title}.pdf`, "download")}
+                                              className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                                              title="Télécharger le fichier sur mon ordinateur"
+                                            >
+                                              <Download className="w-3 h-3 text-blue-600" />
+                                              <span>Télécharger</span>
+                                            </button>
+                                          </div>
                                         </div>
 
                                         {/* Grade form or details */}
@@ -1021,6 +1056,59 @@ export default function StudentDetailPage() {
           }}
         />
       )}
+      {/* Document Preview Modal */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl max-w-4xl w-full p-6 shadow-2xl space-y-4 relative flex flex-col max-h-[92vh]">
+            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-teal-600" />
+                <h3 className="font-extrabold text-sm text-zinc-900 dark:text-white truncate max-w-md">
+                  {previewDoc.title}
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => viewOrDownloadSubmission(previewDoc.url, `${previewDoc.title}.pdf`, "view")}
+                  className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Nouvel onglet</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => viewOrDownloadSubmission(previewDoc.url, `${previewDoc.title}.pdf`, "download")}
+                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Télécharger</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDoc(null)}
+                  className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 min-h-[500px] w-full bg-zinc-100 dark:bg-zinc-800/50 rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 flex items-center justify-center">
+              {previewDoc.blobUrl || previewDoc.url ? (
+                <iframe
+                  src={previewDoc.blobUrl || previewDoc.url}
+                  className="w-full h-full min-h-[500px] border-0 rounded-2xl"
+                  title="Document Preview"
+                />
+              ) : (
+                <p className="text-xs text-zinc-400">Impossible de charger le document.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

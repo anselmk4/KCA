@@ -7,13 +7,14 @@ import {
   Users, Search, TrendingUp, BookOpen, Award, DollarSign,
   ArrowRight, Filter, ChevronDown, Loader2, UserCheck,
   AlertCircle, Clock, CheckCircle2, Circle, Sparkles, Lock, Unlock,
-  Coins, GraduationCap, Zap, RefreshCw, X
+  Coins, GraduationCap, Zap, RefreshCw, X, UserPlus
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { getSimulatedSession } from "@/lib/rbac";
 import { useLanguage } from "@/context/LanguageContext";
 import { AddInstallmentModal } from "@/components/instructor/AddInstallmentModal";
 import { AssignSessionModal } from "@/components/instructor/AssignSessionModal";
+import { EnrollStudentModal } from "@/components/instructor/EnrollStudentModal";
 
 type StudentEnrollment = {
   studentId: string;
@@ -116,6 +117,9 @@ export default function StudentsPage() {
   const [retentionData, setRetentionData] = useState<any | null>(null);
   const [sendingRetentionMsg, setSendingRetentionMsg] = useState<boolean>(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
+
+  // Enroll Student Modal state
+  const [showEnrollModal, setShowEnrollModal] = useState<boolean>(false);
 
   async function fetchStudents(instructorId: string) {
     setLoading(true);
@@ -288,6 +292,15 @@ export default function StudentsPage() {
             {grouped.length} apprenant{grouped.length !== 1 ? "s" : ""} inscrit{grouped.length !== 1 ? "s" : ""} · Suivi des tranches et gestion des accès
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setShowEnrollModal(true)}
+          className="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-teal-600/20 flex items-center gap-2 shrink-0 cursor-pointer"
+        >
+          <UserPlus className="w-4 h-4" />
+          <span>Enrôler un étudiant</span>
+        </button>
       </div>
 
       {/* KPI Cards */}
@@ -684,6 +697,17 @@ export default function StudentsPage() {
           }}
         />
       )}
+
+      {/* Enroll Student Modal */}
+      <EnrollStudentModal
+        isOpen={showEnrollModal}
+        onClose={() => setShowEnrollModal(false)}
+        courses={courses}
+        sessions={sessions}
+        onSuccess={() => {
+          if (session?.userId) fetchStudents(session.userId);
+        }}
+      />
 
     </div>
   );
