@@ -89,14 +89,42 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Prepare text for evaluation
+    // Prepare text and multimodal data for evaluation
     const studentName = submission.profiles?.full_name || submission.profiles?.email || "l'étudiant";
     const homeworkTitle = homework.title || "Devoir pratique";
     const homeworkDesc = homework.description || "Consignes du devoir non spécifiées";
-    const studentAnswer = submission.content || submission.file_url || "Rendu sous forme de fichier joint / URL : " + (submission.file_url || "Fichier soumis");
 
-    // Evaluation result structure
+    let inlineData: { mimeType: string; data: string } | undefined = undefined;
+    let studentAnswer = submission.content ? String(submission.content).trim() : "";
+
+    if (submission.file_url) {
+      const match = String(submission.file_url).match(/^data:([^;]+);base64,(.+)$/);
+      if (match) {
+        inlineData = {
+          mimeType: match[1],
+          data: match[2],
+        };
+        studentAnswer = studentAnswer
+          ? `${studentAnswer}\n\n[Document joint analysable ci-dessous (${match[1]})]`
+          : `[Document PDF/Image joint soumis par l'apprenant (${match[1]}) - analysé en pièce jointe]`;
+      } else {
+        studentAnswer = studentAnswer
+          ? `${studentAnswer}\n\nLien du fichier soumis : ${submission.file_url}`
+          : `Lien du fichier soumis : ${submission.file_url}`;
+      }
+    }
+
+    if (!studentAnswer) {
+      studentAnswer = "Soumission de devoir standard.";
+    }
+
+    // Default contextual fallback if Gemini is not configured or rate-limited
+    let isAiGenerated = false;
+    let fallbackReason: string | null = null;
+
     let evaluation = {
+      isAiGenerated: false,
+      fallbackReason: "INITIAL",
       suggestedGrade: 85,
       summaryFeedback: `La soumission de ${studentName} pour "${homeworkTitle}" démontre une bonne compréhension générale des concepts clés. Le devoir répond aux critères essentiels de la consigne.`,
       strengths: [
@@ -115,75 +143,98 @@ export async function POST(req: NextRequest) {
       ]
     };
 
-    try {
-      const systemPrompt = `Tu es un professeur agrégé et expert pédagogique sur la plateforme d'apprentissage Ansella. 
-Ta mission est d'évaluer de manière équitable, constructive et professionnelle le devoir soumis par un étudiant.
-Tu dois répondre STRICTEMENT sous forme d'un objet JSON en français avec la structure demandée.`;
+    const envKey = process.env.GEMINI_API_KEY?.trim() || "";
+    const isKeyConfigured = envKey.length > 15 && !envKey.includes("your_gemini_api_key") && envKey.startsWith("AIza");
 
-      const userPrompt = `Évalue le devoir suivant :
-- Cours : "${course.title || 'Formation'}"
-- Consignes du Devoir : "${homeworkTitle}" (${homeworkDesc})
-- Étudiant : ${studentName}
-- Travail rendu par l'étudiant : "${studentAnswer}"
+    if (!isKeyConfigured) {
+      fallbackReason = "MISSING_KEY";
+      evaluation.isAiGenerated = false;
+      evaluation.fallbackReason = "MISSING_KEY";
+    } else {
+      try {
+        const systemPrompt = `Tu es un professeur agrégé et expert pédagogique sur la plateforme d'apprentissage Ansella. 
+Ta mission est d'évaluer de manière rigoureuse, équitable, personnalisée et constructive le devoir soumis par un étudiant.
+Tu dois analyser minutieusement le contenu textuel ou le document PDF/image attaché, attribuer une note réaliste et justifiée en fonction de la qualité réelle du travail, et répondre STRICTEMENT sous forme d'un objet JSON en français avec la structure demandée.`;
+
+        const userPrompt = `Évalue le devoir suivant :
+- Formation / Cours : "${course.title || 'Formation'}"
+- Titre du Devoir : "${homeworkTitle}"
+- Consignes officielles : "${homeworkDesc}"
+- Nom de l'apprenant : ${studentName}
+- Contenu / Rendu soumis : "${studentAnswer}"
 
 Génère une évaluation détaillée comprenant :
-1. suggestedGrade: Une note globale recommandée entre 0 et 100.
-2. summaryFeedback: Un paragraphe récapitulatif bienveillant et constructif adressé à l'étudiant.
-3. strengths: Un tableau de 2 à 4 points forts observés dans son travail.
-4. improvements: Un tableau de 1 à 3 axes d'amélioration recommandés.
-5. rubricBreakdown: Un tableau de 3 critères d'évaluation avec pour chacun "criterion" (nom du critère), "score" (sur 100), et "comment" (commentaire court).`;
+1. suggestedGrade: Une note globale recommandée entre 0 et 100 reflétant fidèlement le travail fourni.
+2. summaryFeedback: Un paragraphe récapitulatif détaillé, bienveillant et constructif adressé directement à l'étudiant.
+3. strengths: Un tableau de 2 à 4 points forts spécifiques et pertinents observés dans son devoir.
+4. improvements: Un tableau de 2 à 3 axes d'amélioration précis pour progresser.
+5. rubricBreakdown: Un tableau de 3 critères d'évaluation adaptés au sujet avec pour chacun "criterion" (nom), "score" (sur 100), et "comment" (justification).`;
 
-      const responseSchema = {
-        type: "OBJECT",
-        properties: {
-          suggestedGrade: { type: "INTEGER", description: "Note globale recommandée sur 100" },
-          summaryFeedback: { type: "STRING", description: "Feedback général constructif pour l'étudiant" },
-          strengths: {
-            type: "ARRAY",
-            items: { type: "STRING" },
-            description: "Liste des points forts de la soumission"
-          },
-          improvements: {
-            type: "ARRAY",
-            items: { type: "STRING" },
-            description: "Axes d'amélioration suggérés"
-          },
-          rubricBreakdown: {
-            type: "ARRAY",
-            items: {
-              type: "OBJECT",
-              properties: {
-                criterion: { type: "STRING", description: "Nom du critère" },
-                score: { type: "INTEGER", description: "Note sur 100 pour ce critère" },
-                comment: { type: "STRING", description: "Commentaire spécifique" }
-              },
-              required: ["criterion", "score", "comment"]
+        const responseSchema = {
+          type: "OBJECT",
+          properties: {
+            suggestedGrade: { type: "INTEGER", description: "Note globale recommandée sur 100" },
+            summaryFeedback: { type: "STRING", description: "Feedback général constructif pour l'étudiant" },
+            strengths: {
+              type: "ARRAY",
+              items: { type: "STRING" },
+              description: "Liste des points forts de la soumission"
             },
-            description: "Détail des critères d'évaluation"
+            improvements: {
+              type: "ARRAY",
+              items: { type: "STRING" },
+              description: "Axes d'amélioration suggérés"
+            },
+            rubricBreakdown: {
+              type: "ARRAY",
+              items: {
+                type: "OBJECT",
+                properties: {
+                  criterion: { type: "STRING", description: "Nom du critère" },
+                  score: { type: "INTEGER", description: "Note sur 100 pour ce critère" },
+                  comment: { type: "STRING", description: "Commentaire spécifique" }
+                },
+                required: ["criterion", "score", "comment"]
+              },
+              description: "Détail des critères d'évaluation"
+            }
+          },
+          required: ["suggestedGrade", "summaryFeedback", "strengths", "improvements", "rubricBreakdown"]
+        };
+
+        const rawAiText = await callGeminiApi({
+          systemInstruction: systemPrompt,
+          userPrompt,
+          responseSchema,
+          temperature: 0.2,
+          inlineData,
+        });
+
+        if (rawAiText) {
+          let cleanText = rawAiText.trim();
+          if (cleanText.startsWith("```")) {
+            cleanText = cleanText.replace(/^```(?:json)?\s*/i, "").replace(/```$/m, "").trim();
           }
-        },
-        required: ["suggestedGrade", "summaryFeedback", "strengths", "improvements", "rubricBreakdown"]
-      };
-
-      const rawAiText = await callGeminiApi({
-        systemInstruction: systemPrompt,
-        userPrompt,
-        responseSchema,
-        temperature: 0.2,
-      });
-
-      if (rawAiText) {
-        let cleanText = rawAiText.trim();
-        if (cleanText.startsWith("```")) {
-          cleanText = cleanText.replace(/^```(?:json)?\s*/i, "").replace(/```$/m, "").trim();
+          const parsed = JSON.parse(cleanText);
+          if (parsed && typeof parsed.suggestedGrade === "number") {
+            evaluation = {
+              ...parsed,
+              isAiGenerated: true,
+              fallbackReason: null,
+            };
+            isAiGenerated = true;
+          }
+        } else {
+          fallbackReason = "API_ERROR";
+          evaluation.isAiGenerated = false;
+          evaluation.fallbackReason = "API_ERROR";
         }
-        const parsed = JSON.parse(cleanText);
-        if (parsed && typeof parsed.suggestedGrade === "number") {
-          evaluation = parsed;
-        }
+      } catch (aiErr) {
+        console.warn("[/api/ai/grade-homework] Gemini evaluation error:", aiErr);
+        fallbackReason = "API_EXCEPTION";
+        evaluation.isAiGenerated = false;
+        evaluation.fallbackReason = "API_EXCEPTION";
       }
-    } catch (aiErr) {
-      console.warn("[/api/ai/grade-homework] Gemini fallback active:", aiErr);
     }
 
     return NextResponse.json({

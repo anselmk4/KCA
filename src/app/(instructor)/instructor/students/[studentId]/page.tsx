@@ -7,13 +7,14 @@ import {
   ArrowLeft, BookOpen, TrendingUp, DollarSign, Award, Clock,
   CheckCircle2, Circle, PlayCircle, AlertTriangle, Mail,
   Calendar, BarChart3, ExternalLink, Loader2, User, Lock, Unlock,
-  Coins, GraduationCap, Zap, Eye, Download, FileText, X
+  Coins, GraduationCap, Zap, Eye, Download, FileText, X, Sparkles, Key, Check
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import { getSimulatedSession } from "@/lib/rbac";
 import { AddInstallmentModal } from "@/components/instructor/AddInstallmentModal";
 import { AssignSessionModal } from "@/components/instructor/AssignSessionModal";
 import { viewOrDownloadSubmission, dataUrlToBlobUrl } from "@/lib/file-utils";
+import { CopilotHomeworkCard } from "@/components/instructor/CopilotHomeworkCard";
 
 type CourseDetail = {
   courseId: string;
@@ -847,30 +848,13 @@ export default function StudentDetailPage() {
                                         {isGradingThis ? (
                                           <div className="p-3 bg-zinc-50 dark:bg-zinc-800/35 border border-zinc-150 dark:border-zinc-800 rounded-lg space-y-3">
                                             {aiEvaluationMap[sub.id] && (
-                                              <div className="p-3.5 bg-gradient-to-r from-blue-900/30 to-indigo-900/30 border border-blue-500/30 rounded-xl space-y-2 text-xs">
-                                                <div className="flex items-center justify-between">
-                                                  <span className="font-bold text-blue-300 flex items-center gap-1.5">
-                                                    ✨ Évaluation par Copilot IA (Plan BASE)
-                                                  </span>
-                                                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300">
-                                                    Note Suggérée : {aiEvaluationMap[sub.id].suggestedGrade} / 100
-                                                  </span>
-                                                </div>
-                                                <p className="text-zinc-300 text-[11px] leading-relaxed">
-                                                  {aiEvaluationMap[sub.id].summaryFeedback}
-                                                </p>
-                                                {aiEvaluationMap[sub.id].rubricBreakdown && (
-                                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-blue-500/20">
-                                                    {aiEvaluationMap[sub.id].rubricBreakdown.map((r: any, idx: number) => (
-                                                      <div key={idx} className="p-2 bg-blue-950/40 rounded-lg text-[10px]">
-                                                        <p className="font-bold text-blue-200">{r.criterion}</p>
-                                                        <p className="text-blue-400 font-extrabold">{r.score}/100</p>
-                                                        <p className="text-zinc-400 text-[9px] mt-0.5">{r.comment}</p>
-                                                      </div>
-                                                    ))}
-                                                  </div>
-                                                )}
-                                              </div>
+                                              <CopilotHomeworkCard
+                                                evaluation={aiEvaluationMap[sub.id]}
+                                                onApply={(suggestedGrade, summaryFeedback) => {
+                                                  setEditGrade(suggestedGrade);
+                                                  setEditFeedback(summaryFeedback);
+                                                }}
+                                              />
                                             )}
 
                                             <div className="flex flex-col sm:flex-row gap-3">

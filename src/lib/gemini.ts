@@ -7,7 +7,6 @@
 const GEMINI_MODELS = [
   "gemini-2.0-flash",
   "gemini-1.5-flash",
-  "gemini-2.5-flash",
   "gemini-1.5-pro",
 ];
 
@@ -24,28 +23,44 @@ export function isGeminiKeyValid(key?: string | null): boolean {
 
 /**
  * Executes a Gemini API call with automatic model failover.
+ * Supports text and multimodal files (PDF, images) via inlineData.
  */
 export async function callGeminiApi({
   systemInstruction,
   userPrompt,
   responseSchema,
   temperature = 0.4,
+  inlineData,
+  apiKeyOverride,
 }: {
   systemInstruction?: string;
   userPrompt: string;
   responseSchema?: any;
   temperature?: number;
+  inlineData?: { mimeType: string; data: string };
+  apiKeyOverride?: string;
 }): Promise<string | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey.trim() === "your_gemini_api_key" || !apiKey.trim().startsWith("AIza")) {
+  const apiKey = (apiKeyOverride || process.env.GEMINI_API_KEY || "").trim();
+  if (!apiKey || apiKey === "your_gemini_api_key" || !apiKey.startsWith("AIza")) {
     return null;
   }
 
   for (const model of GEMINI_MODELS) {
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const parts: any[] = [{ text: userPrompt }];
+
+      if (inlineData?.data && inlineData?.mimeType) {
+        parts.push({
+          inline_data: {
+            mime_type: inlineData.mimeType,
+            data: inlineData.data,
+          },
+        });
+      }
+
       const payload: any = {
-        contents: [{ parts: [{ text: userPrompt }] }],
+        contents: [{ parts }],
         generationConfig: {
           temperature,
         },
