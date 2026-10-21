@@ -5,6 +5,10 @@
  */
 
 const GEMINI_MODELS = [
+  "gemini-3.8-flash",
+  "gemini-3.7-flash",
+  "gemini-3.5-flash",
+  "gemini-2.5-flash",
   "gemini-2.0-flash",
   "gemini-1.5-flash",
   "gemini-1.5-pro",
@@ -17,7 +21,7 @@ export function isGeminiKeyValid(key?: string | null): boolean {
     trimmed.length > 15 &&
     !trimmed.includes("your_gemini_api_key") &&
     !trimmed.includes("placeholder") &&
-    trimmed.startsWith("AIza")
+    (trimmed.startsWith("AIza") || trimmed.startsWith("AQ.") || trimmed.length >= 25)
   );
 }
 
@@ -41,7 +45,7 @@ export async function callGeminiApi({
   apiKeyOverride?: string;
 }): Promise<string | null> {
   const apiKey = (apiKeyOverride || process.env.GEMINI_API_KEY || "").trim();
-  if (!apiKey || apiKey === "your_gemini_api_key" || !apiKey.startsWith("AIza")) {
+  if (!apiKey || apiKey === "your_gemini_api_key" || !isGeminiKeyValid(apiKey)) {
     return null;
   }
 

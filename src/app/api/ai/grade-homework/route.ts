@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { callGeminiApi } from "@/lib/gemini";
+import { callGeminiApi, isGeminiKeyValid } from "@/lib/gemini";
 
 export const dynamic = "force-dynamic";
 
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
     };
 
     const envKey = process.env.GEMINI_API_KEY?.trim() || "";
-    const isKeyConfigured = envKey.length > 15 && !envKey.includes("your_gemini_api_key") && envKey.startsWith("AIza");
+    const isKeyConfigured = isGeminiKeyValid(envKey);
 
     if (!isKeyConfigured) {
       fallbackReason = "MISSING_KEY";
