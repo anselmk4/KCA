@@ -792,5 +792,5 @@ export async function POST(req: NextRequest) {
     console.error("[students-api POST] Error:", err);
     return NextResponse.json({ error: err.message || "Erreur interne du serveur." }, { status: 500 });
   }
-  }
 }
+
