@@ -19,7 +19,7 @@ import {
 interface CourseOption {
   id: string;
   title: string;
-  price: number;
+  price?: number;
   type?: string;
 }
 
@@ -235,7 +235,7 @@ export function EnrollStudentModal({
             >
               {courses.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.title} ({c.price > 0 ? `${c.price} $` : "Gratuit"})
+                  {c.title} ({(c.price ?? 0) > 0 ? `${c.price} $` : "Gratuit"})
                 </option>
               ))}
             </select>

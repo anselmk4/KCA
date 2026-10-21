@@ -75,7 +75,8 @@ export async function GET(req: NextRequest) {
     const formattedCourses = (courses || []).map((c: any) => ({
       id: c.id,
       title: c.title,
-      type: c.type || "academic"
+      type: c.type || "academic",
+      price: Number(c.price) || 0
     }));
 
     if (!courses || courses.length === 0) {

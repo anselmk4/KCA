@@ -61,6 +61,7 @@ type CourseItem = {
   id: string;
   title: string;
   type: string;
+  price?: number;
 };
 
 type SessionItem = {
