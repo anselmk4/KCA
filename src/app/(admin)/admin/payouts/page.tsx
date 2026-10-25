@@ -454,6 +454,40 @@ export default function AdminPayoutsPage() {
     }
   };
 
+  const handleSyncPayoutStatus = async (payoutId: string) => {
+    if (processingId) return;
+    setProcessingId(payoutId);
+    try {
+      const response = await fetch('/api/admin/payouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payoutId, action: 'sync_payout_status', environment: directEnvironment })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Impossible d'interroger l'API PawaPay.");
+      }
+
+      const st = data.status || data.dbStatus;
+      const detail = data.formattedReason || data.failureMessage || data.failureCode || "Aucun détail d'erreur fourni";
+
+      if (st === "FAILED" || st === "REJECTED") {
+        alert(`❌ Statut PawaPay : ÉCHEC (${st})\n\nRaison rapportée par PawaPay :\n${detail}\n\n💡 Action recommandée : Vous pouvez valider ce versement via le bouton « Manuel » après avoir transféré les fonds directement depuis votre application Wave ou Orange.`);
+      } else if (st === "PAID" || st === "COMPLETED") {
+        alert(`✅ Statut PawaPay : PAYÉ (${st})\nLe versement a bien été validé et délivré au destinataire.`);
+      } else {
+        alert(`⏳ Statut PawaPay : ${st}\nLa transaction est actuellement en cours de traitement chez PawaPay.`);
+      }
+
+      loadData();
+    } catch (err: any) {
+      alert("Erreur de synchronisation PawaPay : " + err.message);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const filtered = payouts.filter(p => {
     if (activeTab === "ALL") return true;
     return p.status === activeTab;
@@ -701,6 +735,28 @@ export default function AdminPayoutsPage() {
                   Manuel (Wave / Orange)
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* Contextual guidance banner for PawaPay Wallet vs Manual Direct */}
+          <div className="p-3.5 bg-zinc-800/60 border border-zinc-700/80 rounded-2xl text-xs flex items-start gap-3">
+            <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${directMode === "API" ? "text-amber-400" : "text-emerald-400"}`} />
+            <div className="text-zinc-300 space-y-1">
+              {directMode === "API" ? (
+                <>
+                  <p className="font-bold text-white">Rappel solde PawaPay (Pre-funding) :</p>
+                  <p className="text-zinc-400 text-[11px] leading-relaxed">
+                    L&apos;API PawaPay débite le solde de votre portefeuille marchand dans la devise du pays (<span className="text-teal-400 font-semibold">ex: solde XOF Sénégal</span>). Si votre solde PawaPay est à <span className="text-amber-400 font-bold">0.00 XOF</span>, PawaPay accepte la requête puis marque le transfert en <span className="text-red-400 font-bold">Failed</span> (fonds insuffisants). Pour envoyer immédiatement sans recharger PawaPay ou pour utiliser <span className="text-teal-400 font-bold">Wave</span>, basculez en haut sur <span className="text-emerald-400 font-bold">« Manuel (Wave / Orange) »</span>.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-bold text-white">Mode Versement Direct Manuel (Wave / Orange Money) :</p>
+                  <p className="text-zinc-400 text-[11px] leading-relaxed">
+                    Envoyez les fonds directement au formateur depuis votre application mobile habituelle (<span className="text-teal-400 font-bold">Wave</span> ou <span className="text-amber-400 font-bold">Orange Money</span>), puis validez ce formulaire pour enregistrer la transaction en comptabilité et notifier le bénéficiaire.
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
@@ -1059,44 +1115,76 @@ export default function AdminPayoutsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        {p.status === 'PENDING' || p.status === 'FAILED' ? (
-                          <div className="flex justify-end gap-1.5 flex-wrap">
-                            <button
-                              disabled={processingId !== null}
-                              onClick={() => handleUpdatePayoutStatus(p.id, 'PAID', 'accept')}
-                              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
-                                processingId === p.id 
-                                  ? "bg-teal-700/50 text-white/50 cursor-not-allowed"
-                                  : processingId !== null
-                                  ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
-                                  : "bg-teal-600 hover:bg-teal-700 text-white cursor-pointer shadow-sm"
-                              }`}
-                              title="Tenter le virement via l'API PawaPay"
-                            >
-                              {processingId === p.id ? (
-                                <>
-                                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" />
-                                  Virement...
-                                </>
-                              ) : (
-                                <>
-                                  <Check className="w-3 h-3" /> PawaPay API
-                                </>
-                              )}
-                            </button>
-                            <button
-                              disabled={processingId !== null}
-                              onClick={() => handleUpdatePayoutStatus(p.id, 'PAID', 'manual_accept')}
-                              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
-                                processingId !== null
-                                  ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
-                                  : "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-sm"
-                              }`}
-                              title="Valider manuellement après transfert Mobile Money direct"
-                            >
-                              <Check className="w-3 h-3" /> Manuel
-                            </button>
-                            {p.status === 'PENDING' && (
+                        <div className="flex justify-end gap-1.5 flex-wrap items-center">
+                          {/* Sync / Check Status button with live PawaPay API */}
+                          <button
+                            type="button"
+                            disabled={processingId !== null}
+                            onClick={() => handleSyncPayoutStatus(p.id)}
+                            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-all flex items-center gap-1 cursor-pointer"
+                            title="Interroger directement l'API PawaPay pour connaître le statut exact et la raison du rejet"
+                          >
+                            <Coins className="w-3 h-3 text-teal-500" />
+                            <span>Vérifier PawaPay</span>
+                          </button>
+
+                          {p.status === 'FAILED' ? (
+                            <>
+                              <button
+                                disabled={processingId !== null}
+                                onClick={() => handleUpdatePayoutStatus(p.id, 'PAID', 'manual_accept')}
+                                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1 transition-all cursor-pointer shadow-sm"
+                                title="Valider comme versement manuel (envoyé directement via l'application Wave ou Orange)"
+                              >
+                                <Check className="w-3 h-3" />
+                                <span>Valider Manuel (Wave/Orange)</span>
+                              </button>
+                              <button
+                                disabled={processingId !== null}
+                                onClick={() => handleUpdatePayoutStatus(p.id, 'PAID', 'accept')}
+                                className="px-2 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-zinc-950 flex items-center gap-1 transition-all cursor-pointer shadow-sm"
+                                title="Réessayer le virement automatique via l'API PawaPay"
+                              >
+                                <span>🔁 Réessayer API</span>
+                              </button>
+                            </>
+                          ) : p.status === 'PENDING' ? (
+                            <>
+                              <button
+                                disabled={processingId !== null}
+                                onClick={() => handleUpdatePayoutStatus(p.id, 'PAID', 'accept')}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                                  processingId === p.id 
+                                    ? "bg-teal-700/50 text-white/50 cursor-not-allowed"
+                                    : processingId !== null
+                                    ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
+                                    : "bg-teal-600 hover:bg-teal-700 text-white cursor-pointer shadow-sm"
+                                }`}
+                                title="Tenter le virement via l'API PawaPay"
+                              >
+                                {processingId === p.id ? (
+                                  <>
+                                    <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" />
+                                    Virement...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check className="w-3 h-3" /> PawaPay API
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                disabled={processingId !== null}
+                                onClick={() => handleUpdatePayoutStatus(p.id, 'PAID', 'manual_accept')}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                                  processingId !== null
+                                    ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
+                                    : "bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-sm"
+                                }`}
+                                title="Valider manuellement après transfert Mobile Money direct"
+                              >
+                                <Check className="w-3 h-3" /> Manuel
+                              </button>
                               <button
                                 disabled={processingId !== null}
                                 onClick={() => handleUpdatePayoutStatus(p.id, 'CANCELLED', 'reject')}
@@ -1109,11 +1197,11 @@ export default function AdminPayoutsPage() {
                               >
                                 <X className="w-3 h-3" /> Refuser
                               </button>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-zinc-400 font-medium">Aucune action requise</span>
-                        )}
+                            </>
+                          ) : (
+                            <span className="text-[11px] text-zinc-400 font-medium">Finalisé</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

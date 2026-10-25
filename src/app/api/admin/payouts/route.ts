@@ -44,6 +44,76 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(configRes);
     }
 
+    // --- Check / Sync Live Payout Status with PawaPay ---
+    if (action === "sync_payout_status" || action === "check_payout_status") {
+      const { getPawaPayPayoutStatus } = await import("@/lib/pawapay");
+      const targetPayoutId = payoutId || body.id;
+      if (!targetPayoutId) {
+        return NextResponse.json({ error: "Identifiant de versement manquant" }, { status: 400 });
+      }
+
+      // Fetch the payout from DB
+      const { data: payoutRecord } = await supabaseAdmin
+        .from("payouts")
+        .select("*")
+        .eq("id", targetPayoutId)
+        .maybeSingle() as any;
+
+      // Extract PawaPay transaction reference (e.g., from notes "Réf: <uuid>" or from targetPayoutId)
+      let pawaTxId = targetPayoutId;
+      if (payoutRecord?.notes) {
+        const refMatch = payoutRecord.notes.match(/Réf(?:\s*transaction)?\s*:\s*([a-f0-9-]{36})/i);
+        if (refMatch && refMatch[1]) {
+          pawaTxId = refMatch[1];
+        }
+      }
+
+      const statusRes = await getPawaPayPayoutStatus(pawaTxId, body.environment || "production");
+
+      if (statusRes.success && statusRes.status) {
+        const rawStatus = statusRes.status.toUpperCase();
+        let dbStatus = payoutRecord?.status || "PENDING";
+        let statusNote = "";
+
+        if (["COMPLETED", "PAID", "SUCCESS", "SUCCESSFUL"].includes(rawStatus)) {
+          dbStatus = "PAID";
+          statusNote = `\n[PawaPay Sync] Statut confirmé: PAYÉ (COMPLETED) le ${new Date().toLocaleString('fr-FR')}.`;
+        } else if (["FAILED", "REJECTED", "CANCELLED"].includes(rawStatus)) {
+          dbStatus = "FAILED";
+          statusNote = `\n[PawaPay Sync] Échec confirmé par PawaPay: ${statusRes.formattedReason || statusRes.failureMessage || rawStatus} le ${new Date().toLocaleString('fr-FR')}.`;
+        }
+
+        if (payoutRecord && (dbStatus !== payoutRecord.status || statusNote)) {
+          await supabaseAdmin
+            .from("payouts")
+            .update({
+              status: dbStatus,
+              notes: (payoutRecord.notes || "") + statusNote,
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", targetPayoutId);
+        }
+
+        return NextResponse.json({
+          success: true,
+          payoutId: targetPayoutId,
+          pawaTxId,
+          status: rawStatus,
+          dbStatus,
+          failureCode: statusRes.failureCode,
+          failureMessage: statusRes.failureMessage,
+          formattedReason: statusRes.formattedReason,
+          raw: statusRes.raw
+        });
+      }
+
+      return NextResponse.json({
+        success: false,
+        error: statusRes.error || "Impossible de récupérer le statut auprès de PawaPay.",
+        pawaTxId
+      }, { status: 400 });
+    }
+
     // --- Direct Admin Payout via PawaPay API or Manual Registration ---
     if (action === "direct_payout" || action === "direct_manual_payout") {
       const { 
@@ -209,8 +279,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Demande de retrait introuvable" }, { status: 404 });
     }
 
-    if (payout.status !== "PENDING") {
-      return NextResponse.json({ error: "La demande de retrait n'est plus en attente" }, { status: 400 });
+    if (payout.status !== "PENDING" && payout.status !== "FAILED") {
+      return NextResponse.json({ error: "Cette demande a déjà été finalisée ou annulée." }, { status: 400 });
     }
 
     if (action === "reject") {
@@ -268,7 +338,8 @@ export async function POST(req: NextRequest) {
       const ref = payout.payment_reference || "";
       const separatorIndex = ref.indexOf(":");
       
-      const carrier = separatorIndex !== -1 ? ref.substring(0, separatorIndex).trim() : "MOBILE_MONEY";
+      const defaultCarrier = separatorIndex !== -1 ? ref.substring(0, separatorIndex).trim() : "MOBILE_MONEY";
+      const carrier = body.carrier || defaultCarrier;
       const phoneNumber = separatorIndex !== -1 ? ref.substring(separatorIndex + 1).trim() : ref.trim();
 
       // Resolve currency from payout.currency, or from payment_reference / notes
@@ -297,7 +368,8 @@ export async function POST(req: NextRequest) {
           currency: resolveResult.currency,
           correspondent: resolveResult.correspondent,
           phoneNumber: resolveResult.formattedPhone,
-          statementDescription: "Ansella Payout"
+          statementDescription: "Ansella Payout",
+          environment: body.environment || "production"
         });
 
         if (!payoutResponse.success) {

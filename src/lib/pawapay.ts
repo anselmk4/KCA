@@ -835,11 +835,13 @@ export interface PawaPayPayoutStatusResponse {
   status?: string;
   failureCode?: string;
   failureMessage?: string;
+  formattedReason?: string;
   error?: string;
+  raw?: any;
 }
 
 /**
- * Fetch payout status directly from PawaPay API (V2 / V1 fallback)
+ * Fetch payout status directly from PawaPay API (Primary: V2, Fallback: V1)
  */
 export async function getPawaPayPayoutStatus(payoutId: string, explicitEnv?: string): Promise<PawaPayPayoutStatusResponse> {
   const apiKey = process.env.PAWAPAY_API_TOKEN || "pawapay_sandbox_placeholder_token_abc123";
@@ -847,15 +849,17 @@ export async function getPawaPayPayoutStatus(payoutId: string, explicitEnv?: str
   const baseUrl = isProduction ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io";
 
   try {
-    let response = await fetch(`${baseUrl}/payouts/${payoutId}`, {
+    // 1. Try V2 payout status first
+    let response = await fetch(`${baseUrl}/v2/payouts/${payoutId}`, {
       method: "GET",
       headers: {
         "Authorization": `Bearer ${apiKey}`
       }
     });
 
-    if (response.status === 404) {
-      response = await fetch(`${baseUrl}/v2/payouts/${payoutId}`, {
+    // 2. Fallback to V1 if V2 is not available (404/405)
+    if (response.status === 404 || response.status === 405) {
+      response = await fetch(`${baseUrl}/payouts/${payoutId}`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${apiKey}`
@@ -897,16 +901,19 @@ export async function getPawaPayPayoutStatus(payoutId: string, explicitEnv?: str
       };
     }
 
-    const status = payoutObj.status;
-    const failureCode = payoutObj.failureCode?.failureCode || (typeof payoutObj.failureCode === 'string' ? payoutObj.failureCode : undefined) || payoutObj.rejectionReason?.rejectionCode;
-    const failureMessage = payoutObj.failureCode?.failureMessage || payoutObj.rejectionReason?.rejectionMessage || payoutObj.failureReason;
+    const status = (payoutObj.status || '').toUpperCase();
+    const failureCode = payoutObj.failureCode?.failureCode || (typeof payoutObj.failureCode === 'string' ? payoutObj.failureCode : undefined) || payoutObj.rejectionReason?.rejectionCode || payoutObj.failureReason;
+    const failureMessage = payoutObj.failureCode?.failureMessage || payoutObj.rejectionReason?.rejectionMessage || payoutObj.failureReason || payoutObj.message || payoutObj.error;
+    const formattedReason = formatPawaPayFailureReason(failureCode, failureMessage);
 
     return {
       success: true,
       payoutId,
       status,
       failureCode,
-      failureMessage
+      failureMessage,
+      formattedReason,
+      raw: payoutObj
     };
 
   } catch (err: any) {
