@@ -62,8 +62,8 @@ export default function AdminPayoutsPage() {
   const [instructorsList, setInstructorsList] = useState<{ id: string; name: string }[]>([]);
   const [directMode, setDirectMode] = useState<"API" | "MANUAL">("API");
   const [directEnvironment, setDirectEnvironment] = useState<"production" | "sandbox">("production");
-  const [directCountry, setDirectCountry] = useState<string>("SN"); // Default to SN or CD
-  const [directCarrier, setDirectCarrier] = useState<string>("WAVE_SEN");
+  const [directCountry, setDirectCountry] = useState<string>("SN"); // Default to SN
+  const [directCarrier, setDirectCarrier] = useState<string>("ORANGE_SEN");
   const [directCurrency, setDirectCurrency] = useState<"USD" | "CDF">("CDF");
   const [directPhone, setDirectPhone] = useState<string>("");
   const [directAmount, setDirectAmount] = useState<string>("");
@@ -773,6 +773,11 @@ export default function AdminPayoutsPage() {
                     </option>
                   ))}
                 </select>
+                {directCountry === "SN" && directCarrier.includes("WAVE") && directMode === "API" && (
+                  <p className="text-[10px] text-amber-400 font-bold leading-tight mt-1">
+                    ⚠️ Wave n&apos;est pas activé sur votre compte PawaPay (Orange & Free uniquement). Basculez en haut sur &quot;Manuel&quot; pour Wave, ou choisissez Orange Money.
+                  </p>
+                )}
               </div>
 
               {/* 4. Phone Number */}

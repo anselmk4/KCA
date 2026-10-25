@@ -85,9 +85,9 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
     phonePrefix: "221",
     exchangeRate: 600,
     operators: [
-      { id: "WAVE_SEN", name: "Wave Sénégal" },
-      { id: "ORANGE_SEN", name: "Orange Money Sénégal" },
-      { id: "FREE_SEN", name: "Free Money Sénégal" }
+      { id: "ORANGE_SEN", name: "Orange Money Sénégal (Actif PawaPay ✅)" },
+      { id: "FREE_SEN", name: "Free Money Sénégal (Actif PawaPay ✅)" },
+      { id: "WAVE_SEN", name: "Wave Sénégal (Transfert Manuel ⚠️)" }
     ]
   },
   {
