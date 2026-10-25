@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     // --- Check PawaPay Active Configuration ---
     if (action === "check_active_config") {
       const { fetchPawaPayActiveConfiguration } = await import("@/lib/pawapay");
-      const configRes = await fetchPawaPayActiveConfiguration();
+      const configRes = await fetchPawaPayActiveConfiguration(body.environment || "production");
       return NextResponse.json(configRes);
     }
 
@@ -55,7 +55,8 @@ export async function POST(req: NextRequest) {
         statementDescription, 
         instructorId,
         manualRef,
-        isManual: paramIsManual
+        isManual: paramIsManual,
+        environment
       } = body;
 
       const isManual = action === "direct_manual_payout" || !!paramIsManual;
@@ -92,14 +93,15 @@ export async function POST(req: NextRequest) {
         const customRef = manualRef ? ` (Réf transaction: ${manualRef})` : "";
         pNote = `[Retrait Direct Manuel] Versement de ${formattedAmountText} effectué directement via ${resolveResult.correspondent} vers +${targetPhone} par l'admin (${user.email}).${customRef} Note: ${desc}`;
       } else {
-        // Initiate payout via PawaPay API
+        // Initiate payout via PawaPay API (defaults to Production)
         const payoutResponse = await initiatePawaPayPayout({
           payoutId: freshPayoutTxId,
           amount: amountLocal,
           currency: resolveResult.currency,
           correspondent: resolveResult.correspondent,
           phoneNumber: targetPhone,
-          statementDescription: desc.substring(0, 22)
+          statementDescription: desc.substring(0, 22),
+          environment: environment || "production"
         });
 
         isSuccess = payoutResponse.success;

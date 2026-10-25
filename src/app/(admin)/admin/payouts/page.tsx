@@ -61,6 +61,7 @@ export default function AdminPayoutsPage() {
   // Direct PawaPay Withdrawal Form State
   const [instructorsList, setInstructorsList] = useState<{ id: string; name: string }[]>([]);
   const [directMode, setDirectMode] = useState<"API" | "MANUAL">("API");
+  const [directEnvironment, setDirectEnvironment] = useState<"production" | "sandbox">("production");
   const [directCountry, setDirectCountry] = useState<string>("SN"); // Default to SN or CD
   const [directCarrier, setDirectCarrier] = useState<string>("WAVE_SEN");
   const [directCurrency, setDirectCurrency] = useState<"USD" | "CDF">("CDF");
@@ -124,7 +125,8 @@ export default function AdminPayoutsPage() {
           phoneNumber: directPhone,
           amount: amountNum,
           statementDescription: directDescription || (isManual ? `Retrait Direct Manuel (${carrierToUse})` : "Retrait Direct Admin PawaPay"),
-          instructorId: directInstructorId || undefined
+          instructorId: directInstructorId || undefined,
+          environment: directEnvironment
         })
       });
 
@@ -656,32 +658,49 @@ export default function AdminPayoutsPage() {
               </div>
             </div>
 
-            {/* Mode Selector Toggle */}
-            <div className="flex items-center gap-2 bg-zinc-800/80 p-1 rounded-2xl border border-zinc-700/60">
-              <button
-                type="button"
-                onClick={() => { setDirectMode("API"); setDirectMessage(null); }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  directMode === "API"
-                    ? "bg-teal-500 text-zinc-950 shadow-md"
-                    : "text-zinc-400 hover:text-white"
-                }`}
-              >
-                <Send className="w-3.5 h-3.5" />
-                API PawaPay
-              </button>
-              <button
-                type="button"
-                onClick={() => { setDirectMode("MANUAL"); setDirectMessage(null); }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  directMode === "MANUAL"
-                    ? "bg-teal-500 text-zinc-950 shadow-md"
-                    : "text-zinc-400 hover:text-white"
-                }`}
-              >
-                <Check className="w-3.5 h-3.5" />
-                Manuel (Wave / Orange)
-              </button>
+            {/* Mode & Gateway Environment Selector Controls */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              {directMode === "API" && (
+                <div className="flex items-center gap-1.5 bg-zinc-800/90 px-3 py-1.5 rounded-xl border border-zinc-700/60 text-xs">
+                  <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-wider">Passerelle :</span>
+                  <select
+                    value={directEnvironment}
+                    onChange={(e) => setDirectEnvironment(e.target.value as "production" | "sandbox")}
+                    className="bg-transparent font-extrabold text-xs text-emerald-400 focus:outline-none cursor-pointer"
+                  >
+                    <option value="production" className="bg-zinc-800 text-emerald-400 font-bold">🟢 Production (api.pawapay.io)</option>
+                    <option value="sandbox" className="bg-zinc-800 text-amber-400 font-bold">🟡 Sandbox Test (api.sandbox.pawapay.io)</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Mode Selector Toggle */}
+              <div className="flex items-center gap-1 bg-zinc-800/80 p-1 rounded-2xl border border-zinc-700/60">
+                <button
+                  type="button"
+                  onClick={() => { setDirectMode("API"); setDirectMessage(null); }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    directMode === "API"
+                      ? "bg-teal-500 text-zinc-950 shadow-md"
+                      : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  API PawaPay
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setDirectMode("MANUAL"); setDirectMessage(null); }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    directMode === "MANUAL"
+                      ? "bg-teal-500 text-zinc-950 shadow-md"
+                      : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  Manuel (Wave / Orange)
+                </button>
+              </div>
             </div>
           </div>
 

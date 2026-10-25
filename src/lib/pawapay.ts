@@ -228,51 +228,96 @@ export function normalizePawaPayCorrespondent(correspondent: any): string {
 }
 
 /**
+ * Detect whether PawaPay should operate in Production or Sandbox
+ */
+export function isPawaPayProduction(explicitEnv?: string): boolean {
+  if (explicitEnv === 'production') return true;
+  if (explicitEnv === 'sandbox') return false;
+
+  const envVar = (process.env.PAWAPAY_ENVIRONMENT || '').toLowerCase();
+  if (envVar === 'production') return true;
+  if (envVar === 'sandbox') return false;
+
+  // Auto-detect production deployment (e.g. ansella.app)
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL || '').toLowerCase();
+  if (appUrl.includes('ansella.app')) return true;
+
+  // Next.js production server defaults to production if token is present
+  if (process.env.NODE_ENV === 'production' && (process.env.VERCEL_ENV === 'production' || !process.env.VERCEL_ENV)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Format human-readable error reasons from PawaPay response codes
  */
 export function formatPawaPayFailureReason(code?: any, rawMessage?: any): string {
-  const codeStr = typeof code === 'string' ? code : (code?.failureCode || code?.rejectionCode || (typeof code === 'object' ? JSON.stringify(code) : String(code || '')));
-  const msgStr = typeof rawMessage === 'string' ? rawMessage : (rawMessage?.failureMessage || rawMessage?.rejectionMessage || (typeof rawMessage === 'object' ? JSON.stringify(rawMessage) : String(rawMessage || '')));
+  const extractText = (val: any): string => {
+    if (!val) return '';
+    if (typeof val === 'string') return val;
+    if (typeof val === 'object') {
+      return val.rejectionMessage || val.rejectionCode || val.failureMessage || val.failureCode || val.message || val.error || JSON.stringify(val);
+    }
+    return String(val);
+  };
+
+  const codeStr = extractText(code);
+  const msgStr = extractText(rawMessage);
 
   const codeUpper = codeStr.toUpperCase();
   const msgUpper = msgStr.toUpperCase();
+  const combined = `${codeUpper} ${msgUpper}`;
 
-  if (codeUpper.includes('CANCEL') || msgUpper.includes('CANCEL') || codeUpper.includes('REJECT') || msgUpper.includes('REJECT') || msgUpper.includes('USER_CANCELLED')) {
-    return "Transaction annulée ou rejetée sur le téléphone de l'utilisateur.";
-  }
-  if (codeUpper.includes('INSUFFICIENT') || msgUpper.includes('INSUFFICIENT') || msgUpper.includes('BALANCE') || codeUpper.includes('BALANCE') || msgUpper.includes('SOLDE')) {
-    return "Solde PawaPay marchand ou Mobile Money insuffisant pour effectuer la transaction (balance insuffisante).";
-  }
-  if (codeUpper.includes('TIMEOUT') || msgUpper.includes('EXPIRE')) {
-    return "La demande de paiement a expiré sans saisie du code PIN secret.";
-  }
-  if (codeUpper.includes('PIN') || msgUpper.includes('PIN')) {
-    return "Code PIN secret incorrect ou erroné.";
-  }
-  if (codeUpper.includes('LIMIT') || msgUpper.includes('LIMIT')) {
-    return "Plafond de transaction Mobile Money atteint pour cette journée.";
-  }
-  if (codeUpper.includes('NOT_FOUND') || codeUpper.includes('INVALID_RECIPIENT') || msgUpper.includes('NOT_FOUND') || msgUpper.includes('SUBSCRIBER')) {
-    return "Numéro de téléphone introuvable ou non enregistré auprès de l'opérateur Mobile Money.";
-  }
-  if (msgUpper.includes('UNKNOWN') || msgUpper.includes('UNKNOWN REASON')) {
-    const isSandbox = process.env.PAWAPAY_ENVIRONMENT !== 'production';
-    if (isSandbox) {
-      return "Échec PawaPay (Mode Sandbox) : L'opérateur a rejeté le test. En mode Sandbox, seuls les numéros de test PawaPay sont validés. En Production, vérifiez le solde du compte et la confirmation PIN.";
-    }
-    return "La transaction a été rejetée par l'opérateur Mobile Money (Raison indéfinie). Veuillez vérifier le solde du compte et vous assurer de valider la demande PIN sur votre téléphone.";
+  // 1. Unprovisioned Payout corridor / Not allowed on merchant account
+  if (combined.includes('NO ACTIVE PAYOUT FLOW') || combined.includes('PAYOUTS_NOT_ALLOWED') || combined.includes('PAYOUT_NOT_ALLOWED') || combined.includes('CORRIDOR_NOT_FOUND')) {
+    return "Flux Payout non activé chez PawaPay : L'opérateur sélectionné (Wave ou Orange Sénégal) n'est pas encore provisionné pour les reversements B2C sur votre compte PawaPay. Activez ce corridor dans votre console PawaPay ou enregistrez un versement manuel.";
   }
 
-  if (msgUpper.includes('NO ACTIVE PAYOUT FLOW') || codeUpper.includes('NO ACTIVE PAYOUT FLOW') || msgUpper.includes('PAYOUTS_NOT_ALLOWED') || codeUpper.includes('PAYOUTS_NOT_ALLOWED')) {
-    return "Flux de reversement non activé sur votre compte PawaPay : L'opérateur sélectionné (Wave ou Orange Sénégal) n'a pas de flux B2C Payout ouvert sur votre compte marchand PawaPay. Activez ce corridor dans votre console PawaPay ou effectuez un versement direct avec validation manuelle.";
+  // 2. Insufficient funds in PawaPay wallet
+  if (combined.includes('WALLET_OUT_OF_FUNDS') || combined.includes('INSUFFICIENT_FUNDS') || combined.includes('INSUFFICIENT_BALANCE') || combined.includes('INSUFFICIENT') || combined.includes('SOLDE')) {
+    return "Solde insuffisant dans votre portefeuille marchand PawaPay (ou compte Mobile Money) pour envoyer ce montant.";
   }
 
-  const isSandbox = process.env.PAWAPAY_ENVIRONMENT !== 'production';
-  if (isSandbox && msgStr) {
-    return `Transaction rejetée par l'opérateur (${msgStr}). Remarque : En mode PawaPay Sandbox, utilisez des numéros de test PawaPay.`;
+  // 3. Recipient not found / invalid number on this operator
+  if (combined.includes('RECIPIENT_NOT_FOUND') || combined.includes('INVALID_RECIPIENT') || combined.includes('NOT_FOUND') || combined.includes('SUBSCRIBER_NOT_FOUND') || combined.includes('INVALID_ACCOUNT') || combined.includes('UNKNOWN_MSISDN')) {
+    return "Numéro de téléphone introuvable ou non enregistré auprès de l'opérateur Mobile Money (ex: numéro Orange tenté sous Wave ou compte inactif).";
   }
 
-  return msgStr || codeStr || "Transaction rejetée par l'opérateur Mobile Money.";
+  // 4. Duplicate payout ID
+  if (combined.includes('DUPLICATE_PAYOUT_ID') || combined.includes('DUPLICATE')) {
+    return "Identifiant de transaction déjà utilisé chez PawaPay. Un nouvel identifiant a été généré.";
+  }
+
+  // 5. Provider unavailable or maintenance
+  if (combined.includes('PROVIDER_TEMPORARILY_UNAVAILABLE') || combined.includes('OUTAGE') || combined.includes('DOWN')) {
+    return "Le réseau de l'opérateur Mobile Money est temporairement indisponible ou en maintenance chez PawaPay. Veuillez réessayer un peu plus tard ou basculer sur un autre opérateur.";
+  }
+
+  // 6. User Cancelled (applicable to collections/deposits only when explicitly stated)
+  if (combined.includes('USER_CANCELLED') || combined.includes('REJECTED_BY_USER') || combined.includes('CANCELLED_BY_USER')) {
+    return "Transaction annulée par l'utilisateur sur son téléphone.";
+  }
+
+  // 7. Timeout / PIN
+  if (combined.includes('TIMEOUT') || combined.includes('EXPIRE')) {
+    return "La transaction a expiré auprès de l'opérateur Mobile Money.";
+  }
+  if (combined.includes('PIN')) {
+    return "Erreur d'authentification PIN auprès de l'opérateur.";
+  }
+
+  // 8. General rejection with raw message
+  if (msgStr && msgStr !== 'REJECTED' && msgStr !== 'FAILED') {
+    return `Transaction rejetée par PawaPay : ${msgStr}`;
+  }
+
+  if (codeStr && codeStr !== 'REJECTED' && codeStr !== 'FAILED') {
+    return `Transaction rejetée par PawaPay (${codeStr}).`;
+  }
+
+  return "Transaction rejetée par PawaPay. Vérifiez les informations du bénéficiaire et votre solde PawaPay.";
 }
 
 /**
@@ -619,10 +664,11 @@ export async function initiatePawaPayPayout(params: {
   phoneNumber: string;
   payoutId?: string;
   statementDescription?: string;
+  environment?: "production" | "sandbox";
 }): Promise<InitiatePayoutResponse> {
   const payoutId = params.payoutId || crypto.randomUUID();
   const apiKey = process.env.PAWAPAY_API_TOKEN || "pawapay_sandbox_placeholder_token_abc123";
-  const isProduction = process.env.PAWAPAY_ENVIRONMENT === "production";
+  const isProduction = isPawaPayProduction(params.environment);
   const baseUrl = isProduction ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io";
   const correspondent = normalizePawaPayCorrespondent(params.correspondent);
   const cleanPhone = (params.phoneNumber || "").replace(/\D/g, "");
@@ -666,7 +712,7 @@ export async function initiatePawaPayPayout(params: {
     statementDescription: cleanDesc
   };
 
-  console.log(`[PawaPayService] Initiating Payout (${payoutId}) for ${correspondent}, phone: ${cleanPhone}, amount: ${formattedAmount} ${params.currency}`);
+  console.log(`[PawaPayService] Initiating Payout (${payoutId}) [${isProduction ? "PRODUCTION" : "SANDBOX"}] for ${correspondent}, phone: ${cleanPhone}, amount: ${formattedAmount} ${params.currency}`);
 
   try {
     // 1. Try modern PawaPay V2 endpoint first
@@ -680,7 +726,7 @@ export async function initiatePawaPayPayout(params: {
     });
 
     let responseText = await response.text();
-    console.log("[PawaPayService] /v2/payouts API response status:", response.status, "body:", responseText);
+    console.log(`[PawaPayService] /v2/payouts (${isProduction ? "PROD" : "SANDBOX"}) response status:`, response.status, "body:", responseText);
 
     // 2. If V2 returns 404 or 405 (endpoint not found on older sandbox/prod gateways), fallback to V1 /payouts
     if (!response.ok && (response.status === 404 || response.status === 405)) {
@@ -704,25 +750,30 @@ export async function initiatePawaPayPayout(params: {
       data = { message: responseText };
     }
 
-    if (!response.ok) {
-      const codeVal = data.failureCode || data.rejectionReason?.rejectionCode || data.code || `HTTP_${response.status}`;
-      const rawMsg = data.message || data.error || data.rejectionReason?.rejectionMessage || responseText;
-      const formatted = formatPawaPayFailureReason(codeVal, rawMsg);
-      return {
-        success: false,
-        payoutId,
-        error: formatted
-      };
+    // Extract exact rejection reason (string or object)
+    let rawRejection: string | null = null;
+    if (typeof data.rejectionReason === 'string') {
+      rawRejection = data.rejectionReason;
+    } else if (data.rejectionReason?.rejectionMessage || data.rejectionReason?.rejectionCode) {
+      rawRejection = [data.rejectionReason.rejectionCode, data.rejectionReason.rejectionMessage].filter(Boolean).join(' - ');
+    } else if (data.failureReason || data.failureCode) {
+      rawRejection = [data.failureCode, data.failureReason].filter(Boolean).join(' - ');
+    } else if (data.message || data.error) {
+      rawRejection = [data.code, data.message || data.error].filter(Boolean).join(' - ');
     }
 
-    if (data.status === "REJECTED" || data.status === "FAILED") {
-      const codeVal = data.rejectionReason?.rejectionCode || data.failureCode || data.status;
-      const rejMsg = data.rejectionReason?.rejectionMessage || data.failureReason || data.status;
-      const formatted = formatPawaPayFailureReason(codeVal, rejMsg);
+    if (!response.ok || data.status === "REJECTED" || data.status === "FAILED") {
+      const codeVal = rawRejection || data.failureCode || data.status || `HTTP_${response.status}`;
+      const rawMsg = rawRejection || data.message || data.error || responseText;
+      const formatted = formatPawaPayFailureReason(codeVal, rawMsg);
+      const detailedError = rawRejection && !formatted.includes(rawRejection)
+        ? `${formatted} (Code PawaPay : ${rawRejection})`
+        : formatted;
+
       return {
         success: false,
         payoutId,
-        error: formatted
+        error: detailedError
       };
     }
 
@@ -745,13 +796,13 @@ export async function initiatePawaPayPayout(params: {
 /**
  * Fetch active configuration from PawaPay to discover supported correspondents and flows
  */
-export async function fetchPawaPayActiveConfiguration(): Promise<{
+export async function fetchPawaPayActiveConfiguration(explicitEnv?: string): Promise<{
   success: boolean;
   data?: any;
   error?: string;
 }> {
   const apiKey = process.env.PAWAPAY_API_TOKEN || "";
-  const isProduction = process.env.PAWAPAY_ENVIRONMENT === "production";
+  const isProduction = isPawaPayProduction(explicitEnv);
   const baseUrl = isProduction ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io";
 
   try {
@@ -790,9 +841,9 @@ export interface PawaPayPayoutStatusResponse {
 /**
  * Fetch payout status directly from PawaPay API (V2 / V1 fallback)
  */
-export async function getPawaPayPayoutStatus(payoutId: string): Promise<PawaPayPayoutStatusResponse> {
+export async function getPawaPayPayoutStatus(payoutId: string, explicitEnv?: string): Promise<PawaPayPayoutStatusResponse> {
   const apiKey = process.env.PAWAPAY_API_TOKEN || "pawapay_sandbox_placeholder_token_abc123";
-  const isProduction = process.env.PAWAPAY_ENVIRONMENT === "production";
+  const isProduction = isPawaPayProduction(explicitEnv);
   const baseUrl = isProduction ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io";
 
   try {
