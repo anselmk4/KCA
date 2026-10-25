@@ -85,9 +85,9 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
     phonePrefix: "221",
     exchangeRate: 600,
     operators: [
-      { id: "ORANGE_SEN", name: "Orange Money" },
-      { id: "FREE_SEN", name: "Free Money" },
-      { id: "WAVE_SEN", name: "Wave" }
+      { id: "WAVE_SEN", name: "Wave Sénégal" },
+      { id: "ORANGE_SEN", name: "Orange Money Sénégal" },
+      { id: "FREE_SEN", name: "Free Money Sénégal" }
     ]
   },
   {
@@ -261,6 +261,10 @@ export function formatPawaPayFailureReason(code?: any, rawMessage?: any): string
       return "Échec PawaPay (Mode Sandbox) : L'opérateur a rejeté le test. En mode Sandbox, seuls les numéros de test PawaPay sont validés. En Production, vérifiez le solde du compte et la confirmation PIN.";
     }
     return "La transaction a été rejetée par l'opérateur Mobile Money (Raison indéfinie). Veuillez vérifier le solde du compte et vous assurer de valider la demande PIN sur votre téléphone.";
+  }
+
+  if (msgUpper.includes('NO ACTIVE PAYOUT FLOW') || codeUpper.includes('NO ACTIVE PAYOUT FLOW') || msgUpper.includes('PAYOUTS_NOT_ALLOWED') || codeUpper.includes('PAYOUTS_NOT_ALLOWED')) {
+    return "Flux de reversement non activé sur votre compte PawaPay : L'opérateur sélectionné (Wave ou Orange Sénégal) n'a pas de flux B2C Payout ouvert sur votre compte marchand PawaPay. Activez ce corridor dans votre console PawaPay ou effectuez un versement direct avec validation manuelle.";
   }
 
   const isSandbox = process.env.PAWAPAY_ENVIRONMENT !== 'production';
@@ -606,7 +610,7 @@ export interface InitiatePayoutResponse {
 }
 
 /**
- * Request payout via PawaPay Sandbox API
+ * Request payout via PawaPay API (Primary: V2, Fallback: V1)
  */
 export async function initiatePawaPayPayout(params: {
   amount: number;
@@ -619,37 +623,79 @@ export async function initiatePawaPayPayout(params: {
   const payoutId = params.payoutId || crypto.randomUUID();
   const apiKey = process.env.PAWAPAY_API_TOKEN || "pawapay_sandbox_placeholder_token_abc123";
   const isProduction = process.env.PAWAPAY_ENVIRONMENT === "production";
-  const url = `${isProduction ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io"}/payouts`;
+  const baseUrl = isProduction ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io";
+  const correspondent = normalizePawaPayCorrespondent(params.correspondent);
+  const cleanPhone = (params.phoneNumber || "").replace(/\D/g, "");
+  const cleanDesc = (params.statementDescription || "Ansella Payout").replace(/[^a-zA-Z0-9 ]/g, '').trim().substring(0, 22) || "Ansella Payout";
 
-  const payload = {
+  // Format amount: USD can have 2 decimals, African currencies (XOF, CDF, XAF) are integers
+  let formattedAmount: string;
+  if ((params.currency || '').toUpperCase() === 'USD') {
+    formattedAmount = Number(Number(params.amount || 0).toFixed(2)).toString();
+  } else {
+    formattedAmount = Math.round(Number(params.amount || 0)).toString();
+  }
+
+  // Official PawaPay V2 Payout Payload
+  const v2Payload = {
     payoutId: payoutId,
-    amount: Math.round(params.amount).toString(),
+    amount: formattedAmount,
     currency: params.currency,
-    correspondent: normalizePawaPayCorrespondent(params.correspondent),
+    recipient: {
+      type: "MMO",
+      accountDetails: {
+        phoneNumber: cleanPhone,
+        provider: correspondent
+      }
+    }
+  };
+
+  // Legacy PawaPay V1 Payout Payload
+  const v1Payload = {
+    payoutId: payoutId,
+    amount: formattedAmount,
+    currency: params.currency,
+    correspondent: correspondent,
     recipient: {
       type: "MSISDN",
       address: {
-        value: params.phoneNumber
+        value: cleanPhone
       }
     },
     customerTimestamp: new Date().toISOString(),
-    statementDescription: params.statementDescription || "Ansella Payout"
+    statementDescription: cleanDesc
   };
 
-  console.log("[PawaPayService] Initiating B2C Payout:", url, JSON.stringify(payload, null, 2));
+  console.log(`[PawaPayService] Initiating Payout (${payoutId}) for ${correspondent}, phone: ${cleanPhone}, amount: ${formattedAmount} ${params.currency}`);
 
   try {
-    const response = await fetch(url, {
+    // 1. Try modern PawaPay V2 endpoint first
+    let response = await fetch(`${baseUrl}/v2/payouts`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(v2Payload)
     });
 
-    const responseText = await response.text();
-    console.log("[PawaPayService] PawaPay Payout response status:", response.status, "body:", responseText);
+    let responseText = await response.text();
+    console.log("[PawaPayService] /v2/payouts API response status:", response.status, "body:", responseText);
+
+    // 2. If V2 returns 404 or 405 (endpoint not found on older sandbox/prod gateways), fallback to V1 /payouts
+    if (!response.ok && (response.status === 404 || response.status === 405)) {
+      console.log(`[PawaPayService] /v2/payouts returned ${response.status}, attempting V1 fallback /payouts...`);
+      response = await fetch(`${baseUrl}/payouts`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(v1Payload)
+      });
+      responseText = await response.text();
+      console.log("[PawaPayService] /payouts V1 fallback response status:", response.status, "body:", responseText);
+    }
 
     let data: any = {};
     try {
@@ -693,6 +739,42 @@ export async function initiatePawaPayPayout(params: {
       payoutId,
       error: err.message || "Erreur réseau avec PawaPay"
     };
+  }
+}
+
+/**
+ * Fetch active configuration from PawaPay to discover supported correspondents and flows
+ */
+export async function fetchPawaPayActiveConfiguration(): Promise<{
+  success: boolean;
+  data?: any;
+  error?: string;
+}> {
+  const apiKey = process.env.PAWAPAY_API_TOKEN || "";
+  const isProduction = process.env.PAWAPAY_ENVIRONMENT === "production";
+  const baseUrl = isProduction ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io";
+
+  try {
+    const res = await fetch(`${baseUrl}/v2/active-configuration`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`
+      }
+    });
+
+    if (!res.ok) {
+      const resV1 = await fetch(`${baseUrl}/active-configuration`, {
+        headers: { "Authorization": `Bearer ${apiKey}` }
+      });
+      if (resV1.ok) {
+        return { success: true, data: await resV1.json() };
+      }
+      return { success: false, error: `HTTP ${res.status}: ${await res.text()}` };
+    }
+
+    return { success: true, data: await res.json() };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erreur lors de la vérification de la configuration" };
   }
 }
 
@@ -836,6 +918,7 @@ export function resolvePawaPayCorrespondent(
 
   // Find operator matching the carrier name
   const operator = countryConfig.operators.find(op => {
+    if (op.id.toUpperCase() === carrierUpper) return true;
     const opName = op.name.toLowerCase();
     const opId = op.id.toLowerCase();
     const shortOpId = opId.split("_")[0];

@@ -37,8 +37,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
     }
 
-    // --- Direct Admin Payout via PawaPay API ---
-    if (action === "direct_payout") {
+    // --- Check PawaPay Active Configuration ---
+    if (action === "check_active_config") {
+      const { fetchPawaPayActiveConfiguration } = await import("@/lib/pawapay");
+      const configRes = await fetchPawaPayActiveConfiguration();
+      return NextResponse.json(configRes);
+    }
+
+    // --- Direct Admin Payout via PawaPay API or Manual Registration ---
+    if (action === "direct_payout" || action === "direct_manual_payout") {
       const { 
         phoneNumber, 
         carrier, 
@@ -46,8 +53,12 @@ export async function POST(req: NextRequest) {
         currency: requestCurrency,
         amount, 
         statementDescription, 
-        instructorId 
+        instructorId,
+        manualRef,
+        isManual: paramIsManual
       } = body;
+
+      const isManual = action === "direct_manual_payout" || !!paramIsManual;
 
       const numAmount = parseFloat(amount);
       if (!phoneNumber || !carrier || isNaN(numAmount) || numAmount <= 0) {
@@ -63,27 +74,42 @@ export async function POST(req: NextRequest) {
       const amountLocal = numAmount * resolveResult.exchangeRate;
       const targetPhone = resolveResult.formattedPhone;
       const freshPayoutTxId = crypto.randomUUID();
-      const desc = statementDescription || "Retrait Direct Admin PawaPay";
+      const desc = statementDescription || (isManual ? "Retrait Direct Manuel (Wave/Orange)" : "Retrait Direct Admin PawaPay");
 
-      // Initiate payout via PawaPay API
-      const payoutResponse = await initiatePawaPayPayout({
-        payoutId: freshPayoutTxId,
-        amount: amountLocal,
-        currency: resolveResult.currency,
-        correspondent: resolveResult.correspondent,
-        phoneNumber: targetPhone,
-        statementDescription: desc.substring(0, 22)
-      });
-
-      const isSuccess = payoutResponse.success;
-      const pStatus = isSuccess ? "PAID" : "FAILED";
       const formattedAmountText = resolveResult.currency === "USD" 
         ? `${numAmount}$ USD` 
-        : `${Math.round(amountLocal)} CDF (${numAmount}$ USD)`;
+        : `${Math.round(amountLocal).toLocaleString('fr-FR')} ${resolveResult.currency} (${numAmount}$ USD)`;
 
-      const pNote = isSuccess 
-        ? `[Retrait Direct PawaPay API] Transfert réussi de ${formattedAmountText} via ${resolveResult.correspondent} vers +${targetPhone}. Réf: ${freshPayoutTxId}. Note: ${desc}`
-        : `[Échec Retrait Direct PawaPay API] ${payoutResponse.error}. (Opérateur: ${resolveResult.correspondent}, Devise: ${resolveResult.currency}, Téléphone: +${targetPhone}). Réf: ${freshPayoutTxId}`;
+      let isSuccess = false;
+      let pStatus: "PAID" | "FAILED" = "FAILED";
+      let pNote = "";
+      let apiErrorMessage = "";
+
+      if (isManual) {
+        // Direct manual recording (transfer done directly via Wave / Orange mobile app)
+        isSuccess = true;
+        pStatus = "PAID";
+        const customRef = manualRef ? ` (Réf transaction: ${manualRef})` : "";
+        pNote = `[Retrait Direct Manuel] Versement de ${formattedAmountText} effectué directement via ${resolveResult.correspondent} vers +${targetPhone} par l'admin (${user.email}).${customRef} Note: ${desc}`;
+      } else {
+        // Initiate payout via PawaPay API
+        const payoutResponse = await initiatePawaPayPayout({
+          payoutId: freshPayoutTxId,
+          amount: amountLocal,
+          currency: resolveResult.currency,
+          correspondent: resolveResult.correspondent,
+          phoneNumber: targetPhone,
+          statementDescription: desc.substring(0, 22)
+        });
+
+        isSuccess = payoutResponse.success;
+        pStatus = isSuccess ? "PAID" : "FAILED";
+        apiErrorMessage = payoutResponse.error || "";
+
+        pNote = isSuccess 
+          ? `[Retrait Direct PawaPay API] Transfert réussi de ${formattedAmountText} via ${resolveResult.correspondent} vers +${targetPhone}. Réf: ${freshPayoutTxId}. Note: ${desc}`
+          : `[Échec Retrait Direct PawaPay API] ${apiErrorMessage}. (Opérateur: ${resolveResult.correspondent}, Devise: ${resolveResult.currency}, Téléphone: +${targetPhone}). Réf: ${freshPayoutTxId}`;
+      }
 
       const targetInstructorId = instructorId || user.id;
 
@@ -147,8 +173,11 @@ export async function POST(req: NextRequest) {
 
       if (!isSuccess) {
         return NextResponse.json({
-          error: `Échec du versement PawaPay : ${payoutResponse.error}. Le versement a été consigné avec le statut ÉCHOUÉ.`,
+          error: `Échec du versement PawaPay : ${apiErrorMessage}. Le versement a été consigné avec le statut ÉCHOUÉ.`,
           status: "FAILED",
+          canRecordManually: true,
+          suggestedCarrier: carrier.includes("WAVE") ? "ORANGE_SEN" : carrier.includes("ORANGE") ? "WAVE_SEN" : undefined,
+          payoutId: freshPayoutTxId,
           notes: pNote
         }, { status: 400 });
       }
@@ -157,7 +186,9 @@ export async function POST(req: NextRequest) {
         success: true,
         status: "PAID",
         payoutId: freshPayoutTxId,
-        message: `Versement direct PawaPay de ${formattedAmountText} envoyé avec succès au +${targetPhone} !`
+        message: isManual
+          ? `Versement manuel de ${formattedAmountText} enregistré avec succès au +${targetPhone} !`
+          : `Versement direct PawaPay de ${formattedAmountText} envoyé avec succès au +${targetPhone} !`
       });
     }
 
@@ -292,7 +323,7 @@ export async function POST(req: NextRequest) {
 
       const formattedAmountText = resolveResult.currency === "USD" 
         ? `${payout.amount}$ USD` 
-        : `${Math.round(amountLocal).toLocaleString('fr-FR')} CDF (${payout.amount}$ USD)`;
+        : `${Math.round(amountLocal).toLocaleString('fr-FR')} ${resolveResult.currency} (${payout.amount}$ USD)`;
 
       // Success or Manual Validation: update payout record status to PAID
       const { error: updateErr } = await supabaseAdmin
