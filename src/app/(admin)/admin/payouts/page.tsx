@@ -74,17 +74,55 @@ export default function AdminPayoutsPage() {
   const [directMessage, setDirectMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [suggestedCarrier, setSuggestedCarrier] = useState<string | null>(null);
   const [canRecordManually, setCanRecordManually] = useState<boolean>(false);
+  const [walletBalance, setWalletBalance] = useState<{ amount: string; currency: string } | null>(null);
+  const [checkingBalance, setCheckingBalance] = useState<boolean>(false);
 
   // Accounting States
   const [totalPaidPayouts, setTotalPaidPayouts] = useState<number>(0);
   const [remainingInstructorBalance, setRemainingInstructorBalance] = useState<number>(0);
 
   const selectedCountryConfig = PAWAPAY_COUNTRY_MAPPING.find(c => c.countryCode === directCountry) || PAWAPAY_COUNTRY_MAPPING[0];
+  const selectedOperator = selectedCountryConfig.operators.find(op => op.id === directCarrier) || selectedCountryConfig.operators[0];
+  const selectedOperatorCleanName = selectedOperator ? selectedOperator.name.replace(/\(.*\)/g, '').trim() : directCarrier;
+
+  const checkLiveBalance = async (targetCountry?: string) => {
+    const cCode = targetCountry || directCountry;
+    const cfg = PAWAPAY_COUNTRY_MAPPING.find(c => c.countryCode === cCode);
+    setCheckingBalance(true);
+    try {
+      const res = await fetch("/api/admin/payouts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "check_wallet_balances",
+          environment: directEnvironment,
+          country: cfg?.countryCode3 || cCode
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.balances && data.balances.length > 0) {
+        const match = data.balances.find((b: any) => 
+          b.country === cfg?.countryCode3 || 
+          b.currency === (cfg?.countryCode === "CD" ? directCurrency : cfg?.currency)
+        ) || data.balances[0];
+        if (match) {
+          setWalletBalance({ amount: match.balance, currency: match.currency });
+        }
+      } else if (data.balances && data.balances.length === 0) {
+        setWalletBalance({ amount: "0.00", currency: cfg?.currency || "XOF" });
+      }
+    } catch {
+      // ignore
+    } finally {
+      setCheckingBalance(false);
+    }
+  };
 
   const handleCountryChange = (countryCode: string) => {
     setDirectCountry(countryCode);
     setSuggestedCarrier(null);
     setCanRecordManually(false);
+    setWalletBalance(null);
     const cfg = PAWAPAY_COUNTRY_MAPPING.find(c => c.countryCode === countryCode);
     if (cfg && cfg.operators.length > 0) {
       setDirectCarrier(cfg.operators[0].id);
@@ -971,7 +1009,7 @@ export default function AdminPayoutsPage() {
                       className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
                     >
                       <Check className="w-3.5 h-3.5" />
-                      <span>Valider comme versement manuel (Wave / Orange)</span>
+                      <span>Valider comme versement manuel ({selectedOperatorCleanName})</span>
                     </button>
                   </div>
                 )}
@@ -979,7 +1017,34 @@ export default function AdminPayoutsPage() {
             )}
 
             {/* Submit Action */}
-            <div className="flex justify-end pt-2 gap-2">
+            <div className="flex justify-between items-center pt-2 gap-2">
+              {/* Live PawaPay Wallet Balance trigger */}
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  disabled={checkingBalance}
+                  onClick={() => checkLiveBalance()}
+                  className="text-[11px] text-teal-400 hover:text-teal-300 font-semibold flex items-center gap-1.5 cursor-pointer bg-zinc-800/80 hover:bg-zinc-800 border border-zinc-700/80 px-3 py-2 rounded-xl transition-all"
+                >
+                  {checkingBalance ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 border-2 border-teal-400 border-t-transparent" />
+                      <span>Interrogation solde PawaPay...</span>
+                    </>
+                  ) : walletBalance ? (
+                    <>
+                      <span>💼 Solde PawaPay {selectedCountryConfig.names[0].toUpperCase()} :</span>
+                      <span className="font-extrabold text-white">{parseFloat(walletBalance.amount).toLocaleString('fr-FR')} {walletBalance.currency}</span>
+                      <span className="text-[10px] text-zinc-400 underline">(Actualiser)</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>💼 Vérifier le solde en direct sur PawaPay ({selectedCountryConfig.currency})</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
               <button
                 type="submit"
                 disabled={submittingDirect}
@@ -993,12 +1058,12 @@ export default function AdminPayoutsPage() {
                 ) : directMode === "MANUAL" ? (
                   <>
                     <Check className="w-4 h-4" />
-                    Enregistrer le versement manuel ({directCarrier.includes("WAVE") ? "Wave" : "Orange SN"})
+                    Enregistrer le versement manuel ({selectedOperatorCleanName})
                   </>
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
-                    Envoyer le retrait direct PawaPay ({directCarrier.includes("WAVE") ? "Wave" : "Orange SN"})
+                    Envoyer le retrait direct PawaPay ({selectedOperatorCleanName})
                   </>
                 )}
               </button>

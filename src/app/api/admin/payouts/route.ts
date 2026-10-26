@@ -44,6 +44,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(configRes);
     }
 
+    // --- Check PawaPay Live Wallet Balances ---
+    if (action === "check_wallet_balances" || action === "check_balance") {
+      const { fetchPawaPayWalletBalances } = await import("@/lib/pawapay");
+      const balanceRes = await fetchPawaPayWalletBalances(body.environment || "production", body.countryCode3 || body.country);
+      return NextResponse.json(balanceRes);
+    }
+
     // --- Check / Sync Live Payout Status with PawaPay ---
     if (action === "sync_payout_status" || action === "check_payout_status") {
       const { getPawaPayPayoutStatus } = await import("@/lib/pawapay");

@@ -125,9 +125,9 @@ export const PAWAPAY_COUNTRY_MAPPING: PawaPayCountryConfig[] = [
     phonePrefix: "229",
     exchangeRate: 600,
     operators: [
-      { id: "MTN_MOMO_BEN", name: "MTN Mobile Money" },
-      { id: "MOOV_BEN", name: "Moov Money" },
-      { id: "CELTIIS_BEN", name: "Celtiis Cash" }
+      { id: "MOOV_BEN", name: "Moov Money Bénin (Actif PawaPay ✅)" },
+      { id: "MTN_MOMO_BEN", name: "MTN Mobile Money Bénin (Actif PawaPay ✅)" },
+      { id: "CELTIIS_BEN", name: "Celtiis Cash Bénin (Transfert Manuel ⚠️)" }
     ]
   }
 ];
@@ -258,7 +258,18 @@ export function formatPawaPayFailureReason(code?: any, rawMessage?: any): string
     if (!val) return '';
     if (typeof val === 'string') return val;
     if (typeof val === 'object') {
-      return val.rejectionMessage || val.rejectionCode || val.failureMessage || val.failureCode || val.message || val.error || JSON.stringify(val);
+      if (val.failureMessage && typeof val.failureMessage === 'string') return val.failureMessage;
+      if (val.rejectionMessage && typeof val.rejectionMessage === 'string') return val.rejectionMessage;
+      if (val.message && typeof val.message === 'string') return val.message;
+      if (val.error && typeof val.error === 'string') return val.error;
+      if (val.failureCode && typeof val.failureCode === 'string') return val.failureCode;
+      if (val.rejectionCode && typeof val.rejectionCode === 'string') return val.rejectionCode;
+      if (val.code && typeof val.code === 'string') return val.code;
+      try {
+        return JSON.stringify(val);
+      } catch {
+        return '';
+      }
     }
     return String(val);
   };
@@ -270,37 +281,47 @@ export function formatPawaPayFailureReason(code?: any, rawMessage?: any): string
   const msgUpper = msgStr.toUpperCase();
   const combined = `${codeUpper} ${msgUpper}`;
 
-  // 1. Unprovisioned Payout corridor / Not allowed on merchant account
-  if (combined.includes('NO ACTIVE PAYOUT FLOW') || combined.includes('PAYOUTS_NOT_ALLOWED') || combined.includes('PAYOUT_NOT_ALLOWED') || combined.includes('CORRIDOR_NOT_FOUND')) {
-    return "Flux Payout non activé chez PawaPay : L'opérateur sélectionné (Wave ou Orange Sénégal) n'est pas encore provisionné pour les reversements B2C sur votre compte PawaPay. Activez ce corridor dans votre console PawaPay ou enregistrez un versement manuel.";
+  // 1. Invalid phone number format (Benin / general)
+  if (combined.includes('INVALID_PHONE_NUMBER') || combined.includes('INVALID_PHONE') || combined.includes('INVALID_MSISDN') || combined.includes('MSISDN_INVALID')) {
+    return "Format du numéro de téléphone Mobile Money invalide pour cet opérateur. Au Bénin, les numéros comportent 10 chiffres (commençant par 01, ex: 01 95 72 35 36 sous le préfixe +229).";
   }
 
-  // 2. Insufficient funds in PawaPay wallet
+  // 2. Unprovisioned Payout corridor / Not allowed on merchant account
+  if (combined.includes('NO ACTIVE PAYOUT FLOW') || combined.includes('PAYOUTS_NOT_ALLOWED') || combined.includes('PAYOUT_NOT_ALLOWED') || combined.includes('CORRIDOR_NOT_FOUND') || combined.includes('INVALID_PROVIDER') || combined.includes('CORRIDOR_UNAVAILABLE')) {
+    return "Flux de reversement (Payout) non provisionné chez PawaPay : Ce corridor Mobile Money n'est pas encore activé pour les versements sur votre compte PawaPay. Activez ce corridor dans votre console PawaPay ou enregistrez un versement direct manuel.";
+  }
+
+  // 3. Insufficient funds in PawaPay wallet
   if (combined.includes('WALLET_OUT_OF_FUNDS') || combined.includes('INSUFFICIENT_FUNDS') || combined.includes('INSUFFICIENT_BALANCE') || combined.includes('INSUFFICIENT') || combined.includes('SOLDE')) {
-    return "Solde insuffisant dans votre portefeuille marchand PawaPay (ou compte Mobile Money) pour envoyer ce montant.";
+    return "Solde insuffisant dans votre portefeuille PawaPay (Bénin XOF) pour envoyer ce montant. Rechargez votre portefeuille PawaPay ou effectuez un versement manuel.";
   }
 
-  // 3. Recipient not found / invalid number on this operator
+  // 4. Recipient not found / invalid number on this operator
   if (combined.includes('RECIPIENT_NOT_FOUND') || combined.includes('INVALID_RECIPIENT') || combined.includes('NOT_FOUND') || combined.includes('SUBSCRIBER_NOT_FOUND') || combined.includes('INVALID_ACCOUNT') || combined.includes('UNKNOWN_MSISDN')) {
-    return "Numéro de téléphone introuvable ou non enregistré auprès de l'opérateur Mobile Money (ex: numéro Orange tenté sous Wave ou compte inactif).";
+    return "Numéro de téléphone introuvable ou non enregistré auprès de cet opérateur Mobile Money. Vérifiez que le numéro appartient bien au réseau sélectionné.";
   }
 
-  // 4. Duplicate payout ID
+  // 5. Amount out of bounds
+  if (combined.includes('AMOUNT_OUT_OF_BOUNDS') || combined.includes('INVALID_AMOUNT')) {
+    return "Le montant demandé est en dehors des limites autorisées pour cet opérateur Mobile Money.";
+  }
+
+  // 6. Duplicate payout ID
   if (combined.includes('DUPLICATE_PAYOUT_ID') || combined.includes('DUPLICATE')) {
     return "Identifiant de transaction déjà utilisé chez PawaPay. Un nouvel identifiant a été généré.";
   }
 
-  // 5. Provider unavailable or maintenance
+  // 7. Provider unavailable or maintenance
   if (combined.includes('PROVIDER_TEMPORARILY_UNAVAILABLE') || combined.includes('OUTAGE') || combined.includes('DOWN')) {
-    return "Le réseau de l'opérateur Mobile Money est temporairement indisponible ou en maintenance chez PawaPay. Veuillez réessayer un peu plus tard ou basculer sur un autre opérateur.";
+    return "Le réseau de l'opérateur Mobile Money est temporairement indisponible ou en maintenance chez PawaPay. Veuillez réessayer un peu plus tard ou utiliser le versement direct manuel.";
   }
 
-  // 6. User Cancelled (applicable to collections/deposits only when explicitly stated)
+  // 8. User Cancelled
   if (combined.includes('USER_CANCELLED') || combined.includes('REJECTED_BY_USER') || combined.includes('CANCELLED_BY_USER')) {
     return "Transaction annulée par l'utilisateur sur son téléphone.";
   }
 
-  // 7. Timeout / PIN
+  // 9. Timeout / PIN
   if (combined.includes('TIMEOUT') || combined.includes('EXPIRE')) {
     return "La transaction a expiré auprès de l'opérateur Mobile Money.";
   }
@@ -308,12 +329,12 @@ export function formatPawaPayFailureReason(code?: any, rawMessage?: any): string
     return "Erreur d'authentification PIN auprès de l'opérateur.";
   }
 
-  // 8. General rejection with raw message
-  if (msgStr && msgStr !== 'REJECTED' && msgStr !== 'FAILED') {
+  // 10. General rejection with raw message
+  if (msgStr && msgStr !== 'REJECTED' && msgStr !== 'FAILED' && msgStr !== '[object Object]') {
     return `Transaction rejetée par PawaPay : ${msgStr}`;
   }
 
-  if (codeStr && codeStr !== 'REJECTED' && codeStr !== 'FAILED') {
+  if (codeStr && codeStr !== 'REJECTED' && codeStr !== 'FAILED' && codeStr !== '[object Object]') {
     return `Transaction rejetée par PawaPay (${codeStr}).`;
   }
 
@@ -381,7 +402,7 @@ export function detectPawaPayCountry(phoneNumber?: any, carrier?: any, userCount
 }
 
 /**
- * Format phone number to clean international format (no +, no leading 0 except CI 10-digit numbers) matching target prefix
+ * Format phone number to clean international format (no +, no leading 0 except CI & BJ 10-digit numbers) matching target prefix
  */
 export function formatPawaPayPhoneNumber(phoneNumber: any, prefix: any): string {
   const phoneStr = typeof phoneNumber === 'string' ? phoneNumber : String(phoneNumber || '');
@@ -389,26 +410,70 @@ export function formatPawaPayPhoneNumber(phoneNumber: any, prefix: any): string 
   if (!phoneStr) return "";
   let clean = phoneStr.replace(/\D/g, '');
   
-  // Remove leading international zeros (e.g., 00250 -> 250)
+  // Remove leading international zeros (e.g., 00229 -> 229)
   while (clean.startsWith('00')) {
     clean = clean.substring(2);
   }
   
-  // If already starts with prefix
+  // 1. Special Handling for Bénin (prefix 229):
+  // Since the national numbering reform (ARCEP Bénin), mobile numbers have 10 digits starting with 01 (e.g. 0195723536).
+  // With international prefix 229, the full MSISDN expected by PawaPay is 13 digits (e.g. 2290195723536).
+  if (prefixStr === '229') {
+    if (clean.startsWith('229')) {
+      const national = clean.substring(3);
+      if (national.length === 10 && national.startsWith('01')) {
+        return clean; // 22901XXXXXXXX -> valid 13 digits
+      }
+      if (national.length === 8) {
+        return `22901${national}`; // Old 8-digit format -> converted to 13 digits
+      }
+      if (national.length === 9 && national.startsWith('1')) {
+        return `2290${national}`; // Was stripped of leading 0 (229195723536) -> restore 2290195723536
+      }
+      if (national.length === 9 && national.startsWith('0') && !national.startsWith('01')) {
+        return `22901${national.substring(1)}`;
+      }
+      return clean;
+    }
+    // Number without 229 prefix
+    if (clean.length === 10 && clean.startsWith('01')) {
+      return `229${clean}`; // 0195723536 -> 2290195723536
+    }
+    if (clean.length === 8) {
+      return `22901${clean}`; // 95723536 -> 2290195723536
+    }
+    if (clean.length === 9 && clean.startsWith('1')) {
+      return `2290${clean}`; // 195723536 -> 2290195723536
+    }
+    if (clean.length === 9 && clean.startsWith('0') && !clean.startsWith('01')) {
+      return `22901${clean.substring(1)}`;
+    }
+    return `229${clean}`;
+  }
+
+  // 2. Special Handling for Côte d'Ivoire (prefix 225):
+  // 10-digit national numbers start with 0 (01, 05, 07) -> 225 + 10 digits = 13 digits
+  if (prefixStr === '225') {
+    if (clean.startsWith('225')) {
+      return clean;
+    }
+    if (clean.length === 10 && clean.startsWith('0')) {
+      return `225${clean}`;
+    }
+    if (clean.length === 8) {
+      return `225${clean}`;
+    }
+  }
+
+  // 3. For other countries:
   if (prefixStr && clean.startsWith(prefixStr)) {
-    // Special check for prefix + redundant zero (e.g., 2370677123456 -> 237677123456, EXCEPT for CI 225 where 22505/22507/22501 is valid 13-digit)
-    if (prefixStr !== '225' && clean.startsWith(prefixStr + '0')) {
+    // Redundant zero check (e.g. 2370677123456 -> 237677123456)
+    if (clean.startsWith(prefixStr + '0')) {
       clean = prefixStr + clean.substring(prefixStr.length + 1);
     }
     return clean;
   }
-  
-  // For Côte d'Ivoire (225): 10-digit national numbers start with 0 (05, 07, 01) and MUST keep the 0 (e.g. 0504123456 -> 2250504123456)
-  if (prefixStr === '225' && clean.length === 10 && clean.startsWith('0')) {
-    return prefixStr + clean;
-  }
 
-  // For other countries (or non-10-digit CI), if starts with 0, strip the leading 0
   if (clean.startsWith('0')) {
     clean = clean.substring(1);
   }
@@ -683,7 +748,7 @@ export async function initiatePawaPayPayout(params: {
   }
 
   // Official PawaPay V2 Payout Payload
-  const v2Payload = {
+  const v2Payload: any = {
     payoutId: payoutId,
     amount: formattedAmount,
     currency: params.currency,
@@ -693,7 +758,8 @@ export async function initiatePawaPayPayout(params: {
         phoneNumber: cleanPhone,
         provider: correspondent
       }
-    }
+    },
+    customerMessage: cleanDesc
   };
 
   // Legacy PawaPay V1 Payout Payload
@@ -750,23 +816,53 @@ export async function initiatePawaPayPayout(params: {
       data = { message: responseText };
     }
 
-    // Extract exact rejection reason (string or object)
-    let rawRejection: string | null = null;
-    if (typeof data.rejectionReason === 'string') {
-      rawRejection = data.rejectionReason;
-    } else if (data.rejectionReason?.rejectionMessage || data.rejectionReason?.rejectionCode) {
-      rawRejection = [data.rejectionReason.rejectionCode, data.rejectionReason.rejectionMessage].filter(Boolean).join(' - ');
-    } else if (data.failureReason || data.failureCode) {
-      rawRejection = [data.failureCode, data.failureReason].filter(Boolean).join(' - ');
-    } else if (data.message || data.error) {
-      rawRejection = [data.code, data.message || data.error].filter(Boolean).join(' - ');
+    // Robust extraction of rejection / error reason (string or nested object)
+    let failureCodeStr = "";
+    let failureMsgStr = "";
+
+    const root = Array.isArray(data) ? data[0] : data;
+
+    if (root && typeof root === 'object') {
+      if (typeof root.failureReason === 'object' && root.failureReason !== null) {
+        failureCodeStr = root.failureReason.failureCode || root.failureReason.code || "";
+        failureMsgStr = root.failureReason.failureMessage || root.failureReason.message || "";
+      } else if (typeof root.failureReason === 'string') {
+        failureMsgStr = root.failureReason;
+      }
+
+      if (typeof root.rejectionReason === 'object' && root.rejectionReason !== null) {
+        failureCodeStr = failureCodeStr || root.rejectionReason.rejectionCode || root.rejectionReason.code || "";
+        failureMsgStr = failureMsgStr || root.rejectionReason.rejectionMessage || root.rejectionReason.message || "";
+      } else if (typeof root.rejectionReason === 'string') {
+        failureMsgStr = failureMsgStr || root.rejectionReason;
+      }
+
+      if (root.failureCode && typeof root.failureCode === 'string') {
+        failureCodeStr = failureCodeStr || root.failureCode;
+      }
+
+      if (typeof root.error === 'object' && root.error !== null) {
+        failureCodeStr = failureCodeStr || root.error.code || root.error.errorCode || "";
+        failureMsgStr = failureMsgStr || root.error.message || root.error.errorMessage || JSON.stringify(root.error);
+      } else if (typeof root.error === 'string') {
+        failureMsgStr = failureMsgStr || root.error;
+      }
+
+      if (root.message && typeof root.message === 'string') {
+        failureMsgStr = failureMsgStr || root.message;
+      }
+      if (root.code && typeof root.code === 'string') {
+        failureCodeStr = failureCodeStr || root.code;
+      }
     }
 
+    const rawRejection = [failureCodeStr, failureMsgStr].filter(Boolean).join(' - ') || null;
+
     if (!response.ok || data.status === "REJECTED" || data.status === "FAILED") {
-      const codeVal = rawRejection || data.failureCode || data.status || `HTTP_${response.status}`;
-      const rawMsg = rawRejection || data.message || data.error || responseText;
+      const codeVal = failureCodeStr || root?.status || `HTTP_${response.status}`;
+      const rawMsg = failureMsgStr || rawRejection || root?.message || root?.error || responseText;
       const formatted = formatPawaPayFailureReason(codeVal, rawMsg);
-      const detailedError = rawRejection && !formatted.includes(rawRejection)
+      const detailedError = rawRejection && !formatted.includes(rawRejection) && rawRejection !== '[object Object]'
         ? `${formatted} (Code PawaPay : ${rawRejection})`
         : formatted;
 
@@ -826,6 +922,44 @@ export async function fetchPawaPayActiveConfiguration(explicitEnv?: string): Pro
     return { success: true, data: await res.json() };
   } catch (err: any) {
     return { success: false, error: err.message || "Erreur lors de la vérification de la configuration" };
+  }
+}
+
+/**
+ * Fetch wallet balances from PawaPay (V2 /wallet-balances endpoint)
+ */
+export async function fetchPawaPayWalletBalances(explicitEnv?: string, countryCode3?: string): Promise<{
+  success: boolean;
+  balances?: Array<{
+    country: string;
+    balance: string;
+    currency: string;
+    provider?: string;
+  }>;
+  error?: string;
+}> {
+  const apiKey = process.env.PAWAPAY_API_TOKEN || "";
+  const isProduction = isPawaPayProduction(explicitEnv);
+  const baseUrl = isProduction ? "https://api.pawapay.io" : "https://api.sandbox.pawapay.io";
+  const query = countryCode3 ? `?country=${encodeURIComponent(countryCode3.toUpperCase())}` : "";
+
+  try {
+    const res = await fetch(`${baseUrl}/v2/wallet-balances${query}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`
+      }
+    });
+
+    if (!res.ok) {
+      return { success: false, error: `HTTP ${res.status}: ${await res.text()}` };
+    }
+
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : (data.balances || []);
+    return { success: true, balances: list };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Erreur de connexion lors de la vérification du solde PawaPay" };
   }
 }
 
