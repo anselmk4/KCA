@@ -171,6 +171,24 @@ export async function GET(
       );
     }
 
+    // Si c'est un lien cloud externe (Google Drive, Mega, Dropbox, OneDrive, Notion...), rediriger l'utilisateur autorisé
+    const isExternalCloudLink =
+      fileUrl.includes("drive.google.com") ||
+      fileUrl.includes("docs.google.com") ||
+      fileUrl.includes("mega.nz") ||
+      fileUrl.includes("dropbox.com") ||
+      fileUrl.includes("onedrive.live.com") ||
+      fileUrl.includes("1drv.ms") ||
+      fileUrl.includes("mediafire.com") ||
+      fileUrl.includes("notion.so") ||
+      fileUrl.includes("notion.site") ||
+      fileUrl.includes("github.com") ||
+      fileUrl.includes("wetransfer.com");
+
+    if (isExternalCloudLink) {
+      return NextResponse.redirect(fileUrl);
+    }
+
     // Préparer un nom de fichier propre pour le téléchargement
     const rawFileName =
       product.file_name ||

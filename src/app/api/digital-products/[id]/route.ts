@@ -96,6 +96,7 @@ export async function PUT(
     if (body.cover_image_url !== undefined) updates.cover_image_url = body.cover_image_url.trim();
     if (body.file_url !== undefined) updates.file_url = body.file_url.trim();
     if (body.file_name !== undefined) updates.file_name = body.file_name;
+    if (body.file_size_bytes !== undefined) updates.file_size_bytes = body.file_size_bytes;
     if (body.category !== undefined) updates.category = body.category;
     if (body.tags !== undefined) updates.tags = body.tags;
     if (body.status !== undefined) updates.status = body.status;
