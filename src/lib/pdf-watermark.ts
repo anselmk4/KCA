@@ -41,66 +41,72 @@ export async function applyDynamicWatermark(
     const orderRef = info.orderId ? ` • Réf : #${info.orderId.slice(0, 8).toUpperCase()}` : "";
     const phoneRef = info.buyerPhone ? ` • Tél : ${info.buyerPhone}` : "";
 
-    const footerLine1 = `Document certifié et sous licence exclusive pour : ${recipientString}${phoneRef}${orderRef}`;
-    const footerLine2 = `Acheté le ${formattedDate} sur Ansella. Diffusion, revente ou copie strictement interdite (Art. 360 Code du Numérique RDC & Art. L.335-2 CPI).`;
+    const footerLine1 = `Certifié pour : ${recipientString}${phoneRef}${orderRef}`;
+    const footerLine2 = `Ansella (${formattedDate}) • Diffusion ou revente interdite (Art. 360 Numérique RDC & Art. L.335-2 CPI)`;
     const diagonalText = `LICENCE : ${cleanEmail} • Ansella`;
 
     for (let i = 0; i < totalPages; i++) {
       const page = pages[i];
       const { width, height } = page.getSize();
 
-      // 1. Filigrane diagonal semi-transparent au centre de la page
-      const diagonalFontSize = Math.min(24, Math.max(14, width / 26));
+      // 1. Filigrane diagonal semi-transparent au centre de la page (ultra-discret)
+      const diagonalFontSize = Math.min(22, Math.max(13, width / 28));
       const diagonalWidth = fontBold.widthOfTextAtSize(diagonalText, diagonalFontSize);
 
       page.drawText(diagonalText, {
-        x: Math.max(20, (width - diagonalWidth) / 2),
+        x: Math.max(15, (width - diagonalWidth) / 2),
         y: height / 2 - 10,
         size: diagonalFontSize,
         font: fontBold,
         color: rgb(0.85, 0.22, 0.22),
-        opacity: 0.08, // Très discret, n'altère pas la lisibilité du cours/livre
+        opacity: 0.06, // Ultra-discret, n'altère pas la lisibilité du document
         rotate: degrees(35),
       });
 
-      // 2. Ligne de démarcation inférieure discrète
+      // 2. Ligne de démarcation inférieure compacte
       page.drawLine({
-        start: { x: 25, y: 36 },
-        end: { x: width - 25, y: 36 },
-        thickness: 0.5,
+        start: { x: 20, y: 19 },
+        end: { x: width - 20, y: 19 },
+        thickness: 0.35,
         color: rgb(0.82, 0.2, 0.2),
-        opacity: 0.5,
+        opacity: 0.35,
       });
 
-      // 3. Mention de licence avec identité de l'acheteur
-      page.drawText(footerLine1, {
-        x: 25,
-        y: 25,
-        size: 7,
+      // 3. Mention de licence compacte avec identité de l'acheteur
+      const maxAvailableWidth = width - 40;
+      let printLine1 = footerLine1;
+      if (fontBold.widthOfTextAtSize(printLine1, 5.8) > maxAvailableWidth) {
+        printLine1 = `Certifié pour : ${cleanEmail}${orderRef}`;
+      }
+
+      page.drawText(printLine1, {
+        x: 20,
+        y: 12.5,
+        size: 5.8,
         font: fontBold,
         color: rgb(0.72, 0.12, 0.12),
-        opacity: 0.95,
+        opacity: 0.92,
       });
 
-      // 4. Avertissement légal + pagination
+      // 4. Avertissement légal + pagination ultra-compacte
       const pageStr = `Page ${i + 1} / ${totalPages}`;
-      const pageStrWidth = font.widthOfTextAtSize(pageStr, 6.5);
+      const pageStrWidth = font.widthOfTextAtSize(pageStr, 5.2);
 
       page.drawText(footerLine2, {
-        x: 25,
-        y: 15,
-        size: 6.5,
+        x: 20,
+        y: 6,
+        size: 5.2,
         font: font,
-        color: rgb(0.42, 0.42, 0.42),
+        color: rgb(0.45, 0.45, 0.45),
         opacity: 0.85,
       });
 
       page.drawText(pageStr, {
-        x: width - 25 - pageStrWidth,
-        y: 15,
-        size: 6.5,
+        x: width - 20 - pageStrWidth,
+        y: 6,
+        size: 5.2,
         font: font,
-        color: rgb(0.42, 0.42, 0.42),
+        color: rgb(0.45, 0.45, 0.45),
         opacity: 0.85,
       });
     }
