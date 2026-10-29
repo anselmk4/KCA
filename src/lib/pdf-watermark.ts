@@ -42,7 +42,7 @@ export async function applyDynamicWatermark(
     const phoneRef = info.buyerPhone ? ` • Tél : ${info.buyerPhone}` : "";
 
     const footerLine1 = `Document certifié et sous licence exclusive pour : ${recipientString}${phoneRef}${orderRef}`;
-    const footerLine2 = `Acheté le ${formattedDate} sur Ansella. Reproduction, revente ou diffusion non autorisée strictement interdite (Art. L.335-2 CPI).`;
+    const footerLine2 = `Acheté le ${formattedDate} sur Ansella. Diffusion, revente ou copie strictement interdite (Art. 360 Code du Numérique RDC & Art. L.335-2 CPI).`;
     const diagonalText = `LICENCE : ${cleanEmail} • Ansella`;
 
     for (let i = 0; i < totalPages; i++) {
