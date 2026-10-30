@@ -40,6 +40,7 @@ import {
   Eye,
   Zap,
   Info,
+  Send,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import RichEditor from "@/components/editor/RichEditor";
@@ -1012,8 +1013,9 @@ export default function CourseDetailPage() {
         .update({ status: "REVIEW", updated_at: new Date().toISOString() })
         .eq("id", courseId);
       if (error) { alert("Erreur : " + error.message); return; }
+      setCourse((prev) => (prev ? { ...prev, status: "REVIEW" } : prev));
       setStatusSavedMessage(true);
-      setTimeout(() => setStatusSavedMessage(false), 3000);
+      setTimeout(() => setStatusSavedMessage(false), 4000);
       await loadData(true);
     } finally { setSaving(false); }
   };
@@ -1026,8 +1028,9 @@ export default function CourseDetailPage() {
         .update({ status: "DRAFT", updated_at: new Date().toISOString() })
         .eq("id", courseId);
       if (error) { alert("Erreur : " + error.message); return; }
+      setCourse((prev) => (prev ? { ...prev, status: "DRAFT" } : prev));
       setStatusSavedMessage(true);
-      setTimeout(() => setStatusSavedMessage(false), 3000);
+      setTimeout(() => setStatusSavedMessage(false), 4000);
       await loadData(true);
     } finally { setSaving(false); }
   };
@@ -1328,19 +1331,49 @@ export default function CourseDetailPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <Link
-                href={`/courses/${course.id}/preview`}
-                target="_blank"
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-white/10 cursor-pointer"
-              >
-                <Eye className="w-3.5 h-3.5" /> Aperçu Public
-              </Link>
-              <button
-                onClick={() => setShowAiStructureModal(true)}
-                className="px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white rounded-xl text-xs font-extrabold shadow-lg shadow-teal-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5" /> Assistant IA
-              </button>
+              {course.status === "DRAFT" && (
+                <button
+                  type="button"
+                  onClick={handleRequestReview}
+                  disabled={saving}
+                  className="px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white rounded-xl text-xs font-extrabold shadow-lg shadow-teal-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  title="Soumettre cette formation pour vérification par l'équipe administrative"
+                >
+                  <Send className="w-3.5 h-3.5" /> Soumettre pour validation
+                </button>
+              )}
+              {course.status === "REVIEW" && (
+                <button
+                  type="button"
+                  onClick={handleCancelReview}
+                  disabled={saving}
+                  className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  title="Formation en cours de révision. Cliquer pour annuler et repasser en brouillon."
+                >
+                  <Clock className="w-3.5 h-3.5 animate-spin" /> En validation (Annuler)
+                </button>
+              )}
+              {course.status === "PUBLISHED" && (
+                <div className="px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Cours Publié
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/courses/${course.id}/preview`}
+                  target="_blank"
+                  className="flex-1 px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-white/10 cursor-pointer"
+                >
+                  <Eye className="w-3.5 h-3.5" /> Aperçu
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setShowAiStructureModal(true)}
+                  className="flex-1 px-3 py-2 bg-white/10 hover:bg-white/20 text-teal-300 border border-teal-500/30 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-teal-400" /> IA
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1387,7 +1420,67 @@ export default function CourseDetailPage() {
 
         {/* ── TAB 1: Programme ── */}
         {activeTab === "programme" && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="space-y-4">
+            {/* Bannière de validation directe */}
+            {course.status === "DRAFT" && (
+              <div className="bg-gradient-to-r from-teal-500/10 via-emerald-500/10 to-teal-500/5 border border-teal-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center text-teal-600 dark:text-teal-400 shrink-0">
+                    <Send className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                      Votre programme est prêt pour la validation ?
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                        Brouillon
+                      </span>
+                    </h4>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      Vous n'avez pas besoin d'aller dans le dernier onglet : soumettez directement votre cours pour vérification par l'équipe dès que vos chapitres et leçons sont configurés.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRequestReview}
+                  disabled={saving}
+                  className="px-5 py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white rounded-xl text-xs font-extrabold shadow-md shadow-teal-600/20 transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4" /> Soumettre pour validation
+                </button>
+              </div>
+            )}
+
+            {course.status === "REVIEW" && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                    <Clock className="w-5 h-5 animate-spin" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                      Formation soumise à l'équipe administrative
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                        En révision
+                      </span>
+                    </h4>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      L'équipe pédagogique examine actuellement vos modules. Vous pouvez continuer d'enrichir vos leçons.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCancelReview}
+                  disabled={saving}
+                  className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
+                >
+                  Annuler la demande
+                </button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Left: Sections / Lessons tree */}
             <div className="lg:col-span-5 space-y-4">
               <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 shadow-sm space-y-4">
@@ -1924,7 +2017,8 @@ export default function CourseDetailPage() {
               )}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
         {/* AI Structure Generator Modal */}
         {showAiStructureModal && (

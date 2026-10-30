@@ -45,6 +45,9 @@ export default function AdminCoursesPage() {
   const [editingTitle, setEditingTitle] = useState("");
   const [inspectingCourseId, setInspectingCourseId] = useState<string | null>(null);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 25;
+
   const handleEditCourseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCourse || !editingTitle.trim()) return;
@@ -92,10 +95,11 @@ export default function AdminCoursesPage() {
   const fetchCourses = async () => {
     setLoading(true);
     try {
-      // 1. Get courses
+      // 1. Get courses triés du plus récent au plus ancien
       const { data: sbCourses, error: courseErr } = await supabase
         .from('courses')
-        .select('*');
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (courseErr) throw courseErr;
 
@@ -140,6 +144,9 @@ export default function AdminCoursesPage() {
           type: c.type || 'academic',
         };
       });
+
+      // Tri explicite par date de création du plus récent au plus ancien
+      items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       setCourses(items);
     } catch (err: any) {
@@ -203,12 +210,19 @@ export default function AdminCoursesPage() {
     return matchSearch && matchTab;
   });
 
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1;
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const paginatedCourses = filtered.slice(
+    (safeCurrentPage - 1) * ITEMS_PER_PAGE,
+    safeCurrentPage * ITEMS_PER_PAGE
+  );
+
   return (
     <div className="w-full max-w-6xl mx-auto min-w-0 space-y-8 animate-in fade-in">
       <div>
         <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Validation des Formations</h1>
         <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">
-          Passez en revue les cours soumis par les formateurs pour validation ou modification.
+          Passez en revue les cours soumis par les formateurs pour validation ou modification (triés du plus récent au plus ancien, groupés par 25).
         </p>
       </div>
 
@@ -218,7 +232,10 @@ export default function AdminCoursesPage() {
           {(["REVIEW", "PUBLISHED", "DRAFT", "ALL"] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                setActiveTab(tab);
+                setCurrentPage(1);
+              }}
               className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                 activeTab === tab
                   ? "bg-red-50 dark:bg-red-950/20 text-red-600 border-red-200 dark:border-red-900/30"
@@ -236,7 +253,10 @@ export default function AdminCoursesPage() {
             type="text"
             placeholder="Rechercher un cours..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setCurrentPage(1);
+            }}
             className="w-full pl-10 pr-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-red-500/20"
           />
         </div>
@@ -253,129 +273,181 @@ export default function AdminCoursesPage() {
           Aucun cours en attente de révision.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((course) => (
-            <div 
-              key={course.id} 
-              className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow"
-            >
-              <div className="p-6 space-y-4">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="px-2 py-0.5 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 rounded-lg text-[10px] font-bold uppercase">
-                      {course.categoryName}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold border uppercase ${
-                      course.type === 'self_paced'
-                        ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20'
-                        : 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20'
-                    }`}>
-                      {course.type === 'self_paced' ? '⚡ Autonomie' : '🎓 Encadré'}
-                    </span>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {paginatedCourses.map((course) => (
+              <div 
+                key={course.id} 
+                className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow"
+              >
+                <div className="p-6 space-y-4">
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-2 py-0.5 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 rounded-lg text-[10px] font-bold uppercase">
+                        {course.categoryName}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold border uppercase ${
+                        course.type === 'self_paced'
+                          ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20'
+                          : 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20'
+                      }`}>
+                        {course.type === 'self_paced' ? '⚡ Autonomie' : '🎓 Encadré'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {/* Action buttons */}
+                      <button
+                        onClick={() => {
+                          setEditingCourse(course);
+                          setEditingTitle(course.title);
+                        }}
+                        className="p-1 text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+                        title="Modifier le titre"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCourse(course.id)}
+                        className="p-1 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
+                        title="Supprimer la formation"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                      <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border flex items-center gap-1 uppercase ${
+                        course.status === 'PUBLISHED'
+                          ? 'text-green-700 bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900/30'
+                          : course.status === 'REVIEW'
+                          ? 'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/30'
+                          : 'text-zinc-500 bg-zinc-50 border-zinc-200 dark:bg-zinc-800/40 dark:border-zinc-700'
+                      }`}>
+                        {course.status === 'PUBLISHED' ? 'Publié' : course.status === 'REVIEW' ? 'En révision' : 'Brouillon'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {/* Action buttons */}
-                    <button
-                      onClick={() => {
-                        setEditingCourse(course);
-                        setEditingTitle(course.title);
-                      }}
-                      className="p-1 text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
-                      title="Modifier le titre"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCourse(course.id)}
-                      className="p-1 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
-                      title="Supprimer la formation"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border flex items-center gap-1 uppercase ${
-                      course.status === 'PUBLISHED'
-                        ? 'text-green-700 bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900/30'
-                        : course.status === 'REVIEW'
-                        ? 'text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/30'
-                        : 'text-zinc-500 bg-zinc-50 border-zinc-200 dark:bg-zinc-800/40 dark:border-zinc-700'
-                    }`}>
-                      {course.status === 'PUBLISHED' ? 'Publié' : course.status === 'REVIEW' ? 'En révision' : 'Brouillon'}
-                    </span>
+
+                  {/* Details */}
+                  <div className="space-y-2">
+                    <h3 className="font-bold text-zinc-900 dark:text-white line-clamp-1">{course.title}</h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 h-8">{stripHtml(course.description)}</p>
+                  </div>
+
+                  <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-2 gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+                    <div className="flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-zinc-400" />
+                      <span className="truncate">{course.instructorName}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 justify-end font-bold text-zinc-900 dark:text-white">
+                      <DollarSign className="w-3.5 h-3.5 text-zinc-400" />
+                      <span>{course.price}$</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-zinc-400" />
+                      <span>{course.level}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <span>ID: {course.id.slice(0, 8)}...</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Details */}
-                <div className="space-y-2">
-                  <h3 className="font-bold text-zinc-900 dark:text-white line-clamp-1">{course.title}</h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 h-8">{stripHtml(course.description)}</p>
-                </div>
+                {/* Actions */}
+                <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-100 dark:border-zinc-800 flex flex-col gap-2">
+                  <button
+                    onClick={() => setInspectingCourseId(course.id)}
+                    className="w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" /> Inspecter & Éditer le Contenu
+                  </button>
 
-                <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-2 gap-3 text-xs text-zinc-500 dark:text-zinc-400">
-                  <div className="flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-zinc-400" />
-                    <span className="truncate">{course.instructorName}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 justify-end font-bold text-zinc-900 dark:text-white">
-                    <DollarSign className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>{course.price}$</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>{course.level}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 justify-end">
-                    <span>ID: {course.id.slice(0, 8)}...</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-100 dark:border-zinc-800 flex flex-col gap-2">
-                <button
-                  onClick={() => setInspectingCourseId(course.id)}
-                  className="w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-                >
-                  <BookOpen className="w-3.5 h-3.5" /> Inspecter & Éditer le Contenu
-                </button>
-
-                <div className="flex gap-2">
-                  {course.status === 'REVIEW' && (
-                    <>
+                  <div className="flex gap-2">
+                    {course.status === 'REVIEW' && (
+                      <>
+                        <button
+                          onClick={() => handleUpdateStatus(course.id, 'PUBLISHED')}
+                          className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Check className="w-3 h-3" /> Approuver
+                        </button>
+                        <button
+                          onClick={() => setInspectingCourseId(course.id)}
+                          className="flex-1 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <X className="w-3 h-3" /> Rejeter avec motif
+                        </button>
+                      </>
+                    )}
+                    {course.status === 'PUBLISHED' && (
+                      <button
+                        onClick={() => handleUpdateStatus(course.id, 'ARCHIVED')}
+                        className="w-full py-1.5 bg-red-50 dark:bg-red-950/20 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1 transition-all border border-red-200 dark:border-red-900/30 cursor-pointer"
+                      >
+                        <Archive className="w-3 h-3" /> Archiver
+                      </button>
+                    )}
+                    {course.status === 'DRAFT' && (
                       <button
                         onClick={() => handleUpdateStatus(course.id, 'PUBLISHED')}
-                        className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                        className="w-full py-1.5 bg-zinc-800 hover:bg-zinc-900 text-white rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
                       >
-                        <Check className="w-3 h-3" /> Approuver
+                        <Check className="w-3 h-3" /> Publier directement
                       </button>
-                      <button
-                        onClick={() => setInspectingCourseId(course.id)}
-                        className="flex-1 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                      >
-                        <X className="w-3 h-3" /> Rejeter avec motif
-                      </button>
-                    </>
-                  )}
-                  {course.status === 'PUBLISHED' && (
-                    <button
-                      onClick={() => handleUpdateStatus(course.id, 'ARCHIVED')}
-                      className="w-full py-1.5 bg-red-50 dark:bg-red-950/20 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1 transition-all border border-red-200 dark:border-red-900/30 cursor-pointer"
-                    >
-                      <Archive className="w-3 h-3" /> Archiver
-                    </button>
-                  )}
-                  {course.status === 'DRAFT' && (
-                    <button
-                      onClick={() => handleUpdateStatus(course.id, 'PUBLISHED')}
-                      className="w-full py-1.5 bg-zinc-800 hover:bg-zinc-900 text-white rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                    >
-                      <Check className="w-3 h-3" /> Publier directement
-                    </button>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
+            ))}
+          </div>
+
+          {/* Contrôles de pagination (Groupe de 25 formations) */}
+          {totalPages > 1 && (
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Affichage de <span className="font-bold text-zinc-900 dark:text-white">{(safeCurrentPage - 1) * ITEMS_PER_PAGE + 1}</span> à <span className="font-bold text-zinc-900 dark:text-white">{Math.min(safeCurrentPage * ITEMS_PER_PAGE, filtered.length)}</span> sur <span className="font-bold text-zinc-900 dark:text-white">{filtered.length}</span> formations (Page {safeCurrentPage} / {totalPages})
+              </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={safeCurrentPage === 1}
+                  className="px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                >
+                  ← Précédent
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(page => page === 1 || page === totalPages || Math.abs(page - safeCurrentPage) <= 2)
+                    .map((page, idx, arr) => {
+                      const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
+                      return (
+                        <div key={page} className="flex items-center gap-1">
+                          {showEllipsis && <span className="text-zinc-400 px-1 text-xs">...</span>}
+                          <button
+                            onClick={() => setCurrentPage(page)}
+                            className={`w-8 h-8 rounded-xl text-xs font-bold transition-all ${
+                              safeCurrentPage === page
+                                ? "bg-red-600 text-white shadow-sm"
+                                : "bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={safeCurrentPage === totalPages}
+                  className="px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                >
+                  Suivant →
+                </button>
+              </div>
             </div>
-          ))}
+          )}
         </div>
       )}
 

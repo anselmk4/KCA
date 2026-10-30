@@ -16,6 +16,7 @@ import {
   ShoppingBag,
   TrendingUp,
   User,
+  Users,
   Layers,
   Sparkles,
   AlertTriangle,
@@ -24,6 +25,7 @@ import {
 } from "lucide-react";
 import { DigitalProductEditModal } from "@/components/digital-products/DigitalProductEditModal";
 import { DigitalProductShareModal } from "@/components/digital-products/DigitalProductShareModal";
+import { DigitalProductBuyersModal } from "@/components/digital-products/DigitalProductBuyersModal";
 
 interface AuthorInfo {
   full_name: string;
@@ -67,6 +69,7 @@ export default function AdminDigitalProductsPage() {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<AdminDigitalProduct | null>(null);
   const [sharingProduct, setSharingProduct] = useState<AdminDigitalProduct | null>(null);
+  const [viewingBuyersProduct, setViewingBuyersProduct] = useState<AdminDigitalProduct | null>(null);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -387,15 +390,19 @@ export default function AdminDigitalProductsPage() {
                     >
                       {/* Product details */}
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-3.5">
-                          <div className="relative w-12 h-16 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800 shrink-0 border border-zinc-200 dark:border-zinc-700 shadow-xs">
+                        <div
+                          onClick={() => setViewingBuyersProduct(p)}
+                          className="flex items-center gap-3.5 group cursor-pointer"
+                          title="Cliquer pour afficher la liste des acheteurs et détails de paiement"
+                        >
+                          <div className="relative w-12 h-16 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-800 shrink-0 border border-zinc-200 dark:border-zinc-700 shadow-xs group-hover:ring-2 group-hover:ring-purple-500/50 transition">
                             {p.cover_image_url ? (
                               <Image
                                 src={p.cover_image_url}
                                 alt={p.title}
                                 fill
                                 sizes="48px"
-                                className="object-cover"
+                                className="object-cover group-hover:scale-105 transition duration-300"
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-zinc-400">
@@ -404,7 +411,7 @@ export default function AdminDigitalProductsPage() {
                             )}
                           </div>
                           <div className="min-w-0 max-w-xs">
-                            <p className="font-bold text-zinc-900 dark:text-white text-sm truncate">
+                            <p className="font-bold text-zinc-900 dark:text-white text-sm truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition">
                               {p.title}
                             </p>
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -457,12 +464,23 @@ export default function AdminDigitalProductsPage() {
 
                       {/* Sales & Revenue */}
                       <td className="px-6 py-4 text-center">
-                        <p className="text-xs font-bold text-zinc-900 dark:text-white">
-                          {p.sales_count} vente{p.sales_count > 1 ? "s" : ""}
-                        </p>
-                        <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                          {p.total_revenue.toLocaleString("fr-FR")} $ générés
-                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setViewingBuyersProduct(p)}
+                          className="group inline-flex flex-col items-center justify-center p-2 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-950/30 border border-transparent hover:border-purple-200 dark:hover:border-purple-800 transition cursor-pointer"
+                          title="Cliquer pour afficher la liste des acheteurs et détails de paiement"
+                        >
+                          <span className="text-xs font-bold text-zinc-900 dark:text-white flex items-center gap-1.5 group-hover:text-purple-600 dark:group-hover:text-purple-400">
+                            <Users className="w-3.5 h-3.5 text-purple-500" />
+                            {p.sales_count} vente{p.sales_count > 1 ? "s" : ""}
+                          </span>
+                          <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold group-hover:underline">
+                            {p.total_revenue.toLocaleString("fr-FR")} $ générés
+                          </span>
+                          <span className="text-[10px] text-purple-600 dark:text-purple-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
+                            Voir les acheteurs →
+                          </span>
+                        </button>
                       </td>
 
                       {/* Status */}
@@ -491,6 +509,15 @@ export default function AdminDigitalProductsPage() {
                       {/* Actions */}
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {/* Buyers inspection button */}
+                          <button
+                            onClick={() => setViewingBuyersProduct(p)}
+                            className="p-1.5 rounded-lg text-zinc-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20 transition-colors"
+                            title="Voir la liste des acheteurs et détails de paiement"
+                          >
+                            <Users className="w-4 h-4" />
+                          </button>
+
                           {/* Share button */}
                           <button
                             onClick={() => setSharingProduct(p)}
@@ -570,6 +597,16 @@ export default function AdminDigitalProductsPage() {
         product={sharingProduct}
         isOpen={!!sharingProduct}
         onClose={() => setSharingProduct(null)}
+      />
+
+      {/* Digital Product Buyers Modal */}
+      <DigitalProductBuyersModal
+        productId={viewingBuyersProduct?.id || null}
+        productTitle={viewingBuyersProduct?.title}
+        productPrice={viewingBuyersProduct?.price}
+        productCoverUrl={viewingBuyersProduct?.cover_image_url}
+        isOpen={!!viewingBuyersProduct}
+        onClose={() => setViewingBuyersProduct(null)}
       />
     </div>
   );
