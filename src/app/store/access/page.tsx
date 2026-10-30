@@ -4,16 +4,28 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { Mail, ArrowLeft, Send, CheckCircle2, AlertCircle, BookOpen, ShieldCheck, Sparkles } from "lucide-react";
+import { Mail, ArrowLeft, Send, CheckCircle2, AlertCircle, BookOpen, ShieldCheck, Download, Receipt } from "lucide-react";
+
+interface DownloadLinkItem {
+  title: string;
+  downloadUrl: string;
+  orderNumber: string;
+  price: number;
+}
 
 export default function StoreAccessPage() {
-  const [email, setEmail] = useState("");
+  const [query, setQuery] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ success?: boolean; message?: string } | null>(null);
+  const [result, setResult] = useState<{
+    success?: boolean;
+    message?: string;
+    downloadLinks?: DownloadLinkItem[];
+  } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !email.includes("@")) return;
+    const cleanQuery = query.trim();
+    if (!cleanQuery) return;
 
     setSubmitting(true);
     setResult(null);
@@ -22,19 +34,23 @@ export default function StoreAccessPage() {
       const res = await fetch("/api/digital-products/resend-access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ query: cleanQuery, email: cleanQuery }),
       });
 
       const data = await res.json();
       if (!res.ok || !data.success) {
         setResult({
           success: false,
-          message: data.message || data.error || "Aucun achat trouvé pour cette adresse e-mail.",
+          message:
+            data.message ||
+            data.error ||
+            "Aucun achat trouvé. Veuillez vérifier l'adresse e-mail ou le N° de facture.",
         });
       } else {
         setResult({
           success: true,
           message: data.message,
+          downloadLinks: data.downloadLinks || [],
         });
       }
     } catch (err: any) {
@@ -70,11 +86,15 @@ export default function StoreAccessPage() {
             Retrouver mes téléchargements
           </h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-8 leading-relaxed">
-            Vous avez déjà acheté un livre ou un guide numérique sur Ansella ? Saisissez l&apos;adresse e-mail
-            utilisée lors de votre paiement. Nous vous réexpédierons immédiatement un lien de téléchargement
-            chiffré, sans avoir besoin de mot de passe.
+            Vous avez déjà acheté un livre ou un guide numérique sur Ansella ? Saisissez simplement
+            l&apos;adresse e-mail utilisée lors de votre commande ou votre <strong>N° de facture</strong> (ex :{" "}
+            <span className="font-mono text-xs bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-teal-600 dark:text-teal-400">
+              DP-99R30399
+            </span>
+            ).
           </p>
 
+          {/* MESSAGE DE SUCCÈS OU D'ERREUR */}
           {result && (
             <div
               className={`p-4 rounded-2xl mb-6 text-xs sm:text-sm flex items-start gap-3 ${
@@ -92,23 +112,61 @@ export default function StoreAccessPage() {
             </div>
           )}
 
+          {/* LIENS DE TÉLÉCHARGEMENT DIRECTS SUR ÉCRAN */}
+          {result?.success && result.downloadLinks && result.downloadLinks.length > 0 && (
+            <div className="space-y-4 mb-8 p-5 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/40 dark:to-teal-950/30 border-2 border-emerald-400 dark:border-emerald-700 rounded-3xl animate-in zoom-in-95">
+              <div className="text-center pb-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                  🎉 Téléchargement débloqué immédiatement
+                </span>
+              </div>
+
+              {result.downloadLinks.map((item, index) => (
+                <div
+                  key={index}
+                  className="bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-5 shadow-md space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-extrabold text-sm sm:text-base text-zinc-900 dark:text-white leading-snug">
+                        {item.title}
+                      </h3>
+                      <p className="text-xs text-zinc-500 mt-1">
+                        Réf. {item.orderNumber}
+                      </p>
+                    </div>
+                  </div>
+
+                  <a
+                    href={item.downloadUrl}
+                    download
+                    className="w-full inline-flex items-center justify-center gap-2 py-4 px-6 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white font-extrabold rounded-2xl shadow-xl shadow-teal-500/25 text-sm transition-all hover:scale-[1.01] active:scale-[0.99]"
+                  >
+                    <Download className="w-5 h-5" /> Télécharger mon Produit Numérique (PDF)
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* FORMULAIRE DE RECHERCHE */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label
-                htmlFor="access-email"
+                htmlFor="access-query"
                 className="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 mb-2"
               >
-                Votre adresse e-mail d&apos;achat
+                Adresse e-mail d&apos;achat ou N° de Facture
               </label>
               <div className="relative">
                 <Mail className="w-5 h-5 text-zinc-400 absolute left-4 top-1/2 -translate-y-1/2" />
                 <input
-                  id="access-email"
-                  type="email"
+                  id="access-query"
+                  type="text"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nom@exemple.com"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="nom@exemple.com ou DP-99R30399"
                   className="w-full pl-12 pr-4 py-3.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-2xl text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 transition-all"
                 />
               </div>
@@ -122,11 +180,11 @@ export default function StoreAccessPage() {
               {submitting ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Vérification en cours...
+                  Authentification de l&apos;achat...
                 </>
               ) : (
                 <>
-                  <Send className="w-4 h-4" /> M&apos;envoyer mes liens de téléchargement
+                  <Send className="w-4 h-4" /> Récupérer mon livre numérique
                 </>
               )}
             </button>
@@ -135,11 +193,11 @@ export default function StoreAccessPage() {
           <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-400 space-y-2">
             <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 font-semibold">
               <ShieldCheck className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-              Protection cryptographique de vos données
+              Accès immédiat sécurisé
             </div>
             <p className="leading-relaxed text-[11px]">
-              Chaque lien généré est signé numériquement et intègre un filigrane individuel pour votre licence personnelle.
-              Vous pouvez ouvrir et enregistrer vos documents sur smartphone, tablette ou ordinateur sans contrainte.
+              Votre téléchargement s&apos;ouvre directement dès validation. Le fichier est cryptographiquement
+              signé et intègre un filigrane anti-contrefaçon personnalisé certifiant votre licence légale.
             </p>
           </div>
         </div>

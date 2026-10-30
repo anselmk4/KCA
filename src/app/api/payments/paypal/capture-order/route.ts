@@ -421,15 +421,35 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Produit digital introuvable pour validation finale." }, { status: 404 });
       }
 
-      const buyerId = user?.id || (metadataUserId.startsWith("email_") ? decodeURIComponent(metadataUserId.replace("email_", "")) : metadataUserId);
       const buyerEmail = user?.email || (metadataUserId.startsWith("email_") ? decodeURIComponent(metadataUserId.replace("email_", "")) : "");
+      
+      // Assurer un UUID valide pour PostgreSQL
+      let buyerUserId = user?.id;
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(metadataUserId || "");
+      if (!buyerUserId && isUuid) {
+        buyerUserId = metadataUserId;
+      }
+      if (!buyerUserId && buyerEmail) {
+        const { data: userProfile } = await dbClient
+          .from("profiles")
+          .select("id")
+          .eq("email", buyerEmail)
+          .maybeSingle();
+        if (userProfile?.id) {
+          buyerUserId = userProfile.id;
+        }
+      }
+      if (!buyerUserId) {
+        buyerUserId = crypto.randomUUID();
+      }
 
       // Enregistrer l'achat dans digital_product_purchases
-      let purchaseRecordId = captureId;
+      let purchaseRecordId = crypto.randomUUID();
       try {
         const { data: purRow } = await dbClient.from("digital_product_purchases").upsert({
+          id: purchaseRecordId,
           product_id: itemId,
-          user_id: buyerId,
+          user_id: buyerUserId,
           price_paid: amountCaptured || product.price,
           payment_method: "paypal",
           payment_status: "COMPLETED",
@@ -444,10 +464,27 @@ export async function POST(req: NextRequest) {
         console.warn("[paypal-capture-order] digital_product_purchases upsert warning:", purErr?.message);
       }
 
+      // Enregistrer dans la table payments
+      try {
+        await (dbClient as any).from("payments").insert({
+          id: captureId,
+          user_id: buyerUserId,
+          amount: amountCaptured || product.price,
+          currency: "USD",
+          status: "PAID",
+          provider: "PAYPAL",
+          method: `PAYPAL::DIGITAL_PRODUCT::${itemId}::${encodeURIComponent(buyerEmail)}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      } catch (payErr: any) {
+        console.warn("[paypal-capture-order] payments insert warning:", payErr?.message);
+      }
+
       // Enregistrer dans la table transactions générale
       try {
         await (dbClient as any).from("transactions").insert({
-          user_id: buyerId,
+          user_id: buyerUserId,
           amount: amountCaptured || product.price,
           course_id: itemId,
           method: "PayPal",
