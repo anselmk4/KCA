@@ -99,7 +99,8 @@ export function Footer() {
               <li><Link href="/blog" className="hover:text-teal-600 transition-colors font-semibold">📚 {language === "en" ? "All Guides & Articles" : "Tous les articles"}</Link></li>
               <li><Link href="/courses" className="hover:text-teal-600 transition-colors">{language === "en" ? "Explore Courses" : "Catalogue de formations"}</Link></li>
               <li><Link href="/instructors" className="hover:text-teal-600 transition-colors">{language === "en" ? "Our Instructors" : "Nos Formateurs"}</Link></li>
-              <li><Link href="/templates" className="hover:text-teal-600 transition-colors">{language === "en" ? "Academy Models" : "Modèles d'académie"}</Link></li>
+              <li><Link href="/store" className="hover:text-teal-600 transition-colors font-semibold text-teal-600 dark:text-teal-400">🛍️ {language === "en" ? "Digital Store & E-books" : "Boutique E-books & Guides"}</Link></li>
+              <li><Link href="/store/access" className="hover:text-teal-600 transition-colors text-emerald-600 dark:text-emerald-400 font-medium">📥 {language === "en" ? "Retrieve My Downloads" : "Retrouver mes téléchargements"}</Link></li>
               <li><Link href="/pricing" className="hover:text-teal-600 transition-colors">{language === "en" ? "Pricing & Plans" : "Tarifs & Formules"}</Link></li>
             </ul>
           </div>
