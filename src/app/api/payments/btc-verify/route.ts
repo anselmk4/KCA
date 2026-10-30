@@ -143,7 +143,7 @@ export async function POST(req: NextRequest) {
     let expectedUsdAmount = 0;
     let itemTitle = "Formation";
     let targetCourseId: string | null = null;
-    let targetPlanName: string | null = null;
+    let targetPlanName: "FREE" | "BASE" | "PRO" | "MAX" | null = null;
 
     if (courseId) {
       const pricingResult = await resolveCoursePricing({
@@ -173,7 +173,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Plan d'abonnement invalide." }, { status: 400 });
       }
       expectedUsdAmount = PLAN_PRICES[normalizedPlan];
-      targetPlanName = normalizedPlan;
+      targetPlanName = normalizedPlan as "BASE" | "PRO" | "MAX";
       itemTitle = `Abonnement Formateur Plan ${normalizedPlan}`;
     }
 

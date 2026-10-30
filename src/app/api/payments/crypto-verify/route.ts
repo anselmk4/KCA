@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
     // 2. Resolve authoritative expected price from database
     let expectedUsdAmount = 0;
     let resolvedCourse: { id: string; title: string; price: number } | null = null;
-    let selectedPlan = "";
+    let selectedPlan: "FREE" | "BASE" | "PRO" | "MAX" | null = null;
 
     if (type === "STUDENT_COURSE" || type === "COURSE") {
       if (!itemId) {
@@ -202,16 +202,17 @@ export async function POST(req: NextRequest) {
         price: pricingResult.data.originalPrice,
       };
     } else if (type === "INSTRUCTOR_PLAN" || type === "PLAN" || plan) {
-      selectedPlan = String(plan || itemId || "BASE").toUpperCase();
+      const rawPlan = String(plan || itemId || "BASE").toUpperCase();
       const PLAN_PRICES: Record<string, number> = {
         BASE: 19,
         PRO: 49,
         MAX: 200,
       };
-      if (!PLAN_PRICES[selectedPlan]) {
+      if (!PLAN_PRICES[rawPlan]) {
         return NextResponse.json({ error: "Plan formateur invalide." }, { status: 400 });
       }
-      expectedUsdAmount = PLAN_PRICES[selectedPlan];
+      selectedPlan = rawPlan as "BASE" | "PRO" | "MAX";
+      expectedUsdAmount = PLAN_PRICES[rawPlan];
     } else {
       return NextResponse.json({ error: "Type de paiement non valide." }, { status: 400 });
     }
