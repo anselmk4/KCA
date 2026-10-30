@@ -192,21 +192,46 @@ export async function POST(req: NextRequest) {
     }> = [];
     const sentProductIds = new Set<string>();
 
+    const isKmushombeTarget =
+      cleanInput.includes("kmushombe") ||
+      invoiceRef.includes("99R30399") ||
+      rawInput.toUpperCase().includes("99R30399");
+
+    const REAL_EBOOK_ID = "3b31895d-72da-4d19-a6fd-665a9ce14079";
+
     // 1. Traitement des verifiedPurchases
     for (const pur of verifiedPurchases) {
-      const product = productsList.find((p: any) => p.id === pur.product_id);
-      if (!product || sentProductIds.has(pur.product_id)) continue;
+      let targetProductId = pur.product_id;
+      const isKmushombePurchase =
+        isKmushombeTarget ||
+        String(pur.user_id || "").includes("kmushombe") ||
+        String(pur.transaction_id || "").toUpperCase().includes("99R30399");
 
-      sentProductIds.add(pur.product_id);
+      // Auto-correction : si l'achat pointe par erreur vers le produit Excel (0d0ad7b2) au lieu du vrai e-book PDF (3b31895d)
+      if ((targetProductId === "0d0ad7b2-7e13-4f98-ab46-36346d47ac62" || !targetProductId) && isKmushombePurchase) {
+        targetProductId = REAL_EBOOK_ID;
+        pur.product_id = targetProductId;
+        try {
+          await (admin as any)
+            .from("digital_product_purchases")
+            .update({ product_id: REAL_EBOOK_ID })
+            .eq("id", pur.id);
+        } catch {}
+      }
+
+      const product = productsList.find((p: any) => p.id === targetProductId);
+      if (!product || sentProductIds.has(targetProductId)) continue;
+
+      sentProductIds.add(targetProductId);
       const recipientEmail = isEmail ? cleanInput : "kmushombe@gmail.com";
 
       const token = generateDigitalProductToken(
-        pur.product_id,
+        targetProductId,
         pur.id,
         recipientEmail,
         168 // 7 jours
       );
-      const dlUrl = `${baseUrl.replace(/\/+$/, "")}/api/digital-products/${pur.product_id}/download?token=${token}`;
+      const dlUrl = `${baseUrl.replace(/\/+$/, "")}/api/digital-products/${targetProductId}/download?token=${token}`;
 
       downloadLinks.push({
         title: product.title || "Livre Numérique",
@@ -234,7 +259,11 @@ export async function POST(req: NextRequest) {
     for (const pay of matchingPayments) {
       const parts = (pay.method || "").split("::");
       if (parts[1] === "DIGITAL_PRODUCT" && parts[2]) {
-        const productId = parts[2];
+        let productId = parts[2];
+        if (productId === "0d0ad7b2-7e13-4f98-ab46-36346d47ac62" && isKmushombeTarget) {
+          productId = REAL_EBOOK_ID;
+        }
+
         if (sentProductIds.has(productId)) continue;
 
         const product = productsList.find((p: any) => p.id === productId);
@@ -292,31 +321,28 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Cas de résolution immédiate pour kmushombe (PayPal DP-99R30399 / De l'idée au marché)
-    const isKmushombeTarget =
-      cleanInput.includes("kmushombe") ||
-      invoiceRef.includes("99R30399") ||
-      rawInput.toUpperCase().includes("99R30399");
-
     if (downloadLinks.length === 0 && isKmushombeTarget) {
       console.log("[resend-access] Direct resolution for kmushombe / entreprendre en RDC");
 
-      // Rechercher le livre numérique "De l'idée au marché..."
+      // Rechercher spécifiquement le vrai livre numérique "De l'idée au marché..." (PDF)
       const matchedProd =
+        productsList.find((p: any) => p.id === REAL_EBOOK_ID) ||
         productsList.find((p: any) => {
           const t = normalizeText(p.title);
+          const fn = (p.file_name || "").toLowerCase();
           return (
-            t.includes("entreprendre") ||
-            t.includes("marche") ||
-            t.includes("idee") ||
-            Number(p.price) === 9.99
+            (t.includes("entreprendre") || t.includes("marche") || t.includes("idee")) &&
+            !fn.endsWith(".xlsx")
           );
-        }) || productsList[0];
+        }) ||
+        productsList.find((p: any) => (p.file_name || "").toLowerCase().endsWith(".pdf")) ||
+        productsList[0];
 
       if (matchedProd) {
         const purchaseRecordId = crypto.randomUUID();
         const fallbackUserId = [...candidateUserIds][0] || crypto.randomUUID();
 
-        // Réparer l'achat dans digital_product_purchases
+        // Réparer l'achat dans digital_product_purchases avec le bon product_id
         try {
           await (admin as any).from("digital_product_purchases").upsert(
             {
@@ -331,6 +357,14 @@ export async function POST(req: NextRequest) {
             },
             { onConflict: "product_id,user_id" }
           );
+        } catch {}
+
+        // Nettoyer / corriger toute ancienne entrée corrompue pointant vers le produit Excel 0d0ad7b2
+        try {
+          await (admin as any)
+            .from("digital_product_purchases")
+            .update({ product_id: matchedProd.id })
+            .eq("transaction_id", "99R30399");
         } catch {}
 
         const token = generateDigitalProductToken(
@@ -363,6 +397,28 @@ export async function POST(req: NextRequest) {
               10.29
             );
           } catch {}
+        }
+      }
+    }
+
+    // Sécurité supplémentaire : si kmushombe est l'acheteur, s'assurer qu'aucun lien Excel n'est jamais renvoyé
+    if (isKmushombeTarget) {
+      const ebookProd =
+        productsList.find((p: any) => p.id === REAL_EBOOK_ID) ||
+        productsList.find((p: any) => (p.file_name || "").toLowerCase().endsWith(".pdf"));
+
+      if (ebookProd) {
+        for (const link of downloadLinks) {
+          if (link.downloadUrl.includes("0d0ad7b2-7e13-4f98-ab46-36346d47ac62")) {
+            link.title = ebookProd.title;
+            const newToken = generateDigitalProductToken(
+              ebookProd.id,
+              crypto.randomUUID(),
+              isEmail ? cleanInput : "kmushombe@gmail.com",
+              168
+            );
+            link.downloadUrl = `${baseUrl.replace(/\/+$/, "")}/api/digital-products/${ebookProd.id}/download?token=${newToken}`;
+          }
         }
       }
     }

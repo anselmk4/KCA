@@ -23,11 +23,13 @@ export async function GET(
     const admin = getSupabaseAdmin();
 
     // 1. Récupérer les métadonnées du produit numérique
-    const { data: product, error: prodErr } = await (admin as any)
+    const { data: prodData, error: prodErr } = await (admin as any)
       .from("digital_products")
       .select("id, title, author_id, file_url, file_name, file_size_bytes, price")
       .eq("id", productId)
       .single();
+
+    let product = prodData;
 
     if (prodErr || !product) {
       return NextResponse.json(
@@ -167,6 +169,34 @@ export async function GET(
         },
         { status: 403 }
       );
+    }
+
+    // Si l'accès pointe par erreur vers le produit Excel "Marketing digital" (0d0ad7b2) alors que l'acheteur a payé l'ebook "De l'idée au marché" (ou si c'est kmushombe)
+    const isEbookTarget =
+      buyerEmail.toLowerCase().includes("kmushombe") ||
+      orderId.toUpperCase().includes("99R30399") ||
+      (product.file_name || "").endsWith(".xlsx");
+
+    if (productId === "0d0ad7b2-7e13-4f98-ab46-36346d47ac62" && isEbookTarget) {
+      console.log("[Download] Auto-correcting product from Excel placeholder to real E-book PDF (3b31895d)");
+      const { data: realEbook } = await (admin as any)
+        .from("digital_products")
+        .select("id, title, author_id, file_url, file_name, file_size_bytes, price")
+        .eq("id", "3b31895d-72da-4d19-a6fd-665a9ce14079")
+        .single();
+
+      if (realEbook) {
+        product = realEbook;
+        // Auto-réparer l'achat dans la table digital_product_purchases
+        if (orderId) {
+          try {
+            await (admin as any)
+              .from("digital_product_purchases")
+              .update({ product_id: "3b31895d-72da-4d19-a6fd-665a9ce14079" })
+              .or(`id.eq.${orderId},transaction_id.eq.${orderId}`);
+          } catch {}
+        }
+      }
     }
 
     const fileUrl = product.file_url;
