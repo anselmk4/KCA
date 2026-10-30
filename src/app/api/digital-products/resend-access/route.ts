@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     const admin = getSupabaseAdmin();
     const isInvoiceRef =
       rawInput.toUpperCase().startsWith("DP-") ||
-      /^[0-9A-Z]{7,15}$/i.test(rawInput) && !rawInput.includes("@");
+      Boolean(/^[0-9A-Z]{7,15}$/i.test(rawInput) && !rawInput.includes("@"));
 
     let cleanEmail = rawInput.toLowerCase();
     let invoiceRef = "";

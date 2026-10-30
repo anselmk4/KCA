@@ -497,7 +497,7 @@ export async function POST(req: NextRequest) {
 
       // Génération du jeton cryptographique sécurisé (durée 7 jours / 168 heures)
       const { generateDigitalProductToken } = await import("@/lib/digital-product-token");
-      const buyerIdentifier = buyerEmail || buyerId;
+      const buyerIdentifier = buyerEmail || buyerUserId;
       const downloadToken = generateDigitalProductToken(
         itemId,
         purchaseRecordId,
