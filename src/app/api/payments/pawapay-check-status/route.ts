@@ -332,13 +332,28 @@ export async function GET(req: NextRequest) {
           // non bloquant
         }
 
-        // Générer le jeton cryptographique sécurisé (durée 48 heures)
+        // Résoudre l'email de l'acheteur
+        let buyerEmail = '';
+        const metaEmail = methodParts[3] ? decodeURIComponent(methodParts[3]) : '';
+        if (metaEmail && metaEmail.includes('@')) {
+          buyerEmail = metaEmail;
+        } else {
+          const { data: userProfile } = await supabaseAdmin
+            .from('profiles')
+            .select('email, full_name')
+            .eq('id', payment.user_id)
+            .maybeSingle();
+          buyerEmail = userProfile?.email || '';
+        }
+
+        // Générer le jeton cryptographique sécurisé (durée 7 jours / 168 heures)
         const { generateDigitalProductToken } = await import('@/lib/digital-product-token');
+        const buyerIdentifier = buyerEmail || payment.user_id;
         const downloadToken = generateDigitalProductToken(
           itemId,
           purchaseId,
-          payment.user_id,
-          48
+          buyerIdentifier,
+          168
         );
         const downloadUrl = `/api/digital-products/${itemId}/download?token=${downloadToken}`;
 
@@ -352,29 +367,16 @@ export async function GET(req: NextRequest) {
 
           const productTitle = product?.title || 'Produit Digital';
 
-          // Résoudre email de l'acheteur
-          let buyerEmail = '';
-          const metaEmail = methodParts[3] ? decodeURIComponent(methodParts[3]) : '';
-          if (metaEmail && metaEmail.includes('@')) {
-            buyerEmail = metaEmail;
-          } else {
-            const { data: userProfile } = await supabaseAdmin
-              .from('profiles')
-              .select('email, full_name')
-              .eq('id', payment.user_id)
-              .maybeSingle();
-            buyerEmail = userProfile?.email || '';
-          }
-
           if (buyerEmail) {
-            const { sendInvoiceEmail } = await import('@/lib/email');
-            await sendInvoiceEmail(
+            const { sendDigitalProductDeliveryEmail } = await import('@/lib/email');
+            const buyerName = buyerEmail.split('@')[0] || 'Client';
+            await sendDigitalProductDeliveryEmail(
               buyerEmail,
-              buyerEmail.split('@')[0] || 'Client',
-              `DP-${depositId.substring(0, 8).toUpperCase()}`,
-              payment.amount,
+              buyerName,
               productTitle,
-              'Votre paiement Mobile Money PawaPay est validé. Votre ressource numérique est disponible immédiatement.'
+              downloadUrl,
+              `DP-${depositId.substring(0, 8).toUpperCase()}`,
+              payment.amount
             );
           }
 

@@ -264,7 +264,7 @@ export async function GET(req: NextRequest) {
           }
         } else if (paymentType === 'DIGITAL_PRODUCT' && itemId) {
           try {
-            await supabaseAdmin
+            const { data: purRow } = await supabaseAdmin
               .from('digital_product_purchases')
               .upsert({
                 product_id: itemId,
@@ -274,7 +274,11 @@ export async function GET(req: NextRequest) {
                 payment_status: 'COMPLETED',
                 transaction_id: payment.id,
                 created_at: new Date().toISOString(),
-              } as any, { onConflict: 'product_id,user_id' });
+              } as any, { onConflict: 'product_id,user_id' })
+              .select('id')
+              .maybeSingle();
+
+            const purchaseId = purRow?.id || payment.id;
 
             // Enregistrer dans transactions générale
             await (supabaseAdmin as any).from('transactions').insert({
@@ -334,14 +338,24 @@ export async function GET(req: NextRequest) {
             }
 
             if (buyerEmail) {
-              const { sendInvoiceEmail } = await import("@/lib/email");
-              await sendInvoiceEmail(
+              const { generateDigitalProductToken } = await import('@/lib/digital-product-token');
+              const buyerIdentifier = buyerEmail || payment.user_id;
+              const downloadToken = generateDigitalProductToken(
+                itemId,
+                purchaseId,
+                buyerIdentifier,
+                168
+              );
+              const downloadUrl = `/api/digital-products/${itemId}/download?token=${downloadToken}`;
+
+              const { sendDigitalProductDeliveryEmail } = await import("@/lib/email");
+              await sendDigitalProductDeliveryEmail(
                 buyerEmail,
                 buyerName,
-                `DP-${payment.id.substring(0, 8).toUpperCase()}`,
-                payment.amount,
                 productTitle,
-                "Votre paiement Mobile Money PawaPay est validé. Votre ressource numérique est disponible immédiatement."
+                downloadUrl,
+                `DP-${payment.id.substring(0, 8).toUpperCase()}`,
+                payment.amount
               );
             }
           } catch (dpCronErr) {

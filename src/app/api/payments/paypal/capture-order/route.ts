@@ -458,30 +458,32 @@ export async function POST(req: NextRequest) {
         console.warn("[paypal-capture-order] transactions insert warning:", txErr?.message);
       }
 
-      // Génération du jeton cryptographique sécurisé (durée 48 heures)
+      // Génération du jeton cryptographique sécurisé (durée 7 jours / 168 heures)
       const { generateDigitalProductToken } = await import("@/lib/digital-product-token");
+      const buyerIdentifier = buyerEmail || buyerId;
       const downloadToken = generateDigitalProductToken(
         itemId,
         purchaseRecordId,
-        buyerId,
-        48
+        buyerIdentifier,
+        168
       );
       const downloadUrl = `/api/digital-products/${itemId}/download?token=${downloadToken}`;
 
-      // Envoi de la facture / notification
+      // Envoi de l'e-mail d'accès au produit digital avec lien direct sécurisé
       if (buyerEmail) {
         try {
-          const { sendInvoiceEmail } = await import("@/lib/email");
-          await sendInvoiceEmail(
+          const { sendDigitalProductDeliveryEmail } = await import("@/lib/email");
+          const buyerName = user?.user_metadata?.full_name || buyerEmail.split("@")[0] || "Client";
+          await sendDigitalProductDeliveryEmail(
             buyerEmail,
-            user?.user_metadata?.full_name || buyerEmail.split("@")[0] || "Client",
-            `DP-${captureId.substring(0, 8).toUpperCase()}`,
-            amountCaptured || product.price,
+            buyerName,
             product.title,
-            "Produit digital téléchargeable immédiatement via votre lien sécurisé."
+            downloadUrl,
+            `DP-${captureId.substring(0, 8).toUpperCase()}`,
+            amountCaptured || product.price
           );
         } catch (emailErr) {
-          console.warn("[paypal-capture-order] Invoice email warning:", emailErr);
+          console.warn("[paypal-capture-order] Digital product email delivery warning:", emailErr);
         }
       }
 

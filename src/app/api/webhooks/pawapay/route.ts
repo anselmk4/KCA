@@ -467,15 +467,27 @@ export async function POST(req: NextRequest) {
               buyerEmail = userProfile?.email || '';
             }
 
+            // Générer le jeton cryptographique sécurisé (durée 7 jours / 168 heures)
+            const { generateDigitalProductToken } = await import('@/lib/digital-product-token');
+            const buyerIdentifier = buyerEmail || payment.user_id;
+            const downloadToken = generateDigitalProductToken(
+              itemId,
+              purchaseId,
+              buyerIdentifier,
+              168
+            );
+            const downloadUrl = `/api/digital-products/${itemId}/download?token=${downloadToken}`;
+
             if (buyerEmail) {
-              const { sendInvoiceEmail } = await import('@/lib/email');
-              await sendInvoiceEmail(
+              const { sendDigitalProductDeliveryEmail } = await import('@/lib/email');
+              const buyerName = buyerEmail.split('@')[0] || 'Client';
+              await sendDigitalProductDeliveryEmail(
                 buyerEmail,
-                buyerEmail.split('@')[0] || 'Client',
-                `DP-${depositId.substring(0, 8).toUpperCase()}`,
-                payment.amount,
+                buyerName,
                 productTitle,
-                'Votre paiement Mobile Money PawaPay est validé. Votre ressource numérique est accessible.'
+                downloadUrl,
+                `DP-${depositId.substring(0, 8).toUpperCase()}`,
+                payment.amount
               );
             }
 

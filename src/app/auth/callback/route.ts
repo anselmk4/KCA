@@ -311,5 +311,49 @@ async function bootstrapUserAndGetRole(
       .eq('id', user.id);
   }
 
+  // 4. Rapprochement automatique des achats digitaux invités antérieurs
+  if (user.email) {
+    try {
+      const cleanEmail = user.email.trim().toLowerCase();
+      const encodedEmail = encodeURIComponent(cleanEmail);
+
+      const { data: guestPayments } = await (supabaseAdmin as any)
+        .from('payments')
+        .select('id, user_id, method, amount')
+        .eq('status', 'PAID')
+        .ilike('method', `%${encodedEmail}%`);
+
+      if (guestPayments && guestPayments.length > 0) {
+        for (const gp of guestPayments) {
+          const parts = (gp.method || '').split('::');
+          if (parts[1] === 'DIGITAL_PRODUCT' && parts[2]) {
+            const productId = parts[2];
+            await (supabaseAdmin as any)
+              .from('payments')
+              .update({ user_id: user.id })
+              .eq('id', gp.id);
+
+            await (supabaseAdmin as any)
+              .from('digital_product_purchases')
+              .upsert(
+                {
+                  product_id: productId,
+                  user_id: user.id,
+                  price_paid: gp.amount,
+                  payment_status: 'COMPLETED',
+                  transaction_id: gp.id,
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: 'product_id,user_id' }
+              );
+          }
+        }
+        console.log(`[callback] Reconciled ${guestPayments.length} guest digital purchases for ${cleanEmail} -> user ${user.id}`);
+      }
+    } catch (reconcileErr) {
+      console.warn('[callback] Guest digital purchases reconciliation warning:', reconcileErr);
+    }
+  }
+
   return { role: targetRole || 'STUDENT', needsRole: false };
 }

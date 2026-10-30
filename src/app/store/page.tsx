@@ -234,6 +234,16 @@ export default function StoreCatalogPage() {
                 )}
               </div>
             </div>
+
+            {/* LIEN RETROUVER MES TÉLÉCHARGEMENTS */}
+            <div className="mt-4 text-center">
+              <Link
+                href="/store/access"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-400 hover:text-teal-300 transition-colors"
+              >
+                <BookOpen className="w-3.5 h-3.5" /> Déjà acheté un livre ou un guide ? Retrouver mes téléchargements
+              </Link>
+            </div>
           </div>
         </section>
 

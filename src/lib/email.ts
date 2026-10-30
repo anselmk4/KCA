@@ -502,6 +502,62 @@ export async function sendInvoiceEmail(
 }
 
 /**
+ * Envoi du lien de téléchargement direct et sécurisé pour un produit numérique (E-book, guide, PDF)
+ * Ne nécessite PAS que l'utilisateur soit connecté ou ait un compte créé préalable.
+ */
+export async function sendDigitalProductDeliveryEmail(
+  to: string,
+  customerName: string,
+  productTitle: string,
+  downloadUrl: string,
+  orderNumber: string,
+  amount: number,
+  authorName?: string
+) {
+  const dateStr = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  
+  // Assurer une URL absolue
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://ansella.app";
+  const absoluteDownloadUrl = downloadUrl.startsWith("http") 
+    ? downloadUrl 
+    : `${baseUrl.replace(/\/+$/, '')}${downloadUrl.startsWith('/') ? '' : '/'}${downloadUrl}`;
+
+  const body = `
+    <h2>Votre livre numérique est disponible ! 📚</h2>
+    <p>Bonjour <strong>${customerName}</strong>,</p>
+    <p>Merci pour votre achat ! Votre paiement de <strong>$${amount.toFixed(2)} USD</strong> a été validé avec succès. Votre ressource numérique est prête et accessible immédiatement en téléchargement sécurisé.</p>
+
+    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px; padding: 20px; margin: 20px 0; border-left: 5px solid #10b981;">
+      <h3 style="margin: 0 0 6px 0; color: #065f46; font-size: 17px;">${productTitle}</h3>
+      ${authorName ? `<p style="margin: 0 0 8px 0; font-size: 13px; color: #047857;">Par <strong>${authorName}</strong></p>` : ''}
+      <p style="margin: 0; font-size: 12px; color: #059669;">Réf. Commande : <strong>${orderNumber}</strong> • Date : ${dateStr}</p>
+    </div>
+
+    <div style="text-align: center; margin: 28px 0;">
+      <a href="${absoluteDownloadUrl}" class="btn" style="background-color: #059669; font-size: 16px; padding: 15px 32px; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);">
+        📥 Télécharger mon Produit Numérique
+      </a>
+    </div>
+
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 20px 0; font-size: 13px; color: #475569; line-height: 1.6;">
+      <p style="margin: 0 0 8px 0; font-weight: bold; color: #0f172a;">🛡️ Accès Privé Sans Connexion Requise :</p>
+      <ul style="margin: 0; padding-left: 20px; font-size: 12px; color: #64748b;">
+        <li>Ce lien est cryptographiquement signé et lié à votre transaction. Vous pouvez télécharger votre livre <strong>sans avoir besoin de vous connecter ni de créer un compte</strong>.</li>
+        <li>Nous vous conseillons d'enregistrer le fichier PDF directement dans vos fichiers ou sur votre appareil dès son ouverture.</li>
+        <li>Votre document est authentifié avec un filigrane numérique certifiant votre licence personnelle.</li>
+      </ul>
+    </div>
+
+    <p class="fallback-link">
+      Si le bouton ne s'ouvre pas directement, copiez et collez cette adresse dans votre navigateur :<br>
+      <a href="${absoluteDownloadUrl}" style="color: #059669;">${absoluteDownloadUrl}</a>
+    </p>
+  `;
+
+  await sendEmail(to, `📚 Votre livre numérique : ${productTitle} (Téléchargement direct)`, body);
+}
+
+/**
  * Facture de souscription de Plan Formateur (BASE, PRO, MAX)
  */
 export async function sendInstructorPlanInvoiceEmail(
