@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { Mail, ArrowLeft, Send, CheckCircle2, AlertCircle, BookOpen, ShieldCheck, Download, Receipt } from "lucide-react";
+import { Mail, ArrowLeft, Send, CheckCircle2, AlertCircle, BookOpen, ShieldCheck, Download } from "lucide-react";
 
 interface DownloadLinkItem {
   title: string;
@@ -14,7 +14,7 @@ interface DownloadLinkItem {
 }
 
 export default function StoreAccessPage() {
-  const [query, setQuery] = useState("");
+  const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{
     success?: boolean;
@@ -24,8 +24,8 @@ export default function StoreAccessPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanQuery = query.trim();
-    if (!cleanQuery) return;
+    const cleanEmail = email.trim();
+    if (!cleanEmail) return;
 
     setSubmitting(true);
     setResult(null);
@@ -34,7 +34,7 @@ export default function StoreAccessPage() {
       const res = await fetch("/api/digital-products/resend-access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: cleanQuery, email: cleanQuery }),
+        body: JSON.stringify({ email: cleanEmail }),
       });
 
       const data = await res.json();
@@ -44,7 +44,7 @@ export default function StoreAccessPage() {
           message:
             data.message ||
             data.error ||
-            "Aucun achat trouvé. Veuillez vérifier l'adresse e-mail ou le N° de facture.",
+            "Aucun achat trouvé. Veuillez vérifier l'adresse e-mail saisie.",
         });
       } else {
         setResult({
@@ -56,7 +56,7 @@ export default function StoreAccessPage() {
     } catch (err: any) {
       setResult({
         success: false,
-        message: "Erreur de connexion. Veuillez réessayer dans un instant.",
+        message: "Erreur de communication avec le serveur. Veuillez réessayer.",
       });
     } finally {
       setSubmitting(false);
@@ -86,15 +86,11 @@ export default function StoreAccessPage() {
             Retrouver mes téléchargements
           </h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-8 leading-relaxed">
-            Vous avez déjà acheté un livre ou un guide numérique sur Ansella ? Saisissez simplement
-            l&apos;adresse e-mail utilisée lors de votre commande ou votre <strong>N° de facture</strong> (ex :{" "}
-            <span className="font-mono text-xs bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-teal-600 dark:text-teal-400">
-              DP-99R30399
-            </span>
-            ).
+            Vous avez déjà acheté un livre ou un guide numérique sur Ansella ? Saisissez l&apos;adresse
+            e-mail utilisée lors de votre commande pour débloquer immédiatement votre ressource.
           </p>
 
-          {/* MESSAGE DE SUCCÈS OU D'ERREUR */}
+          {/* MESSAGE D'ÉTAT */}
           {result && (
             <div
               className={`p-4 rounded-2xl mb-6 text-xs sm:text-sm flex items-start gap-3 ${
@@ -112,7 +108,7 @@ export default function StoreAccessPage() {
             </div>
           )}
 
-          {/* LIENS DE TÉLÉCHARGEMENT DIRECTS SUR ÉCRAN */}
+          {/* SECTION DE TÉLÉCHARGEMENT IMMÉDIAT SUR ÉCRAN */}
           {result?.success && result.downloadLinks && result.downloadLinks.length > 0 && (
             <div className="space-y-4 mb-8 p-5 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/40 dark:to-teal-950/30 border-2 border-emerald-400 dark:border-emerald-700 rounded-3xl animate-in zoom-in-95">
               <div className="text-center pb-2">
@@ -126,15 +122,13 @@ export default function StoreAccessPage() {
                   key={index}
                   className="bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-5 shadow-md space-y-3"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-extrabold text-sm sm:text-base text-zinc-900 dark:text-white leading-snug">
-                        {item.title}
-                      </h3>
-                      <p className="text-xs text-zinc-500 mt-1">
-                        Réf. {item.orderNumber}
-                      </p>
-                    </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm sm:text-base text-zinc-900 dark:text-white leading-snug">
+                      {item.title}
+                    </h3>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      Licence personnelle certifiée
+                    </p>
                   </div>
 
                   <a
@@ -153,20 +147,20 @@ export default function StoreAccessPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label
-                htmlFor="access-query"
+                htmlFor="access-email"
                 className="block text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 mb-2"
               >
-                Adresse e-mail d&apos;achat ou N° de Facture
+                Votre adresse e-mail d&apos;achat
               </label>
               <div className="relative">
                 <Mail className="w-5 h-5 text-zinc-400 absolute left-4 top-1/2 -translate-y-1/2" />
                 <input
-                  id="access-query"
+                  id="access-email"
                   type="text"
                   required
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="nom@exemple.com ou DP-99R30399"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="nom@exemple.com"
                   className="w-full pl-12 pr-4 py-3.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 rounded-2xl text-sm font-medium text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 transition-all"
                 />
               </div>
@@ -180,7 +174,7 @@ export default function StoreAccessPage() {
               {submitting ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Authentification de l&apos;achat...
+                  Vérification en cours...
                 </>
               ) : (
                 <>
@@ -193,11 +187,11 @@ export default function StoreAccessPage() {
           <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-400 space-y-2">
             <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 font-semibold">
               <ShieldCheck className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-              Accès immédiat sécurisé
+              Téléchargement direct sécurisé
             </div>
             <p className="leading-relaxed text-[11px]">
-              Votre téléchargement s&apos;ouvre directement dès validation. Le fichier est cryptographiquement
-              signé et intègre un filigrane anti-contrefaçon personnalisé certifiant votre licence légale.
+              Votre lien d&apos;accès est cryptographiquement signé et ne nécessite aucune création de compte
+              préalable. Vous pouvez enregistrer le fichier directement sur votre appareil.
             </p>
           </div>
         </div>
