@@ -1,8 +1,14 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { ShieldOff } from "lucide-react";
-import { getSimulatedSession, hasPermission, Permission, Role, RolePermissions } from "@/lib/rbac";
+import {
+  getSimulatedSession,
+  setSimulatedSession,
+  hasPermission,
+  Permission,
+  Role,
+} from "@/lib/rbac";
 
 interface AdminGuardProps {
   permission: Permission;
@@ -11,7 +17,35 @@ interface AdminGuardProps {
 }
 
 export function AdminGuard({ permission, children, fallback }: AdminGuardProps) {
-  const session = getSimulatedSession();
+  const [session, setSession] = useState(() => getSimulatedSession());
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admin/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active || !data?.role) return;
+        const current = getSimulatedSession();
+        const synced = {
+          userId: data.id || current?.userId || "",
+          name: data.full_name || current?.name || "Admin",
+          email: data.email || current?.email || "",
+          role: data.role as Role,
+          status: "ACTIVE" as const,
+          plan: current?.plan || "FREE",
+          grantedPermissions: data.grantedPermissions || [],
+          revokedPermissions: data.revokedPermissions || [],
+        };
+        setSimulatedSession(synced);
+        setSession(synced);
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   if (!session) return null;
 
   const granted = hasPermission(

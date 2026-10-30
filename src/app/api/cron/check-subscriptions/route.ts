@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { createNotification } from '@/lib/supabase/notifications-helper';
+import crypto from 'crypto';
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,9 +13,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Configuration serveur incomplète' }, { status: 500 });
     }
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      console.warn('[cron-subscriptions] Unauthorized cron execution attempt blocked.');
-      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 401 });
+    if (cronSecret) {
+      const expectedHeader = `Bearer ${cronSecret}`;
+      const providedBuf = Buffer.from(authHeader || '');
+      const expectedBuf = Buffer.from(expectedHeader);
+      if (providedBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(providedBuf, expectedBuf)) {
+        console.warn('[cron-subscriptions] Unauthorized cron execution attempt blocked.');
+        return NextResponse.json({ error: 'Accès non autorisé' }, { status: 401 });
+      }
     }
 
     console.log('[cron-subscriptions] Running background instructor subscription expiration check...');

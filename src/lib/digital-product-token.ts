@@ -1,10 +1,19 @@
 import crypto from "crypto";
 
-const TOKEN_SECRET =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.NEXTAUTH_SECRET ||
-  process.env.PAWAPAY_API_TOKEN ||
-  "ansella_digital_product_secret_key_2026";
+function getDigitalProductSecret(): string {
+  const configuredSecret =
+    process.env.DIGITAL_PRODUCT_TOKEN_SECRET ||
+    process.env.NEXTAUTH_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!configuredSecret && process.env.NODE_ENV === "production") {
+    console.error(
+      "[SECURITY CRITICAL] DIGITAL_PRODUCT_TOKEN_SECRET is missing in production environment!"
+    );
+  }
+
+  return configuredSecret || "ansella_digital_product_dev_fallback_secret";
+}
 
 export interface DownloadTokenPayload {
   productId: string;
@@ -24,11 +33,12 @@ export function generateDigitalProductToken(
   buyerIdentifier: string,
   expiresInHours: number = 48
 ): string {
+  const secret = getDigitalProductSecret();
   const expiresAt = Date.now() + expiresInHours * 60 * 60 * 1000;
   const nonce = crypto.randomBytes(8).toString("hex");
 
   const rawData = `${productId}:${purchaseId}:${buyerIdentifier}:${expiresAt}:${nonce}`;
-  const hmac = crypto.createHmac("sha256", TOKEN_SECRET);
+  const hmac = crypto.createHmac("sha256", secret);
   hmac.update(rawData);
   const signature = hmac.digest("hex");
 
@@ -63,11 +73,12 @@ export function verifyDigitalProductToken(
   const [encodedPayload, signature] = parts;
 
   try {
+    const secret = getDigitalProductSecret();
     const payloadStr = Buffer.from(encodedPayload, "base64url").toString("utf-8");
     const payload: DownloadTokenPayload = JSON.parse(payloadStr);
 
     const rawData = `${payload.productId}:${payload.purchaseId}:${payload.buyerIdentifier}:${payload.expiresAt}:${payload.nonce}`;
-    const hmac = crypto.createHmac("sha256", TOKEN_SECRET);
+    const hmac = crypto.createHmac("sha256", secret);
     hmac.update(rawData);
     const expectedSignature = hmac.digest("hex");
 
@@ -85,7 +96,8 @@ export function verifyDigitalProductToken(
     if (Date.now() > payload.expiresAt) {
       return {
         valid: false,
-        error: "Ce lien de téléchargement a expiré. Veuillez utiliser votre espace d'achat ou votre reçu.",
+        error:
+          "Ce lien de téléchargement a expiré. Veuillez utiliser votre espace d'achat ou votre reçu.",
       };
     }
 
@@ -97,7 +109,7 @@ export function verifyDigitalProductToken(
     }
 
     return { valid: true, payload };
-  } catch (err: any) {
+  } catch {
     return { valid: false, error: "Erreur de décodage du jeton de sécurité." };
   }
 }

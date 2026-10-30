@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createPayPalOrder } from "@/lib/paypal";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { resolveCoursePricing } from "@/lib/payment-pricing";
 
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    const { type, itemId, payInstallment, couponId, userEmail, userName } = await req.json(); // type: "COURSE", "INSTRUCTOR_PLAN", or "DIGITAL_PRODUCT"
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const { type, itemId, payInstallment, couponId, userEmail } = await req.json();
 
     if (!type || !itemId) {
       return NextResponse.json({ error: "Paramètres 'type' et 'itemId' requis." }, { status: 400 });
@@ -18,63 +21,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
     }
 
-    const effectiveUserId = user?.id || (userEmail ? `email_${encodeURIComponent(userEmail)}` : `guest_${Date.now()}`);
+    const effectiveUserId =
+      user?.id || (userEmail ? `email_${encodeURIComponent(userEmail)}` : `guest_${Date.now()}`);
 
     let baseAmount = 0;
-    let customId = ""; // Used to pass metadata to capture phase: "type:itemId:userId"
+    let customId = "";
 
     if (type === "COURSE") {
-      // 1. Fetch course details from DB to get the correct price (avoid client-side price tampering)
-      const { data: course, error: courseError } = await supabaseAdmin
-        .from("courses")
-        .select("price, title, allow_installments, installments_count")
-        .eq("id", itemId)
-        .maybeSingle();
+      const pricingResult = await resolveCoursePricing({
+        courseId: itemId,
+        payInstallment,
+        couponId,
+      });
 
-      if (courseError || !course) {
-        return NextResponse.json({ error: "Cours introuvable." }, { status: 404 });
+      if (!pricingResult.data) {
+        return NextResponse.json(
+          { error: pricingResult.error || "Cours introuvable." },
+          { status: pricingResult.status || 404 }
+        );
       }
 
-      const originalPrice = course.price;
-      let installmentCount = 1;
-      if (payInstallment === 2) {
-        installmentCount = 2;
-      } else if (payInstallment === 3 || payInstallment === true) {
-        installmentCount = course.installments_count || 3;
-      } else if (typeof payInstallment === 'number' && payInstallment > 1) {
-        installmentCount = payInstallment;
-      }
-
-      let fullCourseDiscount = 0;
-      if (couponId) {
-        const { data: coupon } = await supabaseAdmin
-          .from("coupons")
-          .select("*")
-          .eq("id", couponId)
-          .eq("is_active", true)
-          .maybeSingle();
-
-        if (coupon) {
-          if (coupon.discount_type === "PERCENTAGE") {
-            fullCourseDiscount = Math.round(originalPrice * (coupon.discount_value / 100));
-          } else if (coupon.discount_type === "FIXED") {
-            fullCourseDiscount = coupon.discount_value;
-          }
-        }
-      }
-
-      const discountedTotalCoursePrice = Math.max(0, originalPrice - fullCourseDiscount);
-      baseAmount = Math.max(0, Math.round(discountedTotalCoursePrice / installmentCount));
+      baseAmount = pricingResult.data.baseAmount;
       customId = `COURSE:${itemId}:${user?.id || effectiveUserId}`;
     } else if (type === "INSTRUCTOR_PLAN") {
-      // 2. Resolve plan price
       const planPrices = {
         BASE: 19,
         PRO: 49,
         MAX: 200,
       };
 
-      const selectedPlan = itemId.toUpperCase();
+      const selectedPlan = String(itemId).toUpperCase();
       const price = planPrices[selectedPlan as keyof typeof planPrices];
 
       if (!price) {
@@ -84,7 +60,6 @@ export async function POST(req: NextRequest) {
       baseAmount = price;
       customId = `INSTRUCTOR_PLAN:${selectedPlan}:${user?.id || effectiveUserId}`;
     } else if (type === "DIGITAL_PRODUCT") {
-      // 3. Resolve digital product price
       const { data: product, error: prodErr } = await supabaseAdmin
         .from("digital_products")
         .select("id, price, title")
@@ -101,15 +76,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Type de paiement non supporté." }, { status: 400 });
     }
 
+    if (baseAmount <= 0) {
+      return NextResponse.json(
+        { error: "Le montant de la commande PayPal doit être supérieur à 0 USD." },
+        { status: 400 }
+      );
+    }
+
     // Add +3% PayPal fee surcharge (amount + 3%)
     const paypalTotalAmount = Number((baseAmount * 1.03).toFixed(2));
 
-    // Call PayPal API to create checkout order with +3% fee surcharge included
     const order = await createPayPalOrder(paypalTotalAmount, customId);
 
     return NextResponse.json({ orderId: order.id, amount: paypalTotalAmount });
   } catch (err: any) {
     console.error("[paypal-create-order] Error:", err);
-    return NextResponse.json({ error: err.message || "Erreur lors de la création de la commande PayPal." }, { status: 500 });
+    return NextResponse.json(
+      { error: err.message || "Erreur lors de la création de la commande PayPal." },
+      { status: 500 }
+    );
   }
 }

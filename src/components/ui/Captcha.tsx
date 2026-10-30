@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { ShieldCheck, RefreshCw, Check } from "lucide-react";
 
 interface CaptchaProps {
@@ -9,26 +9,42 @@ interface CaptchaProps {
 }
 
 export function Captcha({ onVerify, resetKey = 0 }: CaptchaProps) {
-  const [targetX, setTargetX] = useState<number>(0);
+  const [targetX, setTargetX] = useState<number>(50);
+  const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [sliderVal, setSliderVal] = useState<number>(0);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isVerified, setIsVerified] = useState<boolean>(false);
   const [error, setError] = useState<boolean>(false);
   const sliderRef = useRef<HTMLDivElement>(null);
 
-  // Generate random target slot position (between 30% and 80%)
-  const resetCaptcha = () => {
-    const randomPercent = Math.floor(Math.random() * 50) + 30; // 30 to 80
-    setTargetX(randomPercent);
+  const resetCaptcha = useCallback(async () => {
     setSliderVal(0);
     setIsVerified(false);
     setError(false);
     onVerify(null);
-  };
+
+    try {
+      const res = await fetch("/api/auth/security-check", { method: "GET", cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.targetX === "number" && typeof data.challenge === "string") {
+          setTargetX(data.targetX);
+          setChallengeToken(data.challenge);
+          return;
+        }
+      }
+    } catch {
+      // Fallback if network request fails
+    }
+
+    const randomPercent = Math.floor(Math.random() * 50) + 30;
+    setTargetX(randomPercent);
+    setChallengeToken(null);
+  }, [onVerify]);
 
   useEffect(() => {
     resetCaptcha();
-  }, [resetKey]);
+  }, [resetKey, resetCaptcha]);
 
   const handleStart = () => {
     if (isVerified) return;
@@ -39,7 +55,7 @@ export function Captcha({ onVerify, resetKey = 0 }: CaptchaProps) {
   const handleMove = (clientX: number) => {
     if (!isDragging || !sliderRef.current) return;
     const rect = sliderRef.current.getBoundingClientRect();
-    const trackWidth = rect.width - 40; // Subtract handle width
+    const trackWidth = rect.width - 40;
     const currentX = clientX - rect.left - 20;
     const percent = Math.max(0, Math.min(100, (currentX / trackWidth) * 100));
     setSliderVal(percent);
@@ -49,17 +65,19 @@ export function Captcha({ onVerify, resetKey = 0 }: CaptchaProps) {
     if (!isDragging) return;
     setIsDragging(false);
 
-    // Tolerance check (+/- 4 percent points)
     const diff = Math.abs(sliderVal - targetX);
     if (diff <= 4) {
       setIsVerified(true);
       setError(false);
-      // Generate a mock secure token with the current position and action timestamp
-      const token = btoa(JSON.stringify({
-        t: Date.now(),
-        p: targetX,
-        v: "ansella_sec_pass"
-      }));
+      const token = btoa(
+        JSON.stringify({
+          t: Date.now(),
+          p: targetX,
+          s: Number(sliderVal.toFixed(2)),
+          c: challengeToken,
+          v: "ansella_sec_pass",
+        })
+      );
       onVerify(token);
     } else {
       setError(true);
@@ -70,7 +88,6 @@ export function Captcha({ onVerify, resetKey = 0 }: CaptchaProps) {
     }
   };
 
-  // Attach global event listeners during drag for smooth tracking
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => handleMove(e.clientX);
     const onTouchMove = (e: TouchEvent) => {
@@ -91,7 +108,7 @@ export function Captcha({ onVerify, resetKey = 0 }: CaptchaProps) {
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onMouseUp);
     };
-  }, [isDragging, sliderVal, targetX]);
+  }, [isDragging, sliderVal, targetX, challengeToken]);
 
   return (
     <div className="w-full bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-white/10 rounded-2xl p-4 select-none">
@@ -114,19 +131,17 @@ export function Captcha({ onVerify, resetKey = 0 }: CaptchaProps) {
 
       {/* Visual Puzzle Box */}
       <div className="relative h-20 bg-zinc-200/50 dark:bg-zinc-900/60 rounded-xl overflow-hidden mb-4 border border-zinc-300/30 dark:border-zinc-800/80">
-        {/* Decorative grids */}
         <div className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,#808080_1px,transparent_1px),linear-gradient(to_bottom,#808080_1px,transparent_1px)] bg-[size:14px_24px]" />
-        
-        {/* Text Hint */}
+
         {!isVerified && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-              Glissez le puzzle dans l'emplacement
+              Glissez le puzzle dans l&apos;emplacement
             </span>
           </div>
         )}
 
-        {/* Target Slot (The destination) */}
+        {/* Target Slot */}
         <div
           style={{ left: `${targetX}%` }}
           className="absolute top-1/2 -translate-y-1/2 w-10 h-10 border-2 border-dashed border-zinc-400 dark:border-zinc-600 bg-zinc-300/40 dark:bg-zinc-800/50 rounded-lg flex items-center justify-center transition-all duration-300"
@@ -158,7 +173,6 @@ export function Captcha({ onVerify, resetKey = 0 }: CaptchaProps) {
           isVerified ? "border-green-500/30 bg-green-500/5" : ""
         }`}
       >
-        {/* Slider Progress Bar */}
         <div
           style={{ width: `${sliderVal}%` }}
           className={`h-full bg-blue-500/10 transition-colors duration-100 ${
@@ -166,13 +180,14 @@ export function Captcha({ onVerify, resetKey = 0 }: CaptchaProps) {
           }`}
         />
 
-        {/* Drag Handle */}
         <div
           onMouseDown={handleStart}
           onTouchStart={handleStart}
           style={{ left: `calc(${sliderVal}% - ${sliderVal * 0.4}px)` }}
           className={`absolute top-0.5 bottom-0.5 w-9 bg-white dark:bg-zinc-700 border border-zinc-300/80 dark:border-zinc-600 rounded-lg flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-zinc-50 dark:hover:bg-zinc-600 hover:shadow-md transition-all shadow-sm ${
-            isVerified ? "border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-950 pointer-events-none" : ""
+            isVerified
+              ? "border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-950 pointer-events-none"
+              : ""
           }`}
         >
           {isVerified ? (
@@ -186,7 +201,6 @@ export function Captcha({ onVerify, resetKey = 0 }: CaptchaProps) {
           )}
         </div>
 
-        {/* Hint text inside track */}
         {sliderVal === 0 && !isVerified && (
           <div className="absolute right-4 text-[10px] font-bold text-zinc-400 tracking-wider pointer-events-none uppercase">
             Glisser

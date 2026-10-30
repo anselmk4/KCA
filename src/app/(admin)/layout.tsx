@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, Users2, CreditCard, LogOut, ShieldAlert,
   LifeBuoy, BookOpen, Coins, Settings, Ticket, Activity, Menu, X,
-  Mail, ChevronRight, Shield, Loader2, Newspaper, Send, FileText,
+  Mail, ChevronRight, Shield, Loader2, Newspaper, Send, FileText, BarChart3,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import {
@@ -16,6 +16,7 @@ import {
 
 const ICON_MAP: Record<string, React.ReactNode> = {
   LayoutDashboard: <LayoutDashboard className="w-5 h-5" />,
+  BarChart3:       <BarChart3 className="w-5 h-5" />,
   Newspaper:       <Newspaper className="w-5 h-5" />,
   Users2:          <Users2 className="w-5 h-5" />,
   Users:           <Users className="w-5 h-5" />,

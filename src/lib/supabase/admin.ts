@@ -7,6 +7,16 @@ const serviceRoleKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   'placeholder';
 
+if (
+  typeof window === 'undefined' &&
+  process.env.NODE_ENV === 'production' &&
+  !process.env.SUPABASE_SERVICE_ROLE_KEY
+) {
+  console.error(
+    '[SECURITY WARNING] SUPABASE_SERVICE_ROLE_KEY is not defined in production. supabaseAdmin is falling back to NEXT_PUBLIC_SUPABASE_ANON_KEY.'
+  );
+}
+
 export const supabaseAdmin = createClient<Database>(supabaseUrl, serviceRoleKey, {
   auth: {
     autoRefreshToken: false,

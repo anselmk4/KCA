@@ -13,6 +13,7 @@ import { SOLANA_TREASURY_ADDRESS, getSolanaPayUri, getSolanaQrCodeUrl, getBackup
 import { SolanaQrCode } from "@/components/ui/SolanaQrCode";
 import { fetchBtcPriceInUsd, convertUsdToBtc } from "@/lib/bitcoin";
 import { BitcoinQrCode } from "@/components/ui/BitcoinQrCode";
+import { sendAnalyticsEvent } from "@/components/analytics/AnalyticsTracker";
 
 declare global {
   interface Window {
@@ -164,6 +165,27 @@ export default function PaymentPage() {
   const [paypalError, setPaypalError] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (paymentError) {
+      sendAnalyticsEvent({
+        type: "payment_error",
+        courseId,
+        paymentMethod: method,
+        errorReason: paymentError,
+      });
+    }
+  }, [paymentError, courseId, method]);
+
+  useEffect(() => {
+    if (success) {
+      sendAnalyticsEvent({
+        type: "payment_success",
+        courseId,
+        paymentMethod: method,
+      });
+    }
+  }, [success, courseId, method]);
 
   // Crypto state
   const [cryptoNetwork, setCryptoNetwork] = useState("solana");

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { BITCOIN_TREASURY_ADDRESS, fetchBtcPriceInUsd, convertUsdToBtc } from "@/lib/bitcoin";
 import { createNotification } from "@/lib/supabase/notifications-helper";
+import { resolveCoursePricing } from "@/lib/payment-pricing";
 
 /**
  * Queries Mempool.space or Blockstream Explorer APIs to verify a Bitcoin transaction.
@@ -29,7 +30,8 @@ async function verifyBitcoinTxOnChain(txHash: string): Promise<{
         return {
           verified: false,
           receivedSatoshis: 0,
-          errorMsg: "La transaction Bitcoin est encore dans le mempool (0 confirmation). Veuillez patienter qu'elle soit minée dans un bloc.",
+          errorMsg:
+            "La transaction Bitcoin est encore dans le mempool (0 confirmation). Veuillez patienter qu'elle soit minée dans un bloc.",
         };
       }
 
@@ -63,7 +65,8 @@ async function verifyBitcoinTxOnChain(txHash: string): Promise<{
         return {
           verified: false,
           receivedSatoshis: 0,
-          errorMsg: "La transaction Bitcoin est encore dans le mempool (0 confirmation). Veuillez patienter qu'elle soit minée dans un bloc.",
+          errorMsg:
+            "La transaction Bitcoin est encore dans le mempool (0 confirmation). Veuillez patienter qu'elle soit minée dans un bloc.",
         };
       }
 
@@ -86,25 +89,36 @@ async function verifyBitcoinTxOnChain(txHash: string): Promise<{
   return {
     verified: false,
     receivedSatoshis: 0,
-    errorMsg: "Transaction introuvable ou le destinataire ne correspond pas à l'adresse de trésorerie Bitcoin Kuettu.",
+    errorMsg:
+      "Transaction introuvable ou le destinataire ne correspond pas à l'adresse de trésorerie Bitcoin Kuettu.",
   };
 }
 
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
     if (userError || !user) {
       return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
     }
 
     const body = await req.json();
-    const { txHash, courseId, planId, payInstallment } = body;
+    const { txHash, courseId, planId, payInstallment, couponId } = body;
 
     if (!txHash || typeof txHash !== "string" || txHash.trim().length < 20) {
       return NextResponse.json(
         { error: "Veuillez fournir un Hash de transaction Bitcoin (TxID) valide." },
+        { status: 400 }
+      );
+    }
+
+    if (!courseId && !planId) {
+      return NextResponse.json(
+        { error: "Paramètre 'courseId' ou 'planId' requis." },
         { status: 400 }
       );
     }
@@ -128,32 +142,46 @@ export async function POST(req: NextRequest) {
     // Determine target item details (course or instructor plan)
     let expectedUsdAmount = 0;
     let itemTitle = "Formation";
-    let targetCourseId = courseId || null;
+    let targetCourseId: string | null = null;
+    let targetPlanName: string | null = null;
 
     if (courseId) {
-      const { data: course } = await supabaseAdmin
-        .from("courses")
-        .select("id, title, price")
-        .eq("id", courseId)
-        .maybeSingle();
+      const pricingResult = await resolveCoursePricing({
+        courseId,
+        payInstallment,
+        couponId,
+      });
 
-      if (!course) {
-        return NextResponse.json({ error: "Cours introuvable." }, { status: 404 });
+      if (!pricingResult.data) {
+        return NextResponse.json(
+          { error: pricingResult.error || "Cours introuvable." },
+          { status: pricingResult.status || 404 }
+        );
       }
 
-      const fullPrice = Number(course.price) || 0;
-      const installmentCount = (typeof payInstallment === "number" && payInstallment > 1) ? payInstallment : 1;
-      expectedUsdAmount = Math.round(fullPrice / installmentCount);
-      itemTitle = course.title;
-      targetCourseId = course.id;
+      expectedUsdAmount = pricingResult.data.baseAmount;
+      itemTitle = pricingResult.data.courseTitle;
+      targetCourseId = pricingResult.data.courseId;
     } else if (planId) {
       const PLAN_PRICES: Record<string, number> = {
-        "BASE": 29,
-        "PRO": 79,
-        "MAX": 149,
+        BASE: 19,
+        PRO: 49,
+        MAX: 149,
       };
-      expectedUsdAmount = PLAN_PRICES[planId.toUpperCase()] || 49;
-      itemTitle = `Abonnement Formateur Plan ${planId.toUpperCase()}`;
+      const normalizedPlan = String(planId).toUpperCase();
+      if (!PLAN_PRICES[normalizedPlan]) {
+        return NextResponse.json({ error: "Plan d'abonnement invalide." }, { status: 400 });
+      }
+      expectedUsdAmount = PLAN_PRICES[normalizedPlan];
+      targetPlanName = normalizedPlan;
+      itemTitle = `Abonnement Formateur Plan ${normalizedPlan}`;
+    }
+
+    if (expectedUsdAmount <= 0) {
+      return NextResponse.json(
+        { error: "Montant attendu invalide pour une transaction Bitcoin." },
+        { status: 400 }
+      );
     }
 
     // Fetch live BTC price and expected Satoshis
@@ -171,8 +199,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check tolerance (allow 5% price fluctuation or minor fee diffs)
-    const minRequiredSatoshis = Math.floor(expectedSatoshis * 0.95);
+    // Check tolerance (allow 5% price fluctuation or minor fee diffs, minimum 500 satoshis)
+    const minRequiredSatoshis = Math.max(500, Math.floor(expectedSatoshis * 0.95));
     if (verification.receivedSatoshis < minRequiredSatoshis) {
       const receivedBtc = (verification.receivedSatoshis / 100000000).toFixed(8);
       return NextResponse.json(
@@ -183,7 +211,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const finalPaidUsd = expectedUsdAmount > 0 ? expectedUsdAmount : Math.round((verification.receivedSatoshis / 100000000) * btcPriceUsd);
+    const finalPaidUsd = expectedUsdAmount;
 
     // Create Order & Payment Records
     const orderId = crypto.randomUUID();
@@ -206,7 +234,6 @@ export async function POST(req: NextRequest) {
         final_price: finalPaidUsd,
       });
 
-      // Insert enrollment
       await (supabaseAdmin as any).from("enrollments").upsert({
         student_id: user.id,
         course_id: targetCourseId,
@@ -215,6 +242,11 @@ export async function POST(req: NextRequest) {
         enrolled_at: new Date().toISOString(),
         enrollment_type: "ONLINE_PURCHASE",
       });
+    } else if (targetPlanName) {
+      await supabaseAdmin
+        .from("profiles")
+        .update({ plan: targetPlanName, updated_at: new Date().toISOString() })
+        .eq("id", user.id);
     }
 
     // Insert Payment Record with provider CRYPTO_BTC
@@ -226,7 +258,7 @@ export async function POST(req: NextRequest) {
       currency: "USD",
       status: "PAID",
       provider: "CRYPTO_BTC",
-      method: `BITCOIN::ON_CHAIN::${targetCourseId || 'PLAN'}::${cleanHash}`,
+      method: `BITCOIN::ON_CHAIN::${targetCourseId || targetPlanName || "PLAN"}::${cleanHash}`,
       provider_transaction_id: cleanHash,
       paid_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
@@ -248,7 +280,6 @@ export async function POST(req: NextRequest) {
       receivedSatoshis: verification.receivedSatoshis,
       txHash: cleanHash,
     });
-
   } catch (err: any) {
     console.error("[POST /api/payments/btc-verify] Error:", err);
     return NextResponse.json(

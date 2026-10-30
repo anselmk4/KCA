@@ -10,6 +10,7 @@ import {
   calculatePawaPayAmountWithFee,
   PAWAPAY_FEE_RATE
 } from '@/lib/pawapay';
+import { resolveCoursePricing } from '@/lib/payment-pricing';
 
 export async function POST(req: NextRequest) {
   try {
@@ -107,53 +108,29 @@ export async function POST(req: NextRequest) {
       : supabase;
 
     // Server-side verification and calculation of base price + discount to prevent tampering
-    let baseAmount = typeof amount === 'number' ? amount : (parseFloat(amount) || 0);
-    let subtotal = baseAmount;
+    let baseAmount = 0;
+    let subtotal = 0;
     let discountAmount = 0;
+    let validatedCouponId: string | null = null;
 
     if (type === 'STUDENT_COURSE') {
-      const { data: course } = await supabaseAdmin
-        .from('courses')
-        .select('price, allow_installments, installments_count')
-        .eq('id', itemId)
-        .maybeSingle();
+      const pricingResult = await resolveCoursePricing({
+        courseId: itemId,
+        payInstallment,
+        couponId,
+      });
 
-      if (course) {
-        const originalPrice = parseFloat(course.price as any) || 0;
-
-        let installmentCount = 1;
-        if (payInstallment === 2) {
-          installmentCount = 2;
-        } else if (payInstallment === 3 || payInstallment === true) {
-          installmentCount = course.installments_count || 3;
-        } else if (typeof payInstallment === 'number' && payInstallment > 1) {
-          installmentCount = payInstallment;
-        }
-
-        let fullCourseDiscount = 0;
-        if (couponId) {
-          const { data: coupon } = await supabaseAdmin
-            .from('coupons')
-            .select('*')
-            .eq('id', couponId)
-            .eq('is_active', true)
-            .maybeSingle();
-
-          if (coupon) {
-            if (coupon.discount_type === 'PERCENTAGE') {
-              fullCourseDiscount = Math.round(originalPrice * (parseFloat(coupon.discount_value as any) / 100));
-            } else if (coupon.discount_type === 'FIXED') {
-              fullCourseDiscount = parseFloat(coupon.discount_value as any) || 0;
-            }
-          }
-        }
-
-        const discountedTotalCoursePrice = Math.max(0, originalPrice - fullCourseDiscount);
-
-        subtotal = Math.round(originalPrice / installmentCount);
-        discountAmount = Math.round(fullCourseDiscount / installmentCount);
-        baseAmount = Math.max(0, Math.round(discountedTotalCoursePrice / installmentCount));
+      if (!pricingResult.data) {
+        return NextResponse.json(
+          { error: pricingResult.error || 'Cours introuvable.' },
+          { status: pricingResult.status || 404 }
+        );
       }
+
+      subtotal = pricingResult.data.subtotal;
+      discountAmount = pricingResult.data.discountAmount;
+      baseAmount = pricingResult.data.baseAmount;
+      validatedCouponId = pricingResult.data.validCouponId;
     } else if (type === 'INSTRUCTOR_PLAN') {
       const planPrices: Record<string, { monthly: number; annual: number }> = {
         BASE: { monthly: 15, annual: 144 },
@@ -161,10 +138,11 @@ export async function POST(req: NextRequest) {
         MAX: { monthly: 59, annual: 566 }
       };
       const planConfig = planPrices[itemId?.toUpperCase()];
-      if (planConfig) {
-        baseAmount = cycle === 'ANNUAL' ? planConfig.annual : planConfig.monthly;
-        subtotal = baseAmount;
+      if (!planConfig) {
+        return NextResponse.json({ error: 'Plan formateur invalide.' }, { status: 400 });
       }
+      baseAmount = cycle === 'ANNUAL' ? planConfig.annual : planConfig.monthly;
+      subtotal = baseAmount;
     } else if (type === 'DIGITAL_PRODUCT') {
       const { data: product, error: prodErr } = await supabaseAdmin
         .from('digital_products')
@@ -178,6 +156,12 @@ export async function POST(req: NextRequest) {
 
       baseAmount = Number(product.price);
       subtotal = baseAmount;
+    } else {
+      return NextResponse.json({ error: 'Type de paiement invalide.' }, { status: 400 });
+    }
+
+    if (baseAmount <= 0) {
+      return NextResponse.json({ error: 'Montant à payer invalide.' }, { status: 400 });
     }
 
     // Résolution de l'identifiant utilisateur (connecté ou invité par email)
@@ -216,7 +200,7 @@ export async function POST(req: NextRequest) {
           tax_amount: feeAmount, // Store PawaPay fee surcharge
           total: calculatedAmountWithFee, // Full debited amount
           currency: 'USD',
-          coupon_id: couponId || null,
+          coupon_id: validatedCouponId,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         } as any);

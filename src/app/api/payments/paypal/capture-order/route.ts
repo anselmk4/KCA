@@ -127,13 +127,20 @@ export async function POST(req: NextRequest) {
       // Check course exists
       const { data: course, error: courseErr } = await dbClient
         .from("courses")
-        .select("id, price, title, instructor_id")
+        .select("id, price, title, instructor_id, allow_installments, installments_count")
         .eq("id", itemId)
         .maybeSingle();
 
       if (courseErr || !course) {
         console.error("[paypal-capture-order] Course fetch error or missing course:", courseErr?.message);
         return NextResponse.json({ error: "Cours introuvable pour validation finale." }, { status: 404 });
+      }
+
+      if (Number(course.price) > 0 && amountCaptured < 1) {
+        return NextResponse.json(
+          { error: "Montant capturé invalide pour un cours payant." },
+          { status: 400 }
+        );
       }
 
       // Write Order record
@@ -292,6 +299,14 @@ export async function POST(req: NextRequest) {
       }
       const activeInstructorId = user.id;
       const planName = itemId.toUpperCase();
+      const minPlanPrices: Record<string, number> = { BASE: 15, PRO: 29, MAX: 59 };
+      const minExpectedPlanPrice = minPlanPrices[planName] || 15;
+      if (amountCaptured < minExpectedPlanPrice * 0.95) {
+        return NextResponse.json(
+          { error: `Montant capturé (${amountCaptured}$) insuffisant pour le plan ${planName}.` },
+          { status: 400 }
+        );
+      }
       const dbOrderId = crypto.randomUUID();
       const paymentId = crypto.randomUUID();
 
@@ -419,6 +434,13 @@ export async function POST(req: NextRequest) {
       if (prodErr || !product) {
         console.error("[paypal-capture-order] Digital product fetch error:", prodErr?.message);
         return NextResponse.json({ error: "Produit digital introuvable pour validation finale." }, { status: 404 });
+      }
+
+      if (Number(product.price) > 0 && amountCaptured < Number(product.price) * 0.95) {
+        return NextResponse.json(
+          { error: "Le montant capturé ne correspond pas au prix du produit digital." },
+          { status: 400 }
+        );
       }
 
       const buyerEmail = user?.email || (metadataUserId.startsWith("email_") ? decodeURIComponent(metadataUserId.replace("email_", "")) : "");

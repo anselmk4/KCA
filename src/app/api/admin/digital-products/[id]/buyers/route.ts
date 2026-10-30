@@ -37,7 +37,8 @@ export async function GET(
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const { id: productId } = await params;
+    const { id: rawProductId } = await params;
+    const productId = String(rawProductId || "").replace(/[^a-zA-Z0-9_-]/g, "");
     if (!productId) {
       return NextResponse.json({ error: "ID du produit manquant" }, { status: 400 });
     }

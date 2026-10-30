@@ -203,10 +203,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Aucun destinataire valide trouvé pour cette sélection." }, { status: 400 });
     }
 
-    // 2. Format HTML Body Content matching standard Ansella layout
+    // 2. Format HTML Body Content matching standard Ansella layout (with HTML escaping)
+    const { escapeHtml } = await import("@/lib/sanitize");
     const formattedParagraphs = message
       .split(/\n\s*\n/)
-      .map((p: string) => `<p>${p.replace(/\n/g, "<br/>")}</p>`)
+      .map((p: string) => `<p>${escapeHtml(p).replace(/\n/g, "<br/>")}</p>`)
       .join("\n");
 
     let infoBoxHtml = "";
@@ -230,21 +231,27 @@ export async function POST(req: NextRequest) {
 
       infoBoxHtml = `
         <div style="background-color: ${bgColor}; border: 1px solid ${borderColor}; border-left: 4px solid ${leftBorderColor}; border-radius: 12px; padding: 16px; margin: 20px 0; color: ${textColor}; font-size: 14px;">
-          ${infoBoxText.replace(/\n/g, "<br/>")}
+          ${escapeHtml(infoBoxText).replace(/\n/g, "<br/>")}
         </div>
       `;
     }
 
     let buttonHtml = "";
-    if (buttonText && buttonText.trim() && buttonUrl && buttonUrl.trim()) {
+    const trimmedBtnUrl = buttonUrl ? String(buttonUrl).trim() : "";
+    const isSafeButtonUrl =
+      trimmedBtnUrl.startsWith("https://") || trimmedBtnUrl.startsWith("http://");
+    if (buttonText && buttonText.trim() && isSafeButtonUrl) {
       buttonHtml = `
         <div style="text-align: center; margin: 30px 0 20px 0;">
-          <a href="${buttonUrl.trim()}" class="btn" style="display: inline-block; padding: 14px 28px; background-color: #4f46e5; color: #ffffff !important; text-decoration: none; font-weight: 700; border-radius: 10px; font-size: 15px; box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);">${buttonText.trim()}</a>
+          <a href="${escapeHtml(trimmedBtnUrl)}" class="btn" style="display: inline-block; padding: 14px 28px; background-color: #4f46e5; color: #ffffff !important; text-decoration: none; font-weight: 700; border-radius: 10px; font-size: 15px; box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);">${escapeHtml(buttonText.trim())}</a>
         </div>
       `;
     }
 
-    const emailHeading = heading && heading.trim() ? `<h2>${heading.trim()}</h2>` : `<h2>${subject.trim()}</h2>`;
+    const emailHeading =
+      heading && heading.trim()
+        ? `<h2>${escapeHtml(heading.trim())}</h2>`
+        : `<h2>${escapeHtml(subject.trim())}</h2>`;
     const fullBodyContent = `
       ${emailHeading}
       ${formattedParagraphs}

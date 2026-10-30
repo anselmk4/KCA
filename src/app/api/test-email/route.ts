@@ -1,28 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { isAuthorizedSuperAdmin } from "@/lib/rbac";
 import { sendEmail } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user || !isAuthorizedSuperAdmin(user.email)) {
+      return NextResponse.json({ error: "Accès réservé au Super Administrateur." }, { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
-    const to = searchParams.get("to") || "anselmk4@gmail.com";
+    const to = searchParams.get("to") || user.email!;
 
-    const subject = "Confirmez votre adresse e-mail";
+    const subject = "Test de configuration e-mail Ansella";
     const bodyContent = `
-      <h2>Confirmez votre adresse e-mail</h2>
-      <p>Bonjour et bienvenue ! Merci d'avoir créé un compte sur Ansella. Pour finaliser votre inscription et activer pleinement vos accès, veuillez confirmer votre adresse en cliquant sur le bouton ci-dessous :</p>
-      
-      <div style="margin: 24px 0;">
-        <a href="https://ansella.app/auth/confirmed" class="btn">Confirmer mon compte</a>
-      </div>
-
-      <hr class="divider" />
-
-      <p class="fallback-link">
-        Si le bouton ne fonctionne pas, vous pouvez copier et coller ce lien directement dans votre navigateur :<br/>
-        <a href="https://ansella.app/auth/confirmed">https://ansella.app/auth/confirmed</a>
-      </p>
+      <h2>Configuration e-mail fonctionnelle</h2>
+      <p>Cet e-mail de test a été déclenché par l'administrateur (${user.email}).</p>
     `;
 
     const result = await sendEmail(to, subject, bodyContent);

@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { isAuthorizedSuperAdmin } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 
+function sanitizePostgrestValue(val: string): string {
+  return String(val || "").replace(/[,()*\\]/g, "").trim();
+}
+
 /**
  * GET /api/profile/[userId]
- * Public profile data endpoint with admin fallback and auto-provisioning.
+ * Public profile data endpoint with PII redaction for non-owners/non-admins.
  */
 export async function GET(
   req: NextRequest,
@@ -20,9 +25,10 @@ export async function GET(
     }
 
     const supabase = await createClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
 
-    // Support "me" alias
     const targetId = userId === "me" ? authUser?.id : userId;
 
     if (!targetId) {
@@ -32,14 +38,14 @@ export async function GET(
     const dbClient = (process.env.SUPABASE_SERVICE_ROLE_KEY ? supabaseAdmin : supabase) as any;
 
     // 1. Fetch Profile from profiles table
-    let { data: profile, error: profErr } = await dbClient
+    let { data: profile } = await dbClient
       .from("profiles")
       .select("*")
       .eq("id", targetId)
       .maybeSingle();
 
-    // 2. If profile is not found in profiles, try checking auth.users via supabaseAdmin
-    if (!profile && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    // 2. If profile is not found in profiles and caller is looking up their own account, auto-provision
+    if (!profile && authUser && authUser.id === targetId && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       try {
         const { data: adminUserData } = await supabaseAdmin.auth.admin.getUserById(targetId);
         if (adminUserData?.user) {
@@ -62,7 +68,6 @@ export async function GET(
             created_at: new Date().toISOString(),
           };
 
-          // Upsert profile
           await dbClient.from("profiles").upsert(newProfile);
           profile = newProfile;
         }
@@ -71,22 +76,27 @@ export async function GET(
       }
     }
 
-    // 3. Fallback: try matching by email or username
+    // 3. Fallback: try matching by full_name safely (without PostgREST filter injection)
     if (!profile) {
-      const { data: altProf } = await dbClient
-        .from("profiles")
-        .select("*")
-        .or(`email.eq.${targetId},full_name.ilike.${targetId}`)
-        .maybeSingle();
-      if (altProf) profile = altProf;
+      const safeLookup = sanitizePostgrestValue(targetId);
+      if (safeLookup) {
+        const { data: altProf } = await dbClient
+          .from("profiles")
+          .select("*")
+          .ilike("full_name", safeLookup)
+          .maybeSingle();
+        if (altProf) profile = altProf;
+      }
     }
 
     if (!profile) {
       return NextResponse.json({ error: "Profil introuvable" }, { status: 404 });
     }
 
-    // 4. Check user roles
+    // 4. Check target user roles and caller privileges
     let isInstructor = false;
+    let isCallerAdmin = Boolean(authUser?.email && isAuthorizedSuperAdmin(authUser.email));
+
     try {
       const { data: roles } = await dbClient
         .from("user_roles")
@@ -100,9 +110,25 @@ export async function GET(
         roleNames.includes("ADMIN") ||
         profile.role === "INSTRUCTOR" ||
         profile.role === "ADMIN";
+
+      if (authUser && authUser.id !== profile.id && !isCallerAdmin) {
+        const { data: callerRoles } = await dbClient
+          .from("user_roles")
+          .select("roles(name)")
+          .eq("user_id", authUser.id);
+        const callerRoleNames = (callerRoles || [])
+          .map((r: any) => r.roles?.name)
+          .filter(Boolean);
+        isCallerAdmin = callerRoleNames.some((r: string) =>
+          ["SUPER_ADMIN", "ADMIN", "ACADEMIC_ADMIN", "FINANCE_ADMIN", "SUPPORT_AGENT"].includes(r)
+        );
+      }
     } catch {
       isInstructor = profile.role === "INSTRUCTOR";
     }
+
+    const isOwn = Boolean(authUser && authUser.id === profile.id);
+    const canViewPrivateFields = isOwn || isCallerAdmin;
 
     // 5. Fetch published courses if instructor
     let courses: any[] = [];
@@ -136,34 +162,53 @@ export async function GET(
       }
     }
 
-    // 6. Fetch enrolled courses if student
+    // 6. Fetch enrolled courses ONLY if caller is the profile owner or an admin
     let paidCourses: any[] = [];
-    try {
-      const { data: enrollData } = await dbClient
-        .from("enrollments")
-        .select("course_id, courses(id, title, price, thumbnail_url, level, language)")
-        .eq("student_id", profile.id);
+    if (canViewPrivateFields) {
+      try {
+        const { data: enrollData } = await dbClient
+          .from("enrollments")
+          .select("course_id, courses(id, title, price, thumbnail_url, level, language)")
+          .eq("student_id", profile.id);
 
-      paidCourses = (enrollData || []).map((e: any) => ({
-        id: e.courses?.id || e.course_id,
-        title: e.courses?.title || "Formation",
-        price: e.courses?.price || 0,
-        status: "PUBLISHED",
-        thumbnail_url: e.courses?.thumbnail_url,
-        level: e.courses?.level,
-        language: e.courses?.language || "fr",
-        enrollmentCount: 0,
-      }));
-    } catch (eErr) {
-      console.warn("[GET /api/profile/[userId]] Enrollments query note:", eErr);
+        paidCourses = (enrollData || []).map((e: any) => ({
+          id: e.courses?.id || e.course_id,
+          title: e.courses?.title || "Formation",
+          price: e.courses?.price || 0,
+          status: "PUBLISHED",
+          thumbnail_url: e.courses?.thumbnail_url,
+          level: e.courses?.level,
+          language: e.courses?.language || "fr",
+          enrollmentCount: 0,
+        }));
+      } catch (eErr) {
+        console.warn("[GET /api/profile/[userId]] Enrollments query note:", eErr);
+      }
     }
 
+    // 7. Redact sensitive PII fields when accessed by a third-party visitor
+    const responseProfile = canViewPrivateFields
+      ? profile
+      : {
+          id: profile.id,
+          full_name: profile.full_name,
+          avatar_url: profile.avatar_url || null,
+          bio: profile.bio || null,
+          specialty: profile.specialty || null,
+          academy_name: profile.academy_name || null,
+          website: profile.website || null,
+          twitter: profile.twitter || null,
+          linkedin: profile.linkedin || null,
+          role: profile.role || (isInstructor ? "INSTRUCTOR" : "STUDENT"),
+          created_at: profile.created_at,
+        };
+
     return NextResponse.json({
-      profile,
+      profile: responseProfile,
       isInstructor,
       courses,
       paidCourses,
-      isOwn: authUser?.id === profile.id,
+      isOwn,
     });
   } catch (err: any) {
     console.error("[GET /api/profile/[userId]] Unexpected error:", err);

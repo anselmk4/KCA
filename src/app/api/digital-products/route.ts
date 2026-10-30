@@ -115,15 +115,14 @@ export async function POST(req: NextRequest) {
       author_id,
     } = body;
 
-    // Déterminer l'ID de l'auteur (utilisateur connecté ou fourni en mode simulation)
-    const effectiveAuthorId = user?.id || author_id;
-
-    if (!effectiveAuthorId) {
+    if (!user) {
       return NextResponse.json(
         { error: "Vous devez être connecté pour publier un produit digital." },
         { status: 401 }
       );
     }
+
+    const effectiveAuthorId = user.id;
 
     // 1. Validation des champs obligatoires
     if (!title || !title.trim()) {

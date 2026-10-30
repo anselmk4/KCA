@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { OrganizationJsonLd } from "@/components/seo/JsonLd";
 import { PdfModalViewerGlobal } from "@/components/ui/PdfModalViewerGlobal";
+import { AnalyticsTracker } from "@/components/analytics/AnalyticsTracker";
 import "./globals.css";
 
 const inter = Inter({
@@ -99,6 +100,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <LanguageProvider>
+            <AnalyticsTracker />
             {children}
             <PdfModalViewerGlobal />
           </LanguageProvider>

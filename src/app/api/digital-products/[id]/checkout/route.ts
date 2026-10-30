@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { generateDigitalProductToken } from "@/lib/digital-product-token";
 
 export const dynamic = "force-dynamic";
 
@@ -10,15 +11,8 @@ export async function POST(
 ) {
   try {
     const { id: productId } = await params;
-    const body = await req.json();
-    const {
-      paymentMethod = "momo",
-      phoneNumber,
-      operator,
-      userEmail,
-      userName,
-      txHash,
-    } = body;
+    const body = await req.json().catch(() => ({}));
+    const { userEmail } = body;
 
     const supabase = await createClient();
     const {
@@ -38,117 +32,97 @@ export async function POST(
       return NextResponse.json({ error: "Produit digital introuvable." }, { status: 404 });
     }
 
-    // Déterminer l'ID de l'acheteur
-    let buyerId = user?.id;
-    if (!buyerId) {
-      // Trouver ou créer un profil temporaire si non connecté
-      if (userEmail) {
-        const { data: existingProfile } = await (admin as any)
-          .from("profiles")
+    const productPrice = Number(product.price) || 0;
+
+    // 2. SÉCURITÉ CRITIQUE : Interdire la validation directe sans passerelle de paiement pour tout produit payant
+    if (productPrice > 0) {
+      // Vérifier uniquement si l'utilisateur authentifié possède déjà un achat COMPLETED
+      if (user) {
+        const { data: existingPurchase } = await (admin as any)
+          .from("digital_product_purchases")
           .select("id")
-          .eq("email", userEmail)
+          .eq("product_id", productId)
+          .eq("user_id", user.id)
+          .eq("payment_status", "COMPLETED")
           .maybeSingle();
 
-        if (existingProfile) {
-          buyerId = existingProfile.id;
-        } else {
-          // Utiliser un ID déterministe ou aléatoire pour l'acheteur invité
-          buyerId = `guest_${Date.now()}`;
+        if (existingPurchase) {
+          const token = generateDigitalProductToken(
+            productId,
+            existingPurchase.id,
+            user.email || user.id,
+            168
+          );
+          return NextResponse.json({
+            success: true,
+            alreadyPurchased: true,
+            message: "Vous avez déjà acquis ce produit digital !",
+            downloadUrl: `/api/digital-products/${productId}/download?token=${token}`,
+          });
         }
-      } else {
-        return NextResponse.json(
-          { error: "Veuillez fournir une adresse email ou vous connecter pour finaliser l'achat." },
-          { status: 400 }
-        );
       }
+
+      return NextResponse.json(
+        {
+          error:
+            "Ce produit est payant. Veuillez finaliser le règlement via Mobile Money (pawaPay) ou Carte/PayPal.",
+        },
+        { status: 402 }
+      );
     }
 
-    // 2. Vérifier si l'utilisateur a déjà acheté ce produit
-    const { data: existingPurchase } = await (admin as any)
+    // 3. Cas d'un produit explicitement GRATUIT (price === 0)
+    if (!user) {
+      return NextResponse.json(
+        { error: "Veuillez vous connecter pour télécharger cette ressource gratuite." },
+        { status: 401 }
+      );
+    }
+
+    const buyerId = user.id;
+
+    const { data: existingFreePurchase } = await (admin as any)
       .from("digital_product_purchases")
       .select("id")
       .eq("product_id", productId)
       .eq("user_id", buyerId)
       .maybeSingle();
 
-    if (existingPurchase) {
-      return NextResponse.json({
-        success: true,
-        alreadyPurchased: true,
-        message: "Vous avez déjà acquis ce produit digital !",
-        downloadUrl: `/api/digital-products/${productId}/download`,
-      });
+    let purchaseId = existingFreePurchase?.id;
+
+    if (!purchaseId) {
+      const txRef = `free_dp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const { data: purchase } = await (admin as any)
+        .from("digital_product_purchases")
+        .insert({
+          product_id: productId,
+          user_id: buyerId,
+          price_paid: 0,
+          payment_method: "free",
+          payment_status: "COMPLETED",
+          transaction_id: txRef,
+          created_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+
+      purchaseId = purchase?.id || txRef;
     }
 
-    // 3. Enregistrer l'achat
-    const purchasePayload = {
-      product_id: productId,
-      user_id: buyerId,
-      price_paid: product.price,
-      payment_method: paymentMethod,
-      payment_status: "COMPLETED",
-      transaction_id: txHash || `tx_dp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      created_at: new Date().toISOString(),
-    };
-
-    const { data: purchase, error: purchaseErr } = await (admin as any)
-      .from("digital_product_purchases")
-      .insert(purchasePayload)
-      .select()
-      .single();
-
-    if (purchaseErr) {
-      console.warn("[DigitalProduct Checkout] Purchase insert error:", purchaseErr);
-    }
-
-    // 4. Enregistrer dans la table transactions générale si disponible
-    try {
-      await (admin as any).from("transactions").insert({
-        user_id: buyerId,
-        amount: product.price,
-        course_id: productId, // réutilise le champ pour stocker l'entité
-        method: paymentMethod === "momo" ? "Mobile Money" : paymentMethod === "crypto" ? "Crypto" : "Carte",
-        status: "PAID",
-        date: new Date().toISOString(),
-      });
-    } catch (txErr) {
-      // Non critique
-    }
-
-    // 5. Notifier l'auteur / formateur avec calcul de commission
-    if (product.author_id) {
-      try {
-        const { data: authorProfile } = await (admin as any)
-          .from("profiles")
-          .select("email, full_name, plan")
-          .eq("id", product.author_id)
-          .maybeSingle();
-
-        const instPlan = authorProfile?.plan || "FREE";
-        const commissionRate = instPlan === "FREE" ? 0.20 : (instPlan === "BASE" ? 0.10 : (instPlan === "PRO" ? 0.05 : 0.0));
-        const platformFee = product.price * commissionRate;
-        const instructorEarnings = product.price - platformFee;
-
-        const { createNotification } = await import("@/lib/supabase/notifications-helper");
-        await createNotification({
-          userId: product.author_id,
-          title: "Nouvelle vente de produit digital !",
-          message: `Un exemplaire de "${product.title}" a été vendu (${product.price} $). Vos gains nets : $${instructorEarnings.toFixed(2)} (Commission plateforme : ${(commissionRate * 100).toFixed(0)}%).`,
-          type: "SUCCESS",
-          link: `/instructor/courses`
-        });
-      } catch (notifErr) {
-        console.warn("[DigitalProduct Checkout] Instructor notification warning:", notifErr);
-      }
-    }
+    const token = generateDigitalProductToken(
+      productId,
+      String(purchaseId),
+      user.email || userEmail || buyerId,
+      168
+    );
 
     return NextResponse.json({
       success: true,
-      purchaseId: purchase?.id || purchasePayload.transaction_id,
-      downloadUrl: `/api/digital-products/${productId}/download`,
+      purchaseId,
+      downloadUrl: `/api/digital-products/${productId}/download?token=${token}`,
       productTitle: product.title,
-      price: product.price,
-      message: "Paiement confirmé avec succès ! Vous pouvez télécharger votre produit dès maintenant.",
+      price: 0,
+      message: "Accès gratuit confirmé ! Vous pouvez télécharger votre produit dès maintenant.",
     });
   } catch (err: any) {
     console.error("[DigitalProduct Checkout] Error:", err);

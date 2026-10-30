@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
-// Temporary memory cache for base64 PDF streams (stores for 15 minutes)
 interface CachedPdf {
   buffer: Buffer;
   filename: string;
@@ -8,8 +8,9 @@ interface CachedPdf {
 }
 
 const pdfCache = new Map<string, CachedPdf>();
+const MAX_CACHE_ENTRIES = 25;
+const MAX_PDF_BYTES = 15 * 1024 * 1024; // 15 MB
 
-// Periodically clean expired items
 function cleanExpired() {
   const now = Date.now();
   for (const [key, item] of pdfCache.entries()) {
@@ -17,10 +18,61 @@ function cleanExpired() {
       pdfCache.delete(key);
     }
   }
+  while (pdfCache.size >= MAX_CACHE_ENTRIES) {
+    const oldestKey = pdfCache.keys().next().value;
+    if (!oldestKey) break;
+    pdfCache.delete(oldestKey);
+  }
+}
+
+function isAllowedRemotePdfUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== "https:") return false;
+
+    const hostname = parsed.hostname.toLowerCase();
+    // Block localhost, loopback, link-local, or private IPv4/IPv6 ranges
+    if (
+      hostname === "localhost" ||
+      hostname.startsWith("127.") ||
+      hostname.startsWith("10.") ||
+      hostname.startsWith("192.168.") ||
+      hostname.startsWith("169.254.") ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname) ||
+      hostname === "[::1]"
+    ) {
+      return false;
+    }
+
+    const configuredSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    let configuredSupabaseHost = "";
+    if (configuredSupabaseUrl) {
+      try {
+        configuredSupabaseHost = new URL(configuredSupabaseUrl).hostname.toLowerCase();
+      } catch {}
+    }
+
+    if (configuredSupabaseHost && hostname === configuredSupabaseHost) {
+      return true;
+    }
+
+    return hostname.endsWith(".supabase.co") || hostname.endsWith(".supabase.in");
+  } catch {
+    return false;
+  }
 }
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Authentification requise" }, { status: 401 });
+    }
+
     cleanExpired();
     const body = await req.json();
     const { data, title } = body;
@@ -40,13 +92,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Format base64 invalide" }, { status: 400 });
     }
 
+    if (buffer.byteLength > MAX_PDF_BYTES) {
+      return NextResponse.json(
+        { error: "Le document PDF dépasse la limite autorisée (15 Mo)." },
+        { status: 413 }
+      );
+    }
+
     const token = crypto.randomUUID();
     const filename = (title || "document").replace(/[^\w\s-]/gi, "") + ".pdf";
 
     pdfCache.set(token, {
       buffer,
       filename,
-      expiresAt: Date.now() + 15 * 60 * 1000, // 15 min
+      expiresAt: Date.now() + 15 * 60 * 1000,
     });
 
     return NextResponse.json({
@@ -69,10 +128,13 @@ export async function GET(req: NextRequest) {
     if (token) {
       const cached = pdfCache.get(token);
       if (!cached) {
-        return new NextResponse("Document expiré ou introuvable. Veuillez fermer et réouvrir la visionneuse.", {
-          status: 404,
-          headers: { "Content-Type": "text/plain; charset=utf-8" },
-        });
+        return new NextResponse(
+          "Document expiré ou introuvable. Veuillez fermer et réouvrir la visionneuse.",
+          {
+            status: 404,
+            headers: { "Content-Type": "text/plain; charset=utf-8" },
+          }
+        );
       }
 
       return new NextResponse(new Uint8Array(cached.buffer), {
@@ -81,31 +143,45 @@ export async function GET(req: NextRequest) {
           "Content-Type": "application/pdf",
           "Content-Disposition": `inline; filename="${cached.filename}"`,
           "X-Frame-Options": "SAMEORIGIN",
-          "Cache-Control": "public, max-age=1800",
+          "Cache-Control": "private, max-age=900",
           "X-Content-Type-Options": "nosniff",
         },
       });
     }
 
-    // 2. If served via remote URL (proxying through same-origin)
+    // 2. If served via remote URL (strictly restricted to project's Supabase Storage host to prevent SSRF)
     if (rawUrl) {
       const decodedUrl = decodeURIComponent(rawUrl);
-      if (!decodedUrl.startsWith("http://") && !decodedUrl.startsWith("https://")) {
-        return new NextResponse("URL non valide", { status: 400 });
+      if (!isAllowedRemotePdfUrl(decodedUrl)) {
+        return new NextResponse(
+          "Domaine distant non autorisé pour le flux PDF.",
+          { status: 403 }
+        );
       }
 
       const response = await fetch(decodedUrl, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          Accept: "application/pdf,application/octet-stream",
         },
+        redirect: "error",
       });
 
       if (!response.ok) {
-        return new NextResponse("Impossible de récupérer le fichier distant", { status: response.status });
+        return new NextResponse("Impossible de récupérer le fichier distant", {
+          status: response.status,
+        });
       }
 
       const arrayBuffer = await response.arrayBuffer();
-      const filename = decodedUrl.split("/").pop()?.split("?")[0] || "document.pdf";
+      if (arrayBuffer.byteLength > MAX_PDF_BYTES * 2) {
+        return new NextResponse("Fichier PDF trop volumineux", { status: 413 });
+      }
+
+      const filename =
+        (decodedUrl.split("/").pop()?.split("?")[0] || "document.pdf").replace(
+          /[^\w.-]/g,
+          "_"
+        );
 
       return new NextResponse(new Uint8Array(arrayBuffer), {
         status: 200,
@@ -113,7 +189,7 @@ export async function GET(req: NextRequest) {
           "Content-Type": "application/pdf",
           "Content-Disposition": `inline; filename="${filename}"`,
           "X-Frame-Options": "SAMEORIGIN",
-          "Cache-Control": "public, max-age=3600",
+          "Cache-Control": "private, max-age=3600",
           "X-Content-Type-Options": "nosniff",
         },
       });

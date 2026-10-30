@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { isAuthorizedSuperAdmin } from "@/lib/rbac";
+import { validateDigitalProductPrice } from "@/lib/digital-products-pricing";
 
 export const dynamic = "force-dynamic";
-import { validateDigitalProductPrice } from "@/lib/digital-products-pricing";
+
+async function isUserAdmin(admin: any, userId: string, email?: string | null): Promise<boolean> {
+  if (email && isAuthorizedSuperAdmin(email)) return true;
+  const { data: userRoles } = await admin
+    .from("user_roles")
+    .select("roles(name)")
+    .eq("user_id", userId);
+  const roleNames: string[] =
+    userRoles?.map((ur: any) => ur.roles?.name).filter(Boolean) || [];
+  return roleNames.some((r) => ["SUPER_ADMIN", "ADMIN", "ACADEMIC_ADMIN"].includes(r));
+}
 
 export async function GET(
   req: NextRequest,
@@ -13,8 +25,7 @@ export async function GET(
     const { id } = await params;
     const admin = getSupabaseAdmin();
 
-    // 1. Fetch product directly
-    let { data: product, error } = await (admin as any)
+    const { data: product, error } = await (admin as any)
       .from("digital_products")
       .select("*")
       .eq("id", id)
@@ -27,11 +38,12 @@ export async function GET(
       );
     }
 
-    // 2. Fetch author profile separately
     if (product.author_id) {
       const { data: profile } = await (admin as any)
         .from("profiles")
-        .select("id, full_name, avatar_url, specialty, academy_name, bio, website, twitter, linkedin")
+        .select(
+          "id, full_name, avatar_url, specialty, academy_name, bio, website, twitter, linkedin"
+        )
         .eq("id", product.author_id)
         .maybeSingle();
 
@@ -43,7 +55,7 @@ export async function GET(
       data: { user },
     } = await supabase.auth.getUser();
 
-    const isAuthor = user && user.id === product.author_id;
+    const isAuthor = Boolean(user && user.id === product.author_id);
     if (!isAuthor) {
       delete product.file_url;
       product.has_file = true;
@@ -66,13 +78,19 @@ export async function PUT(
       data: { user },
     } = await supabase.auth.getUser();
 
+    if (!user) {
+      return NextResponse.json(
+        { error: "Vous devez être connecté pour modifier un produit digital." },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const admin = getSupabaseAdmin();
 
-    // Check ownership
     const { data: existing } = await (admin as any)
       .from("digital_products")
-      .select("author_id")
+      .select("author_id, category, file_name")
       .eq("id", id)
       .single();
 
@@ -80,11 +98,14 @@ export async function PUT(
       return NextResponse.json({ error: "Produit introuvable." }, { status: 404 });
     }
 
-    if (user && existing.author_id !== user.id) {
-      return NextResponse.json(
-        { error: "Action non autorisée. Vous n'êtes pas l'auteur de ce produit." },
-        { status: 403 }
-      );
+    if (existing.author_id !== user.id) {
+      const adminAllowed = await isUserAdmin(admin, user.id, user.email);
+      if (!adminAllowed) {
+        return NextResponse.json(
+          { error: "Action non autorisée. Vous n'êtes pas l'auteur de ce produit." },
+          { status: 403 }
+        );
+      }
     }
 
     const updates: Record<string, any> = {
@@ -102,7 +123,6 @@ export async function PUT(
     if (body.status !== undefined) updates.status = body.status;
     if (body.preview_url !== undefined) updates.preview_url = body.preview_url;
 
-    // RÈGLE TARIFAIRE : SEULS LES E-BOOKS ET GUIDES PDF SONT PLAFONNÉS À 25 $ MAX
     if (body.price !== undefined) {
       const numPrice = parseFloat(body.price);
       const categoryToCheck = body.category !== undefined ? body.category : existing.category;
@@ -142,6 +162,13 @@ export async function DELETE(
       data: { user },
     } = await supabase.auth.getUser();
 
+    if (!user) {
+      return NextResponse.json(
+        { error: "Vous devez être connecté pour supprimer un produit digital." },
+        { status: 401 }
+      );
+    }
+
     const admin = getSupabaseAdmin();
     const { data: existing } = await (admin as any)
       .from("digital_products")
@@ -153,11 +180,14 @@ export async function DELETE(
       return NextResponse.json({ error: "Produit introuvable." }, { status: 404 });
     }
 
-    if (user && existing.author_id !== user.id) {
-      return NextResponse.json(
-        { error: "Seul l'auteur peut supprimer ce produit digital." },
-        { status: 403 }
-      );
+    if (existing.author_id !== user.id) {
+      const adminAllowed = await isUserAdmin(admin, user.id, user.email);
+      if (!adminAllowed) {
+        return NextResponse.json(
+          { error: "Seul l'auteur ou un administrateur peut supprimer ce produit digital." },
+          { status: 403 }
+        );
+      }
     }
 
     const { error: delErr } = await (admin as any)

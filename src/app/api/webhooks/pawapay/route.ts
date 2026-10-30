@@ -21,13 +21,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Configuration de sécurité du serveur requise' }, { status: 500 });
     }
 
-    if (isSecretConfigured) {
-      const authHeader = req.headers.get('authorization') || req.headers.get('x-pawapay-token');
-      const querySecret = req.nextUrl.searchParams.get('secret');
+    if (isSecretConfigured && webhookSecret) {
+      const authHeader = req.headers.get('authorization') || req.headers.get('x-pawapay-token') || '';
+      const querySecret = req.nextUrl.searchParams.get('secret') || '';
+
+      const safeCompare = (a: string, b: string): boolean => {
+        const bufA = Buffer.from(a);
+        const bufB = Buffer.from(b);
+        return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+      };
+
       const isValid =
-        authHeader === `Bearer ${webhookSecret}` ||
-        authHeader === webhookSecret ||
-        querySecret === webhookSecret;
+        safeCompare(authHeader, `Bearer ${webhookSecret}`) ||
+        safeCompare(authHeader, webhookSecret) ||
+        safeCompare(querySecret, webhookSecret);
 
       if (!isValid) {
         console.warn('[webhook-pawapay] Unauthorized webhook attempt: invalid or missing token.');

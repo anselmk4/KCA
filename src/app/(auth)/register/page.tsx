@@ -27,6 +27,7 @@ import { ensureProfile, fetchUserProfile } from "@/lib/supabase/auth-helpers";
 import { Captcha } from "@/components/ui/Captcha";
 import { useLanguage } from "@/context/LanguageContext";
 import { COUNTRIES } from "@/lib/countries";
+import { sendAnalyticsEvent } from "@/components/analytics/AnalyticsTracker";
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
 
@@ -154,6 +155,18 @@ function RegisterForm() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
+
+  useEffect(() => {
+    if (!role) {
+      sendAnalyticsEvent({ type: "onboarding_step", path: "/register", step: "step_0_role_choice" });
+    } else {
+      sendAnalyticsEvent({
+        type: "onboarding_step",
+        path: "/register",
+        step: `step_${step}_${role.toLowerCase()}`,
+      });
+    }
+  }, [role, step]);
 
   // ── Session guard & query params ──────────────────────────────────────────
 

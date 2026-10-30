@@ -768,14 +768,18 @@ export async function POST(req: NextRequest) {
     // 4. Welcome Email Notification
     if (notifyEmail && targetStudentEmail) {
       try {
-        const studentGreeting = targetStudentName ? `Bonjour ${targetStudentName},` : "Bonjour,";
+        const { escapeHtml } = await import("@/lib/sanitize");
+        const safeStudentName = escapeHtml(targetStudentName);
+        const safeCourseTitle = escapeHtml(courseTitle);
+        const safeStudentEmail = escapeHtml(targetStudentEmail);
+        const studentGreeting = safeStudentName ? `Bonjour ${safeStudentName},` : "Bonjour,";
         const emailContent = `
           <h2>Félicitations ! Vous êtes inscrit à une formation</h2>
           <p>${studentGreeting}</p>
-          <p>Votre formateur vient de valider votre inscription au cours <strong>"${courseTitle}"</strong> sur la plateforme Ansella.</p>
+          <p>Votre formateur vient de valider votre inscription au cours <strong>"${safeCourseTitle}"</strong> sur la plateforme Ansella.</p>
           <div style="background-color: #f1f5f9; padding: 16px; border-radius: 12px; margin: 20px 0;">
             <p style="margin: 0; font-weight: bold; color: #1e293b;">Détails de l'inscription :</p>
-            <p style="margin: 4px 0 0 0; color: #475569;">• Cours : <strong>${courseTitle}</strong></p>
+            <p style="margin: 4px 0 0 0; color: #475569;">• Cours : <strong>${safeCourseTitle}</strong></p>
             <p style="margin: 4px 0 0 0; color: #475569;">• Statut : <strong style="color: #16a34a;">Actif &amp; Débloqué</strong></p>
           </div>
           <p>Vous pouvez dès maintenant vous connecter à votre espace étudiant et commencer à suivre vos cours :</p>
@@ -784,7 +788,7 @@ export async function POST(req: NextRequest) {
               Accéder à mes cours
             </a>
           </div>
-          <p style="font-size: 13px; color: #64748b;">Si vous n'avez pas encore défini votre mot de passe, vous pouvez utiliser la fonction "Mot de passe oublié" avec cet email (${targetStudentEmail}).</p>
+          <p style="font-size: 13px; color: #64748b;">Si vous n'avez pas encore défini votre mot de passe, vous pouvez utiliser la fonction "Mot de passe oublié" avec cet email (${safeStudentEmail}).</p>
         `;
 
         await sendEmail(
