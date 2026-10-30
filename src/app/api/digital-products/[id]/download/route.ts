@@ -43,20 +43,20 @@ export async function GET(
     let accessReason = isFree ? "Produit gratuit" : "";
 
     // Métadonnées d'identification pour le filigrane anti-partage
-    let buyerEmail = user?.email || "";
-    let buyerName = user?.user_metadata?.full_name || user?.user_metadata?.name || "";
-    let buyerPhone = user?.user_metadata?.phone_number || user?.user_metadata?.phone || "";
+    let buyerEmail = "";
+    let buyerName = "";
+    let buyerPhone = "";
     let orderId = "";
     let purchaseDate = "";
 
-    // 2. Vérification A : L'utilisateur connecté est-il l'auteur ?
-    if (!hasAccess && user && product.author_id === user.id) {
+    // 2. Vérification A : L'utilisateur connecté est-il l'auteur (uniquement si aucun jeton n'est fourni) ?
+    if (!token && !hasAccess && user && product.author_id === user.id) {
       hasAccess = true;
       accessReason = "Auteur du contenu";
     }
 
-    // 3. Vérification B : L'utilisateur connecté a-t-il acheté ce produit ?
-    if (user) {
+    // 3. Vérification B : L'utilisateur connecté a-t-il acheté ce produit (uniquement si aucun jeton n'est fourni) ?
+    if (!token && user) {
       const { data: purchase } = await (admin as any)
         .from("digital_product_purchases")
         .select("id, payment_status, created_at")
@@ -91,17 +91,32 @@ export async function GET(
     }
 
     // 4. Vérification C : Jeton cryptographique signé à usage temporaire (Guest ou lien direct reçu par email/paiement)
-    if (!hasAccess && token) {
-      const tokenResult = verifyDigitalProductToken(token, productId);
+    // PRIORITÉ ABSOLUE : Si un jeton est fourni, il définit l'identité officielle de l'acheteur pour le filigrane
+    if (token) {
+      let tokenResult = verifyDigitalProductToken(token, productId);
+
+      // Tolérance si le jeton a été émis lors de la transition entre l'ancien produit et l'e-book
+      if (!tokenResult.valid) {
+        const altProductId =
+          productId === "0d0ad7b2-7e13-4f98-ab46-36346d47ac62"
+            ? "3b31895d-72da-4d19-a6fd-665a9ce14079"
+            : "0d0ad7b2-7e13-4f98-ab46-36346d47ac62";
+        const altCheck = verifyDigitalProductToken(token, altProductId);
+        if (altCheck.valid) {
+          tokenResult = altCheck;
+        }
+      }
 
       if (tokenResult.valid && tokenResult.payload) {
         const { purchaseId, buyerIdentifier } = tokenResult.payload;
         orderId = purchaseId || "";
 
         if (buyerIdentifier?.includes("@")) {
-          buyerEmail = buyerIdentifier;
+          buyerEmail = buyerIdentifier.trim();
+          const localPart = buyerEmail.split("@")[0];
+          buyerName = localPart.charAt(0).toUpperCase() + localPart.slice(1);
         } else if (buyerIdentifier) {
-          buyerName = buyerIdentifier;
+          buyerName = buyerIdentifier.trim();
         }
 
         // Contrôle d'intégrité en base de données : vérifier que l'achat existe ou réparer si jeton signé authentique
@@ -339,7 +354,7 @@ export async function GET(
       rawFileName.toLowerCase().endsWith(".pdf");
 
     if (isPdf) {
-      const stampEmail = buyerEmail || user?.email || "acheteur-kca@ansella.app";
+      const stampEmail = buyerEmail || (!token ? user?.email : "") || "acheteur-kca@ansella.app";
       try {
         finalPayload = await applyDynamicWatermark(fileBuffer, {
           buyerName,
