@@ -10,13 +10,10 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient();
 
-    // 1. Verify user session
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Non authentifié. Veuillez vous connecter.' }, { status: 401 });
-    }
+    // 1. Session utilisateur (optionnelle pour les vérifications de produits digitaux par invité)
+    const { data: { user } } = await supabase.auth.getUser();
 
-    // 2. Extract depositId from query params
+    // 2. Extraire le depositId des paramètres de requête
     const { searchParams } = new URL(req.url);
     const depositId = searchParams.get('depositId');
 
@@ -24,7 +21,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Identifiant de dépôt manquant (depositId)' }, { status: 400 });
     }
 
-    // 3. Fetch payment from database
+    // 3. Récupérer le paiement en base de données
     const { data: payment, error: fetchErr } = await supabaseAdmin
       .from('payments')
       .select('id, order_id, user_id, amount, status, method, failure_reason')
@@ -35,16 +32,46 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: `Paiement introuvable pour l'id ${depositId}` }, { status: 404 });
     }
 
-    // Ensure payment belongs to the current user (security check)
-    if (payment.user_id !== user.id) {
-      return NextResponse.json({ error: 'Accès non autorisé à cette transaction.' }, { status: 403 });
+    const isDigitalProduct = (payment.method || '').includes('DIGITAL_PRODUCT');
+
+    // Contrôle d'accès :
+    // Pour les cours ou abonnements, une session connectée correspondant à user_id est requise.
+    // Pour les produits digitaux achetés en tant qu'invité, le depositId unique (UUID cryptographique) fait foi.
+    if (!isDigitalProduct) {
+      if (!user) {
+        return NextResponse.json({ error: 'Non authentifié. Veuillez vous connecter.' }, { status: 401 });
+      }
+      if (payment.user_id !== user.id) {
+        return NextResponse.json({ error: 'Accès non autorisé à cette transaction.' }, { status: 403 });
+      }
     }
 
-    // If already marked as PAID in DB, return immediately
+    // Si déjà marqué PAYÉ en base, renvoyer immédiatement avec le lien de téléchargement
     if (payment.status === 'PAID') {
+      let downloadUrl: string | undefined = undefined;
+      let productId: string | undefined = undefined;
+
+      if (isDigitalProduct) {
+        const methodParts = (payment.method || '').split('::');
+        const itemId = methodParts[2];
+        const metaEmail = methodParts[3] ? decodeURIComponent(methodParts[3]) : '';
+        if (itemId) {
+          productId = itemId;
+          try {
+            const { generateDigitalProductToken } = await import('@/lib/digital-product-token');
+            const token = generateDigitalProductToken(itemId, payment.id, metaEmail || payment.user_id, 168);
+            downloadUrl = `/api/digital-products/${itemId}/download?token=${token}`;
+          } catch (tokenErr) {
+            console.warn('[pawapay-check-status] Token generation warning for existing PAID:', tokenErr);
+          }
+        }
+      }
+
       return NextResponse.json({ 
         status: 'PAID',
-        message: 'Paiement déjà validé.'
+        message: 'Paiement déjà validé.',
+        downloadUrl,
+        productId
       });
     }
 

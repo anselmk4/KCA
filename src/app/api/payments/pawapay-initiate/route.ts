@@ -167,16 +167,30 @@ export async function POST(req: NextRequest) {
     // Résolution de l'identifiant utilisateur (connecté ou invité par email)
     let effectiveUserId = user?.id;
     if (!effectiveUserId && userEmail) {
+      const cleanEmail = String(userEmail).trim().toLowerCase();
       const { data: existingProfile } = await supabaseAdmin
         .from('profiles')
         .select('id')
-        .eq('email', userEmail)
+        .eq('email', cleanEmail)
         .maybeSingle();
 
       if (existingProfile?.id) {
         effectiveUserId = existingProfile.id;
       } else {
         effectiveUserId = crypto.randomUUID();
+        try {
+          await supabaseAdmin.from('profiles').insert({
+            id: effectiveUserId,
+            email: cleanEmail,
+            full_name: userName || cleanEmail.split('@')[0],
+            phone: formattedPhone || phoneNumber,
+            role: 'STUDENT',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          } as any);
+        } catch (profErr: any) {
+          console.warn('[pawapay-initiate] Guest profile creation non-blocking warning:', profErr?.message);
+        }
       }
     }
 
