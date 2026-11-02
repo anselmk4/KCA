@@ -1,4 +1,4 @@
-import { PDFDocument, rgb, StandardFonts, degrees } from "pdf-lib";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 export interface WatermarkBuyerInfo {
   buyerName?: string;
@@ -9,9 +9,9 @@ export interface WatermarkBuyerInfo {
 }
 
 /**
- * Applique un filigrane numérique dynamique et personnalisé sur chaque page d'un PDF.
- * Ce filigrane inclut le nom, l'email et la référence de l'acheteur pour dissuader
- * psychologiquement et juridiquement toute diffusion ou fuite du document.
+ * Applique un marquage numérique certifié et discret en bas de page d'un PDF (e-book, guide).
+ * Garantit une traçabilité légale et personnelle tout en préservant à 100% la mise en page,
+ * la présentation d'origine et le confort de lecture de l'utilisateur.
  */
 export async function applyDynamicWatermark(
   pdfBuffer: Buffer | Uint8Array,
@@ -43,78 +43,66 @@ export async function applyDynamicWatermark(
 
     const footerLine1 = `Certifié pour : ${recipientString}${phoneRef}${orderRef}`;
     const footerLine2 = `Ansella (${formattedDate}) • Diffusion ou revente interdite (Art. 360 Numérique RDC & Art. L.335-2 CPI)`;
-    const diagonalText = `LICENCE : ${cleanEmail} • Ansella`;
 
     for (let i = 0; i < totalPages; i++) {
       const page = pages[i];
-      const { width, height } = page.getSize();
+      const { width } = page.getSize();
 
-      // 1. Filigrane diagonal semi-transparent au centre de la page (ultra-discret)
-      const diagonalFontSize = Math.min(22, Math.max(13, width / 28));
-      const diagonalWidth = fontBold.widthOfTextAtSize(diagonalText, diagonalFontSize);
+      // Note : Tout filigrane diagonal barrant le texte au centre de la page est délibérément
+      // proscrit afin d'éviter tout conflit de rendu (opacité non gérée sur lecteurs mobiles / Android)
+      // et garantir une lisibilité fluide et impeccable pour les lecteurs.
 
-      page.drawText(diagonalText, {
-        x: Math.max(15, (width - diagonalWidth) / 2),
-        y: height / 2 - 10,
-        size: diagonalFontSize,
-        font: fontBold,
-        color: rgb(0.85, 0.22, 0.22),
-        opacity: 0.06, // Ultra-discret, n'altère pas la lisibilité du document
-        rotate: degrees(35),
-      });
-
-      // 2. Ligne de démarcation inférieure compacte
+      // 1. Ligne de démarcation inférieure discrète et élégante (teinte neutre)
       page.drawLine({
-        start: { x: 20, y: 19 },
-        end: { x: width - 20, y: 19 },
-        thickness: 0.35,
-        color: rgb(0.82, 0.2, 0.2),
-        opacity: 0.35,
+        start: { x: 24, y: 20 },
+        end: { x: width - 24, y: 20 },
+        thickness: 0.4,
+        color: rgb(0.82, 0.84, 0.87),
       });
 
-      // 3. Mention de licence compacte avec identité de l'acheteur
-      const maxAvailableWidth = width - 40;
+      // 2. Mention de licence avec identité de l'acheteur (bas de page, zone de marge sécurisée)
+      const maxAvailableWidth = width - 48;
       let printLine1 = footerLine1;
-      if (fontBold.widthOfTextAtSize(printLine1, 5.8) > maxAvailableWidth) {
+      if (fontBold.widthOfTextAtSize(printLine1, 5.6) > maxAvailableWidth) {
         printLine1 = `Certifié pour : ${cleanEmail}${orderRef}`;
+      }
+      if (fontBold.widthOfTextAtSize(printLine1, 5.6) > maxAvailableWidth) {
+        printLine1 = `Certifié pour : ${cleanEmail}`;
       }
 
       page.drawText(printLine1, {
-        x: 20,
+        x: 24,
         y: 12.5,
-        size: 5.8,
+        size: 5.6,
         font: fontBold,
-        color: rgb(0.72, 0.12, 0.12),
-        opacity: 0.92,
+        color: rgb(0.38, 0.42, 0.48), // Gris ardoise sobre et professionnel
       });
 
-      // 4. Avertissement légal + pagination ultra-compacte
+      // 3. Avertissement légal + pagination ultra-compacte
       const pageStr = `Page ${i + 1} / ${totalPages}`;
-      const pageStrWidth = font.widthOfTextAtSize(pageStr, 5.2);
+      const pageStrWidth = font.widthOfTextAtSize(pageStr, 5.0);
 
       page.drawText(footerLine2, {
-        x: 20,
+        x: 24,
         y: 6,
-        size: 5.2,
+        size: 5.0,
         font: font,
-        color: rgb(0.45, 0.45, 0.45),
-        opacity: 0.85,
+        color: rgb(0.55, 0.58, 0.62), // Gris clair neutre
       });
 
       page.drawText(pageStr, {
-        x: width - 20 - pageStrWidth,
+        x: width - 24 - pageStrWidth,
         y: 6,
-        size: 5.2,
+        size: 5.0,
         font: font,
-        color: rgb(0.45, 0.45, 0.45),
-        opacity: 0.85,
+        color: rgb(0.55, 0.58, 0.62),
       });
     }
 
-    // Métadonnées du PDF
+    // Métadonnées du PDF (traçabilité invisible dans le document)
     pdfDoc.setAuthor("Ansella Platform");
     pdfDoc.setSubject(`Exemplaire certifié et attribué à ${cleanEmail}`);
-    pdfDoc.setProducer("Ansella Secure Dynamic Watermarking Engine");
+    pdfDoc.setProducer("Ansella Secure Watermarking Engine");
     if (info.orderId) {
       pdfDoc.setKeywords(["Ansella", "Licence", cleanEmail, info.orderId]);
     }
