@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getPawaPayDepositStatus } from "@/lib/pawapay";
+import { getPayPalOrderDetails } from "@/lib/paypal";
 import { createNotification } from "@/lib/supabase/notifications-helper";
 import crypto from "crypto";
 
@@ -30,18 +31,42 @@ async function verifyAdminAuth() {
   return { error: null, status: 200, user };
 }
 
-function extractEmailFromMethod(method: string | null | undefined): string {
-  if (!method || !method.includes("::")) return "";
+/**
+ * Analyse le champ method d'un paiement pour en extraire email, téléphone et nom
+ */
+function parsePaymentMethodMeta(method: string | null | undefined): { email: string; phone: string; name: string } {
+  if (!method || !method.includes("::")) return { email: "", phone: "", name: "" };
   const parts = method.split("::");
-  if (parts[3]) {
-    try {
-      const decoded = decodeURIComponent(parts[3]).trim();
-      if (decoded.includes("@")) return decoded;
-    } catch {
-      // ignore
+  const rawMeta = parts[3] ? decodeURIComponent(parts[3]).trim() : "";
+  if (!rawMeta) return { email: "", phone: "", name: "" };
+
+  let email = "";
+  let phone = "";
+  let name = "";
+
+  if (rawMeta.includes("|")) {
+    const subParts = rawMeta.split("|");
+    subParts.forEach(p => {
+      const trimmed = p.trim();
+      if (trimmed.includes("@") && !email) {
+        email = trimmed;
+      } else if (/^[+0-9\s()-]{7,22}$/.test(trimmed) && !phone) {
+        phone = trimmed;
+      } else if (trimmed && !name && trimmed !== "client" && trimmed !== "MONTHLY" && trimmed !== "ANNUAL") {
+        name = trimmed;
+      }
+    });
+  } else {
+    if (rawMeta.includes("@")) {
+      email = rawMeta;
+    } else if (/^[+0-9\s()-]{7,22}$/.test(rawMeta)) {
+      phone = rawMeta;
+    } else if (rawMeta !== "client" && rawMeta !== "MONTHLY" && rawMeta !== "ANNUAL") {
+      name = rawMeta;
     }
   }
-  return "";
+
+  return { email, phone, name };
 }
 
 export async function GET(
@@ -71,30 +96,69 @@ export async function GET(
       return NextResponse.json({ error: "Produit digital introuvable" }, { status: 404 });
     }
 
+    // Gérer la transition historique des identifiants d'e-book
+    const altProductId =
+      productId === "0d0ad7b2-7e13-4f98-ab46-36346d47ac62"
+        ? "3b31895d-72da-4d19-a6fd-665a9ce14079"
+        : (productId === "3b31895d-72da-4d19-a6fd-665a9ce14079" ? "0d0ad7b2-7e13-4f98-ab46-36346d47ac62" : null);
+
+    const targetProductIds = altProductId ? [productId, altProductId] : [productId];
+
     // 2. Récupérer les achats dans digital_product_purchases
     const { data: purchases, error: purErr } = await (supabaseAdmin as any)
       .from("digital_product_purchases")
       .select("id, product_id, user_id, price_paid, payment_method, payment_status, transaction_id, created_at")
-      .eq("product_id", productId)
+      .in("product_id", targetProductIds)
       .order("created_at", { ascending: false });
 
     if (purErr) {
       console.warn("[admin-digital-product-buyers] Purchases fetch warning:", purErr.message);
     }
 
-    // 3. Récupérer également les paiements dans la table payments liée au produit
-    const { data: paymentsData } = await (supabaseAdmin as any)
-      .from("payments")
-      .select("id, order_id, user_id, amount, currency, status, method, provider, provider_transaction_id, created_at, paid_at")
-      .or(`method.ilike.%DIGITAL_PRODUCT::${productId}%,order_id.eq.${productId}`)
-      .order("created_at", { ascending: false });
+    // 3. Récupérer les paiements associés (par IDs de transaction et par produit)
+    const txIds = (purchases || []).map((p: any) => p.transaction_id).filter(Boolean);
+    const purIds = (purchases || []).map((p: any) => p.id).filter(Boolean);
 
-    // Indexer les paiements pour enrichir rapidement les achats
-    const paymentByTxMap = new Map<string, any>();
-    (paymentsData || []).forEach((pay: any) => {
-      if (pay.id) paymentByTxMap.set(pay.id, pay);
-      if (pay.provider_transaction_id) paymentByTxMap.set(pay.provider_transaction_id, pay);
-      if (pay.order_id) paymentByTxMap.set(pay.order_id, pay);
+    const paymentsMap = new Map<string, any>();
+
+    // A. Récupérer par identifiants exacts
+    const uniqueKeys = Array.from(new Set([...txIds, ...purIds]));
+    if (uniqueKeys.length > 0) {
+      const { data: directPayments } = await (supabaseAdmin as any)
+        .from("payments")
+        .select("id, order_id, user_id, amount, currency, status, method, provider, provider_metadata, provider_transaction_id, created_at, paid_at")
+        .in("id", uniqueKeys);
+
+      (directPayments || []).forEach((pay: any) => {
+        if (pay.id) paymentsMap.set(pay.id, pay);
+        if (pay.provider_transaction_id) paymentsMap.set(pay.provider_transaction_id, pay);
+        if (pay.order_id) paymentsMap.set(pay.order_id, pay);
+      });
+
+      const { data: providerPayments } = await (supabaseAdmin as any)
+        .from("payments")
+        .select("id, order_id, user_id, amount, currency, status, method, provider, provider_metadata, provider_transaction_id, created_at, paid_at")
+        .in("provider_transaction_id", uniqueKeys);
+
+      (providerPayments || []).forEach((pay: any) => {
+        if (pay.id) paymentsMap.set(pay.id, pay);
+        if (pay.provider_transaction_id) paymentsMap.set(pay.provider_transaction_id, pay);
+        if (pay.order_id) paymentsMap.set(pay.order_id, pay);
+      });
+    }
+
+    // B. Récupérer également les paiements liés au produit via la colonne method
+    const { data: productPayments } = await (supabaseAdmin as any)
+      .from("payments")
+      .select("id, order_id, user_id, amount, currency, status, method, provider, provider_metadata, provider_transaction_id, created_at, paid_at")
+      .or(`method.ilike.%DIGITAL_PRODUCT::${productId}%,method.ilike.%DIGITAL_PRODUCT::${altProductId || productId}%`)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    (productPayments || []).forEach((pay: any) => {
+      if (pay.id && !paymentsMap.has(pay.id)) paymentsMap.set(pay.id, pay);
+      if (pay.provider_transaction_id && !paymentsMap.has(pay.provider_transaction_id)) paymentsMap.set(pay.provider_transaction_id, pay);
+      if (pay.order_id && !paymentsMap.has(pay.order_id)) paymentsMap.set(pay.order_id, pay);
     });
 
     // 4. Collecter tous les user_ids pour enrichir les profils en batch
@@ -102,7 +166,7 @@ export async function GET(
     (purchases || []).forEach((p: any) => {
       if (p.user_id && p.user_id.length > 10) candidateUserIds.add(p.user_id);
     });
-    (paymentsData || []).forEach((p: any) => {
+    Array.from(paymentsMap.values()).forEach((p: any) => {
       if (p.user_id && p.user_id.length > 10) candidateUserIds.add(p.user_id);
     });
 
@@ -129,7 +193,7 @@ export async function GET(
       });
     }
 
-    // 5. Consolider les acheteurs uniques et vérifiés
+    // 5. Consolider les acheteurs uniques avec coordonnées complètes (Email, Téléphone, Nom)
     interface BuyerItem {
       id: string;
       purchaseId: string;
@@ -149,7 +213,7 @@ export async function GET(
     // Traitement des achats de digital_product_purchases
     for (const pur of (purchases || [])) {
       const txKey = pur.transaction_id || pur.id;
-      const matchedPayment = paymentByTxMap.get(pur.transaction_id) || paymentByTxMap.get(pur.id);
+      const matchedPayment = paymentsMap.get(pur.transaction_id) || paymentsMap.get(pur.id);
 
       const isPurPaid =
         pur.payment_status === "COMPLETED" ||
@@ -168,23 +232,78 @@ export async function GET(
       let name = profile?.full_name || "";
       let phone = profile?.phone || "";
 
-      // Fallback 1 : extraire l'email de l'user_id si format email
+      // Extraction depuis provider_metadata
+      if (matchedPayment?.provider_metadata && typeof matchedPayment.provider_metadata === "object") {
+        const meta = matchedPayment.provider_metadata;
+        if (!email && (meta.buyerEmail || meta.email)) {
+          email = String(meta.buyerEmail || meta.email).trim();
+        }
+        if (!phone && (meta.buyerPhone || meta.phone || meta.phoneNumber)) {
+          phone = String(meta.buyerPhone || meta.phone || meta.phoneNumber).trim();
+        }
+        if (!name && (meta.buyerName || meta.name)) {
+          name = String(meta.buyerName || meta.name).trim();
+        }
+      }
+
+      // Extraction depuis payments.method
+      if ((!email || !phone || !name) && matchedPayment?.method) {
+        const methodMeta = parsePaymentMethodMeta(matchedPayment.method);
+        if (!email && methodMeta.email) email = methodMeta.email;
+        if (!phone && methodMeta.phone) phone = methodMeta.phone;
+        if (!name && methodMeta.name) name = methodMeta.name;
+      }
+
+      // Fallback si l'user_id contient un email
       if (!email && pur.user_id?.includes("@")) {
         email = pur.user_id.trim();
       }
 
-      // Fallback 2 : extraire l'email depuis les métadonnées de la table payments (method string)
-      if (!email && matchedPayment?.method) {
-        email = extractEmailFromMethod(matchedPayment.method);
-      }
-
-      // Fallback 3 : charger le compte Supabase auth si user_id valide
-      if ((!email || !name) && pur.user_id && pur.user_id.length >= 30) {
+      // Fallback Supabase auth si user_id valide
+      if ((!email || !name || !phone) && pur.user_id && pur.user_id.length >= 30) {
         try {
           const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(pur.user_id);
           if (authUser?.user) {
             email = email || authUser.user.email || "";
             name = name || authUser.user.user_metadata?.full_name || authUser.user.user_metadata?.name || "";
+            phone = phone || authUser.user.phone || authUser.user.user_metadata?.phone || authUser.user.user_metadata?.phone_number || "";
+          }
+        } catch {
+          // non bloquant
+        }
+      }
+
+      // Réconciliation automatique PayPal si email/téléphone encore manquant
+      const isPayPal =
+        (pur.payment_method || "").toLowerCase().includes("paypal") ||
+        (matchedPayment?.provider || "").toUpperCase() === "PAYPAL" ||
+        /^[0-9A-Z]{17}$/.test(txKey);
+
+      if (isPayPal && (!email || email === "Email non renseigné")) {
+        try {
+          const ppOrder = await getPayPalOrderDetails(txKey);
+          if (ppOrder?.payer) {
+            const ppEmail = ppOrder.payer.email_address || "";
+            const ppName = `${ppOrder.payer.name?.given_name || ""} ${ppOrder.payer.name?.surname || ""}`.trim();
+            const ppPhone = ppOrder.payer.phone?.phone_number?.national_number || "";
+
+            if (ppEmail) email = ppEmail;
+            if (ppName) name = ppName;
+            if (ppPhone) phone = ppPhone;
+
+            // Sauvegarder dans la table payments
+            await (supabaseAdmin as any)
+              .from("payments")
+              .update({
+                provider_metadata: {
+                  buyerEmail: email,
+                  buyerName: name,
+                  buyerPhone: phone,
+                  paypalOrderId: txKey,
+                  payer: ppOrder.payer,
+                },
+              })
+              .or(`id.eq.${txKey},provider_transaction_id.eq.${txKey}`);
           }
         } catch {
           // non bloquant
@@ -213,7 +332,7 @@ export async function GET(
     }
 
     // Traitement des paiements de la table payments non encore consolidés
-    for (const pay of (paymentsData || [])) {
+    for (const pay of Array.from(paymentsMap.values())) {
       const isPaid = pay.status === "PAID" || pay.status === "COMPLETED";
       const txId = pay.provider_transaction_id || pay.id;
 
@@ -223,12 +342,18 @@ export async function GET(
         let name = profile?.full_name || "";
         let phone = profile?.phone || "";
 
-        if (!email && pay.user_id?.includes("@")) {
-          email = pay.user_id.trim();
+        if (pay.provider_metadata && typeof pay.provider_metadata === "object") {
+          const meta = pay.provider_metadata;
+          if (!email && (meta.buyerEmail || meta.email)) email = String(meta.buyerEmail || meta.email).trim();
+          if (!phone && (meta.buyerPhone || meta.phone || meta.phoneNumber)) phone = String(meta.buyerPhone || meta.phone || meta.phoneNumber).trim();
+          if (!name && (meta.buyerName || meta.name)) name = String(meta.buyerName || meta.name).trim();
         }
 
-        if (!email && pay.method) {
-          email = extractEmailFromMethod(pay.method);
+        if ((!email || !phone || !name) && pay.method) {
+          const methodMeta = parsePaymentMethodMeta(pay.method);
+          if (!email && methodMeta.email) email = methodMeta.email;
+          if (!phone && methodMeta.phone) phone = methodMeta.phone;
+          if (!name && methodMeta.name) name = methodMeta.name;
         }
 
         if (!name && email) {
@@ -285,9 +410,6 @@ export async function GET(
 
 /**
  * POST : Gestion administrative des accès et acheteurs
- * - manual_add : Ajouter manuellement un acheteur (PawaPay, PayPal, etc.) et lui envoyer son livre
- * - verify_pawapay : Vérifier en direct auprès de l'API PawaPay l'état d'un paiement PENDING et l'activer
- * - get_download_link : Générer et retourner un lien de téléchargement cryptographique direct
  */
 export async function POST(
   req: NextRequest,
@@ -305,7 +427,6 @@ export async function POST(
       return NextResponse.json({ error: "ID du produit manquant" }, { status: 400 });
     }
 
-    // Charger les métadonnées du produit
     const { data: product, error: prodErr } = await supabaseAdmin
       .from("digital_products")
       .select("id, title, price, author_id, file_name, file_url")
@@ -321,7 +442,105 @@ export async function POST(
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://ansella.app";
 
     // ─────────────────────────────────────────────────────────────
-    // CAS 1 : Génération rapide d'un lien de téléchargement direct
+    // CAS 1 : Mise à jour manuelle des coordonnées d'un acheteur
+    // ─────────────────────────────────────────────────────────────
+    if (action === "update_buyer_info") {
+      const { transactionId, purchaseId, email, phone, name } = body;
+      const cleanEmail = String(email || "").trim().toLowerCase();
+      const cleanPhone = String(phone || "").trim();
+      const cleanName = String(name || "").trim() || (cleanEmail ? cleanEmail.split("@")[0] : "Client");
+
+      if (!transactionId && !purchaseId) {
+        return NextResponse.json({ error: "Identifiant de transaction ou d'achat requis" }, { status: 400 });
+      }
+
+      // Mettre à jour la table payments
+      await (supabaseAdmin as any)
+        .from("payments")
+        .update({
+          provider_metadata: {
+            buyerEmail: cleanEmail,
+            buyerPhone: cleanPhone,
+            buyerName: cleanName,
+          },
+        })
+        .or(`id.eq.${transactionId || purchaseId},provider_transaction_id.eq.${transactionId || purchaseId}`);
+
+      // Mettre à jour profiles si email présent
+      if (cleanEmail && cleanEmail.includes("@")) {
+        const { data: existingProf } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("email", cleanEmail)
+          .maybeSingle();
+
+        if (existingProf?.id) {
+          await supabaseAdmin
+            .from("profiles")
+            .update({
+              full_name: cleanName,
+              phone: cleanPhone || undefined,
+            } as any)
+            .eq("id", existingProf.id);
+
+          // Lier à l'achat dans digital_product_purchases
+          if (purchaseId || transactionId) {
+            await (supabaseAdmin as any)
+              .from("digital_product_purchases")
+              .update({ user_id: existingProf.id })
+              .or(`id.eq.${purchaseId},transaction_id.eq.${transactionId}`);
+          }
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Coordonnées de l'acheteur mises à jour avec succès !",
+        buyer: { email: cleanEmail, phone: cleanPhone, name: cleanName },
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // CAS 2 : Synchronisation en direct avec PayPal
+    // ─────────────────────────────────────────────────────────────
+    if (action === "sync_paypal") {
+      const { orderId } = body;
+      if (!orderId) {
+        return NextResponse.json({ error: "orderId PayPal requis" }, { status: 400 });
+      }
+
+      try {
+        const ppOrder = await getPayPalOrderDetails(orderId);
+        const payer = ppOrder.payer || {};
+        const email = payer.email_address || "";
+        const name = `${payer.name?.given_name || ""} ${payer.name?.surname || ""}`.trim();
+        const phone = payer.phone?.phone_number?.national_number || "";
+
+        await (supabaseAdmin as any)
+          .from("payments")
+          .update({
+            provider_metadata: {
+              buyerEmail: email,
+              buyerName: name,
+              buyerPhone: phone,
+              paypalOrderId: orderId,
+              payer,
+            },
+          })
+          .or(`id.eq.${orderId},provider_transaction_id.eq.${orderId}`);
+
+        return NextResponse.json({
+          success: true,
+          message: "Coordonnées synchronisées depuis PayPal !",
+          buyer: { email, phone, name },
+        });
+      } catch (ppErr: any) {
+        return NextResponse.json({ error: `Erreur PayPal : ${ppErr.message}` }, { status: 400 });
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // CAS 3 : Génération rapide d'un lien de téléchargement direct
     // ─────────────────────────────────────────────────────────────
     if (action === "get_download_link") {
       const { email, purchaseId } = body;
@@ -334,7 +553,7 @@ export async function POST(
         productId,
         purchaseId || crypto.randomUUID(),
         email.trim(),
-        168 // 7 jours
+        168
       );
       const downloadUrl = `${baseUrl.replace(/\/+$/, "")}/api/digital-products/${productId}/download?token=${token}`;
 
@@ -345,48 +564,52 @@ export async function POST(
     }
 
     // ─────────────────────────────────────────────────────────────
-    // CAS 2 : Vérification live auprès de l'API PawaPay d'un dépôt PENDING
+    // CAS 4 : Vérification live auprès de l'API PawaPay d'un dépôt PENDING
     // ─────────────────────────────────────────────────────────────
     if (action === "verify_pawapay") {
-      const { depositId, buyerEmail: inputEmail, buyerName: inputName } = body;
+      const { depositId, buyerEmail: inputEmail, buyerName: inputName, buyerPhone: inputPhone } = body;
       if (!depositId) {
         return NextResponse.json({ error: "depositId PawaPay requis" }, { status: 400 });
       }
 
       const pawaResult = await getPawaPayDepositStatus(depositId);
       const rawStatus = (pawaResult.status || "").toUpperCase();
+      const livePhone = pawaResult.payerPhone || inputPhone || "";
 
       if (["COMPLETED", "PAID", "SUCCESS", "SUCCESSFUL"].includes(rawStatus)) {
-        // 1. Mettre à jour la table payments en PAID
+        let effectiveEmail = inputEmail ? String(inputEmail).trim().toLowerCase() : "";
+
+        const { data: payRow } = await (supabaseAdmin as any)
+          .from("payments")
+          .select("user_id, amount, method, provider_metadata")
+          .eq("id", depositId)
+          .maybeSingle();
+
+        if (!effectiveEmail && payRow?.provider_metadata?.buyerEmail) {
+          effectiveEmail = payRow.provider_metadata.buyerEmail;
+        }
+
+        if (!effectiveEmail && payRow?.method) {
+          effectiveEmail = parsePaymentMethodMeta(payRow.method).email;
+        }
+
         await (supabaseAdmin as any)
           .from("payments")
           .update({
             status: "PAID",
             paid_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
+            provider_metadata: {
+              ...(payRow?.provider_metadata || {}),
+              buyerEmail: effectiveEmail,
+              buyerPhone: livePhone,
+              buyerName: inputName || effectiveEmail.split("@")[0] || "Client",
+            },
           })
           .eq("id", depositId);
 
-        // 2. Mettre à jour ou insérer dans digital_product_purchases
-        let effectiveEmail = inputEmail ? String(inputEmail).trim().toLowerCase() : "";
+        let userId = payRow?.user_id || crypto.randomUUID();
 
-        // Récupérer le paiement pour extraire l'email encodé si manquant
-        const { data: payRow } = await (supabaseAdmin as any)
-          .from("payments")
-          .select("user_id, amount, method")
-          .eq("id", depositId)
-          .maybeSingle();
-
-        if (!effectiveEmail && payRow?.method) {
-          effectiveEmail = extractEmailFromMethod(payRow.method);
-        }
-
-        let userId = payRow?.user_id;
-        if (!userId || userId.length < 10) {
-          userId = crypto.randomUUID();
-        }
-
-        // Si profil absent, le créer
         if (effectiveEmail) {
           const { data: prof } = await supabaseAdmin
             .from("profiles")
@@ -402,6 +625,7 @@ export async function POST(
                 id: userId,
                 email: effectiveEmail,
                 full_name: inputName || effectiveEmail.split("@")[0],
+                phone: livePhone,
                 role: "STUDENT",
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
@@ -424,7 +648,6 @@ export async function POST(
           { onConflict: "product_id,user_id" }
         );
 
-        // 3. Générer le jeton et envoyer l'e-mail si email disponible
         let downloadUrl = "";
         if (effectiveEmail) {
           const { generateDigitalProductToken } = await import("@/lib/digital-product-token");
@@ -453,6 +676,7 @@ export async function POST(
           message: "Paiement validé avec succès auprès de PawaPay. Accès activé et exemplaire livré !",
           downloadUrl,
           buyerEmail: effectiveEmail,
+          buyerPhone: livePhone,
         });
       }
 
@@ -470,6 +694,7 @@ export async function POST(
           success: false,
           status: "FAILED",
           message: `PawaPay indique que la transaction a échoué (${pawaResult.error || "Paiement rejeté ou expiré"}).`,
+          buyerPhone: livePhone,
         });
       }
 
@@ -477,11 +702,12 @@ export async function POST(
         success: false,
         status: rawStatus || "PENDING",
         message: "La transaction est toujours en attente d'approbation sur le mobile du client chez PawaPay.",
+        buyerPhone: livePhone,
       });
     }
 
     // ─────────────────────────────────────────────────────────────
-    // CAS 3 : Ajout manuel d'un acheteur / Régularisation forcée
+    // CAS 5 : Ajout manuel d'un acheteur / Régularisation forcée
     // ─────────────────────────────────────────────────────────────
     const {
       email,
@@ -510,7 +736,6 @@ export async function POST(
       String(existingPaymentId || "").trim() ||
       `MANUAL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
-    // 1. Résoudre le profil utilisateur (créer un profil propre si nécessaire)
     let userId = "";
     const { data: existingProfile } = await supabaseAdmin
       .from("profiles")
@@ -539,7 +764,6 @@ export async function POST(
 
     const purchaseRecordId = crypto.randomUUID();
 
-    // 2. Enregistrer l'achat dans digital_product_purchases
     const { error: purInsertErr } = await (supabaseAdmin as any)
       .from("digital_product_purchases")
       .upsert(
@@ -563,7 +787,7 @@ export async function POST(
       );
     }
 
-    // 3. Mettre à jour ou insérer dans la table payments
+    const encodedBuyerMeta = encodeURIComponent(`${cleanEmail}|${cleanPhone}|${cleanName}`);
     if (existingPaymentId) {
       await (supabaseAdmin as any)
         .from("payments")
@@ -573,6 +797,11 @@ export async function POST(
           amount: finalAmount,
           paid_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          provider_metadata: {
+            buyerEmail: cleanEmail,
+            buyerPhone: cleanPhone,
+            buyerName: cleanName,
+          },
         })
         .eq("id", existingPaymentId);
     } else {
@@ -584,7 +813,13 @@ export async function POST(
           currency: "USD",
           status: "PAID",
           provider: paymentMethod.toUpperCase(),
-          method: `${paymentMethod.toUpperCase()}::DIGITAL_PRODUCT::${productId}::${encodeURIComponent(cleanEmail)}`,
+          provider_transaction_id: finalTxId,
+          method: `${paymentMethod.toUpperCase()}::DIGITAL_PRODUCT::${productId}::${encodedBuyerMeta}`,
+          provider_metadata: {
+            buyerEmail: cleanEmail,
+            buyerPhone: cleanPhone,
+            buyerName: cleanName,
+          },
           created_at: new Date().toISOString(),
           paid_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -594,17 +829,15 @@ export async function POST(
       }
     }
 
-    // 4. Générer le jeton d'accès sécurisé (7 jours)
     const { generateDigitalProductToken } = await import("@/lib/digital-product-token");
     const downloadToken = generateDigitalProductToken(
       productId,
       purchaseRecordId,
       cleanEmail,
-      168 // 7 jours
+      168
     );
     const downloadUrl = `${baseUrl.replace(/\/+$/, "")}/api/digital-products/${productId}/download?token=${downloadToken}`;
 
-    // 5. Envoyer l'email officiel avec lien direct si demandé
     let emailSent = false;
     if (sendEmail) {
       try {
@@ -623,7 +856,6 @@ export async function POST(
       }
     }
 
-    // 6. Notifier le créateur / formateur du produit
     if (product.author_id) {
       try {
         await createNotification({

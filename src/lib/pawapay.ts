@@ -626,6 +626,8 @@ export interface PawaPayDepositStatusResponse {
   failureCode?: string;
   failureMessage?: string;
   error?: string;
+  payerPhone?: string;
+  rawDeposit?: any;
 }
 
 /**
@@ -693,12 +695,21 @@ export async function getPawaPayDepositStatus(depositId: string): Promise<PawaPa
     const failureCode = depositObj.failureCode?.failureCode || (typeof depositObj.failureCode === 'string' ? depositObj.failureCode : undefined) || depositObj.rejectionReason?.rejectionCode;
     const failureMessage = depositObj.failureCode?.failureMessage || depositObj.rejectionReason?.rejectionMessage || depositObj.failureReason;
 
+    const payerPhone =
+      depositObj.payer?.address?.value ||
+      depositObj.payer?.phoneNumber ||
+      depositObj.msisdn ||
+      depositObj.phoneNumber ||
+      undefined;
+
     return {
       success: true,
       depositId,
       status,
       failureCode,
-      failureMessage
+      failureMessage,
+      payerPhone,
+      rawDeposit: depositObj,
     };
 
   } catch (err: any) {

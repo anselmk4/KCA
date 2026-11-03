@@ -238,7 +238,11 @@ export async function POST(req: NextRequest) {
         if (itemError) throw itemError;
       }
 
-      const encodedBuyerMeta = encodeURIComponent(userEmail || user?.email || userName || 'client');
+      const cleanBuyerEmail = String(userEmail || user?.email || '').trim().toLowerCase();
+      const cleanBuyerPhone = String(formattedPhone || phoneNumber || '').trim();
+      const cleanBuyerName = String(userName || user?.user_metadata?.full_name || '').trim();
+      const encodedBuyerMeta = encodeURIComponent(`${cleanBuyerEmail}|${cleanBuyerPhone}|${cleanBuyerName}`);
+
       const { error: paymentError } = await dbClient.from('payments').insert({
         id: paymentId,
         order_id: orderId,
@@ -247,7 +251,15 @@ export async function POST(req: NextRequest) {
         currency: 'USD',
         status: 'PENDING',
         provider: 'MOBILE_MONEY',
-        // Encode carrier, type, itemId and cycle/email for webhook resolution
+        provider_transaction_id: paymentId,
+        provider_metadata: {
+          buyerEmail: cleanBuyerEmail,
+          buyerPhone: cleanBuyerPhone,
+          buyerName: cleanBuyerName,
+          carrier: effectiveCarrier,
+          country: userCountry,
+        },
+        // Encode carrier, type, itemId and buyer metadata for webhook resolution & admin visibility
         method: `${carrier}::${type}::${itemId}::${type === 'DIGITAL_PRODUCT' ? encodedBuyerMeta : (cycle || 'MONTHLY')}`,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()

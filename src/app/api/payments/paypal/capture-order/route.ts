@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
       ? supabaseAdmin 
       : supabase;
 
-    const { orderId } = await req.json();
+    const reqBody = await req.json();
+    const { orderId, userEmail: reqEmail, userName: reqName, userPhone: reqPhone } = reqBody || {};
     console.log(`[paypal-capture-order] Order ID received: ${orderId} for User: ${user?.id || 'guest'}`);
 
     if (!orderId) {
@@ -443,8 +444,38 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const buyerEmail = user?.email || (metadataUserId.startsWith("email_") ? decodeURIComponent(metadataUserId.replace("email_", "")) : "");
-      
+      // Extraire les coordonnées réelles de l'acheteur depuis PayPal ou les données transmises
+      const payerObj = captureData.payer;
+      const paypalEmail = payerObj?.email_address || "";
+      const paypalName = payerObj?.name
+        ? `${payerObj.name.given_name || ""} ${payerObj.name.surname || ""}`.trim()
+        : "";
+      const paypalPhone =
+        payerObj?.phone?.phone_number?.national_number || "";
+
+      const buyerEmail = (
+        reqEmail?.trim() ||
+        user?.email ||
+        paypalEmail ||
+        (metadataUserId && metadataUserId.startsWith("email_")
+          ? decodeURIComponent(metadataUserId.replace("email_", ""))
+          : "")
+      ).trim();
+
+      const buyerName = (
+        reqName?.trim() ||
+        user?.user_metadata?.full_name ||
+        paypalName ||
+        (buyerEmail ? buyerEmail.split("@")[0] : "Client")
+      ).trim();
+
+      const buyerPhone = (
+        reqPhone?.trim() ||
+        paypalPhone ||
+        user?.user_metadata?.phone ||
+        ""
+      ).trim();
+
       // Assurer un UUID valide pour PostgreSQL
       let buyerUserId = user?.id;
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(metadataUserId || "");
@@ -463,6 +494,25 @@ export async function POST(req: NextRequest) {
       }
       if (!buyerUserId) {
         buyerUserId = crypto.randomUUID();
+      }
+
+      // Enregistrer/mettre à jour un profil complet si email disponible
+      if (buyerEmail) {
+        try {
+          await supabaseAdmin.from("profiles").upsert(
+            {
+              id: buyerUserId,
+              email: buyerEmail,
+              full_name: buyerName,
+              phone: buyerPhone,
+              role: "STUDENT",
+              updated_at: new Date().toISOString(),
+            } as any,
+            { onConflict: "email" }
+          );
+        } catch (profErr: any) {
+          console.warn("[paypal-capture-order] Profile upsert warning:", profErr?.message);
+        }
       }
 
       // Enregistrer l'achat dans digital_product_purchases
@@ -486,17 +536,29 @@ export async function POST(req: NextRequest) {
         console.warn("[paypal-capture-order] digital_product_purchases upsert warning:", purErr?.message);
       }
 
-      // Enregistrer dans la table payments
+      // Enregistrer dans la table payments avec métadonnées complètes
+      const encodedBuyerMeta = encodeURIComponent(`${buyerEmail}|${buyerPhone}|${buyerName}`);
       try {
         await (dbClient as any).from("payments").insert({
           id: captureId,
+          order_id: orderId,
           user_id: buyerUserId,
           amount: amountCaptured || product.price,
           currency: "USD",
           status: "PAID",
           provider: "PAYPAL",
-          method: `PAYPAL::DIGITAL_PRODUCT::${itemId}::${encodeURIComponent(buyerEmail)}`,
+          provider_transaction_id: orderId,
+          method: `PAYPAL::DIGITAL_PRODUCT::${itemId}::${encodedBuyerMeta}`,
+          provider_metadata: {
+            buyerEmail,
+            buyerName,
+            buyerPhone,
+            paypalOrderId: orderId,
+            captureId,
+            payer: captureData.payer,
+          },
           created_at: new Date().toISOString(),
+          paid_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
       } catch (payErr: any) {

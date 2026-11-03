@@ -21,9 +21,9 @@ import {
   UserPlus,
   CheckCircle2,
   ExternalLink,
-  Send,
-  HelpCircle,
-  ArrowRight,
+  Edit3,
+  Save,
+  MessageCircle,
 } from "lucide-react";
 
 export interface DigitalProductBuyer {
@@ -83,6 +83,13 @@ export function DigitalProductBuyersModal({
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
+  // État de modification rapide des coordonnées d'un acheteur existant
+  const [editingBuyer, setEditingBuyer] = useState<DigitalProductBuyer | null>(null);
+  const [editEmail, setEditEmail] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editName, setEditName] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
   const fetchBuyers = async () => {
     if (!productId) return;
     setLoading(true);
@@ -112,6 +119,7 @@ export function DigitalProductBuyersModal({
       setSearch("");
       setCopiedId(null);
       setShowAddForm(false);
+      setEditingBuyer(null);
       setManualSuccessMsg(null);
       setGeneratedLink(null);
       setExistingPaymentId(null);
@@ -131,6 +139,7 @@ export function DigitalProductBuyersModal({
   const handleOpenAddForm = (prefill?: {
     email?: string;
     name?: string;
+    phone?: string;
     txId?: string;
     method?: string;
     price?: number;
@@ -141,6 +150,7 @@ export function DigitalProductBuyersModal({
     if (prefill) {
       setManualEmail(prefill.email && prefill.email !== "Email non renseigné" ? prefill.email : "");
       setManualName(prefill.name && prefill.name !== "Client Inconnu" ? prefill.name : "");
+      setManualPhone(prefill.phone || "");
       setManualTxId(prefill.txId || "");
       setManualMethod(prefill.method?.toUpperCase() || "PAWAPAY");
       setManualPrice(prefill.price ?? productMeta?.price ?? productPrice ?? 9.99);
@@ -155,6 +165,46 @@ export function DigitalProductBuyersModal({
       setExistingPaymentId(null);
     }
     setShowAddForm(true);
+  };
+
+  const handleOpenEditBuyer = (b: DigitalProductBuyer) => {
+    setEditingBuyer(b);
+    setEditEmail(b.buyerEmail !== "Email non renseigné" ? b.buyerEmail : "");
+    setEditPhone(b.buyerPhone || "");
+    setEditName(b.buyerName !== "Client Inconnu" ? b.buyerName : "");
+  };
+
+  const handleSaveEditBuyer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!productId || !editingBuyer) return;
+
+    setSavingEdit(true);
+    try {
+      const res = await fetch(`/api/admin/digital-products/${productId}/buyers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update_buyer_info",
+          transactionId: editingBuyer.transactionId,
+          purchaseId: editingBuyer.purchaseId || editingBuyer.id,
+          email: editEmail.trim(),
+          phone: editPhone.trim(),
+          name: editName.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Impossible de mettre à jour les coordonnées.");
+      }
+
+      setEditingBuyer(null);
+      await fetchBuyers();
+    } catch (err: any) {
+      alert(`Erreur : ${err.message}`);
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const handleSubmitManualBuyer = async (e: React.FormEvent) => {
@@ -195,7 +245,6 @@ export function DigitalProductBuyersModal({
         setGeneratedLink(data.downloadUrl);
       }
 
-      // Rafraîchir immédiatement la liste des acheteurs
       await fetchBuyers();
     } catch (err: any) {
       alert(`Erreur : ${err.message}`);
@@ -204,8 +253,34 @@ export function DigitalProductBuyersModal({
     }
   };
 
+  // Synchroniser les détails d'une commande PayPal
+  const handleSyncPayPal = async (orderId: string) => {
+    if (!productId || !orderId) return;
+    setActionLoadingId(`pp-${orderId}`);
+    try {
+      const res = await fetch(`/api/admin/digital-products/${productId}/buyers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "sync_paypal",
+          orderId,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchBuyers();
+      } else {
+        alert(data.error || "Impossible de synchroniser avec PayPal.");
+      }
+    } catch (err: any) {
+      alert(`Erreur de synchronisation PayPal : ${err.message}`);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   // Vérifier en direct auprès de PawaPay
-  const handleVerifyPawaPay = async (depositId: string, currentEmail?: string) => {
+  const handleVerifyPawaPay = async (depositId: string, currentEmail?: string, currentPhone?: string) => {
     if (!productId || !depositId) return;
     setActionLoadingId(depositId);
     try {
@@ -216,15 +291,18 @@ export function DigitalProductBuyersModal({
           action: "verify_pawapay",
           depositId,
           buyerEmail: currentEmail && currentEmail !== "Email non renseigné" ? currentEmail : undefined,
+          buyerPhone: currentPhone || undefined,
         }),
       });
 
       const data = await res.json();
       if (data.success && data.status === "COMPLETED") {
-        alert("Succès ! PawaPay a confirmé le paiement. La transaction est maintenant PAYÉE et le client a reçu son lien.");
         await fetchBuyers();
       } else {
         alert(data.message || "Statut PawaPay : en attente ou non complété.");
+        if (data.buyerPhone) {
+          await fetchBuyers();
+        }
       }
     } catch (err: any) {
       alert(`Erreur lors de la vérification PawaPay : ${err.message}`);
@@ -241,6 +319,7 @@ export function DigitalProductBuyersModal({
       handleOpenAddForm({
         email: "",
         name: b.buyerName,
+        phone: b.buyerPhone,
         txId: b.transactionId,
         method: b.paymentMethod,
         price: b.pricePaid,
@@ -349,7 +428,7 @@ export function DigitalProductBuyersModal({
                 {displayTitle}
               </h2>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
-                Historique des clients et attribution manuelle d&apos;accès suite à paiement PawaPay / PayPal.
+                Historique des clients avec email et téléphone direct pour support et délivrance.
               </p>
             </div>
           </div>
@@ -411,7 +490,7 @@ export function DigitalProductBuyersModal({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher par nom, email ou ID..."
+              placeholder="Rechercher par nom, email, téléphone ou ID..."
               className="w-full pl-9 pr-8 py-1.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-xs text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
             />
             {search && (
@@ -424,6 +503,89 @@ export function DigitalProductBuyersModal({
             )}
           </div>
         </div>
+
+        {/* Modal d'édition des coordonnées d'un client */}
+        {editingBuyer && (
+          <div className="p-4 sm:p-5 bg-amber-50/80 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900/40 animate-in slide-in-from-top-2 duration-200">
+            <div className="flex items-start justify-between gap-4 mb-3">
+              <div>
+                <h4 className="text-xs font-black text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                  <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                  Renseigner / Modifier les coordonnées du client (Transaction : {editingBuyer.transactionId})
+                </h4>
+                <p className="text-[11px] text-zinc-600 dark:text-zinc-400 mt-0.5">
+                  Permet d&apos;enregistrer le téléphone Mobile Money et l&apos;email afin de contacter le client et lui envoyer l&apos;e-book.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingBuyer(null)}
+                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-amber-200/50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditBuyer} className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
+              <div className="flex-1">
+                <label className="block text-[10px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Nom du client
+                </label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="ex: Jordan Bisalu"
+                  className="w-full px-3 py-1.5 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div className="flex-1">
+                <label className="block text-[10px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Adresse Email
+                </label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder="client@gmail.com"
+                  className="w-full px-3 py-1.5 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div className="flex-1">
+                <label className="block text-[10px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Numéro Téléphone (WhatsApp / Mobile Money)
+                </label>
+                <input
+                  type="text"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="+243 812 345 678"
+                  className="w-full px-3 py-1.5 text-xs bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setEditingBuyer(null)}
+                  className="px-3 py-1.5 text-xs font-bold text-zinc-500 hover:bg-zinc-200/50 rounded-xl transition"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-black bg-amber-600 hover:bg-amber-500 text-white rounded-xl shadow transition disabled:opacity-50 cursor-pointer"
+                >
+                  {savingEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  Enregistrer
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
         {/* Formulaire d'ajout / régularisation manuelle */}
         {showAddForm && (
@@ -521,7 +683,7 @@ export function DigitalProductBuyersModal({
                 {/* Téléphone */}
                 <div>
                   <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
-                    Téléphone Mobile Money (optionnel)
+                    Téléphone Mobile Money / WhatsApp (optionnel)
                   </label>
                   <div className="relative">
                     <Phone className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
@@ -664,7 +826,7 @@ export function DigitalProductBuyersModal({
               <table className="w-full text-left border-collapse text-xs">
                 <thead className="bg-zinc-50 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 font-semibold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800">
                   <tr>
-                    <th className="px-3.5 py-3.5">Client / Acheteur</th>
+                    <th className="px-3.5 py-3.5">Client & Contact</th>
                     <th className="px-3.5 py-3.5">Date & Heure</th>
                     <th className="px-3.5 py-3.5">Mode & ID de paiement</th>
                     <th className="px-3.5 py-3.5">Montant & Statut</th>
@@ -674,37 +836,83 @@ export function DigitalProductBuyersModal({
                 <tbody className="divide-y divide-zinc-150 dark:divide-zinc-800">
                   {filteredBuyers.map((b) => {
                     const isCompleted = b.paymentStatus === "COMPLETED" || b.paymentStatus === "PAID";
-                    const isPawaPay = b.paymentMethod.toLowerCase().includes("pawapay") || b.paymentMethod.toLowerCase().includes("mobile_money");
+                    const isPawaPay = b.paymentMethod.toLowerCase().includes("pawapay") || b.paymentMethod.toLowerCase().includes("momo");
+                    const isPayPal = b.paymentMethod.toLowerCase().includes("paypal") || /^[0-9A-Z]{17}$/.test(b.transactionId);
 
                     return (
                       <tr
                         key={b.id || b.transactionId}
                         className="hover:bg-zinc-50/70 dark:hover:bg-zinc-800/30 transition-colors"
                       >
-                        {/* Buyer Info */}
+                        {/* Buyer Info : Nom, Email et Téléphone bien visibles */}
                         <td className="px-3.5 py-3.5">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white font-black text-xs flex items-center justify-center shrink-0 uppercase shadow-xs">
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white font-black text-xs flex items-center justify-center shrink-0 uppercase shadow-xs mt-0.5">
                               {b.buyerName && b.buyerName !== "Client Inconnu" ? b.buyerName.charAt(0) : (b.buyerEmail && b.buyerEmail.includes("@") ? b.buyerEmail.charAt(0).toUpperCase() : "C")}
                             </div>
-                            <div className="min-w-0 max-w-[190px] sm:max-w-[220px]">
-                              <p className="font-bold text-zinc-900 dark:text-white truncate">
-                                {b.buyerName}
-                              </p>
-                              <div className="flex items-center gap-1.5 mt-0.5">
-                                <Mail className="w-3 h-3 text-zinc-400 shrink-0" />
-                                <span className={`text-[11px] truncate ${b.buyerEmail === "Email non renseigné" ? "text-amber-600 dark:text-amber-400 font-semibold italic" : "text-zinc-500 dark:text-zinc-400"}`}>
-                                  {b.buyerEmail}
-                                </span>
+                            <div className="min-w-0 max-w-[210px] sm:max-w-[260px] space-y-0.5">
+                              {/* Nom */}
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-extrabold text-zinc-900 dark:text-white truncate">
+                                  {b.buyerName}
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditBuyer(b)}
+                                  className="p-0.5 text-zinc-400 hover:text-purple-600 dark:hover:text-purple-400 transition"
+                                  title="Modifier les coordonnées du client"
+                                >
+                                  <Edit3 className="w-3 h-3" />
+                                </button>
                               </div>
-                              {b.buyerPhone && (
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                  <Phone className="w-3 h-3 text-zinc-400 shrink-0" />
-                                  <span className="text-[11px] text-zinc-400 truncate">
-                                    {b.buyerPhone}
+
+                              {/* Email */}
+                              <div className="flex items-center gap-1.5 text-[11px]">
+                                <Mail className="w-3 h-3 text-zinc-400 shrink-0" />
+                                {b.buyerEmail && b.buyerEmail !== "Email non renseigné" ? (
+                                  <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate select-all">
+                                    {b.buyerEmail}
                                   </span>
-                                </div>
-                              )}
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditBuyer(b)}
+                                    className="text-amber-600 dark:text-amber-400 font-semibold italic hover:underline"
+                                  >
+                                    + Ajouter email
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Téléphone */}
+                              <div className="flex items-center gap-1.5 text-[11px]">
+                                <Phone className="w-3 h-3 text-emerald-500 shrink-0" />
+                                {b.buyerPhone ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-emerald-700 dark:text-emerald-400 font-mono select-all">
+                                      {b.buyerPhone}
+                                    </span>
+                                    {/* Lien WhatsApp direct */}
+                                    <a
+                                      href={`https://wa.me/${b.buyerPhone.replace(/[^0-9]/g, "")}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-emerald-600 hover:text-emerald-500 transition"
+                                      title="Contacter sur WhatsApp"
+                                    >
+                                      <MessageCircle className="w-3 h-3" />
+                                    </a>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditBuyer(b)}
+                                    className="text-zinc-400 hover:text-purple-600 dark:hover:text-purple-400 text-[10px] italic hover:underline"
+                                  >
+                                    + Ajouter tél / WhatsApp
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -763,6 +971,20 @@ export function DigitalProductBuyersModal({
                         {/* Actions rapides */}
                         <td className="px-3.5 py-3.5 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5">
+                            {/* Bouton Synchroniser PayPal si PayPal */}
+                            {isPayPal && (
+                              <button
+                                type="button"
+                                onClick={() => handleSyncPayPal(b.transactionId)}
+                                disabled={actionLoadingId === `pp-${b.transactionId}`}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-bold text-[11px] border border-blue-200 dark:border-blue-800 transition cursor-pointer"
+                                title="Récupérer l'email et le nom réels depuis les serveurs PayPal"
+                              >
+                                <RefreshCw className={`w-3 h-3 ${actionLoadingId === `pp-${b.transactionId}` ? "animate-spin text-blue-600" : ""}`} />
+                                Sync PayPal
+                              </button>
+                            )}
+
                             {!isCompleted ? (
                               <>
                                 {/* Bouton régulariser manuellement */}
@@ -772,13 +994,14 @@ export function DigitalProductBuyersModal({
                                     handleOpenAddForm({
                                       email: b.buyerEmail,
                                       name: b.buyerName,
+                                      phone: b.buyerPhone,
                                       txId: b.transactionId,
                                       method: b.paymentMethod,
                                       price: b.pricePaid,
                                       paymentId: b.id,
                                     })
                                   }
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow-xs transition"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow-xs transition cursor-pointer"
                                   title="Valider manuellement ce paiement et délivrer l'accès"
                                 >
                                   <CheckCircle2 className="w-3.5 h-3.5" />
@@ -789,9 +1012,9 @@ export function DigitalProductBuyersModal({
                                 {isPawaPay && (
                                   <button
                                     type="button"
-                                    onClick={() => handleVerifyPawaPay(b.transactionId, b.buyerEmail)}
+                                    onClick={() => handleVerifyPawaPay(b.transactionId, b.buyerEmail, b.buyerPhone)}
                                     disabled={actionLoadingId === b.transactionId}
-                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-[11px] transition"
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold text-[11px] transition cursor-pointer"
                                     title="Interroger les serveurs PawaPay en temps réel"
                                   >
                                     <RefreshCw className={`w-3 h-3 ${actionLoadingId === b.transactionId ? "animate-spin text-purple-600" : ""}`} />

@@ -158,7 +158,11 @@ export function DigitalProductCheckoutModal({
                   const res = await fetch("/api/payments/paypal/capture-order", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ orderId: data.orderID }),
+                    body: JSON.stringify({
+                      orderId: data.orderID,
+                      userEmail: email,
+                      userName: name,
+                    }),
                   });
                   const captureData = await res.json();
                   if (captureData.error) {

@@ -107,3 +107,26 @@ export async function capturePayPalOrder(orderId: string) {
 
   return response.json();
 }
+
+/**
+ * Get details of a PayPal Order (payer info, email, phone, name, status).
+ */
+export async function getPayPalOrderDetails(orderId: string) {
+  const accessToken = await getPayPalAccessToken();
+
+  const response = await fetch(`${PAYPAL_API_BASE}/v2/checkout/orders/${orderId}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to get PayPal order ${orderId}: ${response.status} ${errorText}`);
+  }
+
+  return response.json();
+}
