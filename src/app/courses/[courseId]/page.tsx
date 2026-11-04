@@ -311,9 +311,32 @@ export default function CourseDetailPage() {
                 />
               </div>
               <p className="text-zinc-400 text-xs uppercase tracking-widest font-bold">Course Price</p>
-              <p className="text-4xl font-black">
-                {course.price === 0 ? "Free" : `$${course.price}`}
-              </p>
+              <div className="space-y-1.5">
+                <p className="text-4xl font-black">
+                  {course.price === 0 ? "Free" : `$${course.price}`}
+                </p>
+                {course.price > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-teal-300">
+                      ≈ {(course.price * 2850).toLocaleString("fr-FR")} CDF &middot; {(course.price * 600).toLocaleString("fr-FR")} FCFA
+                    </p>
+                    {course.price > 45 && (
+                      <div className="inline-block px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold">
+                        💳 3x sans frais : dès ${Math.round(course.price / 3)}/tranche
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Free Preview Video Button (no registration needed) */}
+              <Link
+                href={`/courses/${course.id}/preview`}
+                className="block w-full py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold rounded-xl transition-all text-xs flex items-center justify-center gap-2 shadow-sm"
+              >
+                <PlayCircle className="w-4 h-4 text-emerald-400 animate-pulse" />
+                <span>Regarder 1 vidéo d&apos;aperçu gratuit (Sans compte)</span>
+              </Link>
 
               {hasCertificate ? (
                 <Link
@@ -417,23 +440,34 @@ export default function CourseDetailPage() {
                         {section.lessons.length === 0 ? (
                           <p className="text-xs text-zinc-400 italic p-5 text-center">No lessons in this module yet.</p>
                         ) : (
-                          section.lessons.map((lesson) => (
-                            <div key={lesson.id} className="flex items-center justify-between px-5 py-3.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
-                              <div className="flex items-center gap-3 min-w-0">
-                                {isEnrolled ? (
-                                  <CheckCircle2 className="w-4 h-4 text-teal-500 shrink-0" />
-                                ) : (
-                                  <Lock className="w-4 h-4 text-zinc-300 shrink-0" />
+                          section.lessons.map((lesson, lIdx) => {
+                            const isFreePreview = !isEnrolled && idx === 0 && lIdx === 0;
+                            return (
+                              <div key={lesson.id} className="flex items-center justify-between px-5 py-3.5 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  {isEnrolled ? (
+                                    <CheckCircle2 className="w-4 h-4 text-teal-500 shrink-0" />
+                                  ) : isFreePreview ? (
+                                    <Link
+                                      href={`/courses/${course.id}/preview`}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-[10px] font-bold shrink-0 hover:bg-emerald-500/25 transition-colors"
+                                    >
+                                      <PlayCircle className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
+                                      <span>Aperçu gratuit</span>
+                                    </Link>
+                                  ) : (
+                                    <Lock className="w-4 h-4 text-zinc-300 shrink-0" />
+                                  )}
+                                  <span className="truncate">{lesson.title}</span>
+                                </div>
+                                {lesson.duration_minutes > 0 && (
+                                  <span className="text-xs text-zinc-400 shrink-0 ml-4 font-mono">
+                                    {lesson.duration_minutes}m
+                                  </span>
                                 )}
-                                <span className="truncate">{lesson.title}</span>
                               </div>
-                              {lesson.duration_minutes > 0 && (
-                                <span className="text-xs text-zinc-400 shrink-0 ml-4 font-mono">
-                                  {lesson.duration_minutes}m
-                                </span>
-                              )}
-                            </div>
-                          ))
+                            );
+                          })
                         )}
                       </div>
                     )}

@@ -1094,3 +1094,63 @@ export async function sendInstructorDigitalProductsAnnouncementEmail(
   );
 }
 
+/**
+ * Relance automatique par email envoyée après 10 min pour les paiements Mobile Money PENDING.
+ */
+export async function sendPendingPaymentReminderEmail(
+  buyerEmail: string,
+  buyerName: string,
+  itemTitle: string,
+  amount: number,
+  paymentReference: string,
+  checkoutUrl: string,
+  whatsappSupportUrl: string
+) {
+  const body = `
+    <div style="text-align: center; margin-bottom: 24px;">
+      <span style="background: #fef3c7; color: #b45309; font-size: 11px; font-weight: 800; padding: 6px 14px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid #fde68a;">
+        ⏳ Paiement Mobile Money en attente
+      </span>
+    </div>
+
+    <h2>Finalisez votre commande : "${itemTitle}"</h2>
+    <p>Bonjour <strong>${buyerName}</strong>,</p>
+    <p>Nous avons remarqué que vous avez initié un paiement Mobile Money de <strong>$${amount.toFixed(2)}</strong> pour accéder à <strong>${itemTitle}</strong>, mais la transaction est toujours en attente de validation.</p>
+    
+    <div style="background-color: #fffbeb; border: 1px solid #fef08a; border-radius: 14px; padding: 18px; margin: 20px 0;">
+      <p style="margin: 0 0 10px 0; color: #92400e; font-weight: 700; font-size: 14px;">
+        💡 Pourquoi votre paiement est-il en attente ?
+      </p>
+      <ul style="margin: 0; padding-left: 20px; color: #78350f; font-size: 13px; line-height: 1.6;">
+        <li>Le message Push USSD n'est pas apparu sur votre écran ou a expiré.</li>
+        <li>Vous n'avez pas encore saisi votre code PIN secret sur votre téléphone.</li>
+      </ul>
+    </div>
+
+    <h3 style="color: #0f172a; font-size: 16px; margin-top: 20px; margin-bottom: 10px;">Options pour débloquer votre accès immédiatement :</h3>
+
+    <div style="margin: 16px 0;">
+      <a href="${checkoutUrl}" class="btn" style="background: #4f46e5; color: #ffffff !important; padding: 12px 24px; font-weight: 700; border-radius: 10px; text-decoration: none; display: inline-block; margin-right: 10px;">
+        Relancer le paiement en 1 clic →
+      </a>
+      <a href="${whatsappSupportUrl}" style="background: #10b981; color: #ffffff !important; padding: 12px 24px; font-weight: 700; border-radius: 10px; text-decoration: none; display: inline-block;">
+        Assistance Directe WhatsApp
+      </a>
+    </div>
+
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-top: 20px; font-size: 13px; color: #475569;">
+      <strong>Transfert Manuel Assisté :</strong> Vous pouvez également envoyer directement le montant par M-Pesa, Airtel Money ou Orange Money puis nous transmettre l'ID de transaction pour une activation immédiate.
+    </div>
+
+    <p style="font-size: 12px; color: #94a3b8; margin-top: 16px;">
+      Référence de votre commande : <code>${paymentReference}</code>
+    </p>
+  `;
+
+  await sendEmail(
+    buyerEmail,
+    `⏳ Finalisez votre accès à "${itemTitle}" sur ANSELLA`,
+    body
+  );
+}
+

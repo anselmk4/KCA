@@ -118,6 +118,7 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryNext = searchParams.get("next");
+  const isExpressCheckout = Boolean(queryNext && queryNext.includes("/dashboard/payment/"));
 
   const [role, setRole] = useState<"INSTRUCTOR" | "STUDENT" | null>(null);
   const [step, setStep] = useState(1); // Steps 1–4
@@ -133,7 +134,14 @@ function RegisterForm() {
   const [country, setCountry] = useState("");
   const [dialCode, setDialCode] = useState("+243");
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [gender, setGender] = useState<"" | "male" | "female">("");;
+  const [gender, setGender] = useState<"" | "male" | "female">("");
+
+  useEffect(() => {
+    if (isExpressCheckout) {
+      setRole("STUDENT");
+      if (!country) setCountry("CD");
+    }
+  }, [isExpressCheckout, country]);
 
   // Step 3 — Role-specific
   // Instructor
@@ -384,7 +392,7 @@ function RegisterForm() {
       setStep(2);
       return;
     }
-    if (!gender) {
+    if (!gender && !isExpressCheckout) {
       setFormError("Veuillez sélectionner votre genre (Homme ou Femme).");
       setStep(2);
       return;
@@ -596,7 +604,47 @@ function RegisterForm() {
         const nextQuery = queryNext ? `&next=${encodeURIComponent(queryNext)}` : "";
         router.push(`/login?registered=true&email=${encodeURIComponent(email)}&role=${role}${nextQuery}`);
       } else {
-        router.push(queryNext || (role === "INSTRUCTOR" ? "/instructor" : "/dashboard"));
+        if (queryNext) {
+          router.push(queryNext);
+        } else if (role === "INSTRUCTOR") {
+          router.push("/instructor");
+        } else {
+          // Classic learner registration: find flagship course for chosen theme and redirect with welcome coupon
+          let targetUrl = "/dashboard/discover?welcome=true&coupon=BIENVENUE15";
+          try {
+            const { data: matchedCourses } = await supabase
+              .from("courses")
+              .select("id, slug, title")
+              .eq("status", "PUBLISHED")
+              .ilike("title", `%${interestCourse || "blockchain"}%`)
+              .limit(1);
+
+            if (matchedCourses && matchedCourses.length > 0) {
+              const c = matchedCourses[0];
+              targetUrl = `/courses/${c.slug || c.id}?welcome=true&coupon=BIENVENUE15`;
+            }
+          } catch (mErr) {
+            console.warn("Could not find matching flagship course:", mErr);
+          }
+
+          // In-app welcome coupon notification (valid 48h)
+          if (authData.user) {
+            try {
+              const { createNotification } = await import("@/lib/supabase/notifications-helper");
+              await createNotification({
+                userId: authData.user.id,
+                title: "🎁 Bienvenue ! Votre coupon de -15% est prêt",
+                message: "Profitez de votre coupon de bienvenue exclusif BIENVENUE15 valable pendant 48h sur la formation de votre choix !",
+                type: "SUCCESS",
+                link: targetUrl
+              });
+            } catch (nErr) {
+              console.warn("Could not send welcome notification:", nErr);
+            }
+          }
+
+          router.push(targetUrl);
+        }
       }
     } catch (err: any) {
       setFormError(err.message || "Une erreur est survenue.");
@@ -611,6 +659,7 @@ function RegisterForm() {
   const selectedCountry = COUNTRIES.find((c) => c.code === country);
 
   const stepTitle = () => {
+    if (isExpressCheckout) return language === "en" ? "Express Checkout Registration" : "Inscription Express & Accès Immédiat";
     if (role === null) return language === "en" ? "Choose your profile" : "Choisissez votre profil";
     const titles: Record<string, string[]> = {
       INSTRUCTOR: language === "en"
@@ -624,6 +673,7 @@ function RegisterForm() {
   };
 
   const stepSubtitle = () => {
+    if (isExpressCheckout) return language === "en" ? "Complete in 1 step to proceed to secure checkout." : "Complétez votre inscription en 1 étape pour débloquer votre formation immédiatement.";
     if (role === null) return language === "en" ? "Select how you would like to use our LMS." : "Sélectionnez la manière dont vous souhaitez utiliser notre LMS.";
     const subtitles: Record<string, string[]> = {
       INSTRUCTOR: language === "en"
@@ -683,7 +733,16 @@ function RegisterForm() {
           </Link>
         </div>
 
-        {role !== null && <StepIndicator step={step} role={role} />}
+        {isExpressCheckout ? (
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <div className="px-3.5 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs font-black flex items-center gap-1.5 shadow-xs">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+              <span>Fast Checkout · Inscription en 1 clic</span>
+            </div>
+          </div>
+        ) : (
+          role !== null && <StepIndicator step={step} role={role} />
+        )}
 
         <h1 className="text-2xl font-bold text-zinc-900 dark:text-white mb-1.5 text-center leading-snug">
           {stepTitle()}
@@ -693,8 +752,140 @@ function RegisterForm() {
         </p>
       </div>
 
-      {/* ── Role Selection (Step 0) ── */}
-      {role === null ? (
+      {/* ── Express Checkout Form (1 seul écran pour le checkout) ── */}
+      {isExpressCheckout ? (
+        <form
+          onSubmit={handleComplete}
+          className="space-y-4 animate-in fade-in duration-300"
+        >
+          {formError && (
+            <div className="px-4 py-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 text-xs text-red-700 dark:text-red-400 font-semibold rounded-xl animate-in fade-in">
+              {formError}
+            </div>
+          )}
+
+          <div className="p-3.5 bg-gradient-to-r from-amber-500/10 via-blue-500/10 to-teal-500/10 border border-amber-500/30 rounded-2xl flex items-center gap-2.5 text-xs text-amber-900 dark:text-amber-200">
+            <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+            <span><strong>Inscription Rapide :</strong> Remplissez vos coordonnées ci-dessous pour accéder directement au paiement sécurisé Mobile Money / PayPal de votre cours.</span>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
+              {language === "en" ? "Full Name" : "Nom complet"} *
+            </label>
+            <input
+              required
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Jean Dupont"
+              className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
+              {language === "en" ? "Email Address" : "Adresse Email"} *
+            </label>
+            <input
+              required
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="vous@exemple.com"
+              className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
+              {language === "en" ? "WhatsApp / Mobile Money Phone" : "Téléphone WhatsApp / Mobile Money"} *
+            </label>
+            <div className="flex gap-2">
+              <select
+                value={country || "CD"}
+                onChange={(e) => {
+                  const cCode = e.target.value;
+                  setCountry(cCode);
+                  const found = COUNTRIES.find((c) => c.code === cCode);
+                  if (found) setDialCode(found.dial);
+                }}
+                className="px-3 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-800 dark:text-zinc-200 outline-none"
+              >
+                {COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.flag} {c.dial}
+                  </option>
+                ))}
+              </select>
+              <input
+                required
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="Ex: 812345678"
+                className="flex-1 px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white font-mono"
+              />
+            </div>
+            <p className="text-[11px] text-zinc-400 mt-1">
+              Ce numéro sera utilisé pour préremplir votre paiement Mobile Money.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5 uppercase tracking-wider">
+              {language === "en" ? "Password (min. 8 characters)" : "Mot de passe (Min. 8 caractères)"} *
+            </label>
+            <div className="relative">
+              <input
+                required
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={8}
+                placeholder="••••••••"
+                className="w-full px-4 py-3 pr-12 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors text-xs font-semibold"
+              >
+                {showPassword ? "Cacher" : "Voir"}
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-1">
+            <Captcha onVerify={setCaptchaToken} resetKey={captchaResetKey} />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || !name.trim() || !email.trim() || !password || password.length < 8 || !phoneNumber.trim()}
+            className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-extrabold rounded-2xl transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 text-sm cursor-pointer mt-3"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Création du compte et redirection paiement...</span>
+              </>
+            ) : (
+              <>
+                <span>Créer mon compte &amp; Payer (Accès immédiat)</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+
+          <div className="pt-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
+            Déjà inscrit ?{" "}
+            <Link href={`/login?next=${encodeURIComponent(queryNext || "")}`} className="text-blue-600 hover:text-blue-500 font-bold">
+              Se connecter
+            </Link>
+          </div>
+        </form>
+      ) : role === null ? (
         <div className="space-y-4 animate-in fade-in duration-300">
           <div
             onClick={() => setRole("STUDENT")}

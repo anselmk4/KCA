@@ -72,14 +72,30 @@ function LoginForm() {
             plan: userPlan,
           });
 
-          if (userRole === 'INSTRUCTOR' || userRole === 'TEACHING_ASSISTANT') {
+          if (nextParam) {
+            router.replace(nextParam);
+          } else if (userRole === 'INSTRUCTOR' || userRole === 'TEACHING_ASSISTANT') {
             router.replace('/instructor');
           } else if (
             ['SUPER_ADMIN', 'ADMIN', 'FINANCE_ADMIN', 'ACADEMIC_ADMIN', 'SUPPORT_AGENT'].includes(userRole)
           ) {
             router.replace('/admin');
           } else {
-            router.replace('/dashboard');
+            // Student: redirect to discover if they have 0 active enrollments
+            try {
+              const { count } = await supabase
+                .from('enrollments')
+                .select('id', { count: 'exact', head: true })
+                .eq('student_id', user.id)
+                .eq('status', 'ACTIVE');
+              if (!count || count === 0) {
+                router.replace('/dashboard/discover?welcome=true');
+              } else {
+                router.replace('/dashboard');
+              }
+            } catch {
+              router.replace('/dashboard/discover?welcome=true');
+            }
           }
         }
       } catch (err) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   PlayCircle,
   Clock,
@@ -114,6 +115,8 @@ function getCourseStyles(category: string) {
 
 export default function DashboardPage() {
   const { t, language } = useLanguage();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [activeEnrollments, setActiveEnrollments] = useState<EnrollmentData[]>([]);
   const [completedEnrollments, setCompletedEnrollments] = useState<EnrollmentData[]>([]);
@@ -150,6 +153,14 @@ export default function DashboardPage() {
           thumbnail_url: e.courses.thumbnail_url
         } : undefined
       })) as unknown as EnrollmentData[];
+
+      // Si le nouvel apprenant n'a aucun cours actif ni complété (100% des nouveaux inscrits),
+      // le rediriger directement vers la page Découvrir pour voir immédiatement les formations et produits digitaux.
+      const stayOnDashboard = searchParams.get("stay") === "true";
+      if (all.length === 0 && !stayOnDashboard) {
+        router.replace("/dashboard/discover?welcome=true");
+        return;
+      }
 
       const active = all.filter((e) => e.status === "ACTIVE" && e.progress_percent < 100);
       const completed = all.filter((e) => e.progress_percent >= 100 || e.status === "COMPLETED");

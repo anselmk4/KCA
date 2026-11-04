@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Search,
@@ -93,6 +94,8 @@ function stripHtml(html: string | null | undefined): string {
 
 export default function DiscoverPage() {
   const { t } = useLanguage();
+  const searchParams = useSearchParams();
+  const isWelcome = searchParams.get("welcome") === "true";
   const [search, setSearch] = useState("");
   const [contentType, setContentType] = useState<ContentTypeFilter>("all");
   const [activeCategory, setActiveCategory] = useState("all");
@@ -326,6 +329,32 @@ export default function DiscoverPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500 pb-16">
+      {/* Welcome Banner for 1st Connection & New Students */}
+      {isWelcome && (
+        <div className="p-5 rounded-3xl bg-gradient-to-r from-teal-500/15 via-emerald-500/10 to-indigo-500/15 border-2 border-teal-500/30 flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top-3 duration-500">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-lg shadow-teal-500/30">
+              <Sparkles className="w-6 h-6 animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2">
+                <span>Bienvenue sur votre Académie !</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500 text-white">Prêt à démarrer</span>
+              </h3>
+              <p className="text-xs text-zinc-600 dark:text-zinc-300 mt-0.5">
+                Découvrez directement ci-dessous nos formations vidéo certifiantes et nos guides digitaux spécialisés en Blockchain, Trading & Intelligence Artificielle.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/dashboard?stay=true"
+            className="hidden sm:inline-flex px-3.5 py-2 rounded-xl text-xs font-bold bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 shrink-0"
+          >
+            Accéder à mon tableau de bord vide
+          </Link>
+        </div>
+      )}
+
       {/* Header */}
       <div>
         <div className="flex items-center gap-2 text-teal-600 dark:text-teal-400 mb-1">
@@ -523,11 +552,16 @@ export default function DiscoverPage() {
                       </span>
                     </div>
 
-                    {/* Price Badge */}
-                    <div className="absolute top-3.5 right-3.5 pointer-events-auto">
+                    {/* Price Badge with Local Currency */}
+                    <div className="absolute top-3.5 right-3.5 pointer-events-auto flex flex-col items-end gap-1">
                       <span className="px-3 py-1 rounded-full text-xs font-black bg-zinc-950/85 text-amber-400 border border-amber-400/30 shadow-lg backdrop-blur-xs">
                         {item.price > 0 ? `$${item.price}` : "Gratuit"}
                       </span>
+                      {item.price > 0 && (
+                        <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-zinc-950/80 text-zinc-300 border border-zinc-700/50 backdrop-blur-xs">
+                          ≈ {(item.price * 2850).toLocaleString("fr-FR")} CDF
+                        </span>
+                      )}
                     </div>
                   </ColorfulContentCover>
 
@@ -540,6 +574,15 @@ export default function DiscoverPage() {
                       <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
                         {stripHtml(item.description)}
                       </p>
+                      
+                      {/* Tranche badge for courses > 45$ */}
+                      {item.price > 45 && (
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[11px] font-bold">
+                          <span>💳 3x sans frais : dès ${Math.round(item.price / 3)}/tranche</span>
+                          <span className="text-[10px] text-zinc-400 font-normal">({(Math.round(item.price / 3) * 2850).toLocaleString("fr-FR")} CDF)</span>
+                        </div>
+                      )}
+
                       <p className="text-[11px] text-zinc-400 dark:text-zinc-500 font-medium pt-1">
                         Par <span className="text-zinc-700 dark:text-zinc-300 font-bold">{item.authorName}</span>
                       </p>
@@ -603,11 +646,16 @@ export default function DiscoverPage() {
                     </span>
                   </div>
 
-                  {/* Price Badge */}
-                  <div className="absolute top-3.5 right-3.5 pointer-events-auto">
+                  {/* Price Badge with Local Currency */}
+                  <div className="absolute top-3.5 right-3.5 pointer-events-auto flex flex-col items-end gap-1">
                     <span className="px-3 py-1 rounded-full text-xs font-black bg-zinc-950/85 text-amber-400 border border-amber-400/30 shadow-lg backdrop-blur-xs">
                       ${Number(item.price).toFixed(2)} USD
                     </span>
+                    {Number(item.price) > 0 && (
+                      <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-zinc-950/80 text-zinc-300 border border-zinc-700/50 backdrop-blur-xs">
+                        ≈ {(Number(item.price) * 2850).toLocaleString("fr-FR")} CDF
+                      </span>
+                    )}
                   </div>
                 </ColorfulContentCover>
 

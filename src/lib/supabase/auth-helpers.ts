@@ -264,6 +264,22 @@ export async function loginWithEmail(
     redirectTo = '/admin';
   } else if (profile.role === 'INSTRUCTOR' || profile.role === 'TEACHING_ASSISTANT') {
     redirectTo = '/instructor';
+  } else {
+    // Student or unassigned: check if they have any active course enrollments
+    try {
+      const { count } = await supabase
+        .from('enrollments')
+        .select('id', { count: 'exact', head: true })
+        .eq('student_id', profile.id)
+        .eq('status', 'ACTIVE');
+
+      // If user has no active course, redirect directly to discover so they don't land on an empty dashboard
+      if (!count || count === 0) {
+        redirectTo = '/dashboard/discover?welcome=true';
+      }
+    } catch {
+      redirectTo = '/dashboard/discover?welcome=true';
+    }
   }
 
   return { profile, redirectTo };

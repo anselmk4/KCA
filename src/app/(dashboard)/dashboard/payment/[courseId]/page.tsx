@@ -294,8 +294,9 @@ export default function PaymentPage() {
         else if (currentCourse.level === 'EXPERT') level = 'Expert';
 
         const courseType = currentCourse.type || 'academic';
-        let allowInstallments = courseType === 'self_paced' ? false : (currentCourse.allow_installments || false);
-        let installmentsCount = courseType === 'self_paced' ? 1 : (currentCourse.installments_count || 1);
+        const isPriceOver45 = (Number(currentCourse.price) || 0) > 45;
+        let allowInstallments = isPriceOver45 ? true : (courseType === 'self_paced' ? false : (currentCourse.allow_installments || false));
+        let installmentsCount = isPriceOver45 ? (currentCourse.installments_count || 3) : (courseType === 'self_paced' ? 1 : (currentCourse.installments_count || 1));
 
         setCourse({
           id: currentCourse.id,
@@ -434,10 +435,11 @@ export default function PaymentPage() {
         return true;
       } else if (data.status === 'FAILED') {
         setShowPendingState(false);
-        const reasonText = data.failureReason || "Transaction refusée par l'opérateur Mobile Money.";
-        setPaymentError(reasonText);
+        setMomoSubMode("manual");
+        const reasonText = data.failureReason || "Push USSD expiré ou refusé par l'opérateur.";
+        setPaymentError(`${reasonText} — Mode « Transfert Manuel assisté » activé ci-dessous.`);
         if (!isSilent) {
-          alert(`Le paiement a échoué : ${reasonText}`);
+          alert(`Le push automatique a échoué (${reasonText}). Le mode « Transfert Manuel assisté » a été activé ci-dessous pour valider votre cours.`);
         }
         return false;
       } else {
@@ -877,6 +879,19 @@ export default function PaymentPage() {
               </button>
             )}
             
+            {/* Switch to assisted manual transfer */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowPendingState(false);
+                setMomoSubMode("manual");
+              }}
+              className="w-full py-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 font-bold rounded-xl transition-all text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+            >
+              <Smartphone className="w-4 h-4" />
+              <span>Push USSD non reçu ? Activer le « Transfert Manuel assisté »</span>
+            </button>
+            
             <button
               onClick={() => setShowPendingState(false)}
               className="w-full py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-300 font-bold rounded-xl transition-all text-sm cursor-pointer"
@@ -1059,14 +1074,60 @@ export default function PaymentPage() {
                     </select>
                   </div>
 
+                  {/* Mode Selector Push vs Manuel */}
+                  <div className="flex items-center justify-between p-1 bg-zinc-100 dark:bg-zinc-800/60 rounded-xl mb-3 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setMomoSubMode("push")}
+                      className={`flex-1 py-2 rounded-lg font-bold transition-all text-center cursor-pointer ${
+                        momoSubMode === "push"
+                          ? "bg-white dark:bg-zinc-900 text-blue-600 dark:text-blue-400 shadow-xs"
+                          : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                      }`}
+                    >
+                      ⚡ Push USSD Automatique
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMomoSubMode("manual")}
+                      className={`flex-1 py-2 rounded-lg font-bold transition-all text-center cursor-pointer ${
+                        momoSubMode === "manual"
+                          ? "bg-amber-500 text-white shadow-xs"
+                          : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900"
+                      }`}
+                    >
+                      🤝 Transfert Manuel assisté
+                    </button>
+                  </div>
+
                   {momoSubMode === "manual" && (
-                    <div className="p-4 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-2xl space-y-3 animate-in fade-in">
-                      <div className="font-extrabold text-xs uppercase tracking-wider text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
-                        <span>Instructions de Virement Direct Mobile Money</span>
+                    <div className="p-4 bg-amber-50/70 dark:bg-amber-950/30 border-2 border-amber-300 dark:border-amber-700/50 rounded-2xl space-y-3.5 animate-in fade-in">
+                      <div className="font-black text-xs uppercase tracking-wider text-amber-900 dark:text-amber-200 flex items-center justify-between">
+                        <span>Instructions — Transfert Manuel Assisté</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-100">Sans échec</span>
                       </div>
-                      <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                        Effectuez votre virement de <strong className="text-blue-600 dark:text-blue-400">{userCountry === "CD" && momoCurrency === "USD" ? `$${finalAmountWithFee.toFixed(2)} USD` : `${Math.round(finalAmountWithFee * countryConfig.exchangeRate).toLocaleString()} ${countryConfig.currency}`}</strong> vers votre compte marchand MoMo habituel, puis entrez le numéro de référence reçu par SMS ci-dessous :
+                      <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed">
+                        Envoyez le montant exact de <strong className="text-amber-700 dark:text-amber-400 font-black text-sm">{userCountry === "CD" && momoCurrency === "USD" ? `$${finalAmountWithFee.toFixed(2)} USD` : `${Math.round(finalAmountWithFee * countryConfig.exchangeRate).toLocaleString()} ${countryConfig.currency}`}</strong> vers l&apos;un de nos numéros officiels :
                       </p>
+
+                      {/* Official Reception Accounts */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-amber-200 dark:border-zinc-800">
+                          <p className="font-bold text-red-600">Airtel Money</p>
+                          <p className="font-mono font-black text-zinc-900 dark:text-white">+243 99 876 5432</p>
+                          <p className="text-[10px] text-zinc-400">Anselm K.</p>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-amber-200 dark:border-zinc-800">
+                          <p className="font-bold text-blue-600">Vodacom M-Pesa</p>
+                          <p className="font-mono font-black text-zinc-900 dark:text-white">+243 81 234 5678</p>
+                          <p className="text-[10px] text-zinc-400">Anselm K.</p>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-amber-200 dark:border-zinc-800">
+                          <p className="font-bold text-orange-500">Orange Money</p>
+                          <p className="font-mono font-black text-zinc-900 dark:text-white">+243 89 012 3456</p>
+                          <p className="text-[10px] text-zinc-400">Anselm K.</p>
+                        </div>
+                      </div>
 
                       <div className="space-y-1.5 pt-1">
                         <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
@@ -1075,56 +1136,67 @@ export default function PaymentPage() {
                         <input
                           type="text"
                           required
-                          placeholder="Ex: 250788123456 ou TXN-98765432"
+                          placeholder="Ex: PP261104... ou TXN-98765432"
                           value={momoTxRef}
                           onChange={(e) => setMomoTxRef(e.target.value)}
-                          className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-white font-mono tracking-wide outline-none focus:ring-2 focus:ring-blue-500/40"
+                          className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm text-zinc-900 dark:text-white font-mono tracking-wide outline-none focus:ring-2 focus:ring-amber-500/40"
                         />
                       </div>
 
-                      <button
-                        type="button"
-                        disabled={submitting || !momoTxRef.trim()}
-                        onClick={async () => {
-                          setSubmitting(true);
-                          try {
-                            const response = await fetch('/api/payments/manual-momo-submit', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                amount: finalAmountWithFee,
-                                phoneNumber: momoPhone || 'N/A',
-                                carrier: momoProvider,
-                                type: 'STUDENT_COURSE',
-                                itemId: course.id,
-                                transactionRef: momoTxRef.trim(),
-                                couponId: appliedCoupon?.id || null,
-                                payInstallment
-                              }),
-                            });
-                            const data = await response.json();
-                            if (!response.ok) throw new Error(data.error || "Erreur de validation");
-                            setSuccess(true);
-                            setTimeout(() => {
-                              router.push("/dashboard/courses");
-                            }, 2500);
-                          } catch (err: any) {
-                            alert("Erreur de virement : " + (err.message || err));
-                          } finally {
-                            setSubmitting(false);
-                          }
-                        }}
-                        className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-xl transition-all cursor-pointer shadow-md text-xs flex items-center justify-center gap-2"
-                      >
-                        {submitting ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            <span>Validation du virement...</span>
-                          </>
-                        ) : (
-                          <span>✓ Valider mon virement et débloquer le cours</span>
-                        )}
-                      </button>
+                      <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                        <button
+                          type="button"
+                          disabled={submitting || !momoTxRef.trim()}
+                          onClick={async () => {
+                            setSubmitting(true);
+                            try {
+                              const response = await fetch('/api/payments/manual-momo-submit', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  amount: finalAmountWithFee,
+                                  phoneNumber: momoPhone || 'N/A',
+                                  carrier: momoProvider,
+                                  type: 'STUDENT_COURSE',
+                                  itemId: course.id,
+                                  transactionRef: momoTxRef.trim(),
+                                  couponId: appliedCoupon?.id || null,
+                                  payInstallment
+                                }),
+                              });
+                              const data = await response.json();
+                              if (!response.ok) throw new Error(data.error || "Erreur de validation");
+                              setSuccess(true);
+                              setTimeout(() => {
+                                router.push("/dashboard/courses");
+                              }, 2500);
+                            } catch (err: any) {
+                              alert("Erreur de virement : " + (err.message || err));
+                            } finally {
+                              setSubmitting(false);
+                            }
+                          }}
+                          className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white font-bold rounded-xl transition-all cursor-pointer shadow-md text-xs flex items-center justify-center gap-2"
+                        >
+                          {submitting ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              <span>Validation de votre virement...</span>
+                            </>
+                          ) : (
+                            <span>✓ Valider mon virement et activer mon cours</span>
+                          )}
+                        </button>
+
+                        <a
+                          href={`https://wa.me/243812345678?text=${encodeURIComponent("Bonjour support Ansella, mon push USSD Mobile Money a échoué pour la formation \"" + course.title + "\" ($" + finalAmountWithFee + "). Référence: " + (momoTxRef.trim() || "(en attente)"))}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all text-xs flex items-center justify-center gap-1.5 shadow-md"
+                        >
+                          Assistance WhatsApp
+                        </a>
+                      </div>
                     </div>
                   )}
 

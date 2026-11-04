@@ -437,40 +437,74 @@ export default function InstructorDashboardPage() {
         </div>
       </div>
 
-      {/* Plan Free Limitations Card / Upgrade Invite Banner */}
+      {/* Plan Free Limitations or First Sale PRO Upgrade Offer */}
       {session?.plan === "FREE" && (
-        <div className="bg-gradient-to-r from-red-500/10 via-amber-500/10 to-blue-500/10 border-2 border-dashed border-red-500/30 rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6 shadow-md relative overflow-hidden text-left">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/5 dark:bg-red-500/5 rounded-full blur-[40px] pointer-events-none -mr-16 -mt-16" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/5 dark:bg-blue-500/5 rounded-full blur-[40px] pointer-events-none -ml-16 -mb-16" />
-          
-          <div className="space-y-3 z-10 max-w-2xl">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-[10px] font-bold uppercase tracking-wider rounded-lg">
-              ⚠️ Plan d&apos;essai gratuit actif
-            </span>
-            <h2 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white leading-snug">
-              Boostez votre Académie en passant au Plan Supérieur !
-            </h2>
-            <p className="text-xs md:text-sm text-zinc-650 dark:text-zinc-400 leading-relaxed font-medium">
-              Votre plan actuel est limité à <span className="font-bold text-zinc-900 dark:text-white">1 cours actif</span>, <span className="font-bold text-zinc-900 dark:text-white">15 apprenants</span> et comporte des frais de transaction de <span className="font-bold text-zinc-900 dark:text-white">20%</span>. 
-              Passez au Plan supérieur pour débloquer les <span className="font-semibold text-blue-600 dark:text-blue-400">sessions live</span>, réduire vos frais de transaction à <span className="font-semibold text-teal-600 dark:text-teal-400">10% ou moins</span> et accueillir des élèves en illimité.
-            </p>
+        hasPaidSales ? (
+          <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-r from-amber-500/15 via-purple-500/15 to-blue-500/15 border-2 border-amber-500/40 shadow-lg flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative overflow-hidden animate-in fade-in duration-500">
+            <div className="space-y-3 z-10 max-w-2xl">
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 bg-amber-500 text-white text-[10px] font-black uppercase tracking-wider rounded-lg shadow-sm">
+                  🎉 Première vente encaissée !
+                </span>
+                <span className="text-xs font-bold text-amber-700 dark:text-amber-300">Offre Déblocage PRO</span>
+              </div>
+              <h2 className="text-xl md:text-2xl font-black text-zinc-900 dark:text-white leading-tight">
+                Passez au Plan PRO et réduisez votre commission à 5% !
+              </h2>
+              <p className="text-xs md:text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed font-medium">
+                Bravo pour votre premier encaissement sur Ansella ! Actuellement sur le plan Gratuit (<strong className="text-red-500 font-bold">20% de commission</strong>), passez immédiatement au <strong className="text-amber-600 dark:text-amber-400 font-bold">Plan PRO</strong> pour réduire vos frais de plateforme à seulement <strong className="text-emerald-600 font-black">5%</strong> et garder <strong className="text-emerald-600 font-black">95% net</strong> de tous vos futurs paiements.
+              </p>
+            </div>
+            <div className="shrink-0 z-10 flex flex-col sm:flex-row lg:flex-col gap-3">
+              <Link
+                href="/instructor/billing"
+                className="px-6 py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-xs rounded-xl shadow-lg shadow-amber-500/30 transition-all text-center flex items-center justify-center gap-2 hover:scale-[1.02] cursor-pointer"
+              >
+                <span>Activer le Plan PRO (5% commission)</span>
+                <ArrowUpRight className="w-4 h-4" />
+              </Link>
+              <Link
+                href="/instructor/billing"
+                className="px-6 py-2.5 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 font-bold text-xs rounded-xl transition-all text-center hover:bg-amber-50/50 dark:hover:bg-amber-950/30"
+              >
+                Comparer les avantages
+              </Link>
+            </div>
           </div>
-          <div className="shrink-0 z-10 flex flex-col sm:flex-row lg:flex-col gap-3">
-            <Link
-              href="/instructor/billing"
-              className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-md transition-all text-center flex items-center justify-center gap-2 cursor-pointer"
-            >
-              Passer à l&apos;offre supérieure
-              <TrendingUp className="w-4 h-4" />
-            </Link>
-            <Link
-              href="/instructor/billing"
-              className="px-6 py-3 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-850 text-zinc-650 dark:text-zinc-350 font-bold text-xs rounded-xl transition-all text-center cursor-pointer"
-            >
-              Voir tous les tarifs & avantages
-            </Link>
+        ) : (
+          <div className="bg-gradient-to-r from-red-500/10 via-amber-500/10 to-blue-500/10 border-2 border-dashed border-red-500/30 rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6 shadow-md relative overflow-hidden text-left">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/5 dark:bg-red-500/5 rounded-full blur-[40px] pointer-events-none -mr-16 -mt-16" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/5 dark:bg-blue-500/5 rounded-full blur-[40px] pointer-events-none -ml-16 -mb-16" />
+            
+            <div className="space-y-3 z-10 max-w-2xl">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-[10px] font-bold uppercase tracking-wider rounded-lg">
+                ⚠️ Plan d&apos;essai gratuit actif
+              </span>
+              <h2 className="text-lg md:text-xl font-bold text-zinc-900 dark:text-white leading-snug">
+                Boostez votre Académie en passant au Plan Supérieur !
+              </h2>
+              <p className="text-xs md:text-sm text-zinc-650 dark:text-zinc-400 leading-relaxed font-medium">
+                Votre plan actuel est limité à <span className="font-bold text-zinc-900 dark:text-white">1 cours actif</span>, <span className="font-bold text-zinc-900 dark:text-white">15 apprenants</span> et comporte des frais de transaction de <span className="font-bold text-zinc-900 dark:text-white">20%</span>. 
+                Passez au Plan supérieur pour débloquer les <span className="font-semibold text-blue-600 dark:text-blue-400">sessions live</span>, réduire vos frais de transaction à <span className="font-semibold text-teal-600 dark:text-teal-400">10% ou moins</span> et accueillir des élèves en illimité.
+              </p>
+            </div>
+            <div className="shrink-0 z-10 flex flex-col sm:flex-row lg:flex-col gap-3">
+              <Link
+                href="/instructor/billing"
+                className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-md transition-all text-center flex items-center justify-center gap-2 cursor-pointer"
+              >
+                Passer à l&apos;offre supérieure
+                <TrendingUp className="w-4 h-4" />
+              </Link>
+              <Link
+                href="/instructor/billing"
+                className="px-6 py-3 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-850 text-zinc-650 dark:text-zinc-350 font-bold text-xs rounded-xl transition-all text-center cursor-pointer"
+              >
+                Voir tous les tarifs & avantages
+              </Link>
+            </div>
           </div>
-        </div>
+        )
       )}
 
       {/* KPI Grid */}

@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: pendingPayments, error: fetchErr } = await supabaseAdmin
       .from('payments')
-      .select('id, order_id, user_id, amount, status, method, created_at')
+      .select('id, order_id, user_id, amount, status, method, created_at, provider_metadata')
       .eq('status', 'PENDING')
       .eq('provider', 'MOBILE_MONEY')
       .gte('created_at', yesterday);
@@ -232,6 +232,17 @@ export async function GET(req: NextRequest) {
                   link: `/instructor/students`
                 });
 
+                // Proposer le passage au plan PRO (5% de commission) dès la 1ère vente si sur plan FREE
+                if (instPlan === 'FREE') {
+                  await createNotification({
+                    userId: courseData.instructor_id,
+                    title: "🎉 Première vente encaissée — Réduisez votre commission !",
+                    message: `Félicitations pour votre vente ! Passez au Plan PRO pour réduire votre commission plateforme à seulement 5% (au lieu de 20%) et garder 95% de vos revenus.`,
+                    type: "SUCCESS",
+                    link: `/instructor/billing`
+                  });
+                }
+
                 if (instructorProfile.email) {
                   const { sendInstructorCoursePurchasedEmail } = await import("@/lib/email");
                   await sendInstructorCoursePurchasedEmail(
@@ -369,6 +380,83 @@ export async function GET(req: NextRequest) {
         }
 
         completedCount++;
+
+      } else if (['PENDING', 'SUBMITTED', 'WAITING_FOR_PAYER', ''].includes(pawaStatus) && ageMinutes < 15) {
+        // Relance automatique Email/WhatsApp sur les paiements PENDING après 10 min
+        const meta = (payment.provider_metadata || {}) as Record<string, any>;
+        if (ageMinutes >= 10 && !meta.reminder_sent_at) {
+          try {
+            const methodParts = (payment.method || '').split('::');
+            const paymentType = methodParts[1] || '';
+            const itemId = methodParts[2] || '';
+            let buyerEmail = meta.buyerEmail || '';
+            let buyerName = meta.buyerName || 'Client';
+
+            if (!buyerEmail && payment.user_id) {
+              const { data: bProf } = await supabaseAdmin
+                .from('profiles')
+                .select('email, full_name, phone')
+                .eq('id', payment.user_id)
+                .maybeSingle();
+              if (bProf?.email) {
+                buyerEmail = bProf.email;
+                buyerName = bProf.full_name || buyerName;
+              }
+            }
+
+            let itemTitle = 'votre commande';
+            let checkoutUrl = `https://ansella.app/dashboard/payment/${itemId}`;
+            if (paymentType === 'STUDENT_COURSE' && itemId) {
+              const { data: cRow } = await supabaseAdmin.from('courses').select('title').eq('id', itemId).maybeSingle();
+              if (cRow?.title) itemTitle = cRow.title;
+            } else if (paymentType === 'DIGITAL_PRODUCT' && itemId) {
+              const { data: dpRow } = await supabaseAdmin.from('digital_products').select('title').eq('id', itemId).maybeSingle();
+              if (dpRow?.title) itemTitle = dpRow.title;
+              checkoutUrl = `https://ansella.app/dashboard/discover`;
+            }
+
+            const waText = encodeURIComponent(`Bonjour support Ansella, mon paiement Mobile Money pour "${itemTitle}" (${payment.amount}$) est en attente (Réf: ${payment.id}). Pouvez-vous m'assister avec le transfert manuel ?`);
+            const whatsappSupportUrl = `https://wa.me/243812345678?text=${waText}`;
+
+            if (buyerEmail) {
+              const { sendPendingPaymentReminderEmail } = await import('@/lib/email');
+              await sendPendingPaymentReminderEmail(
+                buyerEmail,
+                buyerName,
+                itemTitle,
+                payment.amount,
+                payment.id,
+                checkoutUrl,
+                whatsappSupportUrl
+              );
+            }
+
+            if (payment.user_id) {
+              await createNotification({
+                userId: payment.user_id,
+                title: "⏳ Paiement Mobile Money en attente (10 min)",
+                message: `Votre paiement pour "${itemTitle}" est toujours en attente. Vous pouvez également opter pour un transfert manuel assisté.`,
+                type: "WARNING",
+                link: checkoutUrl
+              });
+            }
+
+            // Flag reminder as sent
+            await supabaseAdmin
+              .from('payments')
+              .update({
+                provider_metadata: {
+                  ...meta,
+                  reminder_sent_at: new Date().toISOString()
+                }
+              } as any)
+              .eq('id', payment.id);
+
+            console.log(`[cron-pending-payments] Relance 10 min envoyée pour le paiement ${payment.id}`);
+          } catch (remErr) {
+            console.error('[cron-pending-payments] Erreur lors de la relance 10 min:', remErr);
+          }
+        }
 
       } else if (['FAILED', 'REJECTED', 'CANCELLED', 'EXPIRED'].includes(pawaStatus) || ageMinutes > 15) {
         await expirePayment(payment, pawaResult.failureMessage || 'Expiré ou rejeté.');
