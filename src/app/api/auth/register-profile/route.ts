@@ -78,9 +78,6 @@ export async function POST(req: NextRequest) {
     }
 
     const cleanGenderRaw = String(gender || "").trim().toLowerCase();
-    if (!cleanGenderRaw || !["male", "female", "homme", "femme", "m", "f"].includes(cleanGenderRaw)) {
-      return NextResponse.json({ error: "Le genre est obligatoire (Masculin ou Féminin)." }, { status: 400 });
-    }
     const cleanGender =
       cleanGenderRaw === "female" || cleanGenderRaw === "femme" || cleanGenderRaw === "f"
         ? "female"

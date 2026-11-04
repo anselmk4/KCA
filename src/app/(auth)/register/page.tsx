@@ -75,33 +75,30 @@ function StepIndicator({ step, role }: { step: number; role: "INSTRUCTOR" | "STU
           <div key={idx} className="flex items-center">
             <div className="flex flex-col items-center gap-0.5">
               <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
-                  isCompleted
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${isCompleted
                     ? "bg-blue-600 text-white shadow-sm shadow-blue-500/40"
                     : isCurrent
-                    ? "bg-blue-600 text-white ring-4 ring-blue-500/20"
-                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500"
-                }`}
+                      ? "bg-blue-600 text-white ring-4 ring-blue-500/20"
+                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500"
+                  }`}
               >
                 {isCompleted ? <CheckCircle2 className="w-3.5 h-3.5" /> : idx}
               </div>
               <span
-                className={`text-[9px] font-semibold transition-colors ${
-                  isCurrent
+                className={`text-[9px] font-semibold transition-colors ${isCurrent
                     ? "text-blue-600 dark:text-blue-400"
                     : isCompleted
-                    ? "text-zinc-500 dark:text-zinc-400"
-                    : "text-zinc-400 dark:text-zinc-600"
-                }`}
+                      ? "text-zinc-500 dark:text-zinc-400"
+                      : "text-zinc-400 dark:text-zinc-600"
+                  }`}
               >
                 {label}
               </span>
             </div>
             {i < labels.length - 1 && (
               <div
-                className={`w-8 h-0.5 mx-1 mb-3 rounded-full transition-all duration-300 ${
-                  step > idx ? "bg-blue-600" : "bg-zinc-200 dark:bg-zinc-700"
-                }`}
+                className={`w-8 h-0.5 mx-1 mb-3 rounded-full transition-all duration-300 ${step > idx ? "bg-blue-600" : "bg-zinc-200 dark:bg-zinc-700"
+                  }`}
               />
             )}
           </div>
@@ -392,7 +389,7 @@ function RegisterForm() {
       setStep(2);
       return;
     }
-    if (!gender && !isExpressCheckout) {
+    if (!gender) {
       setFormError("Veuillez sélectionner votre genre (Homme ou Femme).");
       setStep(2);
       return;
@@ -627,16 +624,17 @@ function RegisterForm() {
             console.warn("Could not find matching flagship course:", mErr);
           }
 
-          // In-app welcome coupon notification (valid 48h)
+          // In-app welcome coupon notification (valid 48h) via client Supabase
           if (authData.user) {
             try {
-              const { createNotification } = await import("@/lib/supabase/notifications-helper");
-              await createNotification({
-                userId: authData.user.id,
+              await supabase.from("notifications").insert({
+                user_id: authData.user.id,
                 title: "🎁 Bienvenue ! Votre coupon de -15% est prêt",
                 message: "Profitez de votre coupon de bienvenue exclusif BIENVENUE15 valable pendant 48h sur la formation de votre choix !",
                 type: "SUCCESS",
-                link: targetUrl
+                link: targetUrl,
+                is_read: false,
+                created_at: new Date().toISOString()
               });
             } catch (nErr) {
               console.warn("Could not send welcome notification:", nErr);
@@ -678,30 +676,30 @@ function RegisterForm() {
     const subtitles: Record<string, string[]> = {
       INSTRUCTOR: language === "en"
         ? [
-            "Launch and monetize your online school in a few clicks.",
-            "This information helps us personalize your experience.",
-            "Configure your teaching domain and your academy.",
-            "Review your information and complete your registration.",
-          ]
+          "Launch and monetize your online school in a few clicks.",
+          "This information helps us personalize your experience.",
+          "Configure your teaching domain and your academy.",
+          "Review your information and complete your registration.",
+        ]
         : [
-            "Lancez et monétisez votre école en ligne en quelques clics.",
-            "Ces informations nous permettent de personnaliser votre expérience.",
-            "Configurez votre domaine d'enseignement et votre académie.",
-            "Relisez vos informations et finalisez votre inscription.",
-          ],
+          "Lancez et monétisez votre école en ligne en quelques clics.",
+          "Ces informations nous permettent de personnaliser votre expérience.",
+          "Configurez votre domaine d'enseignement et votre académie.",
+          "Relisez vos informations et finalisez votre inscription.",
+        ],
       STUDENT: language === "en"
         ? [
-            "Access top high-level certification training.",
-            "This information helps us personalize your space.",
-            "Tell us more about your learning goals.",
-            "Review your information and complete your registration.",
-          ]
+          "Access top high-level certification training.",
+          "This information helps us personalize your space.",
+          "Tell us more about your learning goals.",
+          "Review your information and complete your registration.",
+        ]
         : [
-            "Accédez aux meilleures formations certifiantes de haut niveau.",
-            "Ces informations nous permettent de personnaliser votre espace.",
-            "Dites-nous en plus sur vos objectifs d'apprentissage.",
-            "Relisez vos informations et finalisez votre inscription.",
-          ],
+          "Accédez aux meilleures formations certifiantes de haut niveau.",
+          "Ces informations nous permettent de personnaliser votre espace.",
+          "Dites-nous en plus sur vos objectifs d'apprentissage.",
+          "Relisez vos informations et finalisez votre inscription.",
+        ],
     };
     return subtitles[role][step - 1];
   };
@@ -1010,17 +1008,16 @@ function RegisterForm() {
                       return (
                         <div
                           key={level}
-                          className={`h-1 flex-1 rounded-full transition-all duration-300 ${
-                            level <= strength
+                          className={`h-1 flex-1 rounded-full transition-all duration-300 ${level <= strength
                               ? strength <= 1
                                 ? "bg-red-500"
                                 : strength <= 2
-                                ? "bg-orange-400"
-                                : strength <= 3
-                                ? "bg-yellow-400"
-                                : "bg-emerald-500"
+                                  ? "bg-orange-400"
+                                  : strength <= 3
+                                    ? "bg-yellow-400"
+                                    : "bg-emerald-500"
                               : "bg-zinc-200 dark:bg-zinc-700"
-                          }`}
+                            }`}
                         />
                       );
                     })}
@@ -1086,7 +1083,7 @@ function RegisterForm() {
                     <option value="">{language === "en" ? "-- Select your country --" : "-- Sélectionner votre pays --"}</option>
                     <optgroup label={language === "en" ? "🌍 Africa" : "🌍 Afrique"}>
                       {COUNTRIES.filter((c) =>
-                        !["FR","BE","CA","CH","US","GB","DE","BR","AE"].includes(c.code)
+                        !["FR", "BE", "CA", "CH", "US", "GB", "DE", "BR", "AE"].includes(c.code)
                       ).map((c) => (
                         <option key={c.code} value={c.code}>
                           {c.flag} {c.name}
@@ -1095,7 +1092,7 @@ function RegisterForm() {
                     </optgroup>
                     <optgroup label="🌐 International">
                       {COUNTRIES.filter((c) =>
-                        ["FR","BE","CA","CH","US","GB","DE","BR","AE"].includes(c.code)
+                        ["FR", "BE", "CA", "CH", "US", "GB", "DE", "BR", "AE"].includes(c.code)
                       ).map((c) => (
                         <option key={c.code} value={c.code}>
                           {c.flag} {c.name}
@@ -1165,11 +1162,10 @@ function RegisterForm() {
                       key={opt.value}
                       type="button"
                       onClick={() => setGender(opt.value as typeof gender)}
-                      className={`py-3 px-2 rounded-xl border-2 font-bold text-xs transition-all duration-200 flex flex-col items-center gap-1 cursor-pointer ${
-                        gender === opt.value
+                      className={`py-3 px-2 rounded-xl border-2 font-bold text-xs transition-all duration-200 flex flex-col items-center gap-1 cursor-pointer ${gender === opt.value
                           ? "border-blue-600 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 shadow-sm shadow-blue-500/20"
                           : "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-600 bg-zinc-50 dark:bg-zinc-800"
-                      }`}
+                        }`}
                     >
                       <span className="text-lg">{opt.emoji}</span>
                       <span>{opt.label}</span>
@@ -1230,20 +1226,18 @@ function RegisterForm() {
                         key={d.value}
                         type="button"
                         onClick={() => setThematic(d.value)}
-                        className={`px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200 cursor-pointer ${
-                          thematic === d.value
+                        className={`px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200 cursor-pointer ${thematic === d.value
                             ? "border-blue-600 bg-blue-50 dark:bg-blue-950/30 shadow-sm shadow-blue-500/10"
                             : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center gap-2">
                           <span className="text-base">{d.icon}</span>
                           <span
-                            className={`text-[11px] font-semibold leading-tight ${
-                              thematic === d.value
+                            className={`text-[11px] font-semibold leading-tight ${thematic === d.value
                                 ? "text-blue-700 dark:text-blue-400"
                                 : "text-zinc-700 dark:text-zinc-300"
-                            }`}
+                              }`}
                           >
                             {translatedLabel}
                           </span>
@@ -1307,11 +1301,10 @@ function RegisterForm() {
                       key={lvl.value}
                       type="button"
                       onClick={() => setStudentLevel(lvl.value)}
-                      className={`w-full px-4 py-3 rounded-xl border-2 text-left transition-all duration-200 cursor-pointer flex items-center gap-3 ${
-                        studentLevel === lvl.value
+                      className={`w-full px-4 py-3 rounded-xl border-2 text-left transition-all duration-200 cursor-pointer flex items-center gap-3 ${studentLevel === lvl.value
                           ? "border-blue-600 bg-blue-50 dark:bg-blue-950/30 shadow-sm shadow-blue-500/10"
                           : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600"
-                      }`}
+                        }`}
                     >
                       <span className="text-xl">{lvl.emoji}</span>
                       <div>
@@ -1339,11 +1332,10 @@ function RegisterForm() {
                       key={course.value}
                       type="button"
                       onClick={() => setInterestCourse(course.value)}
-                      className={`px-3 py-3 rounded-xl border-2 text-left transition-all duration-200 cursor-pointer ${
-                        interestCourse === course.value
+                      className={`px-3 py-3 rounded-xl border-2 text-left transition-all duration-200 cursor-pointer ${interestCourse === course.value
                           ? "border-blue-600 bg-blue-50 dark:bg-blue-950/30 shadow-sm shadow-blue-500/10"
                           : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600"
-                      }`}
+                        }`}
                     >
                       <span className="text-xl block mb-1">{course.icon}</span>
                       <span className={`text-[11px] font-bold ${interestCourse === course.value ? "text-blue-700 dark:text-blue-400" : "text-zinc-700 dark:text-zinc-300"}`}>
@@ -1385,13 +1377,13 @@ function RegisterForm() {
                     { label: language === "en" ? "Gender" : "Genre", value: gender === "male" ? (language === "en" ? "Male" : "Homme") : gender === "female" ? (language === "en" ? "Female" : "Femme") : "—" },
                     ...(role === "INSTRUCTOR"
                       ? [
-                          { label: language === "en" ? "Academy" : "Académie", value: academyName },
-                          { label: language === "en" ? "Domain" : "Domaine", value: thematic === "other" ? customThematic : (INSTRUCTOR_DOMAINS.find((d) => d.value === thematic)?.label || thematic) },
-                        ]
+                        { label: language === "en" ? "Academy" : "Académie", value: academyName },
+                        { label: language === "en" ? "Domain" : "Domaine", value: thematic === "other" ? customThematic : (INSTRUCTOR_DOMAINS.find((d) => d.value === thematic)?.label || thematic) },
+                      ]
                       : [
-                          { label: language === "en" ? "Level" : "Niveau", value: studentLevel },
-                          { label: language === "en" ? "Interest" : "Intérêt", value: interestCourse },
-                        ]),
+                        { label: language === "en" ? "Level" : "Niveau", value: studentLevel },
+                        { label: language === "en" ? "Interest" : "Intérêt", value: interestCourse },
+                      ]),
                   ].map((row) => (
                     <div key={row.label} className="flex justify-between items-center px-4 py-2.5">
                       <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">{row.label}</span>
@@ -1438,8 +1430,8 @@ function RegisterForm() {
               {loading || checkingEmail ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  {checkingEmail 
-                    ? (language === "en" ? "Verifying..." : "Vérification...") 
+                  {checkingEmail
+                    ? (language === "en" ? "Verifying..." : "Vérification...")
                     : (language === "en" ? "Creating account..." : "Création du compte...")}
                 </>
               ) : step === TOTAL_STEPS ? (
@@ -1494,8 +1486,8 @@ export default function RegisterPage() {
               </span>
             </h1>
             <p className="text-zinc-600 dark:text-zinc-400 text-base leading-relaxed font-medium">
-              {language === "en" 
-                ? "Create your profile in seconds to acquire concrete and market-valuable skills." 
+              {language === "en"
+                ? "Create your profile in seconds to acquire concrete and market-valuable skills."
                 : "Créez votre profil en quelques secondes pour acquérir des compétences concrètes et valorisables sur le marché."}
             </p>
           </div>
