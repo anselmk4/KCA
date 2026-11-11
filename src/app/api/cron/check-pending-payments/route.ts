@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getPawaPayDepositStatus } from '@/lib/pawapay';
 import { createNotification } from '@/lib/supabase/notifications-helper';
 import { incrementCouponUses } from '@/lib/supabase/orders-helper';
+import { extractBuyerInfo, sanitizeBuyerEmail } from '@/lib/payments-meta';
 import crypto from 'crypto';
 
 export async function GET(req: NextRequest) {
@@ -337,9 +338,9 @@ export async function GET(req: NextRequest) {
             }
 
             // Buyer notification & invoice
-            const metaEmail = methodParts[3] ? decodeURIComponent(methodParts[3]) : '';
-            let buyerEmail = (metaEmail && metaEmail.includes('@')) ? metaEmail : '';
-            let buyerName = buyerEmail ? (buyerEmail.split('@')[0] || "Client") : "Client";
+            const buyerInfo = extractBuyerInfo(payment);
+            let buyerEmail = buyerInfo.email;
+            let buyerName = buyerInfo.name;
 
             if (!buyerEmail && payment.user_id) {
               const { data: buyerProfile } = await supabaseAdmin
@@ -348,8 +349,10 @@ export async function GET(req: NextRequest) {
                 .eq('id', payment.user_id)
                 .maybeSingle();
               if (buyerProfile?.email) {
-                buyerEmail = buyerProfile.email;
-                buyerName = buyerProfile.full_name || buyerName;
+                buyerEmail = sanitizeBuyerEmail(buyerProfile.email);
+                if (!buyerName || buyerName === 'Client') {
+                  buyerName = buyerProfile.full_name || buyerName;
+                }
               }
             }
 
@@ -365,9 +368,10 @@ export async function GET(req: NextRequest) {
               const downloadUrl = `/api/digital-products/${itemId}/download?token=${downloadToken}`;
 
               const { sendDigitalProductDeliveryEmail } = await import("@/lib/email");
+              const finalBuyerName = buyerName || buyerEmail.split('@')[0] || "Client";
               await sendDigitalProductDeliveryEmail(
                 buyerEmail,
-                buyerName,
+                finalBuyerName,
                 productTitle,
                 downloadUrl,
                 `DP-${payment.id.substring(0, 8).toUpperCase()}`,

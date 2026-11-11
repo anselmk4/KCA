@@ -4,6 +4,13 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getPawaPayDepositStatus } from "@/lib/pawapay";
 import { getPayPalOrderDetails } from "@/lib/paypal";
 import { createNotification } from "@/lib/supabase/notifications-helper";
+import { 
+  extractBuyerInfo, 
+  sanitizeBuyerEmail, 
+  sanitizeBuyerPhone, 
+  sanitizeBuyerName,
+  resolveOrCreateGuestUser 
+} from "@/lib/payments-meta";
 import crypto from "crypto";
 
 const ADMIN_MOD_ROLES = ["SUPER_ADMIN", "ADMIN", "MODERATOR", "ACADEMIC_ADMIN", "FINANCE_ADMIN"];
@@ -153,7 +160,7 @@ export async function GET(
       .select("id, order_id, user_id, amount, currency, status, method, provider, provider_metadata, provider_transaction_id, created_at, paid_at")
       .or(`method.ilike.%DIGITAL_PRODUCT::${productId}%,method.ilike.%DIGITAL_PRODUCT::${altProductId || productId}%`)
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(250);
 
     (productPayments || []).forEach((pay: any) => {
       if (pay.id && !paymentsMap.has(pay.id)) paymentsMap.set(pay.id, pay);
@@ -215,48 +222,34 @@ export async function GET(
       const txKey = pur.transaction_id || pur.id;
       const matchedPayment = paymentsMap.get(pur.transaction_id) || paymentsMap.get(pur.id);
 
-      const isPurPaid =
+      let isPurPaid =
         pur.payment_status === "COMPLETED" ||
         pur.payment_status === "PAID" ||
         pur.payment_status === "completed" ||
         pur.payment_status === "paid";
 
-      const isPaymentPaid =
+      let isPaymentPaid =
         matchedPayment &&
         (matchedPayment.status === "PAID" || matchedPayment.status === "COMPLETED");
 
-      const isPaid = isPurPaid || isPaymentPaid;
+      let isPaid = isPurPaid || isPaymentPaid;
 
       const profile = pur.user_id ? userProfileMap.get(pur.user_id) : null;
       let email = profile?.email || "";
       let name = profile?.full_name || "";
       let phone = profile?.phone || "";
 
-      // Extraction depuis provider_metadata
-      if (matchedPayment?.provider_metadata && typeof matchedPayment.provider_metadata === "object") {
-        const meta = matchedPayment.provider_metadata;
-        if (!email && (meta.buyerEmail || meta.email)) {
-          email = String(meta.buyerEmail || meta.email).trim();
-        }
-        if (!phone && (meta.buyerPhone || meta.phone || meta.phoneNumber)) {
-          phone = String(meta.buyerPhone || meta.phone || meta.phoneNumber).trim();
-        }
-        if (!name && (meta.buyerName || meta.name)) {
-          name = String(meta.buyerName || meta.name).trim();
-        }
-      }
-
-      // Extraction depuis payments.method
-      if ((!email || !phone || !name) && matchedPayment?.method) {
-        const methodMeta = parsePaymentMethodMeta(matchedPayment.method);
-        if (!email && methodMeta.email) email = methodMeta.email;
-        if (!phone && methodMeta.phone) phone = methodMeta.phone;
-        if (!name && methodMeta.name) name = methodMeta.name;
+      // Extraction infaillible depuis le paiement associé
+      if (matchedPayment) {
+        const extracted = extractBuyerInfo(matchedPayment);
+        if (!email && extracted.email) email = extracted.email;
+        if (!phone && extracted.phone) phone = extracted.phone;
+        if (!name && extracted.name && extracted.name !== "Client") name = extracted.name;
       }
 
       // Fallback si l'user_id contient un email
       if (!email && pur.user_id?.includes("@")) {
-        email = pur.user_id.trim();
+        email = sanitizeBuyerEmail(pur.user_id);
       }
 
       // Fallback Supabase auth si user_id valide
@@ -264,9 +257,9 @@ export async function GET(
         try {
           const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(pur.user_id);
           if (authUser?.user) {
-            email = email || authUser.user.email || "";
+            email = email || sanitizeBuyerEmail(authUser.user.email) || "";
             name = name || authUser.user.user_metadata?.full_name || authUser.user.user_metadata?.name || "";
-            phone = phone || authUser.user.phone || authUser.user.user_metadata?.phone || authUser.user.user_metadata?.phone_number || "";
+            phone = phone || sanitizeBuyerPhone(authUser.user.phone || authUser.user.user_metadata?.phone || authUser.user.user_metadata?.phone_number) || "";
           }
         } catch {
           // non bloquant
@@ -283,9 +276,9 @@ export async function GET(
         try {
           const ppOrder = await getPayPalOrderDetails(txKey);
           if (ppOrder?.payer) {
-            const ppEmail = ppOrder.payer.email_address || "";
+            const ppEmail = sanitizeBuyerEmail(ppOrder.payer.email_address) || "";
             const ppName = `${ppOrder.payer.name?.given_name || ""} ${ppOrder.payer.name?.surname || ""}`.trim();
-            const ppPhone = ppOrder.payer.phone?.phone_number?.national_number || "";
+            const ppPhone = sanitizeBuyerPhone(ppOrder.payer.phone?.phone_number?.national_number) || "";
 
             if (ppEmail) email = ppEmail;
             if (ppName) name = ppName;
@@ -296,6 +289,7 @@ export async function GET(
               .from("payments")
               .update({
                 provider_metadata: {
+                  ...(matchedPayment?.provider_metadata || {}),
                   buyerEmail: email,
                   buyerName: name,
                   buyerPhone: phone,
@@ -310,17 +304,63 @@ export async function GET(
         }
       }
 
-      // Dériver un nom propre si l'email est présent mais sans nom explicite
-      if (!name && email) {
-        const local = email.split("@")[0];
-        name = local.charAt(0).toUpperCase() + local.slice(1);
+      // Réconciliation live PawaPay si téléphone manquant ou statut PENDING
+      const isPawaPay =
+        (pur.payment_method || "").toLowerCase().includes("pawapay") ||
+        (matchedPayment?.provider || "").toUpperCase() === "MOBILE_MONEY" ||
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(txKey);
+
+      if (isPawaPay && (!phone || !isPaid)) {
+        try {
+          const pawaResult = await getPawaPayDepositStatus(txKey);
+          if (pawaResult.success) {
+            if (pawaResult.payerPhone && !phone) {
+              phone = sanitizeBuyerPhone(pawaResult.payerPhone);
+            }
+            const liveStatus = (pawaResult.status || "").toUpperCase();
+            if (["COMPLETED", "PAID", "SUCCESS", "SUCCESSFUL"].includes(liveStatus)) {
+              isPaid = true;
+              await (supabaseAdmin as any)
+                .from("payments")
+                .update({
+                  status: "PAID",
+                  paid_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                  provider_metadata: {
+                    ...(matchedPayment?.provider_metadata || {}),
+                    buyerEmail: email,
+                    buyerPhone: phone,
+                    buyerName: name,
+                    payerPhone: pawaResult.payerPhone,
+                  },
+                })
+                .or(`id.eq.${txKey},provider_transaction_id.eq.${txKey}`);
+
+              await (supabaseAdmin as any)
+                .from("digital_product_purchases")
+                .update({ payment_status: "COMPLETED" })
+                .eq("id", pur.id);
+            }
+          }
+        } catch {}
+      }
+
+      // Dériver un nom propre si l'email ou téléphone est présent
+      if (!name) {
+        if (email) {
+          name = sanitizeBuyerName("", email);
+        } else if (phone) {
+          name = `Client Mobile (${phone})`;
+        } else {
+          name = "Client Inconnu";
+        }
       }
 
       buyersMap.set(txKey, {
         id: pur.id,
         purchaseId: pur.id,
         transactionId: pur.transaction_id || pur.id,
-        buyerName: name || "Client Inconnu",
+        buyerName: name,
         buyerEmail: email || "Email non renseigné",
         buyerPhone: phone || "",
         avatarUrl: profile?.avatar_url || null,
@@ -331,9 +371,9 @@ export async function GET(
       });
     }
 
-    // Traitement des paiements de la table payments non encore consolidés
+    // Traitement des paiements de la table payments non encore consolidés (dont PENDING et invités)
     for (const pay of Array.from(paymentsMap.values())) {
-      const isPaid = pay.status === "PAID" || pay.status === "COMPLETED";
+      let isPaid = pay.status === "PAID" || pay.status === "COMPLETED";
       const txId = pay.provider_transaction_id || pay.id;
 
       if (!buyersMap.has(txId) && !buyersMap.has(pay.id)) {
@@ -342,30 +382,124 @@ export async function GET(
         let name = profile?.full_name || "";
         let phone = profile?.phone || "";
 
-        if (pay.provider_metadata && typeof pay.provider_metadata === "object") {
-          const meta = pay.provider_metadata;
-          if (!email && (meta.buyerEmail || meta.email)) email = String(meta.buyerEmail || meta.email).trim();
-          if (!phone && (meta.buyerPhone || meta.phone || meta.phoneNumber)) phone = String(meta.buyerPhone || meta.phone || meta.phoneNumber).trim();
-          if (!name && (meta.buyerName || meta.name)) name = String(meta.buyerName || meta.name).trim();
+        // Extraction infaillible via extractBuyerInfo
+        const extracted = extractBuyerInfo(pay);
+        if (!email && extracted.email) email = extracted.email;
+        if (!phone && extracted.phone) phone = extracted.phone;
+        if (!name && extracted.name && extracted.name !== "Client") name = extracted.name;
+
+        // Fallback Supabase auth si user_id valide
+        if ((!email || !name || !phone) && pay.user_id && pay.user_id.length >= 30) {
+          try {
+            const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(pay.user_id);
+            if (authUser?.user) {
+              email = email || sanitizeBuyerEmail(authUser.user.email) || "";
+              name = name || authUser.user.user_metadata?.full_name || authUser.user.user_metadata?.name || "";
+              phone = phone || sanitizeBuyerPhone(authUser.user.phone || authUser.user.user_metadata?.phone || authUser.user.user_metadata?.phone_number) || "";
+            }
+          } catch {}
         }
 
-        if ((!email || !phone || !name) && pay.method) {
-          const methodMeta = parsePaymentMethodMeta(pay.method);
-          if (!email && methodMeta.email) email = methodMeta.email;
-          if (!phone && methodMeta.phone) phone = methodMeta.phone;
-          if (!name && methodMeta.name) name = methodMeta.name;
+        // Réconciliation PayPal automatique pour paymentsMap
+        const isPayPal =
+          (pay.provider || "").toUpperCase() === "PAYPAL" ||
+          (pay.method || "").toLowerCase().includes("paypal") ||
+          /^[0-9A-Z]{17}$/.test(txId);
+
+        if (isPayPal && (!email || email === "Email non renseigné")) {
+          try {
+            const ppOrder = await getPayPalOrderDetails(txId);
+            if (ppOrder?.payer) {
+              const ppEmail = sanitizeBuyerEmail(ppOrder.payer.email_address);
+              const ppName = `${ppOrder.payer.name?.given_name || ""} ${ppOrder.payer.name?.surname || ""}`.trim();
+              const ppPhone = sanitizeBuyerPhone(ppOrder.payer.phone?.phone_number?.national_number);
+
+              if (ppEmail) email = ppEmail;
+              if (ppName) name = ppName;
+              if (ppPhone) phone = ppPhone;
+
+              await (supabaseAdmin as any)
+                .from("payments")
+                .update({
+                  provider_metadata: {
+                    ...(pay.provider_metadata || {}),
+                    buyerEmail: email,
+                    buyerName: name,
+                    buyerPhone: phone,
+                    paypalOrderId: txId,
+                    payer: ppOrder.payer,
+                  },
+                })
+                .or(`id.eq.${txId},provider_transaction_id.eq.${txId}`);
+            }
+          } catch {}
         }
 
-        if (!name && email) {
-          const local = email.split("@")[0];
-          name = local.charAt(0).toUpperCase() + local.slice(1);
+        // Réconciliation live PawaPay pour paymentsMap (notamment pour transactions PENDING)
+        const isPawaPay =
+          (pay.provider || "").toUpperCase() === "MOBILE_MONEY" ||
+          (pay.method || "").toLowerCase().includes("pawapay") ||
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(txId);
+
+        if (isPawaPay && (!phone || pay.status === "PENDING")) {
+          try {
+            const pawaResult = await getPawaPayDepositStatus(txId);
+            if (pawaResult.success) {
+              if (pawaResult.payerPhone && !phone) {
+                phone = sanitizeBuyerPhone(pawaResult.payerPhone);
+              }
+              const liveStatus = (pawaResult.status || "").toUpperCase();
+              if (["COMPLETED", "PAID", "SUCCESS", "SUCCESSFUL"].includes(liveStatus)) {
+                isPaid = true;
+                pay.status = "PAID";
+                await (supabaseAdmin as any)
+                  .from("payments")
+                  .update({
+                    status: "PAID",
+                    paid_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    provider_metadata: {
+                      ...(pay.provider_metadata || {}),
+                      buyerEmail: email,
+                      buyerPhone: phone,
+                      buyerName: name,
+                      payerPhone: pawaResult.payerPhone,
+                    },
+                  })
+                  .eq("id", pay.id);
+              } else if (phone && !pay.provider_metadata?.buyerPhone) {
+                await (supabaseAdmin as any)
+                  .from("payments")
+                  .update({
+                    provider_metadata: {
+                      ...(pay.provider_metadata || {}),
+                      buyerEmail: email,
+                      buyerPhone: phone,
+                      buyerName: name,
+                    },
+                  })
+                  .eq("id", pay.id);
+              }
+            }
+          } catch {}
+        }
+
+        // Dériver un nom propre si l'email ou téléphone est présent
+        if (!name) {
+          if (email) {
+            name = sanitizeBuyerName("", email);
+          } else if (phone) {
+            name = `Client Mobile (${phone})`;
+          } else {
+            name = "Client Inconnu";
+          }
         }
 
         buyersMap.set(txId, {
           id: pay.id,
           purchaseId: pay.id,
           transactionId: txId,
-          buyerName: name || "Client Inconnu",
+          buyerName: name,
           buyerEmail: email || "Email non renseigné",
           buyerPhone: phone || "",
           avatarUrl: profile?.avatar_url || null,
@@ -608,30 +742,18 @@ export async function POST(
           })
           .eq("id", depositId);
 
-        let userId = payRow?.user_id || crypto.randomUUID();
+        let userId = payRow?.user_id;
 
         if (effectiveEmail) {
-          const { data: prof } = await supabaseAdmin
-            .from("profiles")
-            .select("id")
-            .eq("email", effectiveEmail)
-            .maybeSingle();
-
-          if (prof?.id) {
-            userId = prof.id;
-          } else {
-            try {
-              await supabaseAdmin.from("profiles").insert({
-                id: userId,
-                email: effectiveEmail,
-                full_name: inputName || effectiveEmail.split("@")[0],
-                phone: livePhone,
-                role: "STUDENT",
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              } as any);
-            } catch {}
-          }
+          const guest = await resolveOrCreateGuestUser(
+            supabaseAdmin,
+            effectiveEmail,
+            livePhone,
+            inputName || effectiveEmail.split("@")[0]
+          );
+          userId = guest.userId;
+        } else if (!userId) {
+          userId = crypto.randomUUID();
         }
 
         const purchaseRecordId = crypto.randomUUID();
@@ -736,31 +858,13 @@ export async function POST(
       String(existingPaymentId || "").trim() ||
       `MANUAL-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
-    let userId = "";
-    const { data: existingProfile } = await supabaseAdmin
-      .from("profiles")
-      .select("id")
-      .eq("email", cleanEmail)
-      .maybeSingle();
-
-    if (existingProfile?.id) {
-      userId = existingProfile.id;
-    } else {
-      userId = crypto.randomUUID();
-      try {
-        await supabaseAdmin.from("profiles").insert({
-          id: userId,
-          email: cleanEmail,
-          full_name: cleanName,
-          phone: cleanPhone,
-          role: "STUDENT",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        } as any);
-      } catch (profErr: any) {
-        console.warn("[admin-digital-product-buyers] Profile insertion warning:", profErr?.message);
-      }
-    }
+    const guest = await resolveOrCreateGuestUser(
+      supabaseAdmin,
+      cleanEmail,
+      cleanPhone,
+      cleanName
+    );
+    const userId = guest.userId;
 
     const purchaseRecordId = crypto.randomUUID();
 

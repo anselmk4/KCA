@@ -11,6 +11,13 @@ import {
   PAWAPAY_FEE_RATE
 } from '@/lib/pawapay';
 import { resolveCoursePricing } from '@/lib/payment-pricing';
+import { 
+  resolveOrCreateGuestUser, 
+  encodeBuyerMeta, 
+  sanitizeBuyerEmail, 
+  sanitizeBuyerPhone, 
+  sanitizeBuyerName 
+} from '@/lib/payments-meta';
 
 export async function POST(req: NextRequest) {
   try {
@@ -166,32 +173,21 @@ export async function POST(req: NextRequest) {
 
     // Résolution de l'identifiant utilisateur (connecté ou invité par email)
     let effectiveUserId = user?.id;
-    if (!effectiveUserId && userEmail) {
-      const cleanEmail = String(userEmail).trim().toLowerCase();
-      const { data: existingProfile } = await supabaseAdmin
-        .from('profiles')
-        .select('id')
-        .eq('email', cleanEmail)
-        .maybeSingle();
+    let cleanBuyerEmail = sanitizeBuyerEmail(userEmail || user?.email);
+    let cleanBuyerPhone = sanitizeBuyerPhone(formattedPhone || phoneNumber);
+    let cleanBuyerName = sanitizeBuyerName(userName || user?.user_metadata?.full_name, cleanBuyerEmail);
 
-      if (existingProfile?.id) {
-        effectiveUserId = existingProfile.id;
-      } else {
-        effectiveUserId = crypto.randomUUID();
-        try {
-          await supabaseAdmin.from('profiles').insert({
-            id: effectiveUserId,
-            email: cleanEmail,
-            full_name: userName || cleanEmail.split('@')[0],
-            phone: formattedPhone || phoneNumber,
-            role: 'STUDENT',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          } as any);
-        } catch (profErr: any) {
-          console.warn('[pawapay-initiate] Guest profile creation non-blocking warning:', profErr?.message);
-        }
-      }
+    if (!effectiveUserId && cleanBuyerEmail) {
+      const guestRes = await resolveOrCreateGuestUser(
+        supabaseAdmin,
+        cleanBuyerEmail,
+        cleanBuyerPhone,
+        cleanBuyerName
+      );
+      effectiveUserId = guestRes.userId;
+      cleanBuyerEmail = guestRes.email || cleanBuyerEmail;
+      cleanBuyerPhone = guestRes.phone || cleanBuyerPhone;
+      cleanBuyerName = guestRes.name || cleanBuyerName;
     }
 
     // Apply PawaPay Mobile Money fee surcharge (+2.5% standard).
@@ -238,10 +234,7 @@ export async function POST(req: NextRequest) {
         if (itemError) throw itemError;
       }
 
-      const cleanBuyerEmail = String(userEmail || user?.email || '').trim().toLowerCase();
-      const cleanBuyerPhone = String(formattedPhone || phoneNumber || '').trim();
-      const cleanBuyerName = String(userName || user?.user_metadata?.full_name || '').trim();
-      const encodedBuyerMeta = encodeURIComponent(`${cleanBuyerEmail}|${cleanBuyerPhone}|${cleanBuyerName}`);
+      const encodedBuyerMeta = encodeBuyerMeta(cleanBuyerEmail, cleanBuyerPhone, cleanBuyerName);
 
       const { error: paymentError } = await dbClient.from('payments').insert({
         id: paymentId,

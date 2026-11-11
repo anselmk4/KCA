@@ -3,6 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { verifyDigitalProductToken } from "@/lib/digital-product-token";
 import { applyDynamicWatermark } from "@/lib/pdf-watermark";
+import { 
+  sanitizeBuyerEmail, 
+  sanitizeBuyerPhone, 
+  sanitizeBuyerName 
+} from "@/lib/payments-meta";
 
 export const dynamic = "force-dynamic";
 
@@ -112,11 +117,10 @@ export async function GET(
         orderId = purchaseId || "";
 
         if (buyerIdentifier?.includes("@")) {
-          buyerEmail = buyerIdentifier.trim();
-          const localPart = buyerEmail.split("@")[0];
-          buyerName = localPart.charAt(0).toUpperCase() + localPart.slice(1);
+          buyerEmail = sanitizeBuyerEmail(buyerIdentifier);
+          buyerName = sanitizeBuyerName("", buyerEmail);
         } else if (buyerIdentifier) {
-          buyerName = buyerIdentifier.trim();
+          buyerName = sanitizeBuyerName(buyerIdentifier);
         }
 
         // Contrôle d'intégrité en base de données : vérifier que l'achat existe ou réparer si jeton signé authentique

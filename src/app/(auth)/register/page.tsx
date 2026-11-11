@@ -76,20 +76,20 @@ function StepIndicator({ step, role }: { step: number; role: "INSTRUCTOR" | "STU
             <div className="flex flex-col items-center gap-0.5">
               <div
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${isCompleted
-                    ? "bg-blue-600 text-white shadow-sm shadow-blue-500/40"
-                    : isCurrent
-                      ? "bg-blue-600 text-white ring-4 ring-blue-500/20"
-                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500"
+                  ? "bg-blue-600 text-white shadow-sm shadow-blue-500/40"
+                  : isCurrent
+                    ? "bg-blue-600 text-white ring-4 ring-blue-500/20"
+                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500"
                   }`}
               >
                 {isCompleted ? <CheckCircle2 className="w-3.5 h-3.5" /> : idx}
               </div>
               <span
                 className={`text-[9px] font-semibold transition-colors ${isCurrent
-                    ? "text-blue-600 dark:text-blue-400"
-                    : isCompleted
-                      ? "text-zinc-500 dark:text-zinc-400"
-                      : "text-zinc-400 dark:text-zinc-600"
+                  ? "text-blue-600 dark:text-blue-400"
+                  : isCompleted
+                    ? "text-zinc-500 dark:text-zinc-400"
+                    : "text-zinc-400 dark:text-zinc-600"
                   }`}
               >
                 {label}
@@ -1009,14 +1009,14 @@ function RegisterForm() {
                         <div
                           key={level}
                           className={`h-1 flex-1 rounded-full transition-all duration-300 ${level <= strength
-                              ? strength <= 1
-                                ? "bg-red-500"
-                                : strength <= 2
-                                  ? "bg-orange-400"
-                                  : strength <= 3
-                                    ? "bg-yellow-400"
-                                    : "bg-emerald-500"
-                              : "bg-zinc-200 dark:bg-zinc-700"
+                            ? strength <= 1
+                              ? "bg-red-500"
+                              : strength <= 2
+                                ? "bg-orange-400"
+                                : strength <= 3
+                                  ? "bg-yellow-400"
+                                  : "bg-emerald-500"
+                            : "bg-zinc-200 dark:bg-zinc-700"
                             }`}
                         />
                       );
@@ -1163,8 +1163,8 @@ function RegisterForm() {
                       type="button"
                       onClick={() => setGender(opt.value as typeof gender)}
                       className={`py-3 px-2 rounded-xl border-2 font-bold text-xs transition-all duration-200 flex flex-col items-center gap-1 cursor-pointer ${gender === opt.value
-                          ? "border-blue-600 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 shadow-sm shadow-blue-500/20"
-                          : "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-600 bg-zinc-50 dark:bg-zinc-800"
+                        ? "border-blue-600 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 shadow-sm shadow-blue-500/20"
+                        : "border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-600 bg-zinc-50 dark:bg-zinc-800"
                         }`}
                     >
                       <span className="text-lg">{opt.emoji}</span>
@@ -1227,16 +1227,16 @@ function RegisterForm() {
                         type="button"
                         onClick={() => setThematic(d.value)}
                         className={`px-3 py-2.5 rounded-xl border-2 text-left transition-all duration-200 cursor-pointer ${thematic === d.value
-                            ? "border-blue-600 bg-blue-50 dark:bg-blue-950/30 shadow-sm shadow-blue-500/10"
-                            : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600"
+                          ? "border-blue-600 bg-blue-50 dark:bg-blue-950/30 shadow-sm shadow-blue-500/10"
+                          : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600"
                           }`}
                       >
                         <div className="flex items-center gap-2">
                           <span className="text-base">{d.icon}</span>
                           <span
                             className={`text-[11px] font-semibold leading-tight ${thematic === d.value
-                                ? "text-blue-700 dark:text-blue-400"
-                                : "text-zinc-700 dark:text-zinc-300"
+                              ? "text-blue-700 dark:text-blue-400"
+                              : "text-zinc-700 dark:text-zinc-300"
                               }`}
                           >
                             {translatedLabel}
@@ -1302,8 +1302,8 @@ function RegisterForm() {
                       type="button"
                       onClick={() => setStudentLevel(lvl.value)}
                       className={`w-full px-4 py-3 rounded-xl border-2 text-left transition-all duration-200 cursor-pointer flex items-center gap-3 ${studentLevel === lvl.value
-                          ? "border-blue-600 bg-blue-50 dark:bg-blue-950/30 shadow-sm shadow-blue-500/10"
-                          : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600"
+                        ? "border-blue-600 bg-blue-50 dark:bg-blue-950/30 shadow-sm shadow-blue-500/10"
+                        : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600"
                         }`}
                     >
                       <span className="text-xl">{lvl.emoji}</span>
@@ -1333,8 +1333,8 @@ function RegisterForm() {
                       type="button"
                       onClick={() => setInterestCourse(course.value)}
                       className={`px-3 py-3 rounded-xl border-2 text-left transition-all duration-200 cursor-pointer ${interestCourse === course.value
-                          ? "border-blue-600 bg-blue-50 dark:bg-blue-950/30 shadow-sm shadow-blue-500/10"
-                          : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600"
+                        ? "border-blue-600 bg-blue-50 dark:bg-blue-950/30 shadow-sm shadow-blue-500/10"
+                        : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600"
                         }`}
                     >
                       <span className="text-xl block mb-1">{course.icon}</span>

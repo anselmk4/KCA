@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { formatPawaPayFailureReason } from '@/lib/pawapay';
 import { createNotification } from '@/lib/supabase/notifications-helper';
 import { incrementCouponUses } from '@/lib/supabase/orders-helper';
+import { extractBuyerInfo, sanitizeBuyerEmail } from '@/lib/payments-meta';
 import crypto from 'crypto';
 
 export async function POST(req: NextRequest) {
@@ -163,10 +164,10 @@ export async function POST(req: NextRequest) {
       // depositId corresponds to paymentId in our database
       const paymentId = depositId;
 
-      // 1. Fetch current payment and order details (include method for type resolution)
+      // 1. Fetch current payment and order details (include method & provider_metadata for type resolution)
       const { data: payment, error: fetchErr } = await supabaseAdmin
         .from('payments')
-        .select('order_id, user_id, amount, status, method')
+        .select('order_id, user_id, amount, status, method, provider_metadata')
         .eq('id', paymentId)
         .maybeSingle();
 
@@ -461,17 +462,23 @@ export async function POST(req: NextRequest) {
 
             const productTitle = product?.title || 'Produit Digital';
 
-            let buyerEmail = '';
-            const metaEmail = methodParts[3] ? decodeURIComponent(methodParts[3]) : '';
-            if (metaEmail && metaEmail.includes('@')) {
-              buyerEmail = metaEmail;
-            } else {
+            // Extraction infaillible de l'email, du téléphone et du nom de l'acheteur
+            const buyerInfo = extractBuyerInfo(payment);
+            let buyerEmail = buyerInfo.email;
+            let buyerName = buyerInfo.name;
+
+            if (!buyerEmail && payment.user_id) {
               const { data: userProfile } = await supabaseAdmin
                 .from('profiles')
                 .select('email, full_name')
                 .eq('id', payment.user_id)
                 .maybeSingle();
-              buyerEmail = userProfile?.email || '';
+              if (userProfile?.email) {
+                buyerEmail = sanitizeBuyerEmail(userProfile.email);
+                if (!buyerName || buyerName === 'Client') {
+                  buyerName = userProfile.full_name || buyerName;
+                }
+              }
             }
 
             // Générer le jeton cryptographique sécurisé (durée 7 jours / 168 heures)
@@ -487,10 +494,10 @@ export async function POST(req: NextRequest) {
 
             if (buyerEmail) {
               const { sendDigitalProductDeliveryEmail } = await import('@/lib/email');
-              const buyerName = buyerEmail.split('@')[0] || 'Client';
+              const finalBuyerName = buyerName || buyerEmail.split('@')[0] || 'Client';
               await sendDigitalProductDeliveryEmail(
                 buyerEmail,
-                buyerName,
+                finalBuyerName,
                 productTitle,
                 downloadUrl,
                 `DP-${depositId.substring(0, 8).toUpperCase()}`,

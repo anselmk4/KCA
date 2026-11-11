@@ -868,11 +868,25 @@ export function DigitalProductBuyersModal({
 
                               {/* Email */}
                               <div className="flex items-center gap-1.5 text-[11px]">
-                                <Mail className="w-3 h-3 text-zinc-400 shrink-0" />
+                                <Mail className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                                 {b.buyerEmail && b.buyerEmail !== "Email non renseigné" ? (
-                                  <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate select-all">
-                                    {b.buyerEmail}
-                                  </span>
+                                  <div className="flex items-center gap-1 min-w-0">
+                                    <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate select-all" title={b.buyerEmail}>
+                                      {b.buyerEmail}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopy(b.buyerEmail, `email-${b.id}`)}
+                                      className="p-0.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                                      title="Copier l'email"
+                                    >
+                                      {copiedId === `email-${b.id}` ? (
+                                        <Check className="w-2.5 h-2.5 text-emerald-500" />
+                                      ) : (
+                                        <Copy className="w-2.5 h-2.5" />
+                                      )}
+                                    </button>
+                                  </div>
                                 ) : (
                                   <button
                                     type="button"
@@ -884,23 +898,37 @@ export function DigitalProductBuyersModal({
                                 )}
                               </div>
 
-                              {/* Téléphone */}
+                              {/* Téléphone Mobile Money / WhatsApp */}
                               <div className="flex items-center gap-1.5 text-[11px]">
-                                <Phone className="w-3 h-3 text-emerald-500 shrink-0" />
+                                <Phone className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                                 {b.buyerPhone ? (
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-bold text-emerald-700 dark:text-emerald-400 font-mono select-all">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-emerald-700 dark:text-emerald-400 font-mono select-all px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 rounded border border-emerald-200 dark:border-emerald-800/60">
                                       {b.buyerPhone}
                                     </span>
+                                    {/* Copier numéro */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopy(b.buyerPhone!, `phone-${b.id}`)}
+                                      className="p-0.5 text-zinc-400 hover:text-emerald-600 transition"
+                                      title="Copier le numéro"
+                                    >
+                                      {copiedId === `phone-${b.id}` ? (
+                                        <Check className="w-2.5 h-2.5 text-emerald-500" />
+                                      ) : (
+                                        <Copy className="w-2.5 h-2.5" />
+                                      )}
+                                    </button>
                                     {/* Lien WhatsApp direct */}
                                     <a
-                                      href={`https://wa.me/${b.buyerPhone.replace(/[^0-9]/g, "")}`}
+                                      href={`https://wa.me/${b.buyerPhone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Bonjour, concernant votre commande du livre "${productMeta?.title || "Guide & E-book"}".`)}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-emerald-600 hover:text-emerald-500 transition"
-                                      title="Contacter sur WhatsApp"
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-bold transition shadow-xs"
+                                      title="Ouvrir conversation WhatsApp"
                                     >
-                                      <MessageCircle className="w-3 h-3" />
+                                      <MessageCircle className="w-2.5 h-2.5" />
+                                      WhatsApp
                                     </a>
                                   </div>
                                 ) : (

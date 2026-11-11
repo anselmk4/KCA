@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getPawaPayDepositStatus, formatPawaPayFailureReason } from '@/lib/pawapay';
 import { createNotification } from '@/lib/supabase/notifications-helper';
 import { incrementCouponUses } from '@/lib/supabase/orders-helper';
+import { extractBuyerInfo, sanitizeBuyerEmail } from '@/lib/payments-meta';
 import crypto from 'crypto';
 
 export async function GET(req: NextRequest) {
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
     // 3. Récupérer le paiement en base de données
     const { data: payment, error: fetchErr } = await supabaseAdmin
       .from('payments')
-      .select('id, order_id, user_id, amount, status, method, failure_reason')
+      .select('id, order_id, user_id, amount, status, method, provider_metadata, failure_reason')
       .eq('id', depositId)
       .maybeSingle();
 
@@ -54,12 +55,13 @@ export async function GET(req: NextRequest) {
       if (isDigitalProduct) {
         const methodParts = (payment.method || '').split('::');
         const itemId = methodParts[2];
-        const metaEmail = methodParts[3] ? decodeURIComponent(methodParts[3]) : '';
+        const buyerInfo = extractBuyerInfo(payment);
+        const buyerEmail = buyerInfo.email;
         if (itemId) {
           productId = itemId;
           try {
             const { generateDigitalProductToken } = await import('@/lib/digital-product-token');
-            const token = generateDigitalProductToken(itemId, payment.id, metaEmail || payment.user_id, 168);
+            const token = generateDigitalProductToken(itemId, payment.id, buyerEmail || payment.user_id, 168);
             downloadUrl = `/api/digital-products/${itemId}/download?token=${token}`;
           } catch (tokenErr) {
             console.warn('[pawapay-check-status] Token generation warning for existing PAID:', tokenErr);
@@ -359,18 +361,23 @@ export async function GET(req: NextRequest) {
           // non bloquant
         }
 
-        // Résoudre l'email de l'acheteur
-        let buyerEmail = '';
-        const metaEmail = methodParts[3] ? decodeURIComponent(methodParts[3]) : '';
-        if (metaEmail && metaEmail.includes('@')) {
-          buyerEmail = metaEmail;
-        } else {
+        // Résoudre l'email et le nom de l'acheteur de façon infaillible
+        const buyerInfo = extractBuyerInfo(payment);
+        let buyerEmail = buyerInfo.email;
+        let buyerName = buyerInfo.name;
+
+        if (!buyerEmail && payment.user_id) {
           const { data: userProfile } = await supabaseAdmin
             .from('profiles')
             .select('email, full_name')
             .eq('id', payment.user_id)
             .maybeSingle();
-          buyerEmail = userProfile?.email || '';
+          if (userProfile?.email) {
+            buyerEmail = sanitizeBuyerEmail(userProfile.email);
+            if (!buyerName || buyerName === 'Client') {
+              buyerName = userProfile.full_name || buyerName;
+            }
+          }
         }
 
         // Générer le jeton cryptographique sécurisé (durée 7 jours / 168 heures)
@@ -396,10 +403,10 @@ export async function GET(req: NextRequest) {
 
           if (buyerEmail) {
             const { sendDigitalProductDeliveryEmail } = await import('@/lib/email');
-            const buyerName = buyerEmail.split('@')[0] || 'Client';
+            const finalBuyerName = buyerName || buyerEmail.split('@')[0] || 'Client';
             await sendDigitalProductDeliveryEmail(
               buyerEmail,
-              buyerName,
+              finalBuyerName,
               productTitle,
               downloadUrl,
               `DP-${depositId.substring(0, 8).toUpperCase()}`,
