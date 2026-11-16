@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import Script from "next/script";
 import {
   Smartphone,
@@ -12,15 +12,13 @@ import {
   Lock,
   ArrowRight,
   Sparkles,
-  CheckCircle2,
-  PhoneCall
+  Check
 } from "lucide-react";
 import {
   PAWAPAY_COUNTRY_MAPPING,
-  getPawaPayConfigForCountry,
-  calculatePawaPayAmountWithFee
+  getPawaPayConfigForCountry
 } from "@/lib/pawapay";
-import { PayPalLogo, MPesaLogo, OrangeMoneyLogo, AirtelMoneyLogo, MtnMomoLogo } from "@/components/icons/PaymentLogos";
+import { PayPalLogo } from "@/components/icons/PaymentLogos";
 import { DonationReceipt } from "./DonationReceipt";
 import { DonationSuccessSummary } from "../types";
 
@@ -30,30 +28,63 @@ declare global {
   }
 }
 
-const PRESET_AMOUNTS_USD = [5, 10, 25, 50, 100];
-const PRESET_AMOUNTS_CDF = [15000, 30000, 75000, 150000, 300000];
-const PRESET_AMOUNTS_EUR = [5, 10, 25, 50, 100];
-const PRESET_AMOUNTS_XAF = [3000, 6000, 15000, 30000, 60000];
+// Montants prédéfinis commençant par 1$ et intégrant 200$ et 500$
+const PRESET_AMOUNTS_USD = [1, 5, 10, 25, 50, 100, 200, 500];
+const PRESET_AMOUNTS_EUR = [1, 5, 10, 25, 50, 100, 200, 500];
+const PRESET_AMOUNTS_CDF = [2800, 15000, 30000, 75000, 150000, 300000, 600000, 1500000];
+const PRESET_AMOUNTS_XAF = [600, 3000, 6000, 15000, 30000, 60000, 120000, 300000];
+const PRESET_AMOUNTS_RWF = [1300, 6500, 13000, 32500, 65000, 130000, 260000, 650000];
+const PRESET_AMOUNTS_UGX = [3700, 18500, 37000, 92500, 185000, 370000, 740000, 1850000];
+
+// Fonction pour déterminer les devises disponibles selon le pays sélectionné
+function getAvailableCurrenciesForCountry(countryCode: string): { code: string; label: string }[] {
+  const code = countryCode.toUpperCase();
+  if (code === "CD") {
+    // La RDC prend en charge le Franc Congolais (CDF) et le Dollar américain (USD)
+    return [
+      { code: "USD", label: "USD ($) - Dollar US" },
+      { code: "CDF", label: "CDF (FC) - Franc Congolais" },
+    ];
+  }
+  if (["SN", "CI", "BJ", "BF", "ML", "TG", "NE"].includes(code)) {
+    return [{ code: "XOF", label: "XOF (FCFA)" }];
+  }
+  if (["CG", "CM", "GA", "TD", "CF", "GQ"].includes(code)) {
+    return [{ code: "XAF", label: "XAF (FCFA)" }];
+  }
+  if (code === "RW") {
+    return [{ code: "RWF", label: "RWF (Franc Rwandais)" }];
+  }
+  if (code === "UG") {
+    return [{ code: "UGX", label: "UGX (Shilling Ougandais)" }];
+  }
+  if (code === "ZM") {
+    return [{ code: "ZMW", label: "ZMW (Kwacha Zambien)" }];
+  }
+  return [{ code: "USD", label: "USD ($)" }];
+}
 
 export function DonationForm() {
-  // Navigation / État global
+  // 1. Choix du mode de paiement (Mobile Money par défaut)
   const [method, setMethod] = useState<"pawapay" | "paypal">("pawapay");
+
+  // Mobile Money : Pays d'abord, puis devise liée au pays
+  const [countryCode, setCountryCode] = useState<string>("CD");
   const [currency, setCurrency] = useState<string>("USD");
+  const [operatorId, setOperatorId] = useState<string>("VODACOM_MPESA_COD");
+  const [phoneNumber, setPhoneNumber] = useState<string>("");
+
+  // Montant du don
   const [selectedPreset, setSelectedPreset] = useState<number | null>(25);
   const [customAmount, setCustomAmount] = useState<string>("");
 
-  // Infos donateur
+  // Donateur
   const [donorName, setDonorName] = useState("");
   const [donorEmail, setDonorEmail] = useState("");
   const [message, setMessage] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(false);
 
-  // PawaPay Mobile Money
-  const [countryCode, setCountryCode] = useState("CD");
-  const [operatorId, setOperatorId] = useState("VODACOM_MPESA_COD");
-  const [phoneNumber, setPhoneNumber] = useState("");
-
-  // Processus & États UI
+  // États du flux & chargement
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [depositId, setDepositId] = useState<string | null>(null);
@@ -64,41 +95,58 @@ export function DonationForm() {
 
   // PayPal SDK
   const [paypalLoaded, setPaypalLoaded] = useState(false);
-  const paypalRenderedRef = useRef(false);
-
-  const countryConfig = getPawaPayConfigForCountry(countryCode) || PAWAPAY_COUNTRY_MAPPING[0];
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "sb";
 
-  // Calcul du montant effectif
-  const effectiveAmount = customAmount ? parseFloat(customAmount) || 0 : selectedPreset || 0;
+  const countryConfig = getPawaPayConfigForCountry(countryCode) || PAWAPAY_COUNTRY_MAPPING[0];
+  const availableCurrencies = getAvailableCurrenciesForCountry(countryCode);
 
-  // Ajuster opérateur par défaut lors du changement de pays
+  // Quand le pays change : actualiser la devise par défaut du pays et l'opérateur
   useEffect(() => {
-    if (countryConfig?.operators?.[0]?.id) {
-      setOperatorId(countryConfig.operators[0].id);
-    }
-  }, [countryCode]);
+    if (method === "pawapay") {
+      const currencies = getAvailableCurrenciesForCountry(countryCode);
+      if (currencies.length > 0) {
+        // Si la devise actuelle n'est pas dans la liste des devises permises pour ce pays, basculer vers la 1ère
+        if (!currencies.some((c) => c.code === currency)) {
+          setCurrency(currencies[0].code);
+        }
+      }
 
-  // Si l'utilisateur choisit CDF, XOF ou XAF, forcer ou recommander Mobile Money
+      const cfg = getPawaPayConfigForCountry(countryCode);
+      if (cfg?.operators?.[0]?.id) {
+        setOperatorId(cfg.operators[0].id);
+      }
+    }
+  }, [countryCode, method]);
+
+  // Si on passe à PayPal : devise USD ou EUR
   useEffect(() => {
-    if (currency === "CDF" || currency === "XOF" || currency === "XAF") {
-      setMethod("pawapay");
+    if (method === "paypal") {
+      if (currency !== "USD" && currency !== "EUR") {
+        setCurrency("USD");
+      }
     }
-  }, [currency]);
+  }, [method]);
 
-  // Réinitialiser les montants prédéfinis lors du changement de devise
+  // Adapter les montants prédéfinis selon la devise
   useEffect(() => {
     if (currency === "CDF") {
       setSelectedPreset(75000);
     } else if (currency === "XAF" || currency === "XOF") {
       setSelectedPreset(15000);
+    } else if (currency === "RWF") {
+      setSelectedPreset(32500);
+    } else if (currency === "UGX") {
+      setSelectedPreset(92500);
     } else {
       setSelectedPreset(25);
     }
     setCustomAmount("");
   }, [currency]);
 
-  // Polling automatique pour la validation Mobile Money
+  // Calcul du montant effectif
+  const effectiveAmount = customAmount ? parseFloat(customAmount) || 0 : selectedPreset || 0;
+
+  // Polling automatique pour Mobile Money
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isPendingMomo && depositId && !successSummary) {
@@ -111,7 +159,7 @@ export function DonationForm() {
     };
   }, [isPendingMomo, depositId, successSummary]);
 
-  // Compte à rebours du délai Mobile Money (120 secondes)
+  // Décompte de 120s pour Mobile Money
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isPendingMomo && countdown > 0 && !successSummary) {
@@ -124,7 +172,7 @@ export function DonationForm() {
     };
   }, [isPendingMomo, countdown, successSummary]);
 
-  // Rendu dynamique des boutons PayPal
+  // Rendu PayPal
   useEffect(() => {
     if (method !== "paypal" || !paypalLoaded || successSummary) return;
 
@@ -134,8 +182,6 @@ export function DonationForm() {
     const renderPayPalButtons = () => {
       const container = document.getElementById("paypal-donation-button-container");
       if (!container) return false;
-
-      // Nettoyer le conteneur précédent
       container.innerHTML = "";
 
       if (window.paypal?.Buttons && effectiveAmount > 0) {
@@ -239,7 +285,7 @@ export function DonationForm() {
     };
   }, [method, paypalLoaded, effectiveAmount, currency, donorName, donorEmail, message, isAnonymous, successSummary]);
 
-  // Soumission don Mobile Money via PawaPay
+  // Soumission Mobile Money
   const handleInitiatePawaPay = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
@@ -250,7 +296,7 @@ export function DonationForm() {
     }
 
     if (!phoneNumber || phoneNumber.trim().length < 6) {
-      setErrorMsg("Veuillez entrer un numéro de téléphone valide pour Mobile Money.");
+      setErrorMsg("Veuillez entrer un numéro de téléphone valide.");
       return;
     }
 
@@ -286,7 +332,7 @@ export function DonationForm() {
     }
   };
 
-  // Vérification manuelle ou par polling du statut Mobile Money
+  // Vérification de statut PawaPay
   const verifyPawaPayStatus = async (isSilent = false) => {
     if (!depositId) return;
     if (!isSilent) setCheckingStatus(true);
@@ -312,7 +358,7 @@ export function DonationForm() {
         setIsPendingMomo(false);
         setErrorMsg(
           data.donation?.metadata?.failureReason ||
-          "La transaction a été refusée ou a expiré sur votre téléphone. Veuillez réessayer."
+            "La transaction a été refusée ou a expiré sur votre téléphone. Veuillez réessayer."
         );
       }
     } catch (err) {
@@ -330,7 +376,6 @@ export function DonationForm() {
     setErrorMsg("");
   };
 
-  // Si le don a réussi, afficher le reçu de confirmation
   if (successSummary) {
     return <DonationReceipt summary={successSummary} onReset={handleResetForm} />;
   }
@@ -342,10 +387,14 @@ export function DonationForm() {
       ? PRESET_AMOUNTS_EUR
       : currency === "XAF" || currency === "XOF"
       ? PRESET_AMOUNTS_XAF
+      : currency === "RWF"
+      ? PRESET_AMOUNTS_RWF
+      : currency === "UGX"
+      ? PRESET_AMOUNTS_UGX
       : PRESET_AMOUNTS_USD;
 
   return (
-    <div className="max-w-2xl mx-auto rounded-3xl bg-slate-900/80 border border-white/10 shadow-2xl backdrop-blur-xl overflow-hidden p-6 sm:p-8">
+    <div className="w-full max-w-2xl mx-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-xl dark:shadow-2xl overflow-hidden p-6 sm:p-8 transition-colors">
       {/* Script PayPal SDK conditionnel */}
       <Script
         src={`https://www.paypal.com/sdk/js?client-id=${paypalClientId}&currency=${currency === "EUR" ? "EUR" : "USD"}&intent=capture`}
@@ -356,7 +405,7 @@ export function DonationForm() {
       {/* Étape : Attente de validation Mobile Money */}
       {isPendingMomo ? (
         <div className="text-center py-6 space-y-6">
-          <div className="relative inline-flex items-center justify-center w-20 h-20 rounded-full bg-teal-500/10 border-2 border-teal-500/30 text-teal-400">
+          <div className="relative inline-flex items-center justify-center w-20 h-20 rounded-full bg-teal-500/10 border-2 border-teal-500/30 text-teal-600 dark:text-teal-400">
             <Smartphone className="w-10 h-10 animate-pulse" />
             <span className="absolute -top-1 -right-1 flex h-4 w-4">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
@@ -365,34 +414,32 @@ export function DonationForm() {
           </div>
 
           <div>
-            <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">
-              Validation sur votre téléphone requise
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-2">
+              Validation requise sur votre téléphone
             </h3>
-            <p className="text-sm text-slate-300 max-w-md mx-auto">
-              Un message de confirmation a été envoyé sur le numéro{" "}
-              <span className="font-semibold text-teal-300">{phoneNumber}</span>. Tapez votre code PIN secret Mobile Money pour valider votre don de{" "}
-              <span className="font-semibold text-white">
-                {effectiveAmount} {currency}
+            <p className="text-sm text-slate-600 dark:text-slate-300 max-w-md mx-auto">
+              Un prompt de confirmation a été envoyé au{" "}
+              <span className="font-bold text-teal-600 dark:text-teal-300">{phoneNumber}</span>. Tapez votre code secret PIN pour confirmer votre don de{" "}
+              <span className="font-bold text-slate-900 dark:text-white">
+                {effectiveAmount.toLocaleString()} {currency}
               </span>.
             </p>
           </div>
 
-          {/* Décompte */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-slate-300">
-            <Loader2 className="w-4 h-4 text-teal-400 animate-spin" />
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 text-xs text-slate-600 dark:text-slate-300">
+            <Loader2 className="w-4 h-4 text-teal-600 dark:text-teal-400 animate-spin" />
             <span>
-              Attente de la confirmation réseau (délai :{" "}
-              <strong className="text-teal-300 font-mono">{countdown}s</strong>)
+              Attente de validation réseau (délai :{" "}
+              <strong className="text-teal-600 dark:text-teal-300 font-mono">{countdown}s</strong>)
             </span>
           </div>
 
-          {/* Boutons d'action statut */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <button
               onClick={() => verifyPawaPayStatus(false)}
               disabled={checkingStatus}
               type="button"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-sm font-bold shadow-md transition disabled:opacity-50"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-sm font-bold shadow-md transition disabled:opacity-50 cursor-pointer"
             >
               {checkingStatus ? (
                 <>
@@ -413,63 +460,201 @@ export function DonationForm() {
                 setDepositId(null);
               }}
               type="button"
-              className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-white/15 hover:bg-white/5 text-slate-400 hover:text-white text-xs font-medium transition"
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-medium transition cursor-pointer"
             >
               Modifier mes informations
             </button>
           </div>
         </div>
       ) : (
-        /* Formulaire Principal de Don */
+        /* Formulaire Principal */
         <form onSubmit={handleInitiatePawaPay} className="space-y-6">
-          {/* Messages d'erreur */}
           {errorMsg && (
-            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs sm:text-sm flex items-start gap-2.5">
+            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-300 text-xs sm:text-sm flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <div className="flex-1">{errorMsg}</div>
             </div>
           )}
 
-          {/* 1. Choix de la Devise */}
+          {/* 1. Moyen de paiement */}
           <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                1. Choisissez la Devise
-              </label>
-              <span className="text-[11px] text-teal-400">Mobile Money & PayPal acceptés</span>
-            </div>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 block mb-2.5">
+              1. Choisissez votre moyen de paiement
+            </label>
 
-            <div className="grid grid-cols-4 gap-2">
-              {[
-                { code: "USD", label: "USD ($)" },
-                { code: "CDF", label: "CDF (FC)" },
-                { code: "EUR", label: "EUR (€)" },
-                { code: "XOF", label: "XOF / XAF" },
-              ].map((c) => (
-                <button
-                  key={c.code}
-                  type="button"
-                  onClick={() => setCurrency(c.code)}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold transition border ${
-                    currency === c.code
-                      ? "bg-teal-500/20 border-teal-500 text-teal-300 shadow-sm shadow-teal-500/10"
-                      : "bg-white/[0.03] border-white/10 text-slate-400 hover:text-white hover:border-white/20"
-                  }`}
-                >
-                  {c.label}
-                </button>
-              ))}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Carte Mobile Money */}
+              <button
+                type="button"
+                onClick={() => setMethod("pawapay")}
+                className={`p-4 rounded-2xl border text-left transition relative flex flex-col justify-between cursor-pointer ${
+                  method === "pawapay"
+                    ? "bg-teal-500/10 border-teal-500 ring-2 ring-teal-500/20"
+                    : "bg-slate-50 dark:bg-white/[0.02] border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <Smartphone className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                    Mobile Money
+                  </span>
+                  {method === "pawapay" && (
+                    <span className="w-2.5 h-2.5 rounded-full bg-teal-500"></span>
+                  )}
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                  M-Pesa, Orange, Airtel, MTN
+                </div>
+              </button>
+
+              {/* Carte PayPal */}
+              <button
+                type="button"
+                onClick={() => setMethod("paypal")}
+                className={`p-4 rounded-2xl border text-left transition relative flex flex-col justify-between cursor-pointer ${
+                  method === "paypal"
+                    ? "bg-indigo-500/10 border-indigo-500 ring-2 ring-indigo-500/20"
+                    : "bg-slate-50 dark:bg-white/[0.02] border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <PayPalLogo className="w-4 h-4" />
+                    PayPal & Cartes
+                  </span>
+                  {method === "paypal" && (
+                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+                  )}
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Visa, Mastercard, Compte PayPal
+                </div>
+              </button>
             </div>
           </div>
 
-          {/* 2. Choix du Montant */}
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 block mb-2">
-              2. Montant du don
-            </label>
+          {/* 2. Configuration du paiement : Pays & Devise */}
+          {method === "pawapay" ? (
+            <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* Étape A : Sélection du Pays */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
+                    Pays Mobile Money
+                  </label>
+                  <select
+                    value={countryCode}
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white text-xs font-medium focus:outline-none focus:border-teal-500"
+                  >
+                    {PAWAPAY_COUNTRY_MAPPING.map((c) => (
+                      <option key={c.countryCode} value={c.countryCode}>
+                        {c.names[0].toUpperCase()} (+{c.phonePrefix})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            {/* Presets rapides */}
-            <div className="grid grid-cols-5 gap-2 mb-3">
+                {/* Étape B : Sélection de la Devise APRÈS le Pays */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
+                    Devise du compte
+                  </label>
+                  <select
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white text-xs font-medium focus:outline-none focus:border-teal-500"
+                  >
+                    {availableCurrencies.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                {/* Étape C : Opérateur */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
+                    Opérateur Mobile
+                  </label>
+                  <select
+                    value={operatorId}
+                    onChange={(e) => setOperatorId(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white text-xs font-medium focus:outline-none focus:border-teal-500"
+                  >
+                    {countryConfig?.operators?.map((op) => (
+                      <option key={op.id} value={op.id}>
+                        {op.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Étape D : Numéro de téléphone */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
+                    Numéro de téléphone
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-slate-500 dark:text-slate-400">
+                      +{countryConfig.phonePrefix}
+                    </span>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="Ex: 812345678"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      className="w-full pl-14 pr-3 py-2.5 rounded-xl bg-white dark:bg-white/[0.04] border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 text-xs font-medium focus:outline-none focus:border-teal-500 transition"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Configuration PayPal (Devise) */
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-2">
+                Devise de facturation PayPal
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { code: "USD", label: "USD ($) - Dollar américain" },
+                  { code: "EUR", label: "EUR (€) - Euro" },
+                ].map((c) => (
+                  <button
+                    key={c.code}
+                    type="button"
+                    onClick={() => setCurrency(c.code)}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition border cursor-pointer ${
+                      currency === c.code
+                        ? "bg-indigo-500/10 border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                        : "bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 3. Choix du Montant (Commence par 1$, inclut 200$ et 500$) */}
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                2. Montant du don ({currency})
+              </label>
+              <span className="text-[11px] text-teal-600 dark:text-teal-400 font-semibold">
+                Dès 1 {currency === "USD" ? "$" : currency}
+              </span>
+            </div>
+
+            {/* Presets rapides : 1, 5, 10, 25, 50, 100, 200, 500 */}
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 mb-3">
               {presets.map((amt) => {
                 const isSelected = selectedPreset === amt && !customAmount;
                 return (
@@ -480,10 +665,10 @@ export function DonationForm() {
                       setSelectedPreset(amt);
                       setCustomAmount("");
                     }}
-                    className={`py-2.5 rounded-xl text-sm font-extrabold transition border ${
+                    className={`py-2.5 rounded-xl text-xs font-extrabold transition border cursor-pointer ${
                       isSelected
-                        ? "bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 border-transparent shadow-lg shadow-teal-500/20"
-                        : "bg-white/[0.04] border-white/10 text-slate-300 hover:text-white hover:border-white/25"
+                        ? "bg-gradient-to-r from-teal-500 to-emerald-500 text-slate-950 border-transparent shadow-md shadow-teal-500/20"
+                        : "bg-slate-100 dark:bg-white/[0.04] border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10"
                     }`}
                   >
                     {amt.toLocaleString()}
@@ -492,7 +677,7 @@ export function DonationForm() {
               })}
             </div>
 
-            {/* Montant libre */}
+            {/* Montant libre personnalisé */}
             <div className="relative">
               <input
                 type="number"
@@ -504,145 +689,26 @@ export function DonationForm() {
                   setCustomAmount(e.target.value);
                   setSelectedPreset(null);
                 }}
-                className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition pr-16"
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 text-sm font-medium focus:outline-none focus:border-teal-500 pr-16 transition"
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-teal-400">
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-teal-600 dark:text-teal-400">
                 {currency}
               </span>
             </div>
           </div>
 
-          {/* 3. Choix du Moyen de Paiement */}
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-300 block mb-2">
-              3. Moyen de paiement
-            </label>
-
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              {/* Carte PawaPay Mobile Money */}
-              <button
-                type="button"
-                onClick={() => setMethod("pawapay")}
-                className={`p-4 rounded-2xl border text-left transition relative flex flex-col justify-between ${
-                  method === "pawapay"
-                    ? "bg-teal-500/10 border-teal-500/50 shadow-md shadow-teal-500/5"
-                    : "bg-white/[0.03] border-white/10 hover:border-white/20"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <Smartphone className="w-4 h-4 text-teal-400" />
-                    Mobile Money
-                  </span>
-                  {method === "pawapay" && (
-                    <span className="w-2.5 h-2.5 rounded-full bg-teal-400"></span>
-                  )}
-                </div>
-                <div className="text-[11px] text-slate-400">
-                  M-Pesa, Orange, Airtel, MTN
-                </div>
-              </button>
-
-              {/* Carte PayPal */}
-              <button
-                type="button"
-                onClick={() => setMethod("paypal")}
-                className={`p-4 rounded-2xl border text-left transition relative flex flex-col justify-between ${
-                  method === "paypal"
-                    ? "bg-indigo-500/10 border-indigo-500/50 shadow-md shadow-indigo-500/5"
-                    : "bg-white/[0.03] border-white/10 hover:border-white/20"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <PayPalLogo className="w-4 h-4" />
-                    PayPal & Cartes
-                  </span>
-                  {method === "paypal" && (
-                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-400"></span>
-                  )}
-                </div>
-                <div className="text-[11px] text-slate-400">
-                  Visa, Mastercard, Compte PayPal
-                </div>
-              </button>
-            </div>
-
-            {/* Options spécifiques PawaPay Mobile Money */}
-            {method === "pawapay" && (
-              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3.5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Choix Pays */}
-                  <div>
-                    <label className="text-[11px] text-slate-400 block mb-1">Pays émetteur</label>
-                    <select
-                      value={countryCode}
-                      onChange={(e) => setCountryCode(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-xs focus:outline-none focus:border-teal-500"
-                    >
-                      {PAWAPAY_COUNTRY_MAPPING.map((c) => (
-                        <option key={c.countryCode} value={c.countryCode}>
-                          {c.names[0].toUpperCase()} (+{c.phonePrefix})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Choix Opérateur */}
-                  <div>
-                    <label className="text-[11px] text-slate-400 block mb-1">Opérateur</label>
-                    <select
-                      value={operatorId}
-                      onChange={(e) => setOperatorId(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-white/10 text-white text-xs focus:outline-none focus:border-teal-500"
-                    >
-                      {countryConfig?.operators?.map((op) => (
-                        <option key={op.id} value={op.id}>
-                          {op.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Champ Numéro de Téléphone */}
-                <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">
-                    Numéro de compte Mobile Money
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono text-slate-400">
-                      +{countryConfig.phonePrefix}
-                    </span>
-                    <input
-                      type="tel"
-                      required
-                      placeholder="Ex: 812345678"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      className="w-full pl-14 pr-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-teal-500 transition"
-                    />
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Saisissez le numéro sans l&apos;indicatif (+{countryConfig.phonePrefix}).
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 4. Informations Donateur (Optionnelles) */}
-          <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-3">
+          {/* 4. Coordonnées donateur (Épuré et sobre) */}
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 space-y-3">
             <div className="flex justify-between items-center">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                4. Vos Coordonnées (Optionnel)
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                3. Informations donateur (Optionnel)
               </label>
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-400 hover:text-white">
+              <label className="flex items-center gap-1.5 cursor-pointer text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
                 <input
                   type="checkbox"
                   checked={isAnonymous}
                   onChange={(e) => setIsAnonymous(e.target.checked)}
-                  className="rounded border-white/20 text-teal-500 focus:ring-0 bg-transparent"
+                  className="rounded border-slate-300 dark:border-white/20 text-teal-500 focus:ring-0 bg-transparent"
                 />
                 <span>Donner anonymement</span>
               </label>
@@ -652,37 +718,37 @@ export function DonationForm() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input
                   type="text"
-                  placeholder="Votre nom ou prénom"
+                  placeholder="Votre nom ou pseudo"
                   value={donorName}
                   onChange={(e) => setDonorName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-teal-500"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-white/[0.04] border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 text-xs focus:outline-none focus:border-teal-500"
                 />
                 <input
                   type="email"
                   placeholder="Votre email (pour le reçu)"
                   value={donorEmail}
                   onChange={(e) => setDonorEmail(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-teal-500"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-white/[0.04] border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 text-xs focus:outline-none focus:border-teal-500"
                 />
               </div>
             )}
 
             <textarea
               rows={2}
-              maxLength={400}
-              placeholder="Un petit mot ou message de soutien pour la communauté Ansella..."
+              maxLength={300}
+              placeholder="Un petit mot d'encouragement pour les apprenants..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-teal-500 resize-none"
+              className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-white/[0.04] border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 text-xs focus:outline-none focus:border-teal-500 resize-none"
             />
           </div>
 
-          {/* 5. Bouton d'action ou Conteneur PayPal */}
+          {/* 5. Bouton d'action ou PayPal SDK */}
           {method === "pawapay" ? (
             <button
               type="submit"
               disabled={submitting || effectiveAmount <= 0}
-              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-teal-500 via-emerald-500 to-teal-400 hover:from-teal-400 hover:to-emerald-300 text-slate-950 font-extrabold text-sm sm:text-base shadow-xl shadow-teal-500/20 transition flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-teal-500 via-emerald-500 to-teal-400 hover:from-teal-400 hover:to-emerald-300 text-slate-950 font-extrabold text-sm sm:text-base shadow-lg shadow-teal-500/20 transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
             >
               {submitting ? (
                 <>
@@ -702,8 +768,8 @@ export function DonationForm() {
             <div>
               <div id="paypal-donation-button-container" className="min-h-[50px] relative z-10" />
               {!paypalLoaded && (
-                <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-teal-400" />
+                <div className="py-4 text-center text-xs text-slate-500 dark:text-slate-400 flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-teal-500" />
                   <span>Chargement sécurisé de PayPal...</span>
                 </div>
               )}
@@ -711,14 +777,14 @@ export function DonationForm() {
           )}
 
           {/* Mentions de sécurité */}
-          <div className="flex items-center justify-center gap-4 text-[11px] text-slate-400 pt-2 border-t border-white/5">
+          <div className="flex items-center justify-center gap-4 text-[11px] text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-white/5">
             <span className="flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
+              <ShieldCheck className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
               Paiement chiffré SSL 256 bits
             </span>
             <span className="flex items-center gap-1">
-              <Lock className="w-3.5 h-3.5 text-emerald-400" />
-              Aucune coordonnée bancaire stockée
+              <Lock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              Sans stockage de coordonnées bancaires
             </span>
           </div>
         </form>
@@ -726,4 +792,3 @@ export function DonationForm() {
     </div>
   );
 }
-
