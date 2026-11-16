@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { MobileMenu } from "@/components/layout/MobileMenu";
+import { Heart } from "lucide-react";
 import { getSimulatedSession } from "@/lib/rbac";
 import { supabase } from "@/lib/supabase/client";
 import { useLanguage } from "@/context/LanguageContext";
@@ -84,6 +85,10 @@ export function Navbar() {
           </Link>
           <Link href="/pricing" className="transition-colors hover:text-foreground/80 text-foreground/60">
             {t("nav.pricing")}
+          </Link>
+          <Link href="/donate" className="transition-colors hover:text-rose-500 text-rose-500/90 dark:text-rose-400 font-semibold flex items-center gap-1.5">
+            <Heart className="w-3.5 h-3.5 fill-rose-500/30" />
+            <span>{language === "en" ? "Donate" : "Faire un don"}</span>
           </Link>
         </nav>
         <div className="flex items-center space-x-4">

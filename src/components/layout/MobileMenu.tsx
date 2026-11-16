@@ -91,6 +91,9 @@ export function MobileMenu() {
             <Link href="/pricing" onClick={() => setOpen(false)} className="text-lg font-medium py-2 border-b border-zinc-100 dark:border-zinc-800">
               {t("nav.pricing")}
             </Link>
+            <Link href="/donate" onClick={() => setOpen(false)} className="text-lg font-bold py-2 border-b border-zinc-100 dark:border-zinc-800 text-rose-500 flex items-center gap-2">
+              <span>❤️ {language === "en" ? "Support us / Donate" : "Faire un don / Soutenir"}</span>
+            </Link>
             <div className="flex flex-col gap-3 pt-4">
               {session ? (
                 <Link 

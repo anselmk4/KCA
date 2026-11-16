@@ -101,6 +101,7 @@ export function Footer() {
               <li><Link href="/instructors" className="hover:text-teal-600 transition-colors">{language === "en" ? "Our Instructors" : "Nos Formateurs"}</Link></li>
               <li><Link href="/store" className="hover:text-teal-600 transition-colors font-semibold text-teal-600 dark:text-teal-400">🛍️ {language === "en" ? "Digital Store & E-books" : "Boutique E-books & Guides"}</Link></li>
               <li><Link href="/store/access" className="hover:text-teal-600 transition-colors text-emerald-600 dark:text-emerald-400 font-medium">📥 {language === "en" ? "Retrieve My Downloads" : "Retrouver mes téléchargements"}</Link></li>
+              <li><Link href="/donate" className="hover:text-rose-500 transition-colors font-semibold text-rose-500/90 dark:text-rose-400">❤️ {language === "en" ? "Support Us (Donate)" : "Soutenir Ansella (Faire un don)"}</Link></li>
               <li><Link href="/pricing" className="hover:text-teal-600 transition-colors">{language === "en" ? "Pricing & Plans" : "Tarifs & Formules"}</Link></li>
             </ul>
           </div>

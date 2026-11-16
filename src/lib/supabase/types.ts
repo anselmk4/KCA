@@ -16,6 +16,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      donations: {
+        Row: {
+          id: string
+          provider: 'pawapay' | 'paypal'
+          provider_reference: string
+          amount: number
+          currency: string
+          status: 'pending' | 'completed' | 'failed' | 'cancelled' | 'refunded'
+          donor_name: string | null
+          donor_email: string | null
+          message: string | null
+          user_id: string | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          provider: 'pawapay' | 'paypal'
+          provider_reference: string
+          amount: number
+          currency?: string
+          status?: 'pending' | 'completed' | 'failed' | 'cancelled' | 'refunded'
+          donor_name?: string | null
+          donor_email?: string | null
+          message?: string | null
+          user_id?: string | null
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          provider?: 'pawapay' | 'paypal'
+          provider_reference?: string
+          amount?: number
+          currency?: string
+          status?: 'pending' | 'completed' | 'failed' | 'cancelled' | 'refunded'
+          donor_name?: string | null
+          donor_email?: string | null
+          message?: string | null
+          user_id?: string | null
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "donations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       digital_products: {
         Row: {
           id: string

@@ -69,6 +69,13 @@ export function CTA() {
             {language === "en" ? "Get Started Now" : "Commencer maintenant"}
             <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
           </Link>
+
+          <div className="mt-8 flex items-center justify-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+            <span>{language === "en" ? "Want to support our educational mission?" : "Vous souhaitez soutenir notre mission d'éducation ?"}</span>
+            <Link href="/donate" className="text-teal-600 dark:text-teal-400 font-semibold hover:underline inline-flex items-center gap-1">
+              <span>{language === "en" ? "Make a donation ❤️" : "Faire un don ❤️"}</span>
+            </Link>
+          </div>
         </motion.div>
 
       </div>
