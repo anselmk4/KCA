@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Script from "next/script";
 import {
   Smartphone,
@@ -96,6 +96,8 @@ export function DonationForm() {
   // PayPal SDK
   const [paypalLoaded, setPaypalLoaded] = useState(false);
   const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "sb";
+  // Ref pour éviter que onError écrase le vrai message d'erreur de createOrder
+  const createOrderErrorRef = useRef(false);
 
   const countryConfig = getPawaPayConfigForCountry(countryCode) || PAWAPAY_COUNTRY_MAPPING[0];
   const availableCurrencies = getAvailableCurrenciesForCountry(countryCode);
@@ -216,7 +218,9 @@ export function DonationForm() {
                   }
                   return data.orderId;
                 } catch (err: any) {
-                  setErrorMsg(err.message || "Erreur lors de l'initialisation PayPal.");
+                  const msg = err.message || "Erreur lors de l'initialisation PayPal.";
+                  setErrorMsg(msg);
+                  createOrderErrorRef.current = true;
                   throw err;
                 } finally {
                   setSubmitting(false);
@@ -256,7 +260,11 @@ export function DonationForm() {
               },
               onError: (err: any) => {
                 console.error("[PayPal Donation Error]", err);
-                setErrorMsg("La transaction PayPal a échoué ou a été interrompue.");
+                // Ne pas écraser le message si createOrder a déjà géré l'erreur
+                if (!createOrderErrorRef.current) {
+                  setErrorMsg("La transaction PayPal a échoué ou a été interrompue.");
+                }
+                createOrderErrorRef.current = false;
               },
               onCancel: () => {
                 setErrorMsg("Paiement PayPal annulé.");

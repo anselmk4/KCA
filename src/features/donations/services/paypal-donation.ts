@@ -27,7 +27,16 @@ export async function createPayPalDonationOrder(args: CreatePayPalDonationArgs):
   error?: string;
 }> {
   try {
-    const accessToken = await getPayPalAccessToken();
+    let accessToken: string;
+    try {
+      accessToken = await getPayPalAccessToken();
+    } catch (authErr: any) {
+      console.error('[PayPalDonation] Erreur authentification PayPal:', authErr);
+      return {
+        success: false,
+        error: 'La passerelle PayPal n\'est pas encore configurée. Veuillez utiliser Mobile Money ou contacter l\'administrateur.',
+      };
+    }
     const currency = (args.currency || 'USD').toUpperCase();
     const formattedAmount = Number(args.amount).toFixed(2);
 
