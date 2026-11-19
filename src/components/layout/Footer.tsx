@@ -111,6 +111,7 @@ export function Footer() {
               {language === "en" ? "Legal & Trust" : "Légal & Confiance"}
             </h3>
             <ul className="space-y-2 text-xs text-muted-foreground">
+              <li><Link href="/contact" className="hover:text-teal-600 transition-colors font-semibold text-teal-600 dark:text-teal-400">✉️ {language === "en" ? "Contact & Support" : "Contact & Support"}</Link></li>
               <li><Link href="/terms" className="hover:text-teal-600 transition-colors">{language === "en" ? "Terms of Service" : "Conditions d'utilisation"}</Link></li>
               <li><Link href="/privacy" className="hover:text-teal-600 transition-colors">{language === "en" ? "Privacy Policy" : "Politique de confidentialité"}</Link></li>
               <li className="pt-2 text-[11px] text-zinc-400">
