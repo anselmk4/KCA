@@ -4,10 +4,6 @@ import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  Sparkles,
-  BookOpen,
-  FileCode,
-  Layers,
   ArrowRight,
   ShieldCheck,
   CheckCircle2,
@@ -19,11 +15,21 @@ import {
   Zap,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import { 
+  Book3DIcon, 
+  Templates3DIcon, 
+  AiChip3DIcon, 
+  CodeZip3DIcon,
+  SpeedClock3DIcon,
+  MobileMoney3DIcon,
+  Shield3DIcon,
+  RevenueCoin3DIcon
+} from "@/components/ui/ImageIcons";
 
 const CATEGORY_PILLARS = [
   {
     id: "ebooks",
-    icon: BookOpen,
+    icon: Book3DIcon,
     badge: "PDF / E-books",
     color: "bg-teal-50 text-teal-600 border-teal-200 dark:bg-teal-950/50 dark:text-teal-400 dark:border-teal-800/60",
     glow: "group-hover:border-teal-500/40",
@@ -36,7 +42,7 @@ const CATEGORY_PILLARS = [
   },
   {
     id: "templates",
-    icon: Layers,
+    icon: Templates3DIcon,
     badge: "Templates",
     color: "bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/50 dark:text-purple-400 dark:border-purple-800/60",
     glow: "group-hover:border-purple-500/40",
@@ -49,7 +55,7 @@ const CATEGORY_PILLARS = [
   },
   {
     id: "prompts",
-    icon: Sparkles,
+    icon: AiChip3DIcon,
     badge: "Packs IA",
     color: "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-800/60",
     glow: "group-hover:border-amber-500/40",
@@ -62,7 +68,7 @@ const CATEGORY_PILLARS = [
   },
   {
     id: "scripts",
-    icon: FileCode,
+    icon: CodeZip3DIcon,
     badge: "Code / ZIP",
     color: "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800/60",
     glow: "group-hover:border-blue-500/40",
@@ -134,10 +140,10 @@ export function DigitalProductsSpotlight() {
                   className={`p-6 rounded-2xl bg-white/90 dark:bg-zinc-900/80 border border-zinc-200/90 dark:border-zinc-800 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1.5 flex flex-col justify-between group ${pillar.glow}`}
                 >
                   <div className="space-y-4">
-                    {/* Icône + Badge */}
+                    {/* Icône 3D + Badge */}
                     <div className="flex items-center justify-between">
-                      <div className={`w-11 h-11 rounded-xl border flex items-center justify-center shadow-sm ${pillar.color}`}>
-                        <Icon className="w-5 h-5" />
+                      <div className="w-12 h-12 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
+                        <Icon size={44} />
                       </div>
                       <span className="text-[10px] uppercase font-black tracking-wider px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200/80 dark:border-zinc-700/60">
                         {pillar.badge}
@@ -169,11 +175,11 @@ export function DigitalProductsSpotlight() {
             })}
           </div>
 
-          {/* ── BARRE DE RÉASSURANCE & BÉNÉFICES (STYLE MODERNE & AIRY) ── */}
+          {/* ── BARRE DE RÉASSURANCE & BÉNÉFICES (STYLE MODERNE & AIRY AVEC 3D ICONS) ── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
             <div className="p-4 rounded-2xl bg-teal-50/50 dark:bg-zinc-900/50 border border-teal-100 dark:border-zinc-800 flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-teal-600/10 text-teal-700 dark:text-teal-400 flex items-center justify-center shrink-0">
-                <Clock className="w-5 h-5" />
+              <div className="shrink-0">
+                <SpeedClock3DIcon size={36} />
               </div>
               <div>
                 <p className="text-xs font-bold text-zinc-900 dark:text-white">
@@ -186,8 +192,8 @@ export function DigitalProductsSpotlight() {
             </div>
 
             <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-zinc-900/50 border border-emerald-100 dark:border-zinc-800 flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-emerald-600/10 text-emerald-700 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                <Smartphone className="w-5 h-5" />
+              <div className="shrink-0">
+                <MobileMoney3DIcon size={36} />
               </div>
               <div>
                 <p className="text-xs font-bold text-zinc-900 dark:text-white">
@@ -200,8 +206,8 @@ export function DigitalProductsSpotlight() {
             </div>
 
             <div className="p-4 rounded-2xl bg-amber-50/50 dark:bg-zinc-900/50 border border-amber-100 dark:border-zinc-800 flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-amber-600/10 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-5 h-5" />
+              <div className="shrink-0">
+                <RevenueCoin3DIcon size={36} />
               </div>
               <div>
                 <p className="text-xs font-bold text-zinc-900 dark:text-white">
@@ -214,8 +220,8 @@ export function DigitalProductsSpotlight() {
             </div>
 
             <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-zinc-900/50 border border-indigo-100 dark:border-zinc-800 flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600/10 text-indigo-700 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                <Zap className="w-5 h-5" />
+              <div className="shrink-0">
+                <Shield3DIcon size={36} />
               </div>
               <div>
                 <p className="text-xs font-bold text-zinc-900 dark:text-white">

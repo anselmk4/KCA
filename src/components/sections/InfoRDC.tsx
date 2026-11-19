@@ -1,43 +1,48 @@
 "use client";
 
 import { useLanguage } from "@/context/LanguageContext";
-import { Smartphone, CreditCard, Globe, Users } from "lucide-react";
+import { 
+  MobileMoney3DIcon, 
+  CreditCard3DIcon, 
+  GlobalAnalytics3DIcon, 
+  StudentsCommunity3DIcon 
+} from "@/components/ui/ImageIcons";
 
 export function InfoRDC() {
   const { language } = useLanguage();
 
   const integrations = [
     {
-      icon: <Smartphone className="h-7 w-7 text-teal-600 dark:text-teal-400" />,
+      icon: <MobileMoney3DIcon size={48} />,
       title: "Mobile Money",
       desc: language === "en"
         ? "Airtel Money, M-Pesa, Orange Money — collect in seconds from anywhere."
         : "Airtel Money, M-Pesa, Orange Money — encaissez en quelques secondes depuis n'importe où.",
-      bg: "bg-teal-50 dark:bg-teal-950/50 border-teal-200 dark:border-teal-500/20"
+      bg: "bg-teal-50/70 dark:bg-teal-950/40 border-teal-200/80 dark:border-teal-500/20"
     },
     {
-      icon: <CreditCard className="h-7 w-7 text-blue-600 dark:text-blue-400" />,
+      icon: <CreditCard3DIcon size={48} />,
       title: language === "en" ? "Credit Cards" : "Cartes bancaires",
       desc: language === "en"
         ? "Visa, Mastercard, Stripe, and PayPal natively integrated for global reach."
         : "Visa, Mastercard, Stripe et PayPal intégrés nativement pour une portée mondiale.",
-      bg: "bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-500/20"
+      bg: "bg-blue-50/70 dark:bg-blue-950/40 border-blue-200/80 dark:border-blue-500/20"
     },
     {
-      icon: <Globe className="h-7 w-7 text-purple-600 dark:text-purple-400" />,
+      icon: <GlobalAnalytics3DIcon size={48} />,
       title: language === "en" ? "Multi-language & Currencies" : "Multi-langues & Devises",
       desc: language === "en"
         ? "French, English, Spanish — EUR, USD, GBP and local currencies supported."
         : "Français, Anglais, Espagnol — EUR, USD, GBP et devises locales supportées.",
-      bg: "bg-purple-50 dark:bg-purple-950/50 border-purple-200 dark:border-purple-500/20"
+      bg: "bg-purple-50/70 dark:bg-purple-950/40 border-purple-200/80 dark:border-purple-500/20"
     },
     {
-      icon: <Users className="h-7 w-7 text-orange-600 dark:text-orange-400" />,
+      icon: <StudentsCommunity3DIcon size={48} />,
       title: language === "en" ? "Global Community" : "Communauté Mondiale",
       desc: language === "en"
         ? "Join thousands of instructors and learners across the entire globe."
         : "Rejoignez des milliers d'instructeurs et d'apprenants à travers le monde entier.",
-      bg: "bg-orange-50 dark:bg-orange-950/50 border-orange-200 dark:border-orange-500/20"
+      bg: "bg-amber-50/70 dark:bg-amber-950/40 border-amber-200/80 dark:border-amber-500/20"
     }
   ];
 

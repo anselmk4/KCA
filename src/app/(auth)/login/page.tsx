@@ -8,7 +8,7 @@ import { AlertCircle, ArrowRight, Loader2, Sparkles, BookOpen, ShieldCheck, Cpu,
 import { initDB } from "@/lib/db";
 import { loginWithEmail, fetchUserProfile, ensureProfile } from "@/lib/supabase/auth-helpers";
 import { supabase } from "@/lib/supabase/client";
-import { setSimulatedSession } from "@/lib/rbac";
+import { setSimulatedSession, clearSimulatedSession } from "@/lib/rbac";
 import { Captcha } from "@/components/ui/Captcha";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -20,6 +20,7 @@ function LoginForm() {
   const registeredEmail = searchParams.get("email") || "";
   const roleParam = searchParams.get("role") || "STUDENT";
   const nextParam = searchParams.get("next");
+  const isTimeout = searchParams.get("reason") === "inactivity_timeout";
   const ENABLE_GOOGLE_AUTH = false; // Désactivé temporairement pour garantir la collecte obligatoire des informations (pays, téléphone, genre)
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,6 +34,17 @@ function LoginForm() {
 
   useEffect(() => {
     initDB();
+
+    if (isTimeout) {
+      supabase.auth.signOut().catch(() => {});
+      clearSimulatedSession();
+      setError(
+        language === "en"
+          ? "Your session has expired after 24 hours of inactivity. Please sign in again."
+          : "Votre session a été déconnectée après 24 heures d'inactivité. Veuillez vous reconnecter."
+      );
+      return;
+    }
 
     const checkSession = async () => {
       try {

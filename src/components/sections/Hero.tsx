@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, BookOpen, GraduationCap, ShieldCheck, DollarSign, Users } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { Book3DIcon, Diploma3DIcon, Shield3DIcon, RevenueCoin3DIcon, StudentsCommunity3DIcon } from "@/components/ui/ImageIcons";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -83,32 +84,32 @@ export function Hero() {
               </Link>
             </motion.div>
 
-            {/* Bottom Key Features */}
+            {/* Bottom Key Features with 3D Image Icons */}
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.5 }}
               className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 text-left border-t border-zinc-200 dark:border-zinc-800/80 pt-8"
             >
-              <div className="flex items-center gap-3">
-                <div className="bg-teal-50 dark:bg-teal-950/50 p-2.5 rounded-xl border border-teal-200 dark:border-teal-500/20">
-                  <BookOpen className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+              <div className="flex items-center gap-3 group">
+                <div className="shrink-0">
+                  <Book3DIcon size={36} />
                 </div>
-                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Création intuitive</span>
+                <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Création intuitive</span>
               </div>
               
-              <div className="flex items-center gap-3">
-                <div className="bg-indigo-50 dark:bg-indigo-950/50 p-2.5 rounded-xl border border-indigo-200 dark:border-indigo-500/20">
-                  <GraduationCap className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              <div className="flex items-center gap-3 group">
+                <div className="shrink-0">
+                  <Diploma3DIcon size={36} />
                 </div>
-                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Quiz & Diplômes</span>
+                <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Quiz & Diplômes</span>
               </div>
               
-              <div className="flex items-center gap-3">
-                <div className="bg-emerald-50 dark:bg-emerald-950/50 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-500/20">
-                  <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              <div className="flex items-center gap-3 group">
+                <div className="shrink-0">
+                  <Shield3DIcon size={36} />
                 </div>
-                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Paiements Globaux</span>
+                <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Paiements Globaux</span>
               </div>
             </motion.div>
           </div>
@@ -152,10 +153,10 @@ export function Hero() {
               <motion.div 
                 animate={{ y: [0, -10, 0] }}
                 transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute -top-4 -left-6 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-xl flex items-center gap-3 max-w-[200px] z-20"
+                className="absolute -top-4 -left-6 bg-white/95 dark:bg-zinc-950/90 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3.5 shadow-xl flex items-center gap-3 max-w-[210px] z-20"
               >
-                <div className="w-10 h-10 rounded-xl bg-teal-100 dark:bg-teal-500/15 border border-teal-200 dark:border-teal-500/20 flex items-center justify-center text-teal-600 dark:text-teal-400 shrink-0">
-                  <DollarSign className="w-5 h-5" />
+                <div className="shrink-0">
+                  <RevenueCoin3DIcon size={40} />
                 </div>
                 <div className="min-w-0">
                   <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Ventes du jour</p>
@@ -167,10 +168,10 @@ export function Hero() {
               <motion.div 
                 animate={{ y: [0, 8, 0] }}
                 transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                className="absolute -bottom-6 -right-6 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 shadow-xl flex items-center gap-3 max-w-[200px] z-20"
+                className="absolute -bottom-6 -right-6 bg-white/95 dark:bg-zinc-950/90 backdrop-blur-xl border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3.5 shadow-xl flex items-center gap-3 max-w-[210px] z-20"
               >
-                <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-500/15 border border-indigo-200 dark:border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
-                  <Users className="w-5 h-5" />
+                <div className="shrink-0">
+                  <StudentsCommunity3DIcon size={40} />
                 </div>
                 <div className="min-w-0">
                   <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Élèves actifs</p>

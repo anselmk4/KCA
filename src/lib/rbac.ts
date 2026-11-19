@@ -205,6 +205,8 @@ export function canSeeMenuItem(userRole: Role, requiredPermission?: Permission):
   return hasPermission(userRole, requiredPermission);
 }
 
+export const SESSION_MAX_IDLE_TIME_MS = 24 * 60 * 60 * 1000; // 24 hours of inactivity timeout
+
 export type CurrentSession = {
   userId: string;
   name: string;
@@ -214,13 +216,60 @@ export type CurrentSession = {
   plan?: "FREE" | "BASE" | "PRO" | "MAX";
   grantedPermissions?: Permission[];
   revokedPermissions?: Permission[];
+  lastActivity?: number; // timestamp in milliseconds
 };
+
+export function touchSession(): void {
+  if (typeof window === "undefined") return;
+  const now = Date.now();
+  try {
+    localStorage.setItem("kuettu_session_last_active", now.toString());
+    const saved = localStorage.getItem("kuettu_session");
+    if (saved && saved !== "logged_out") {
+      const parsed = JSON.parse(saved);
+      parsed.lastActivity = now;
+      localStorage.setItem("kuettu_session", JSON.stringify(parsed));
+    }
+  } catch {
+    /* ignore storage errors */
+  }
+}
+
+export function isSessionExpired(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const lastActiveStr = localStorage.getItem("kuettu_session_last_active");
+    if (lastActiveStr) {
+      const lastActive = parseInt(lastActiveStr, 10);
+      if (!isNaN(lastActive)) {
+        return Date.now() - lastActive > SESSION_MAX_IDLE_TIME_MS;
+      }
+    }
+    const saved = localStorage.getItem("kuettu_session");
+    if (saved && saved !== "logged_out") {
+      const parsed = JSON.parse(saved);
+      if (parsed.lastActivity) {
+        return Date.now() - parsed.lastActivity > SESSION_MAX_IDLE_TIME_MS;
+      }
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
 
 export function getSimulatedSession(): CurrentSession | null {
   if (typeof window === "undefined") return null;
   const saved = localStorage.getItem("kuettu_session");
   if (saved) {
     if (saved === "logged_out") return null;
+
+    // Check 24-hour inactivity timeout
+    if (isSessionExpired()) {
+      clearSimulatedSession();
+      return null;
+    }
+
     try { return JSON.parse(saved); } catch { /* ignore */ }
   }
   return null;
@@ -228,7 +277,10 @@ export function getSimulatedSession(): CurrentSession | null {
 
 export function setSimulatedSession(session: CurrentSession) {
   if (typeof window !== "undefined") {
+    const now = Date.now();
+    session.lastActivity = now;
     localStorage.setItem("kuettu_session", JSON.stringify(session));
+    localStorage.setItem("kuettu_session_last_active", now.toString());
     localStorage.setItem("kuettu_user_name", session.name);
     localStorage.setItem("kuettu_active_role", session.role);
     window.dispatchEvent(new Event("storage"));
@@ -238,6 +290,7 @@ export function setSimulatedSession(session: CurrentSession) {
 export function clearSimulatedSession() {
   if (typeof window !== "undefined") {
     localStorage.setItem("kuettu_session", "logged_out");
+    localStorage.removeItem("kuettu_session_last_active");
     localStorage.removeItem("kuettu_user_name");
     localStorage.removeItem("kuettu_active_role");
     localStorage.removeItem("kuettu_academy_name");

@@ -1,31 +1,28 @@
 "use client";
 
 import { useLanguage } from "@/context/LanguageContext";
-import { Target, TrendingUp, Users } from "lucide-react";
+import { Target3DIcon, GrowthChart3DIcon, SmartLearning3DIcon } from "@/components/ui/ImageIcons";
 
 export function ValueProposition() {
   const { language } = useLanguage();
 
   const values = [
     {
-      icon: <Target className="h-10 w-10 text-teal-600 dark:text-teal-400" />,
-      bg: "bg-teal-50 dark:bg-teal-900/20",
+      icon: <Target3DIcon size={56} />,
       title: language === "en" ? "Simplified Monetization" : "Monétisation Simplifiée",
       description: language === "en" 
         ? "Collect course enrollments via Mobile Money, credit cards, or PayPal — wherever you are in the world." 
         : "Encaissez les inscriptions à vos cours via Mobile Money, Cartes bancaires ou PayPal — où que vous soyez dans le monde."
     },
     {
-      icon: <TrendingUp className="h-10 w-10 text-indigo-600 dark:text-indigo-400" />,
-      bg: "bg-indigo-50 dark:bg-indigo-900/20",
+      icon: <GrowthChart3DIcon size={56} />,
       title: language === "en" ? "Control & Flexibility" : "Contrôle et Flexibilité",
       description: language === "en" 
         ? "Set your own prices, manage discount coupons, and keep up to 100% of your earnings without middle-men." 
         : "Fixez vos propres prix, gérez vos coupons de réduction et gardez jusqu'à 100% de vos revenus sans intermédiaires."
     },
     {
-      icon: <Users className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />,
-      bg: "bg-emerald-50 dark:bg-emerald-900/20",
+      icon: <SmartLearning3DIcon size={56} />,
       title: language === "en" ? "Advanced Pedagogy" : "Pédagogie Avancée",
       description: language === "en" 
         ? "Engage your students with interactive quizzes, downloadable materials, and automated certificates of completion." 
@@ -51,8 +48,8 @@ export function ValueProposition() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {values.map((value, index) => (
-            <div key={index} className="bg-white/60 dark:bg-zinc-950/40 p-8 rounded-3xl border border-zinc-200 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-lg transition-all duration-300 group">
-              <div className={`mb-6 ${value.bg} w-16 h-16 rounded-2xl flex items-center justify-center border border-zinc-200 dark:border-white/5 group-hover:scale-105 transition-transform`}>
+            <div key={index} className="bg-white/70 dark:bg-zinc-950/40 p-8 rounded-3xl border border-zinc-200 dark:border-zinc-800/80 hover:border-teal-500/30 hover:shadow-xl hover:shadow-teal-500/5 transition-all duration-300 group">
+              <div className="mb-6 w-16 h-16 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                 {value.icon}
               </div>
               <h3 className="text-xl font-bold mb-3 text-zinc-900 dark:text-white">{value.title}</h3>

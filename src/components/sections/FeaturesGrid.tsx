@@ -1,8 +1,15 @@
 "use client";
 
-import { Zap, Shield, Smartphone, Globe, ArrowRight, Play, CheckCircle2 } from "lucide-react";
+import Image from "next/image";
+import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { motion, Variants } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
+import { 
+  MobileMoney3DIcon, 
+  QuizExam3DIcon, 
+  CourseBuilder3DIcon, 
+  GlobalAnalytics3DIcon 
+} from "@/components/ui/ImageIcons";
 
 export function FeaturesGrid() {
   const { language } = useLanguage();
@@ -69,8 +76,8 @@ export function FeaturesGrid() {
             <div className="absolute inset-0 bg-gradient-to-r from-teal-500/10 to-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
             
             <div className="space-y-4 relative z-10">
-              <div className="bg-teal-500/15 w-12 h-12 rounded-2xl flex items-center justify-center text-teal-400 border border-teal-500/20">
-                <Smartphone className="h-6 w-6" />
+              <div className="w-14 h-14 flex items-center justify-center shrink-0">
+                <MobileMoney3DIcon size={56} />
               </div>
               <h3 className="text-xl font-bold text-zinc-900 dark:text-white">
                 {language === "en" ? "Flexible Payments & Payouts" : "Paiements et Retraits Flexibles"}
@@ -114,8 +121,8 @@ export function FeaturesGrid() {
             <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
             
             <div className="space-y-4 relative z-10">
-              <div className="bg-indigo-500/15 w-12 h-12 rounded-2xl flex items-center justify-center text-indigo-400 border border-indigo-500/20">
-                <Shield className="h-6 w-6" />
+              <div className="w-14 h-14 flex items-center justify-center shrink-0">
+                <QuizExam3DIcon size={56} />
               </div>
               <h3 className="text-xl font-bold text-zinc-900 dark:text-white">
                 {language === "en" ? "Quizzes & Assessments" : "Quiz & Évaluations"}
@@ -144,8 +151,8 @@ export function FeaturesGrid() {
             <div className="absolute inset-0 bg-gradient-to-b from-teal-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
             
             <div className="space-y-4 relative z-10">
-              <div className="bg-emerald-500/15 w-12 h-12 rounded-2xl flex items-center justify-center text-emerald-400 border border-emerald-500/20">
-                <Zap className="h-6 w-6" />
+              <div className="w-14 h-14 flex items-center justify-center shrink-0">
+                <CourseBuilder3DIcon size={56} />
               </div>
               <h3 className="text-xl font-bold text-zinc-900 dark:text-white">
                 {language === "en" ? "Course Builder" : "Générateur de Cours"}
@@ -170,8 +177,8 @@ export function FeaturesGrid() {
             <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
             
             <div className="space-y-4 relative z-10">
-              <div className="bg-indigo-500/15 w-12 h-12 rounded-2xl flex items-center justify-center text-indigo-400 border border-indigo-500/20">
-                <Globe className="h-6 w-6" />
+              <div className="w-14 h-14 flex items-center justify-center shrink-0">
+                <GlobalAnalytics3DIcon size={56} />
               </div>
               <h3 className="text-xl font-bold text-zinc-900 dark:text-white">
                 {language === "en" ? "Analytics & Student Tracking" : "Analyses & Suivi Élèves"}

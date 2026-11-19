@@ -5,6 +5,7 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import { OrganizationJsonLd } from "@/components/seo/JsonLd";
 import { PdfModalViewerGlobal } from "@/components/ui/PdfModalViewerGlobal";
 import { AnalyticsTracker } from "@/components/analytics/AnalyticsTracker";
+import { SessionTimeoutManager } from "@/components/auth/SessionTimeoutManager";
 import "./globals.css";
 
 const inter = Inter({
@@ -101,6 +102,7 @@ export default function RootLayout({
         >
           <LanguageProvider>
             <AnalyticsTracker />
+            <SessionTimeoutManager />
             {children}
             <PdfModalViewerGlobal />
           </LanguageProvider>
