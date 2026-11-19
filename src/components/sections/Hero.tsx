@@ -8,7 +8,8 @@ import { motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
 
 export function Hero() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isEn = language === "en";
   return (
     <section className="relative overflow-hidden bg-transparent text-zinc-900 dark:text-white pt-28 pb-32 lg:pt-36 lg:pb-44">
       {/* Background Decorative Gradients & Glows */}
@@ -95,21 +96,27 @@ export function Hero() {
                 <div className="shrink-0">
                   <Book3DIcon size={36} />
                 </div>
-                <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Création intuitive</span>
+                <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
+                  {isEn ? "Intuitive Creation" : "Création intuitive"}
+                </span>
               </div>
               
               <div className="flex items-center gap-3 group">
                 <div className="shrink-0">
                   <Diploma3DIcon size={36} />
                 </div>
-                <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Quiz & Diplômes</span>
+                <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
+                  {isEn ? "Quizzes & Degrees" : "Quiz & Diplômes"}
+                </span>
               </div>
               
               <div className="flex items-center gap-3 group">
                 <div className="shrink-0">
                   <Shield3DIcon size={36} />
                 </div>
-                <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">Paiements Globaux</span>
+                <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
+                  {isEn ? "Global Payments" : "Paiements Globaux"}
+                </span>
               </div>
             </motion.div>
           </div>
@@ -130,7 +137,7 @@ export function Hero() {
               >
                 <Image
                   src="/hero-instructors.png"
-                  alt="Formateurs Ansella joyeux et passionnés"
+                  alt={isEn ? "Joyful and passionate Ansella instructors" : "Formateurs Ansella joyeux et passionnés"}
                   fill
                   priority
                   className="object-cover object-center transform group-hover:scale-105 transition-transform duration-700 ease-out"
@@ -142,10 +149,18 @@ export function Hero() {
                 {/* Glassmorphic caption at the bottom of the photo */}
                 <div className="absolute bottom-4 left-4 right-4 p-4 rounded-2xl bg-white/10 dark:bg-zinc-950/40 backdrop-blur-md border border-white/20 dark:border-white/10 text-white space-y-1">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-bold tracking-wide">Créez vos cours avec Ansella</p>
-                    <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-teal-500 text-white uppercase tracking-wider">Plateforme #1</span>
+                    <p className="text-xs font-bold tracking-wide">
+                      {isEn ? "Create your courses with Ansella" : "Créez vos cours avec Ansella"}
+                    </p>
+                    <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-teal-500 text-white uppercase tracking-wider">
+                      {isEn ? "Platform #1" : "Plateforme #1"}
+                    </span>
                   </div>
-                  <p className="text-[11px] text-zinc-200">Rejoignez des milliers de créateurs de savoir à travers l'Afrique et le monde.</p>
+                  <p className="text-[11px] text-zinc-200">
+                    {isEn 
+                      ? "Join thousands of knowledge creators across Africa and worldwide."
+                      : "Rejoignez des milliers de créateurs de savoir à travers l'Afrique et le monde."}
+                  </p>
                 </div>
               </motion.div>
 
@@ -159,7 +174,9 @@ export function Hero() {
                   <RevenueCoin3DIcon size={40} />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Ventes du jour</p>
+                  <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">
+                    {isEn ? "Today's sales" : "Ventes du jour"}
+                  </p>
                   <p className="text-sm font-black text-zinc-900 dark:text-white">$450.00</p>
                 </div>
               </motion.div>
@@ -174,7 +191,9 @@ export function Hero() {
                   <StudentsCommunity3DIcon size={40} />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Élèves actifs</p>
+                  <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">
+                    {isEn ? "Active students" : "Élèves actifs"}
+                  </p>
                   <p className="text-sm font-black text-zinc-900 dark:text-white">1,480</p>
                 </div>
               </motion.div>

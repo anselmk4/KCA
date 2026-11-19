@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { useLanguage } from "@/context/LanguageContext";
 import {
   BookOpen,
   Sparkles,
@@ -441,6 +442,9 @@ export const DOC_SECTIONS: DocSection[] = [
 ];
 
 export function DocsClientView() {
+  const { language } = useLanguage();
+  const isEn = language === "en";
+
   const [selectedSectionId, setSelectedSectionId] = useState<string>("getting-started");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -474,17 +478,18 @@ export function DocsClientView() {
         <div className="text-center max-w-3xl mx-auto space-y-4">
           <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase bg-teal-500/10 dark:bg-teal-500/5 border border-teal-500/20 text-teal-600 dark:text-teal-400 mx-auto">
             <BookOpen className="w-3.5 h-3.5" />
-            Centre de Documentation Formateurs
+            {isEn ? "Instructor Documentation Center" : "Centre de Documentation Formateurs"}
           </span>
           <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight text-zinc-900 dark:text-white">
-            Le Guide Officiel du{" "}
+            {isEn ? "The Official " : "Le Guide Officiel du "}
             <span className="bg-gradient-to-r from-teal-500 via-emerald-500 to-indigo-500 bg-clip-text text-transparent">
-              Formateur ANSELLA
+              {isEn ? "ANSELLA Instructor Guide" : "Formateur ANSELLA"}
             </span>
           </h1>
           <p className="text-sm md:text-base text-zinc-600 dark:text-zinc-400 leading-relaxed">
-            Retrouvez toutes les explications, astuces techniques et démarches pas à pas pour créer,
-            animer et monétiser vos formations en ligne avec succès.
+            {isEn
+              ? "All explanations, technical tips, and step-by-step guides to create, lead, and monetize your courses successfully."
+              : "Retrouvez toutes les explications, astuces techniques et démarches pas à pas pour créer, animer et monétiser vos formations en ligne avec succès."}
           </p>
 
           {/* Search bar */}
@@ -492,7 +497,7 @@ export function DocsClientView() {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
             <input
               type="text"
-              placeholder="Rechercher une fonctionnalité (ex: IA, Mobile Money, Quiz, Certificat, Collaborateur)..."
+              placeholder={isEn ? "Search a feature (e.g., AI, Mobile Money, Quiz, Certificate, Staff)..." : "Rechercher une fonctionnalité (ex: IA, Mobile Money, Quiz, Certificat, Collaborateur)..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-11 pr-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs sm:text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all shadow-sm"
@@ -507,7 +512,7 @@ export function DocsClientView() {
           <div className="lg:col-span-4 space-y-2">
             <div className="bg-white dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-4 shadow-sm sticky top-24 space-y-1.5 max-h-[calc(100vh-140px)] overflow-y-auto scrollbar-thin">
               <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider px-3 py-2">
-                Sommaire des Modules
+                {isEn ? "Module Directory" : "Sommaire des Modules"}
               </p>
               {filteredSections.map((sec) => {
                 const Icon = sec.icon;
@@ -535,16 +540,16 @@ export function DocsClientView() {
               <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 p-3 bg-gradient-to-br from-teal-500/10 to-indigo-500/10 rounded-2xl space-y-2">
                 <div className="flex items-center gap-2 text-teal-600 dark:text-teal-400 font-bold text-xs">
                   <Zap className="w-3.5 h-3.5" />
-                  <span>Prêt à enseigner ?</span>
+                  <span>{isEn ? "Ready to teach?" : "Prêt à enseigner ?"}</span>
                 </div>
                 <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                  Créez votre premier cours en moins de 5 minutes avec l'aide de l'IA.
+                  {isEn ? "Create your first course in under 5 minutes with AI assistance." : "Créez votre premier cours en moins de 5 minutes avec l'aide de l'IA."}
                 </p>
                 <Link
                   href="/instructor/courses"
                   className="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition-all shadow-xs"
                 >
-                  <span>Créer mon premier cours</span>
+                  <span>{isEn ? "Create my first course" : "Créer mon premier cours"}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
@@ -591,7 +596,7 @@ export function DocsClientView() {
                     </span>
                   </div>
                   <span className="text-[10px] font-bold text-teal-400 uppercase tracking-widest">
-                    Aperçu Interface
+                    {isEn ? "Interface Preview" : "Aperçu Interface"}
                   </span>
                 </div>
 
@@ -624,7 +629,7 @@ export function DocsClientView() {
               <div className="space-y-6">
                 <h3 className="text-base font-extrabold text-zinc-900 dark:text-white flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5 text-teal-500" />
-                  <span>Étapes de configuration pas à pas</span>
+                  <span>{isEn ? "Step-by-step setup guide" : "Étapes de configuration pas à pas"}</span>
                 </h3>
 
                 <div className="space-y-4">
@@ -646,7 +651,7 @@ export function DocsClientView() {
                       </p>
                       {step.tip && (
                         <div className="ml-10 p-2.5 rounded-xl bg-teal-500/10 border border-teal-500/20 text-[11px] text-teal-800 dark:text-teal-300 font-medium">
-                          💡 <strong>Conseil :</strong> {step.tip}
+                          💡 <strong>{isEn ? "Tip:" : "Conseil :"}</strong> {step.tip}
                         </div>
                       )}
                     </div>
@@ -672,7 +677,7 @@ export function DocsClientView() {
                   disabled={DOC_SECTIONS.findIndex((s) => s.id === selectedSectionId) === 0}
                   className="px-4 py-2 rounded-xl text-xs font-bold border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 transition-all cursor-pointer"
                 >
-                  ← Module Précédent
+                  {isEn ? "← Previous Module" : "← Module Précédent"}
                 </button>
 
                 <button
@@ -689,7 +694,7 @@ export function DocsClientView() {
                   }
                   className="px-4 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white shadow-xs disabled:opacity-30 transition-all cursor-pointer"
                 >
-                  Module Suivant →
+                  {isEn ? "Next Module →" : "Module Suivant →"}
                 </button>
               </div>
             </motion.div>

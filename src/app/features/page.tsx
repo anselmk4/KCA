@@ -2,14 +2,17 @@
 
 import Link from "next/link";
 import { 
-  Zap, Shield, Smartphone, Globe, ArrowRight, Play, CheckCircle2, 
-  GraduationCap, FileCheck, Layers, Users2, Lock, Sparkles 
+  Zap, Shield, Smartphone, Globe, ArrowRight, CheckCircle2, 
+  Layers, Lock, Sparkles, FileCheck
 } from "lucide-react";
-import { motion } from "framer-motion";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function FeaturesPage() {
+  const { language } = useLanguage();
+  const isEn = language === "en";
+
   return (
     <div className="flex min-h-screen flex-col font-sans bg-gradient-to-br from-slate-100 via-teal-50/50 to-blue-50/70 dark:from-zinc-900 dark:via-zinc-950 dark:to-black text-zinc-900 dark:text-white selection:bg-teal-500/30">
       <Navbar />
@@ -23,16 +26,18 @@ export default function FeaturesPage() {
           {/* Header Banner */}
           <div className="text-center max-w-3xl mx-auto space-y-6">
             <span className="text-xs font-bold text-teal-400 bg-teal-400/10 border border-teal-500/20 px-3.5 py-1 rounded-full uppercase tracking-widest">
-              Features
+              {isEn ? "Features" : "Fonctionnalités"}
             </span>
             <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-[1.1] text-zinc-900 dark:text-white">
-              A world-class{" "}
+              {isEn ? "A world-class " : "Une plateforme d'enseignement "}
               <span className="bg-gradient-to-r from-teal-500 via-teal-450 to-indigo-500 dark:from-teal-400 dark:to-indigo-400 bg-clip-text text-transparent">
-                educational platform.
+                {isEn ? "educational platform." : "de classe mondiale."}
               </span>
             </h1>
             <p className="text-lg text-zinc-650 dark:text-zinc-400 leading-relaxed">
-              Explore all the premium tools developed specifically to design, structure, deliver, and monetize your courses worldwide.
+              {isEn 
+                ? "Explore all the premium tools developed specifically to design, structure, deliver, and monetize your courses worldwide."
+                : "Explorez tous les outils professionnels conçus spécialement pour concevoir, structurer, diffuser et rentabiliser vos formations dans le monde entier."}
             </p>
           </div>
 
@@ -46,15 +51,28 @@ export default function FeaturesPage() {
                 <Smartphone className="h-6 w-6" />
               </div>
               <div className="space-y-3">
-                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Flexible &amp; Global Payments</h3>
+                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">
+                  {isEn ? "Flexible & Global Payments" : "Paiements Flexibles & Globaux"}
+                </h3>
                 <p className="text-zinc-650 dark:text-zinc-400 text-sm leading-relaxed">
-                  Collect enrollments directly via bank cards, PayPal, and global and local Mobile Money networks. Withdraw your instructor earnings instantly in a simple and secure manner, without complicated intermediaries.
+                  {isEn
+                    ? "Collect enrollments directly via bank cards, PayPal, and global and local Mobile Money networks. Withdraw your instructor earnings instantly in a simple and secure manner, without complicated intermediaries."
+                    : "Encaissez les inscriptions directement par cartes bancaires, PayPal et les réseaux Mobile Money locaux et panafricains. Retirez vos gains de formateur instantanément de manière simple et sécurisée, sans intermédiaires complexes."}
                 </p>
               </div>
               <ul className="space-y-2.5 text-sm text-zinc-700 dark:text-zinc-300">
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Instant simulation in sandbox mode</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Automatic order reconciliation</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Detailed history and statistics</li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
+                  <span>{isEn ? "Instant simulation in sandbox mode" : "Simulation instantanée en mode test"}</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
+                  <span>{isEn ? "Automatic order reconciliation" : "Rapprochement automatique des commandes"}</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
+                  <span>{isEn ? "Detailed history and statistics" : "Historique et statistiques financières détaillées"}</span>
+                </li>
               </ul>
             </div>
 
@@ -65,15 +83,28 @@ export default function FeaturesPage() {
                 <Lock className="h-6 w-6" />
               </div>
               <div className="space-y-3">
-                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Video Hosting &amp; Security</h3>
+                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">
+                  {isEn ? "Video Hosting & Security" : "Hébergement Vidéo & Sécurité"}
+                </h3>
                 <p className="text-zinc-650 dark:text-zinc-400 text-sm leading-relaxed">
-                  Protecting your intellectual property is our absolute priority. Integrate your lesson videos smoothly and securely through our proprietary player that blocks unauthorized direct downloads.
+                  {isEn
+                    ? "Protecting your intellectual property is our absolute priority. Integrate your lesson videos smoothly and securely through our proprietary player that blocks unauthorized direct downloads."
+                    : "La protection de votre propriété intellectuelle est notre priorité absolue. Intégrez vos vidéos de cours de manière fluide et sécurisée grâce à notre lecteur propriétaire qui bloque le téléchargement direct non autorisé."}
                 </p>
               </div>
               <ul className="space-y-2.5 text-sm text-zinc-700 dark:text-zinc-300">
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Anti-download protection</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> YouTube, Vimeo &amp; Direct Video integration</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Player optimized for low internet connections</li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
+                  <span>{isEn ? "Anti-download protection" : "Protection anti-téléchargement"}</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
+                  <span>{isEn ? "YouTube, Vimeo & Direct Video integration" : "Intégration YouTube, Vimeo et vidéo directe"}</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
+                  <span>{isEn ? "Player optimized for low internet connections" : "Lecteur optimisé pour les connexions à faible débit"}</span>
+                </li>
               </ul>
             </div>
 
@@ -84,15 +115,28 @@ export default function FeaturesPage() {
                 <Layers className="h-6 w-6" />
               </div>
               <div className="space-y-3">
-                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Modular Course Builder</h3>
+                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">
+                  {isEn ? "Modular Course Builder" : "Constructeur de Cours Modulaire"}
+                </h3>
                 <p className="text-zinc-650 dark:text-zinc-400 text-sm leading-relaxed">
-                  Structure your training didactically and professionally. Divide your content into clear modules and chapters, add assessment quizzes, and provide downloadable course materials (PDF, ZIP).
+                  {isEn
+                    ? "Structure your training didactically and professionally. Divide your content into clear modules and chapters, add assessment quizzes, and provide downloadable course materials (PDF, ZIP)."
+                    : "Structurez vos formations de manière didactique et professionnelle. Découpez vos cours en modules et chapitres clairs, ajoutez des quiz d'évaluation et fournissez des supports téléchargeables (PDF, ZIP)."}
                 </p>
               </div>
               <ul className="space-y-2.5 text-sm text-zinc-700 dark:text-zinc-300">
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Unlimited sections and chapters</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> File manager for external resources</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Draft mode to prepare your publications</li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
+                  <span>{isEn ? "Unlimited sections and chapters" : "Sections et chapitres illimités"}</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
+                  <span>{isEn ? "File manager for external resources" : "Gestionnaire de fichiers et ressources téléchargeables"}</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
+                  <span>{isEn ? "Draft mode to prepare your publications" : "Mode brouillon pour peaufiner avant publication"}</span>
+                </li>
               </ul>
             </div>
 
@@ -103,15 +147,28 @@ export default function FeaturesPage() {
                 <FileCheck className="h-6 w-6" />
               </div>
               <div className="space-y-3">
-                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Interactive Quizzes &amp; Certifications</h3>
+                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">
+                  {isEn ? "Interactive Quizzes & Certifications" : "Quiz Interactifs & Certifications"}
+                </h3>
                 <p className="text-zinc-650 dark:text-zinc-400 text-sm leading-relaxed">
-                  Validate the skills acquired by your learners. Create multiple-choice questionnaires (MCQ) with automatic grade calculation and instantly generate personalized, online-verifiable completion certificates with a unique code.
+                  {isEn
+                    ? "Validate the skills acquired by your learners. Create multiple-choice questionnaires (MCQ) with automatic grade calculation and instantly generate personalized, online-verifiable completion certificates with a unique code."
+                    : "Validez les compétences acquises par vos apprenants. Créez des questionnaires à choix multiples (QCM) avec calcul automatique des notes et générez instantanément des certificats de complétion personnalisés vérifiables en ligne avec un code unique."}
                 </p>
               </div>
               <ul className="space-y-2.5 text-sm text-zinc-700 dark:text-zinc-300">
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Complete question editor</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Customizable passing thresholds</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" /> Public verification code for employers</li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
+                  <span>{isEn ? "Complete question editor" : "Éditeur complet de questions et barèmes"}</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
+                  <span>{isEn ? "Customizable passing thresholds" : "Seuils de réussite personnalisables"}</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-teal-500 dark:text-teal-400 shrink-0" />
+                  <span>{isEn ? "Public verification code for employers" : "Code de vérification public pour les employeurs"}</span>
+                </li>
               </ul>
             </div>
             
@@ -121,11 +178,15 @@ export default function FeaturesPage() {
           <div className="bg-gradient-to-br from-teal-900 to-indigo-950 dark:from-zinc-950 dark:to-zinc-900 border border-teal-850 dark:border-zinc-800 rounded-3xl p-8 md:p-12 flex flex-col md:flex-row justify-between items-center gap-8 relative overflow-hidden text-white shadow-2xl">
             <div className="space-y-4 max-w-2xl relative z-10 text-left">
               <div className="flex items-center gap-2 text-teal-400 text-xs font-bold uppercase tracking-wider">
-                <Sparkles className="w-4 h-4" /> Ready to get started?
+                <Sparkles className="w-4 h-4" /> {isEn ? "Ready to get started?" : "Prêt à commencer ?"}
               </div>
-              <h2 className="text-2xl md:text-3xl font-black">Join Ansella today</h2>
+              <h2 className="text-2xl md:text-3xl font-black">
+                {isEn ? "Join Ansella today" : "Rejoignez Ansella aujourd'hui"}
+              </h2>
               <p className="text-zinc-300 text-sm leading-relaxed">
-                Create your personalized academy in a few clicks and start delivering your training right now.
+                {isEn
+                  ? "Create your personalized academy in a few clicks and start delivering your training right now."
+                  : "Créez votre académie personnalisée en quelques clics et commencez à dispenser vos formations dès maintenant."}
               </p>
             </div>
             <div className="shrink-0 relative z-10 w-full md:w-auto">
@@ -133,7 +194,7 @@ export default function FeaturesPage() {
                 href="/register" 
                 className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white font-bold text-sm transition-all shadow-lg shadow-teal-500/10"
               >
-                Get started for free <ArrowRight className="w-4 h-4" />
+                {isEn ? "Get started for free" : "Commencer gratuitement"} <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
           </div>

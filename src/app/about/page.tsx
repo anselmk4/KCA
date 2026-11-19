@@ -7,8 +7,12 @@ import Image from "next/image";
 import { GraduationCap, Award, ShieldCheck, Mail, Phone, MapPin, Send, Loader2, CheckCircle2 } from "lucide-react";
 import { motion, Variants } from "framer-motion";
 import { supabase } from "@/lib/supabase/client";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function AboutPage() {
+  const { language } = useLanguage();
+  const isEn = language === "en";
+
   const pageVariants: Variants = {
     hidden: { opacity: 0 },
     visible: {
@@ -65,12 +69,15 @@ export default function AboutPage() {
       setSuccess(true);
       setForm({ name: "", email: "", subject: "", message: "" });
     } catch (err: any) {
-      setError("Error: " + (err.message || "Unable to send your message."));
+      setError(
+        isEn
+          ? "Error: " + (err.message || "Unable to send your message.")
+          : "Erreur : " + (err.message || "Impossible d'envoyer votre message.")
+      );
     } finally {
       setLoading(false);
     }
   };
-
 
   return (
     <div className="flex min-h-screen flex-col font-sans bg-gradient-to-br from-slate-100 via-teal-50/50 to-blue-50/70 dark:from-zinc-900 dark:via-zinc-950 dark:to-black text-zinc-900 dark:text-white selection:bg-teal-500/30">
@@ -86,9 +93,9 @@ export default function AboutPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5 }}
-              className="inline-flex items-center rounded-full border border-teal-500/20 px-4 py-1.5 text-xs font-bold text-teal-500 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/30 backdrop-blur-md"
+              className="inline-flex items-center rounded-full border border-teal-500/20 px-4 py-1.5 text-xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/30 backdrop-blur-md"
             >
-              About ANSELLA
+              {isEn ? "About ANSELLA" : "À propos d'ANSELLA"}
             </motion.span>
             
             <motion.h1 
@@ -97,8 +104,10 @@ export default function AboutPage() {
               transition={{ duration: 0.6, delay: 0.1 }}
               className="text-4xl md:text-6xl font-black tracking-tight leading-[1.1] text-zinc-900 dark:text-white"
             >
-              Revolutionizing digital education{" "}
-              <span className="bg-gradient-to-r from-teal-500 via-teal-450 to-indigo-500 dark:from-teal-400 dark:to-indigo-400 bg-clip-text text-transparent">Worldwide</span>
+              {isEn ? "Revolutionizing digital education " : "Révolutionner l'éducation numérique "}
+              <span className="bg-gradient-to-r from-teal-500 via-teal-450 to-indigo-500 dark:from-teal-400 dark:to-indigo-400 bg-clip-text text-transparent">
+                {isEn ? "Worldwide" : "à l'échelle mondiale"}
+              </span>
             </motion.h1>
             
             <motion.p 
@@ -107,7 +116,9 @@ export default function AboutPage() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="text-lg md:text-xl text-zinc-650 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed"
             >
-              A world-class all-in-one LMS platform designed to empower instructors, experts and learners through modern technology.
+              {isEn 
+                ? "A world-class all-in-one LMS platform designed to empower instructors, experts and learners through modern technology."
+                : "Une plateforme LMS tout-en-un de classe mondiale conçue pour donner aux formateurs, experts et apprenants les moyens de réussir grâce aux technologies modernes."}
             </motion.p>
           </div>
         </section>
@@ -129,32 +140,50 @@ export default function AboutPage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-teal-500/10 to-transparent z-10 pointer-events-none" />
                 <Image
                   src="/ceo-ansel-makomo.jpg"
-                  alt="Engineer Ansel Makomo – CEO of Kuettu Corporation SARL"
+                  alt={isEn ? "Engineer Ansel Makomo – CEO of Kuettu Corporation SARL" : "Ingénieur Ansel Makomo – PDG de Kuettu Corporation SARL"}
                   fill
                   className="object-cover transition-transform duration-700 hover:scale-105"
                 />
               </motion.div>
 
               <motion.div variants={itemVariants} className="lg:col-span-7 space-y-6">
-                <div className="inline-flex items-center rounded-full px-3.5 py-1 text-xxs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/30 border border-teal-500/20">
-                  Founder &amp; Visionary
+                <div className="inline-flex items-center rounded-full px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/30 border border-teal-500/20">
+                  {isEn ? "Founder & Visionary" : "Fondateur & Visionnaire"}
                 </div>
                 <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white">
-                  Engineer Ansel Makomo
+                  {isEn ? "Engineer Ansel Makomo" : "Ingénieur Ansel Makomo"}
                 </h2>
                 <p className="text-teal-600 dark:text-teal-400 font-semibold text-base md:text-lg italic">
-                  Designer of the ANSELLA platform &amp; CEO of Kuettu Corporation SARL.
+                  {isEn 
+                    ? "Designer of the ANSELLA platform & CEO of Kuettu Corporation SARL."
+                    : "Concepteur de la plateforme ANSELLA & PDG de Kuettu Corporation SARL."}
                 </p>
                 <div className="space-y-4 text-zinc-650 dark:text-zinc-400 leading-relaxed text-sm md:text-base">
-                  <p>
-                    Recognized for his exceptional innovative spirit and pragmatic leadership, <strong>Engineer Ansel Makomo</strong> is the principal architect of ANSELLA. Under his inspired direction within <strong>Kuettu Corporation SARL</strong>, he is shaping the future of educational and financial technology on an international scale.
-                  </p>
-                  <p>
-                    Endowed with remarkable technical expertise and an unmatched vision for societal impact, Engineer Ansel Makomo strives to break down barriers to access cutting-edge knowledge (Blockchain, Web3, Artificial Intelligence). His academic rigor combined with a deep understanding of the realities of the educational sector makes him one of the most visionary technology leaders of his generation.
-                  </p>
-                  <p>
-                    Through ANSELLA, he provides content creators with a robust and sovereign infrastructure, demonstrating that a global and innovative solution can redefine international technology standards.
-                  </p>
+                  {isEn ? (
+                    <>
+                      <p>
+                        Recognized for his exceptional innovative spirit and pragmatic leadership, <strong>Engineer Ansel Makomo</strong> is the principal architect of ANSELLA. Under his inspired direction within <strong>Kuettu Corporation SARL</strong>, he is shaping the future of educational and financial technology on an international scale.
+                      </p>
+                      <p>
+                        Endowed with remarkable technical expertise and an unmatched vision for societal impact, Engineer Ansel Makomo strives to break down barriers to access cutting-edge knowledge (Blockchain, Web3, Artificial Intelligence). His academic rigor combined with a deep understanding of the realities of the educational sector makes him one of the most visionary technology leaders of his generation.
+                      </p>
+                      <p>
+                        Through ANSELLA, he provides content creators with a robust and sovereign infrastructure, demonstrating that a global and innovative solution can redefine international technology standards.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p>
+                        Reconnu pour son esprit d&apos;innovation exceptionnel et son leadership pragmatique, l&apos;<strong>Ingénieur Ansel Makomo</strong> est l&apos;architecte principal d&apos;ANSELLA. Sous sa direction inspirée au sein de <strong>Kuettu Corporation SARL</strong>, il façonne l&apos;avenir de la technologie éducative et financière à l&apos;échelle internationale.
+                      </p>
+                      <p>
+                        Doté d&apos;une expertise technique remarquable et d&apos;une vision claire de l&apos;impact sociétal, l&apos;Ingénieur Ansel Makomo s&apos;attache à briser les barrières d&apos;accès aux savoirs de pointe (Blockchain, Web3, Intelligence Artificielle). Sa rigueur d&apos;ingénieur alliée à une compréhension fine des réalités du terrain fait de lui l&apos;un des bâtisseurs technologiques les plus visionnaires de sa génération.
+                      </p>
+                      <p>
+                        À travers ANSELLA, il offre aux créateurs de savoirs et formateurs une infrastructure robuste et souveraine, prouvant qu&apos;une solution globale et innovante peut redéfinir les standards technologiques mondiaux.
+                      </p>
+                    </>
+                  )}
                 </div>
               </motion.div>
             </motion.div>
@@ -165,9 +194,13 @@ export default function AboutPage() {
         <section className="py-24 bg-transparent border-t border-zinc-200 dark:border-zinc-900">
           <div className="container mx-auto px-4 md:px-8 max-w-5xl">
             <div className="text-center mb-20 space-y-4">
-              <h2 className="text-3xl md:text-4xl font-black text-zinc-900 dark:text-white">Our Story &amp; Mission</h2>
+              <h2 className="text-3xl md:text-4xl font-black text-zinc-900 dark:text-white">
+                {isEn ? "Our Story & Mission" : "Notre Histoire & Notre Mission"}
+              </h2>
               <p className="text-zinc-600 dark:text-zinc-400 text-sm max-w-lg mx-auto">
-                Why ANSELLA was created and what major challenge it addresses every day.
+                {isEn 
+                  ? "Why ANSELLA was created and what major challenge it addresses every day."
+                  : "Pourquoi ANSELLA a été créée et quel défi majeur elle relève au quotidien."}
               </p>
             </div>
 
@@ -183,9 +216,13 @@ export default function AboutPage() {
                 <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-6">
                   <ShieldCheck className="h-6 w-6 text-red-500 dark:text-red-400" />
                 </div>
-                <h3 className="text-lg font-bold mb-3 text-zinc-900 dark:text-white">The Problem We Solved</h3>
+                <h3 className="text-lg font-bold mb-3 text-zinc-900 dark:text-white">
+                  {isEn ? "The Problem We Solved" : "Le Problème Résolu"}
+                </h3>
                 <p className="text-zinc-650 dark:text-zinc-400 text-xs md:text-sm leading-relaxed">
-                  Many course creators and experts faced major obstacles: the inability to easily integrate local and international payments on Western educational platforms. Learners without standard bank cards or global payment tools were excluded from online knowledge, and instructors could not monetize their expertise flexibly.
+                  {isEn
+                    ? "Many course creators and experts faced major obstacles: the inability to easily integrate local and international payments on Western educational platforms. Learners without standard bank cards or global payment tools were excluded from online knowledge, and instructors could not monetize their expertise flexibly."
+                    : "De nombreux formateurs et créateurs de contenu faisaient face à des blocages majeurs : impossibilité d'encaisser facilement par Mobile Money et cartes bancaires locales sur les plateformes occidentales. Les apprenants sans carte bancaire internationale étaient exclus du savoir en ligne, et les formateurs ne pouvaient pas monétiser sereinement leur expertise."}
                 </p>
               </motion.div>
 
@@ -194,9 +231,13 @@ export default function AboutPage() {
                 <div className="w-12 h-12 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center mb-6">
                   <GraduationCap className="h-6 w-6 text-teal-650 dark:text-teal-400" />
                 </div>
-                <h3 className="text-lg font-bold mb-3 text-zinc-900 dark:text-white">Our Solution</h3>
+                <h3 className="text-lg font-bold mb-3 text-zinc-900 dark:text-white">
+                  {isEn ? "Our Solution" : "Notre Solution"}
+                </h3>
                 <p className="text-zinc-650 dark:text-zinc-400 text-xs md:text-sm leading-relaxed">
-                  ANSELLA was born to unify online learning and modern digital finance. Designed by Kuettu Corporation SARL, it offers a modern, fluid, secure LMS natively connected to global and local payment services. Now, any instructor can launch their certified academy in minutes and collect their earnings instantly.
+                  {isEn
+                    ? "ANSELLA was born to unify online learning and modern digital finance. Designed by Kuettu Corporation SARL, it offers a modern, fluid, secure LMS natively connected to global and local payment services. Now, any instructor can launch their certified academy in minutes and collect their earnings instantly."
+                    : "ANSELLA est née pour unifier l'apprentissage en ligne et la finance numérique moderne. Conçue par Kuettu Corporation SARL, elle propose un LMS fluide, moderne et sécurisé, connecté nativement aux paiements locaux et internationaux. Tout formateur peut désormais créer son académie certifiée en quelques minutes et percevoir ses gains instantanément."}
                 </p>
               </motion.div>
             </motion.div>
@@ -217,9 +258,13 @@ export default function AboutPage() {
                 className="bg-white/40 dark:bg-zinc-950/40 p-8 md:p-10 rounded-3xl border border-zinc-200 dark:border-zinc-850 shadow-sm space-y-6"
               >
                 <div>
-                  <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Contact Us</h3>
+                  <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">
+                    {isEn ? "Contact Us" : "Contactez-nous"}
+                  </h3>
                   <p className="text-zinc-600 dark:text-zinc-500 text-xs md:text-sm mt-1">
-                    A question? An academy digitization project? Write to us directly.
+                    {isEn 
+                      ? "A question? An academy digitization project? Write to us directly."
+                      : "Une question ? Un projet de numérisation d'académie ? Écrivez-nous directement."}
                   </p>
                 </div>
 
@@ -227,7 +272,11 @@ export default function AboutPage() {
                   {success && (
                     <div className="bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 text-xs p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/30 flex items-center gap-2">
                       <CheckCircle2 className="w-5 h-5 shrink-0" />
-                      <span>Your message has been sent successfully! Our team will get back to you very soon.</span>
+                      <span>
+                        {isEn 
+                          ? "Your message has been sent successfully! Our team will get back to you very soon."
+                          : "Votre message a été envoyé avec succès ! Notre équipe vous répondra très rapidement."}
+                      </span>
                     </div>
                   )}
 
@@ -239,10 +288,12 @@ export default function AboutPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider mb-2 text-zinc-550 dark:text-zinc-500">Full Name</label>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider mb-2 text-zinc-550 dark:text-zinc-500">
+                        {isEn ? "Full Name" : "Nom complet"}
+                      </label>
                       <input
                         type="text"
-                        placeholder="E.g. Jean Mukendi"
+                        placeholder={isEn ? "E.g. John Doe" : "Ex. Jean Mukendi"}
                         value={form.name}
                         onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
                         className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/20 focus:bg-white dark:focus:bg-zinc-900/60 focus:border-teal-500/50 text-zinc-900 dark:text-white outline-none text-xs transition-colors"
@@ -250,10 +301,12 @@ export default function AboutPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider mb-2 text-zinc-550 dark:text-zinc-500">Email Address</label>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider mb-2 text-zinc-550 dark:text-zinc-500">
+                        {isEn ? "Email Address" : "Adresse Email"}
+                      </label>
                       <input
                         type="email"
-                        placeholder="E.g. jean.m@ansella.app"
+                        placeholder={isEn ? "E.g. john@ansella.app" : "Ex. jean.m@ansella.app"}
                         value={form.email}
                         onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
                         className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/20 focus:bg-white dark:focus:bg-zinc-900/60 focus:border-teal-500/50 text-zinc-900 dark:text-white outline-none text-xs transition-colors"
@@ -262,10 +315,12 @@ export default function AboutPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider mb-2 text-zinc-550 dark:text-zinc-500">Subject</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider mb-2 text-zinc-550 dark:text-zinc-500">
+                      {isEn ? "Subject" : "Objet"}
+                    </label>
                     <input
                       type="text"
-                      placeholder="E.g. Academic Partnership"
+                      placeholder={isEn ? "E.g. Academic Partnership" : "Ex. Partenariat Académique"}
                       value={form.subject}
                       onChange={(e) => setForm(prev => ({ ...prev, subject: e.target.value }))}
                       className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/20 focus:bg-white dark:focus:bg-zinc-900/60 focus:border-teal-500/50 text-zinc-900 dark:text-white outline-none text-xs transition-colors"
@@ -273,10 +328,12 @@ export default function AboutPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider mb-2 text-zinc-550 dark:text-zinc-500">Message</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider mb-2 text-zinc-550 dark:text-zinc-500">
+                      {isEn ? "Message" : "Message"}
+                    </label>
                     <textarea
                       rows={5}
-                      placeholder="Describe your need..."
+                      placeholder={isEn ? "Describe your request..." : "Décrivez votre besoin..."}
                       value={form.message}
                       onChange={(e) => setForm(prev => ({ ...prev, message: e.target.value }))}
                       className="w-full px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/20 focus:bg-white dark:focus:bg-zinc-900/60 focus:border-teal-500/50 text-zinc-900 dark:text-white outline-none text-xs transition-colors resize-none"
@@ -293,7 +350,7 @@ export default function AboutPage() {
                       <Loader2 className="h-4 w-4 animate-spin text-zinc-950" />
                     ) : (
                       <>
-                        <span>Send Message</span>
+                        <span>{isEn ? "Send Message" : "Envoyer le message"}</span>
                         <Send className="h-4 w-4" />
                       </>
                     )}
@@ -310,9 +367,13 @@ export default function AboutPage() {
                 className="flex flex-col justify-between gap-8"
               >
                 <div className="space-y-6">
-                  <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Our Headquarters</h3>
+                  <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">
+                    {isEn ? "Our Headquarters" : "Notre Siège Social"}
+                  </h3>
                   <p className="text-zinc-650 dark:text-zinc-400 text-xs md:text-sm leading-relaxed">
-                    The ANSELLA and Kuettu Corporation SARL headquarters drives the technological development of the platform for its entire global audience.
+                    {isEn
+                      ? "The ANSELLA and Kuettu Corporation SARL headquarters drives the technological development of the platform for its entire global audience."
+                      : "Le siège d'ANSELLA et de Kuettu Corporation SARL pilote le développement technologique de la plateforme pour l'ensemble de ses utilisateurs à travers le monde."}
                   </p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -321,8 +382,12 @@ export default function AboutPage() {
                         <MapPin className="h-4 w-4" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-xs text-zinc-900 dark:text-white">Address</h4>
-                        <p className="text-[11px] text-zinc-550 dark:text-zinc-500 mt-0.5">Bukavu, DRC (International Office)</p>
+                        <h4 className="font-bold text-xs text-zinc-900 dark:text-white">
+                          {isEn ? "Address" : "Adresse"}
+                        </h4>
+                        <p className="text-[11px] text-zinc-550 dark:text-zinc-500 mt-0.5">
+                          {isEn ? "Bukavu, DRC (International Office)" : "Bukavu, RDC (Bureau International)"}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
@@ -330,7 +395,9 @@ export default function AboutPage() {
                         <Mail className="h-4 w-4" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-xs text-zinc-900 dark:text-white">Email</h4>
+                        <h4 className="font-bold text-xs text-zinc-900 dark:text-white">
+                          {isEn ? "Email" : "Email"}
+                        </h4>
                         <p className="text-[11px] text-zinc-550 dark:text-zinc-500 mt-0.5">info@ansella.app</p>
                       </div>
                     </div>
@@ -339,7 +406,9 @@ export default function AboutPage() {
                         <Phone className="h-4 w-4" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-xs text-zinc-900 dark:text-white">Phone</h4>
+                        <h4 className="font-bold text-xs text-zinc-900 dark:text-white">
+                          {isEn ? "Phone" : "Téléphone"}
+                        </h4>
                         <p className="text-[11px] text-zinc-550 dark:text-zinc-500 mt-0.5">+243 990 387 237</p>
                       </div>
                     </div>

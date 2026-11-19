@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { useLanguage } from "@/context/LanguageContext";
 import {
   BookOpen, Users, ArrowRight, Award, Flame,
   MapPin, Loader2, Sparkles, Star, GraduationCap, Globe
@@ -32,6 +33,9 @@ interface Instructor {
 }
 
 export default function TemplatesPage() {
+  const { language } = useLanguage();
+  const isEn = language === "en";
+
   const [courses, setCourses] = useState<Course[]>([]);
   const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,11 +130,11 @@ export default function TemplatesPage() {
 
   const getLevelLabel = (lvl: string | null) => {
     const l = (lvl || "").toUpperCase();
-    if (l === "BEGINNER") return "Beginner";
-    if (l === "INTERMEDIATE") return "Intermediate";
-    if (l === "ADVANCED") return "Advanced";
-    if (l === "EXPERT") return "Expert";
-    return "All Levels";
+    if (l === "BEGINNER") return isEn ? "Beginner" : "Débutant";
+    if (l === "INTERMEDIATE") return isEn ? "Intermediate" : "Intermédiaire";
+    if (l === "ADVANCED") return isEn ? "Advanced" : "Avancé";
+    if (l === "EXPERT") return isEn ? "Expert" : "Expert";
+    return isEn ? "All Levels" : "Tous niveaux";
   };
 
   const getLevelColor = (lvl: string | null) => {
@@ -156,17 +160,18 @@ export default function TemplatesPage() {
           <div className="relative container mx-auto max-w-4xl text-center space-y-6">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-teal-500/10 border border-teal-500/20 rounded-full text-teal-600 dark:text-teal-400 text-xs font-bold uppercase tracking-widest">
               <Sparkles className="w-3.5 h-3.5" />
-              Academies & Learning Models
+              {isEn ? "Academies & Learning Models" : "Académies & Modèles d'Apprentissage"}
             </div>
             <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-[1.1]">
-              Active Education &amp;{" "}
+              {isEn ? "Active Education & " : "Pédagogie active & "}
               <span className="bg-gradient-to-r from-teal-500 via-teal-400 to-indigo-500 bg-clip-text text-transparent">
-                learning models.
+                {isEn ? "learning models." : "modèles d'apprentissage."}
               </span>
             </h1>
             <p className="text-lg text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-2xl mx-auto">
-              Explore our virtual academies. Discover certified courses
-              and learn from the world&apos;s best experts in blockchain, crypto, and AI.
+              {isEn
+                ? "Explore our virtual academies. Discover certified courses and learn from the world's best experts in blockchain, crypto, and AI."
+                : "Explorez nos académies virtuelles. Découvrez les formations certifiantes et apprenez auprès des meilleurs formateurs en blockchain, crypto et IA."}
             </p>
           </div>
         </section>
@@ -179,29 +184,29 @@ export default function TemplatesPage() {
               <div>
                 <h2 className="text-2xl font-bold flex items-center gap-2">
                   <Flame className="w-5 h-5 text-orange-500" />
-                  Featured Training
+                  {isEn ? "Featured Training" : "Formations à la une"}
                 </h2>
                 <p className="text-sm text-zinc-500 dark:text-zinc-500 mt-1">
-                  Recently published courses by our certified instructors.
+                  {isEn ? "Recently published courses by our certified instructors." : "Cours récemment publiés par nos formateurs certifiés."}
                 </p>
               </div>
               <Link
                 href="/courses"
                 className="inline-flex items-center gap-1.5 text-sm font-semibold text-teal-600 dark:text-teal-400 hover:text-teal-500 transition-colors"
               >
-                View the full catalog <ArrowRight className="w-4 h-4" />
+                {isEn ? "View the full catalog" : "Voir tout le catalogue"} <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
 
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
                 <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
-                <p className="text-xs text-zinc-500">Loading courses...</p>
+                <p className="text-xs text-zinc-500">{isEn ? "Loading courses..." : "Chargement des cours..."}</p>
               </div>
             ) : courses.length === 0 ? (
               <div className="border border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl p-16 text-center space-y-3">
                 <BookOpen className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto" />
-                <p className="text-sm text-zinc-400">No published courses yet.</p>
+                <p className="text-sm text-zinc-400">{isEn ? "No published courses yet." : "Aucune formation publiée pour le moment."}</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -214,14 +219,14 @@ export default function TemplatesPage() {
                     {/* Thumbnail */}
                     <ColorfulContentCover
                       title={course.title}
-                      category={course.categories?.name || "General"}
+                      category={course.categories?.name || (isEn ? "General" : "Général")}
                       coverUrl={course.thumbnail_url}
                       type="course"
                       heightClass="h-44 sm:h-48"
                     >
                       <div className="absolute top-3 left-3 pointer-events-auto flex gap-2">
                         <span className="bg-white/90 dark:bg-zinc-950/90 backdrop-blur px-2.5 py-1 rounded-lg text-[10px] font-bold text-teal-700 dark:text-teal-400 border border-zinc-200/50 dark:border-zinc-700/50">
-                          {course.categories?.name || "General"}
+                          {course.categories?.name || (isEn ? "General" : "Général")}
                         </span>
                       </div>
                       <div className="absolute bottom-3 right-3 pointer-events-auto">
@@ -236,16 +241,16 @@ export default function TemplatesPage() {
                         {course.title}
                       </h3>
                       <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed flex-1 min-h-[36px]">
-                        {course.short_description || "Top-tier certified training."}
+                        {course.short_description || (isEn ? "Top-tier certified training." : "Formation certifiante de haut niveau.")}
                       </p>
 
                       <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                         <div className="flex items-center gap-1 text-amber-500">
                           <Star className="w-3.5 h-3.5 fill-current" />
-                          <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">Certified</span>
+                          <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">{isEn ? "Certified" : "Certifié"}</span>
                         </div>
                         <span className="font-black text-teal-600 dark:text-teal-400 text-sm">
-                          {course.price > 0 ? `${course.price.toLocaleString()} $` : "Free"}
+                          {course.price > 0 ? `${course.price.toLocaleString()} $` : isEn ? "Free" : "Gratuit"}
                         </span>
                       </div>
                     </div>
@@ -261,17 +266,17 @@ export default function TemplatesPage() {
               <div>
                 <h2 className="text-2xl font-bold flex items-center gap-2">
                   <GraduationCap className="w-5 h-5 text-teal-500" />
-                  Ansella Instructors
+                  {isEn ? "Ansella Instructors" : "Formateurs Ansella"}
                 </h2>
                 <p className="text-sm text-zinc-500 dark:text-zinc-500 mt-1">
-                  Learn from globally recognized experts.
+                  {isEn ? "Learn from globally recognized experts." : "Apprenez auprès d'experts reconnus à l'échelle internationale."}
                 </p>
               </div>
               <Link
                 href="/instructors"
                 className="inline-flex items-center gap-1.5 text-sm font-semibold text-teal-600 dark:text-teal-400 hover:text-teal-500 transition-colors"
               >
-                View all instructors <ArrowRight className="w-4 h-4" />
+                {isEn ? "View all instructors" : "Voir tous les formateurs"} <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
 
@@ -282,8 +287,8 @@ export default function TemplatesPage() {
             ) : instructors.length === 0 ? (
               <div className="border border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl p-16 text-center space-y-3">
                 <Users className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto" />
-                <p className="text-sm text-zinc-400">No instructors available yet.</p>
-                <p className="text-xs text-zinc-500">Instructors will appear here once their profiles are set up.</p>
+                <p className="text-sm text-zinc-400">{isEn ? "No instructors available yet." : "Aucun formateur disponible pour l'instant."}</p>
+                <p className="text-xs text-zinc-500">{isEn ? "Instructors will appear here once their profiles are set up." : "Les formateurs s'afficheront ici dès que leurs profils seront configurés."}</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
@@ -318,7 +323,7 @@ export default function TemplatesPage() {
                       {inst.full_name}
                     </h3>
                     <p className="text-xs font-semibold text-teal-600 dark:text-teal-400 mb-1.5">
-                      {inst.specialty || "Expert Instructor"}
+                      {inst.specialty || (isEn ? "Expert Instructor" : "Formateur Expert")}
                     </p>
 
                     {/* Academy name */}
@@ -339,7 +344,7 @@ export default function TemplatesPage() {
 
                     {/* Bio */}
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-3 leading-relaxed flex-1 mb-5 min-h-[48px]">
-                      {inst.bio || "Passionate expert in sharing knowledge in the field of decentralized technologies."}
+                      {inst.bio || (isEn ? "Passionate expert in sharing knowledge in the field of decentralized technologies." : "Expert passionné par la transmission des savoirs dans le domaine des technologies d'avenir.")}
                     </p>
 
                     {/* CTA */}
@@ -347,7 +352,7 @@ export default function TemplatesPage() {
                       href={`/profile/${inst.id}`}
                       className="w-full py-2.5 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white font-bold rounded-xl text-xs transition-all duration-200 block text-center shadow-sm shadow-teal-500/20 group-hover:shadow-teal-500/30"
                     >
-                      View Profile
+                      {isEn ? "View Profile" : "Voir le profil"}
                     </Link>
                   </div>
                 ))}
@@ -361,13 +366,15 @@ export default function TemplatesPage() {
             <div className="relative max-w-2xl mx-auto space-y-5">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/10 border border-white/20 rounded-full text-xs font-bold uppercase tracking-widest">
                 <Globe className="w-3.5 h-3.5" />
-                Join the global community
+                {isEn ? "Join the global community" : "Rejoignez la communauté mondiale"}
               </div>
               <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
-                Ready to transform your knowledge into expertise?
+                {isEn ? "Ready to transform your knowledge into expertise?" : "Prêt à transformer vos connaissances en expertise ?"}
               </h2>
               <p className="text-white/70 text-base leading-relaxed">
-                Join thousands of learners and instructors on Ansella. Start for free, progress at your own pace.
+                {isEn
+                  ? "Join thousands of learners and instructors on Ansella. Start for free, progress at your own pace."
+                  : "Rejoignez des milliers d'apprenants et formateurs sur Ansella. Commencez gratuitement, progressez à votre rythme."}
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
                 <Link
@@ -375,13 +382,13 @@ export default function TemplatesPage() {
                   className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-white text-teal-700 font-bold rounded-2xl hover:bg-zinc-100 transition-colors shadow-lg text-sm"
                 >
                   <Sparkles className="w-4 h-4" />
-                  Create my free account
+                  {isEn ? "Create my free account" : "Créer mon compte gratuit"}
                 </Link>
                 <Link
                   href="/courses"
                   className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-white/10 border border-white/20 text-white font-bold rounded-2xl hover:bg-white/20 transition-colors text-sm"
                 >
-                  Explore the catalog
+                  {isEn ? "Explore the catalog" : "Explorer le catalogue"}
                   <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>

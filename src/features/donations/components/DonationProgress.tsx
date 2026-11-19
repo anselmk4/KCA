@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Sparkles, Users, Target, Heart } from "lucide-react";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface ProgressStats {
   goal: number;
@@ -12,6 +13,9 @@ interface ProgressStats {
 }
 
 export function DonationProgress() {
+  const { language } = useLanguage();
+  const isEn = language === "en";
+
   const [stats, setStats] = useState<ProgressStats>({
     goal: 60000,
     totalCollected: 14250,
@@ -51,10 +55,11 @@ export function DonationProgress() {
           </div>
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white">
-              Campagne Bourses & Éducation
+              {isEn ? "Scholarships & Education Campaign" : "Campagne Bourses & Éducation"}
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Objectif global : <strong className="text-slate-700 dark:text-slate-200">60 000 $</strong>
+              {isEn ? "Global target: " : "Objectif global : "}
+              <strong className="text-slate-700 dark:text-slate-200">$60,000</strong>
             </p>
           </div>
         </div>
@@ -62,11 +67,11 @@ export function DonationProgress() {
         <div className="flex items-center gap-3 text-xs">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-white/[0.05] text-slate-700 dark:text-slate-300 font-medium">
             <Users className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-            <span><strong>{stats.totalDonors}</strong> donateurs</span>
+            <span><strong>{stats.totalDonors}</strong> {isEn ? "donors" : "donateurs"}</span>
           </div>
 
           <div className="px-3 py-1.5 rounded-full bg-teal-500/10 text-teal-700 dark:text-teal-300 font-bold">
-            {stats.percentage}% atteint
+            {stats.percentage}% {isEn ? "reached" : "atteint"}
           </div>
         </div>
       </div>
@@ -86,10 +91,18 @@ export function DonationProgress() {
         {/* Amount details under progress bar */}
         <div className="flex justify-between items-center text-xs font-semibold">
           <span className="text-teal-600 dark:text-teal-400">
-            {stats.totalCollected.toLocaleString()} $ <span className="text-slate-500 dark:text-slate-400 font-normal">collectés</span>
+            {stats.totalCollected.toLocaleString()} $ <span className="text-slate-500 dark:text-slate-400 font-normal">{isEn ? "raised" : "collectés"}</span>
           </span>
           <span className="text-slate-500 dark:text-slate-400 font-medium">
-            Reste <strong className="text-slate-700 dark:text-slate-200">{stats.remaining.toLocaleString()} $</strong> sur 60k $
+            {isEn ? (
+              <>
+                <strong className="text-slate-700 dark:text-slate-200">${stats.remaining.toLocaleString()}</strong> remaining out of $60k
+              </>
+            ) : (
+              <>
+                Reste <strong className="text-slate-700 dark:text-slate-200">{stats.remaining.toLocaleString()} $</strong> sur 60k $
+              </>
+            )}
           </span>
         </div>
       </div>

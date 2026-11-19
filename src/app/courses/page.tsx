@@ -9,6 +9,7 @@ import { Search, Loader2, BookOpen, Clock, ArrowRight, Star, Sparkles, Graduatio
 import { motion, Variants } from "framer-motion";
 import { supabase } from "@/lib/supabase/client";
 import { ColorfulContentCover } from "@/components/ui/ColorfulContentCover";
+import { useLanguage } from "@/context/LanguageContext";
 
 /** Strip HTML tags and decode entities for clean text display */
 function stripHtml(html: string | null | undefined): string {
@@ -40,6 +41,8 @@ export const COURSE_LANGUAGES_CATALOG = [
 ];
 
 export default function CoursesPage() {
+  const { language } = useLanguage();
+  const isEn = language === "en";
   const [courses, setCourses] = useState<Course[]>([]);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
@@ -120,10 +123,10 @@ export default function CoursesPage() {
   const categories = useMemo(() => {
     const list = Array.from(new Set(courses.map((c) => c.category)));
     return [
-      { label: "All Categories", value: "all" },
+      { label: isEn ? "All Categories" : "Toutes les catégories", value: "all" },
       ...list.map((c) => ({ label: c, value: c })),
     ];
-  }, [courses]);
+  }, [courses, isEn]);
 
   const filtered = useMemo(() => {
     let result = courses;
@@ -176,7 +179,7 @@ export default function CoursesPage() {
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase bg-teal-500/10 dark:bg-teal-500/5 border border-teal-500/20 text-teal-600 dark:text-teal-400 mx-auto"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              E-Learning Catalog
+              {isEn ? "E-Learning Catalog" : "Catalogue Formations"}
             </motion.div>
             <motion.h1 
               initial={{ opacity: 0, y: 15 }}
@@ -184,9 +187,9 @@ export default function CoursesPage() {
               transition={{ delay: 0.1 }}
               className="text-3xl sm:text-5xl font-black text-zinc-900 dark:text-white leading-tight tracking-tight"
             >
-              Explore our certified{" "}
+              {isEn ? "Explore our certified " : "Explorez nos parcours "}
               <span className="bg-gradient-to-r from-teal-500 to-indigo-500 bg-clip-text text-transparent">
-                learning paths
+                {isEn ? "learning paths" : "certifiants"}
               </span>
             </motion.h1>
             <motion.p 
@@ -195,7 +198,9 @@ export default function CoursesPage() {
               transition={{ delay: 0.15 }}
               className="text-sm md:text-base text-zinc-500 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed"
             >
-              Comprehensive, immersive training programs in blockchain, artificial intelligence, and decentralized finance, taught by world-class experts.
+              {isEn
+                ? "Comprehensive, immersive training programs in blockchain, artificial intelligence, and decentralized finance, taught by world-class experts."
+                : "Formations complètes et immersives en blockchain, intelligence artificielle et finance décentralisée, dispensées par des experts de terrain."}
             </motion.p>
           </div>
         </section>
@@ -210,7 +215,7 @@ export default function CoursesPage() {
                 <input
                   id="course-search"
                   type="text"
-                  placeholder="Search by keyword, topic, or course..."
+                  placeholder={isEn ? "Search by keyword, topic, or course..." : "Rechercher par mot-clé, sujet ou formation..."}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-11 pr-4 py-3 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20 transition-all outline-none"
@@ -239,7 +244,7 @@ export default function CoursesPage() {
                 {/* Language filter pills */}
                 <div className="flex flex-wrap gap-1.5 justify-center md:justify-end items-center text-xs">
                   <span className="text-[11px] font-bold text-zinc-400 mr-1 flex items-center gap-1">
-                    Langue :
+                    {isEn ? "Language:" : "Langue :"}
                   </span>
                   {COURSE_LANGUAGES_CATALOG.map((lang) => (
                     <button
@@ -252,7 +257,7 @@ export default function CoursesPage() {
                       }`}
                     >
                       <span>{lang.flag}</span>
-                      <span>{lang.label}</span>
+                      <span>{isEn && lang.code === "all" ? "All languages" : lang.label}</span>
                     </button>
                   ))}
                 </div>
@@ -267,19 +272,21 @@ export default function CoursesPage() {
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
                 <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
-                <p className="text-xs text-zinc-500">Loading courses...</p>
+                <p className="text-xs text-zinc-500">
+                  {isEn ? "Loading courses..." : "Chargement des cours..."}
+                </p>
               </div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-20 bg-white dark:bg-zinc-900/20 border border-zinc-200 dark:border-zinc-900 rounded-3xl p-8">
                 <GraduationCap className="w-12 h-12 text-zinc-400 mx-auto mb-3" />
                 <p className="text-zinc-500 text-sm font-semibold">
-                  No courses match your search criteria.
+                  {isEn ? "No courses match your search criteria." : "Aucune formation ne correspond à vos critères de recherche."}
                 </p>
                 <button 
                   onClick={() => { setSearch(""); setActiveCategory("all"); setActiveLanguage("all"); }}
                   className="mt-4 text-xs font-bold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer"
                 >
-                  Reset filters
+                  {isEn ? "Reset filters" : "Réinitialiser les filtres"}
                 </button>
               </div>
             ) : (
@@ -309,6 +316,9 @@ export default function CoursesPage() {
 // Course Card Component
 // ---------------------------------------------------------------------------
 function CourseCard({ course }: { course: Course }) {
+  const { language } = useLanguage();
+  const isEn = language === "en";
+
   const getLevelColor = (level: string) => {
     switch (level.toLowerCase()) {
       case "beginner":
@@ -319,6 +329,22 @@ function CourseCard({ course }: { course: Course }) {
         return "bg-orange-100 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-900/30";
       default:
         return "bg-purple-100 dark:bg-purple-950/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-900/30";
+    }
+  };
+
+  const getLevelLabel = (level: string) => {
+    if (isEn) return level;
+    switch (level.toLowerCase()) {
+      case "beginner":
+        return "Débutant";
+      case "intermediate":
+        return "Intermédiaire";
+      case "advanced":
+        return "Avancé";
+      case "expert":
+        return "Expert";
+      default:
+        return level;
     }
   };
 
@@ -364,7 +390,7 @@ function CourseCard({ course }: { course: Course }) {
             <span>{langInfo.label}</span>
           </span>
           <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider ${getLevelColor(course.level)}`}>
-            {course.level}
+            {getLevelLabel(course.level)}
           </span>
         </div>
       </ColorfulContentCover>
@@ -385,13 +411,13 @@ function CourseCard({ course }: { course: Course }) {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase">
               <Clock className="w-3.5 h-3.5" />
-              <span>{course.weeks} WEEKS</span>
+              <span>{course.weeks} {isEn ? "WEEKS" : "SEMAINES"}</span>
             </div>
           </div>
           <div className="text-right">
-            <span className="text-xs text-zinc-400 block leading-none mb-0.5">Price</span>
+            <span className="text-xs text-zinc-400 block leading-none mb-0.5">{isEn ? "Price" : "Prix"}</span>
             <span className="text-base font-black text-zinc-900 dark:text-white">
-              {course.price > 0 ? `$${course.price}` : "Free"}
+              {course.price > 0 ? `$${course.price}` : isEn ? "Free" : "Gratuit"}
             </span>
           </div>
         </div>
@@ -401,7 +427,7 @@ function CourseCard({ course }: { course: Course }) {
           href={`/courses/${course.id}`}
           className="w-full py-3.5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-800/80 dark:hover:bg-zinc-700/80 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all group/btn shadow-xs cursor-pointer"
         >
-          <span>View Course Details</span>
+          <span>{isEn ? "View Course Details" : "Voir la formation"}</span>
           <ArrowRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-0.5" />
         </Link>
 

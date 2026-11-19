@@ -52,34 +52,34 @@ interface DigitalProduct {
 }
 
 const CATEGORY_FILTERS = [
-  { id: "ALL", label: "Toutes les ressources", icon: Layers },
-  { id: "E-books & Guides PDF", label: "E-books & Guides PDF", icon: BookOpen },
-  { id: "Logiciels & Scripts (ZIP / Code)", label: "Logiciels & Scripts ZIP", icon: FileCode },
-  { id: "Modèles & Templates (Notion, Figma, Canva, Excel)", label: "Modèles & Templates", icon: Layers },
-  { id: "Prompts & Datasets IA", label: "Prompts & IA", icon: Sparkles },
-  { id: "Blockchain, Web3 & Crypto", label: "Web3 & Crypto", icon: Zap },
-  { id: "Développement Web & Mobile", label: "Code & Développement", icon: FileCode },
-  { id: "Fintech, Trading & Économie", label: "Fintech & Trading", icon: DollarSign },
+  { id: "ALL", label: "Toutes les ressources", labelEn: "All Resources", icon: Layers },
+  { id: "E-books & Guides PDF", label: "E-books & Guides PDF", labelEn: "E-books & PDF Guides", icon: BookOpen },
+  { id: "Logiciels & Scripts (ZIP / Code)", label: "Logiciels & Scripts ZIP", labelEn: "Software & ZIP Scripts", icon: FileCode },
+  { id: "Modèles & Templates (Notion, Figma, Canva, Excel)", label: "Modèles & Templates", labelEn: "Templates & Models", icon: Layers },
+  { id: "Prompts & Datasets IA", label: "Prompts & IA", labelEn: "Prompts & AI Datasets", icon: Sparkles },
+  { id: "Blockchain, Web3 & Crypto", label: "Web3 & Crypto", labelEn: "Web3 & Crypto", icon: Zap },
+  { id: "Développement Web & Mobile", label: "Code & Développement", labelEn: "Web & Mobile Dev", icon: FileCode },
+  { id: "Fintech, Trading & Économie", label: "Fintech & Trading", labelEn: "Fintech & Trading", icon: DollarSign },
 ];
 
-function getFileBadge(product: DigitalProduct) {
+function getFileBadge(product: DigitalProduct, isEn: boolean) {
   const fileName = (product.file_name || product.file_url || "").toLowerCase();
   const category = (product.category || "").toLowerCase();
   
   if (fileName.endsWith(".zip") || fileName.endsWith(".rar") || fileName.endsWith(".7z") || category.includes("logiciel") || category.includes("script")) {
-    return { label: "ZIP / LOGICIEL", color: "bg-indigo-600", icon: Archive };
+    return { label: isEn ? "ZIP / SOFTWARE" : "ZIP / LOGICIEL", color: "bg-indigo-600", icon: Archive };
   }
   if (category.includes("modèle") || category.includes("template") || fileName.endsWith(".fig") || fileName.endsWith(".xlsx")) {
     return { label: "TEMPLATE", color: "bg-purple-600", icon: Layers };
   }
   if (category.includes("prompt") || category.includes("ia")) {
-    return { label: "PACK IA", color: "bg-amber-600", icon: Sparkles };
+    return { label: isEn ? "AI PACK" : "PACK IA", color: "bg-amber-600", icon: Sparkles };
   }
   return { label: "PDF / EBOOK", color: "bg-teal-600", icon: BookOpen };
 }
 
-function ProductCardCover({ product }: { product: DigitalProduct }) {
-  const badge = getFileBadge(product);
+function ProductCardCover({ product, isEn }: { product: DigitalProduct; isEn: boolean }) {
+  const badge = getFileBadge(product, isEn);
   const BadgeIcon = badge.icon;
 
   return (
@@ -98,7 +98,7 @@ function ProductCardCover({ product }: { product: DigitalProduct }) {
       </div>
       <div className="absolute top-3 right-3 pointer-events-auto">
         <span className="text-[10px] font-bold text-teal-300 bg-teal-950/80 px-2 py-0.5 rounded border border-teal-800/60 uppercase tracking-widest backdrop-blur-xs">
-          Ressource Pro
+          {isEn ? "Pro Resource" : "Ressource Pro"}
         </span>
       </div>
     </ColorfulContentCover>
@@ -107,6 +107,7 @@ function ProductCardCover({ product }: { product: DigitalProduct }) {
 
 export default function StoreCatalogPage() {
   const { language } = useLanguage();
+  const isEn = language === "en";
   const [products, setProducts] = useState<DigitalProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -198,18 +199,26 @@ export default function StoreCatalogPage() {
             <div className="text-center max-w-3xl mx-auto space-y-4">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-teal-500/20 text-teal-300 border border-teal-500/30">
                 <Sparkles className="w-4 h-4 text-teal-300" />
-                <span>Boutique Digitale & Ressources Créateurs</span>
+                <span>{isEn ? "Digital Store & Creator Resources" : "Boutique Digitale & Ressources Créateurs"}</span>
                 <span className="bg-amber-400 text-zinc-950 px-2 py-0.5 rounded-full text-[10px] font-black">
-                  E-books ≤ 25 $ · Logiciels & Templates Prix Libres
+                  {isEn ? "E-books ≤ $25 · Free Pricing on Software & Templates" : "E-books ≤ 25 $ · Logiciels & Templates Prix Libres"}
                 </span>
               </div>
 
               <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-tight">
-                E-books, Logiciels & Outils Numériques à Fort Impact
+                {isEn ? "High-Impact E-books, Software & Digital Tools" : "E-books, Logiciels & Outils Numériques à Fort Impact"}
               </h1>
 
               <p className="text-sm sm:text-base text-zinc-300 leading-relaxed max-w-2xl mx-auto">
-                Téléchargez instantanément des guides PDF, scripts et logiciels ZIP, modèles Notion/Figma et packs de prompts créés par des experts. Paiement fluide en <strong className="text-teal-300">Mobile Money</strong> (RDC, Congo-Brazzaville, Cameroun, Côte d&apos;Ivoire, Sénégal...) et <strong className="text-emerald-300">Crypto</strong>.
+                {isEn ? (
+                  <>
+                    Instantly download PDF guides, ZIP software &amp; scripts, Notion/Figma templates, and AI prompt packs created by experts. Seamless payment via <strong className="text-teal-300">Mobile Money</strong> (DRC, Congo-Brazzaville, Cameroon, Ivory Coast, Senegal...) and <strong className="text-emerald-300">Crypto</strong>.
+                  </>
+                ) : (
+                  <>
+                    Téléchargez instantanément des guides PDF, scripts et logiciels ZIP, modèles Notion/Figma et packs de prompts créés par des experts. Paiement fluide en <strong className="text-teal-300">Mobile Money</strong> (RDC, Congo-Brazzaville, Cameroun, Côte d&apos;Ivoire, Sénégal...) et <strong className="text-emerald-300">Crypto</strong>.
+                  </>
+                )}
               </p>
             </div>
 
@@ -221,7 +230,7 @@ export default function StoreCatalogPage() {
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Rechercher un e-book, un logiciel ZIP, un template, un auteur..."
+                  placeholder={isEn ? "Search an e-book, ZIP software, template, author..." : "Rechercher un e-book, un logiciel ZIP, un template, un auteur..."}
                   className="w-full pl-12 pr-4 py-3.5 bg-zinc-900/90 border border-zinc-700/80 rounded-2xl text-sm text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-teal-500 shadow-xl backdrop-blur-md"
                 />
                 {search && (
@@ -229,7 +238,7 @@ export default function StoreCatalogPage() {
                     onClick={() => setSearch("")}
                     className="absolute right-4 text-xs font-bold text-zinc-400 hover:text-white"
                   >
-                    Effacer
+                    {isEn ? "Clear" : "Effacer"}
                   </button>
                 )}
               </div>
@@ -241,7 +250,7 @@ export default function StoreCatalogPage() {
                 href="/store/access"
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-400 hover:text-teal-300 transition-colors"
               >
-                <BookOpen className="w-3.5 h-3.5" /> Déjà acheté un livre ou un guide ? Retrouver mes téléchargements
+                <BookOpen className="w-3.5 h-3.5" /> {isEn ? "Already purchased? Find my downloads" : "Déjà acheté un livre ou un guide ? Retrouver mes téléchargements"}
               </Link>
             </div>
           </div>
@@ -266,7 +275,7 @@ export default function StoreCatalogPage() {
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5" />
-                    <span>{cat.label}</span>
+                    <span>{isEn && cat.labelEn ? cat.labelEn : cat.label}</span>
                   </button>
                 );
               })}
@@ -274,15 +283,15 @@ export default function StoreCatalogPage() {
 
             {/* Tri */}
             <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
-              <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Trier par :</span>
+              <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">{isEn ? "Sort by:" : "Trier par :"}</span>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
                 className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 text-xs font-bold text-zinc-800 dark:text-zinc-200 outline-none focus:ring-1 focus:ring-teal-500"
               >
-                <option value="recent">Plus récents</option>
-                <option value="price_asc">Prix croissant</option>
-                <option value="price_desc">Prix décroissant</option>
+                <option value="recent">{isEn ? "Most recent" : "Plus récents"}</option>
+                <option value="price_asc">{isEn ? "Price: Low to High" : "Prix croissant"}</option>
+                <option value="price_desc">{isEn ? "Price: High to Low" : "Prix décroissant"}</option>
               </select>
             </div>
           </div>
@@ -311,12 +320,12 @@ export default function StoreCatalogPage() {
                 <BookOpen className="w-8 h-8" />
               </div>
               <h3 className="text-lg font-black text-zinc-900 dark:text-white">
-                Aucun produit trouvé pour le moment
+                {isEn ? "No products found at this time" : "Aucun produit trouvé pour le moment"}
               </h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-md mx-auto">
                 {search
-                  ? "Aucune ressource ne correspond à votre recherche. Essayez un autre mot-clé ou réinitialisez les filtres."
-                  : "Les premiers créateurs sont en train de téléverser leurs e-books, guides et logiciels ZIP."}
+                  ? (isEn ? "No resource matches your search. Try another keyword or reset filters." : "Aucune ressource ne correspond à votre recherche. Essayez un autre mot-clé ou réinitialisez les filtres.")
+                  : (isEn ? "Creators are currently uploading their resources." : "Les premiers créateurs sont en train de téléverser leurs e-books, guides et logiciels ZIP.")}
               </p>
               <div className="pt-2 flex flex-wrap justify-center gap-3">
                 {search && (
@@ -327,14 +336,14 @@ export default function StoreCatalogPage() {
                     }}
                     className="px-4 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs font-bold hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                   >
-                    Réinitialiser les filtres
+                    {isEn ? "Reset filters" : "Réinitialiser les filtres"}
                   </button>
                 )}
                 <Link
                   href="/instructor/courses"
                   className="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-extrabold shadow-md shadow-teal-500/20 transition-all"
                 >
-                  Publier une ressource en tant que Créateur
+                  {isEn ? "Publish a resource as a Creator" : "Publier une ressource en tant que Créateur"}
                 </Link>
               </div>
             </div>
@@ -359,7 +368,7 @@ export default function StoreCatalogPage() {
                   >
                     {/* Couverture avec fallback */}
                     <div className="relative">
-                      <ProductCardCover product={product} />
+                      <ProductCardCover product={product} isEn={isEn} />
 
                       {/* Badge Prix strict <= 25$ */}
                       <div className="absolute top-3 right-3 z-10 bg-zinc-950/90 backdrop-blur-md text-amber-400 px-3 py-1 rounded-full text-xs font-black border border-amber-400/30 shadow-md">
@@ -402,7 +411,7 @@ export default function StoreCatalogPage() {
                                 {product.profiles.full_name}
                               </p>
                               <p className="text-[10px] text-zinc-400 truncate">
-                                {product.profiles.academy_name || product.profiles.specialty || "Créateur certifié"}
+                                {product.profiles.academy_name || product.profiles.specialty || (isEn ? "Certified Creator" : "Créateur certifié")}
                               </p>
                             </div>
                           </div>
@@ -411,9 +420,9 @@ export default function StoreCatalogPage() {
                             <Link
                               href={`/store/${authorUsername}`}
                               className="text-[11px] font-bold text-teal-600 hover:text-teal-700 flex items-center gap-1 shrink-0 ml-2"
-                              title="Voir la boutique complète du créateur"
+                              title={isEn ? "View creator's complete store" : "Voir la boutique complète du créateur"}
                             >
-                              <span>Boutique</span>
+                              <span>{isEn ? "Store" : "Boutique"}</span>
                               <ExternalLink className="w-3 h-3" />
                             </Link>
                           )}
@@ -426,14 +435,14 @@ export default function StoreCatalogPage() {
                           onClick={() => setSelectedDetail(product)}
                           className="flex-1 py-2.5 px-3 rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer text-center"
                         >
-                          Aperçu
+                          {isEn ? "Preview" : "Aperçu"}
                         </button>
                         <button
                           onClick={() => setSelectedBuy(product)}
                           className="py-2.5 px-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-white text-xs font-extrabold shadow-md shadow-teal-500/20 transition-all flex items-center gap-1.5 cursor-pointer hover:scale-[1.02]"
                         >
                           <Download className="w-3.5 h-3.5" />
-                          Acheter (${price.toFixed(2)})
+                          {isEn ? `Buy ($${price.toFixed(2)})` : `Acheter (${price.toFixed(2)} $)`}
                         </button>
                       </div>
                     </div>
@@ -448,20 +457,22 @@ export default function StoreCatalogPage() {
             <div className="space-y-2 text-center md:text-left">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 text-xs font-bold border border-teal-500/30">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Monétisation Sans Abonnement</span>
+                <span>{isEn ? "Subscription-Free Monetization" : "Monétisation Sans Abonnement"}</span>
               </div>
               <h3 className="text-xl font-black">
-                Vous avez un e-book, un template Notion ou un script à vendre ?
+                {isEn ? "Have an e-book, Notion template, or script to sell?" : "Vous avez un e-book, un template Notion ou un script à vendre ?"}
               </h3>
               <p className="text-xs md:text-sm text-zinc-300 max-w-xl leading-relaxed">
-                Créez votre boutique digitale personnalisée sur ANSELLA en 2 minutes. Fixez votre prix (E-books ≤ 25 $, logiciels et templates au tarif de votre choix) et recevez vos gains directement par Mobile Money et Crypto sans tracas bancaire.
+                {isEn
+                  ? "Create your custom digital store on ANSELLA in 2 minutes. Set your own prices and receive payouts directly via Mobile Money and Crypto without banking hurdles."
+                  : "Créez votre boutique digitale personnalisée sur ANSELLA en 2 minutes. Fixez votre prix (E-books ≤ 25 $, logiciels et templates au tarif de votre choix) et recevez vos gains directement par Mobile Money et Crypto sans tracas bancaire."}
               </p>
             </div>
             <Link
               href="/instructor/courses"
               className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-teal-400 to-emerald-400 hover:from-teal-300 hover:to-emerald-300 text-zinc-950 font-black text-xs transition-all shadow-lg shadow-teal-500/30 shrink-0 flex items-center gap-2"
             >
-              <span>Ouvrir ma Boutique</span>
+              <span>{isEn ? "Open my Store" : "Ouvrir ma Boutique"}</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
