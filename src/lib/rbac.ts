@@ -156,7 +156,6 @@ export function isAuthorizedSuperAdmin(email?: string | null): boolean {
   const cleanEmail = email.toLowerCase().trim();
   const allowed = [
     "ansel@kuettu.com",
-    "anselmk4@gmail.com",
     "admin@kuettu.com",
     "admin@ansella.app",
     (process.env.SUPER_ADMIN_EMAIL || "").toLowerCase().trim(),
