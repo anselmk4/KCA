@@ -1,12 +1,10 @@
-import { getPayPalAccessToken } from '@/lib/paypal';
+import { createPayPalOrder, capturePayPalOrder } from '@/lib/paypal';
 import { createPendingDonation, updateDonationStatus } from './donations-db';
 import { DonationRecord } from '../types';
 
-const PAYPAL_API_BASE = process.env.PAYPAL_API_URL || 'https://api-m.sandbox.paypal.com';
-
 export interface CreatePayPalDonationArgs {
   amount: number;
-  currency: string;
+  currency?: string;
   donorName?: string;
   donorEmail?: string;
   message?: string;
@@ -18,7 +16,8 @@ export interface CapturePayPalDonationArgs {
 }
 
 /**
- * Crée un ordre PayPal Checkout pour un don et stocke la donation en statut 'pending'.
+ * Crée un ordre PayPal Checkout pour un don en s'alignant sur l'implémentation
+ * éprouvée des paiements de cours et produits digitaux de la plateforme.
  */
 export async function createPayPalDonationOrder(args: CreatePayPalDonationArgs): Promise<{
   success: boolean;
@@ -27,96 +26,62 @@ export async function createPayPalDonationOrder(args: CreatePayPalDonationArgs):
   error?: string;
 }> {
   try {
-    let accessToken: string;
-    try {
-      accessToken = await getPayPalAccessToken();
-    } catch (authErr: any) {
-      console.error('[PayPalDonation] Erreur authentification PayPal:', authErr);
-      return {
-        success: false,
-        error: 'La passerelle PayPal n\'est pas encore configurée. Veuillez utiliser Mobile Money ou contacter l\'administrateur.',
-      };
-    }
-    const currency = (args.currency || 'USD').toUpperCase();
     const formattedAmount = Number(args.amount).toFixed(2);
+    const amountNum = Number(formattedAmount);
 
-    // 1. Appeler l'API PayPal pour créer l'ordre
-    const response = await fetch(`${PAYPAL_API_BASE}/v2/checkout/orders`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation',
-      },
-      body: JSON.stringify({
-        intent: 'CAPTURE',
-        purchase_units: [
-          {
-            description: 'Don pour soutenir Ansella LMS',
-            amount: {
-              currency_code: currency,
-              value: formattedAmount,
-            },
-          },
-        ],
-        application_context: {
-          brand_name: 'Ansella LMS',
-          shipping_preference: 'NO_SHIPPING',
-          user_action: 'PAY_NOW',
-        },
-      }),
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[PayPalDonation] Erreur création ordre PayPal:', response.status, errorText);
-      return {
-        success: false,
-        error: `Erreur PayPal (${response.status}): ${errorText}`,
-      };
+    if (amountNum <= 0) {
+      return { success: false, error: 'Le montant du don doit être supérieur à 0 USD.' };
     }
 
-    const orderData = await response.json();
+    // Référence personnalisée passée dans custom_id pour traçabilité PayPal
+    const tempRef = `DONATION_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const donorEmailSafe = (args.donorEmail || 'anonymous').trim().replace(/:/g, '_');
+    const customId = `DONATION:${tempRef}:${donorEmailSafe}`;
+
+    // 1. Création de l'ordre PayPal via la fonction native de la plateforme (identique à facturation / digital products)
+    const orderData = await createPayPalOrder(amountNum, customId);
     const orderId = orderData.id;
 
     if (!orderId) {
-      return { success: false, error: 'Identifiant d\'ordre PayPal non retourné.' };
+      return { success: false, error: "Identifiant d'ordre PayPal non retourné." };
     }
 
-    // 2. Enregistrer la donation en 'pending' dans Supabase
-    const dbResult = await createPendingDonation({
-      provider: 'paypal',
-      provider_reference: orderId,
-      amount: Number(formattedAmount),
-      currency,
-      donor_name: args.donorName || null,
-      donor_email: args.donorEmail || null,
-      message: args.message || null,
-      user_id: args.userId || null,
-      metadata: {
-        paypalOrderId: orderId,
-        paypalOrderStatus: orderData.status,
-      },
-    });
+    // 2. Enregistrement en base Supabase (statut pending)
+    let donation: DonationRecord | undefined;
+    try {
+      const dbResult = await createPendingDonation({
+        provider: 'paypal',
+        provider_reference: orderId,
+        amount: amountNum,
+        currency: 'USD',
+        donor_name: args.donorName || null,
+        donor_email: args.donorEmail || null,
+        message: args.message || null,
+        user_id: args.userId || null,
+        metadata: {
+          paypalOrderId: orderId,
+          paypalOrderStatus: orderData.status,
+          customId,
+        },
+      });
 
-    if (!dbResult.success || !dbResult.donation) {
-      return {
-        success: false,
-        error: dbResult.error || 'Impossible d\'enregistrer le don en base.',
-      };
+      if (dbResult.success && dbResult.donation) {
+        donation = dbResult.donation;
+      }
+    } catch (dbErr) {
+      console.warn('[PayPalDonation] Enregistrement Supabase pending ignoré ou en différé:', dbErr);
     }
 
     return {
       success: true,
       orderId,
-      donation: dbResult.donation,
+      donation,
     };
   } catch (err: any) {
     console.error('[PayPalDonation] Exception createPayPalDonationOrder:', err);
     return {
       success: false,
-      error: err.message || 'Erreur interne lors de la création de l\'ordre PayPal.',
+      error: err.message || "Erreur lors de l'initialisation de la commande PayPal.",
     };
   }
 }
@@ -133,116 +98,82 @@ export async function capturePayPalDonationOrder(args: CapturePayPalDonationArgs
   const { orderId } = args;
 
   try {
-    const accessToken = await getPayPalAccessToken();
+    // 1. Capture via l'API PayPal officielle (même méthode que pour les cours et produits)
+    const captureData = await capturePayPalOrder(orderId);
 
-    // 1. Appeler l'API de capture PayPal
-    const response = await fetch(`${PAYPAL_API_BASE}/v2/checkout/orders/${orderId}/capture`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store',
-    });
-
-    const responseText = await response.text();
-    let captureData: any = {};
-    try {
-      captureData = JSON.parse(responseText);
-    } catch {
-      captureData = { raw: responseText };
-    }
-
-    if (!response.ok) {
-      console.error('[PayPalDonation] Erreur capture PayPal:', response.status, responseText);
-      
-      const issue = captureData?.details?.[0]?.issue || captureData?.name;
-      const desc = captureData?.details?.[0]?.description || captureData?.message;
-
-      let friendlyMessage = `Échec de la capture PayPal : HTTP ${response.status}`;
-      if (issue === 'ORDER_ALREADY_CAPTURED') {
-        // Idempotent: si déjà capturé, vérifier le statut existant en base
-        const updateRes = await updateDonationStatus({
-          reference: orderId,
-          status: 'completed',
-          metadata: { paypalAlreadyCaptured: true },
-        });
-        return {
-          success: true,
-          status: 'COMPLETED',
-          donation: updateRes.donation,
-        };
-      } else if (issue === 'INSTRUMENT_DECLINED') {
-        friendlyMessage = 'Votre moyen de paiement (carte ou compte bancaire) a été refusé par l\'émetteur.';
-      } else if (desc) {
-        friendlyMessage = desc;
-      }
-
-      await updateDonationStatus({
-        reference: orderId,
-        status: 'failed',
-        metadata: {
-          captureError: friendlyMessage,
-          details: captureData,
-        },
-      });
-
-      return {
-        success: false,
-        error: friendlyMessage,
-      };
-    }
-
-    const captureStatus = captureData.status;
-
-    if (captureStatus === 'COMPLETED') {
+    if (captureData.status === 'COMPLETED') {
+      const purchaseUnit = captureData.purchase_units?.[0];
+      const captureId = purchaseUnit?.payments?.captures?.[0]?.id || orderId;
+      const amountCaptured = parseFloat(
+        purchaseUnit?.payments?.captures?.[0]?.amount?.value || '0'
+      );
       const payer = captureData.payer;
       const payerEmail = payer?.email_address;
       const payerName = payer?.name
         ? `${payer.name.given_name || ''} ${payer.name.surname || ''}`.trim()
         : undefined;
 
-      const captureId = captureData.purchase_units?.[0]?.payments?.captures?.[0]?.id;
+      // 2. Mise à jour de la table donations vers 'completed'
+      let finalDonation: DonationRecord | undefined;
+      try {
+        const updateRes = await updateDonationStatus({
+          reference: orderId,
+          status: 'completed',
+          donorEmail: payerEmail,
+          donorName: payerName,
+          metadata: {
+            paypalCaptureId: captureId,
+            paypalPayer: payer,
+            capturePayload: captureData,
+          },
+        });
 
-      const updateRes = await updateDonationStatus({
-        reference: orderId,
-        status: 'completed',
-        donorEmail: payerEmail,
-        donorName: payerName,
-        metadata: {
-          paypalCaptureId: captureId,
-          paypalPayer: payer,
-          capturePayload: captureData,
-        },
-      });
+        if (updateRes.donation) {
+          finalDonation = updateRes.donation;
+        } else {
+          // Si non présent au moment du pending, insérer directement
+          const insertRes = await createPendingDonation({
+            provider: 'paypal',
+            provider_reference: orderId,
+            amount: amountCaptured || 0,
+            currency: 'USD',
+            donor_name: payerName || null,
+            donor_email: payerEmail || null,
+            metadata: {
+              paypalCaptureId: captureId,
+              paypalPayer: payer,
+              capturePayload: captureData,
+            },
+          });
+          if (insertRes.donation) {
+            const finalRes = await updateDonationStatus({
+              reference: orderId,
+              status: 'completed',
+            });
+            finalDonation = finalRes.donation || insertRes.donation;
+          }
+        }
+      } catch (dbErr) {
+        console.warn('[PayPalDonation] Avertissement écriture DB lors de la capture:', dbErr);
+      }
 
       return {
         success: true,
         status: 'COMPLETED',
-        donation: updateRes.donation,
+        donation: finalDonation,
       };
     } else {
-      await updateDonationStatus({
-        reference: orderId,
-        status: 'failed',
-        metadata: {
-          uncompletedStatus: captureStatus,
-          captureData,
-        },
-      });
-
       return {
         success: false,
-        status: captureStatus,
-        error: `Statut de capture non finalisé : ${captureStatus}`,
+        status: captureData.status,
+        error: `Statut de capture non finalisé : ${captureData.status}`,
       };
     }
   } catch (err: any) {
     console.error('[PayPalDonation] Exception capturePayPalDonationOrder:', err);
     return {
       success: false,
-      error: err.message || 'Erreur interne lors de la capture PayPal.',
+      error: err.message || 'Erreur lors de la capture du don PayPal.',
     };
   }
 }
-

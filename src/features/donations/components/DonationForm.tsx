@@ -10,8 +10,8 @@ import {
   Heart,
   RefreshCw,
   Lock,
-  ArrowRight,
-  Sparkles,
+  Globe,
+  CreditCard,
   Check
 } from "lucide-react";
 import {
@@ -30,7 +30,6 @@ declare global {
 
 // Montants prédéfinis commençant par 1$ et intégrant 200$ et 500$
 const PRESET_AMOUNTS_USD = [1, 5, 10, 25, 50, 100, 200, 500];
-const PRESET_AMOUNTS_EUR = [1, 5, 10, 25, 50, 100, 200, 500];
 const PRESET_AMOUNTS_CDF = [2800, 15000, 30000, 75000, 150000, 300000, 600000, 1500000];
 const PRESET_AMOUNTS_XAF = [600, 3000, 6000, 15000, 30000, 60000, 120000, 300000];
 const PRESET_AMOUNTS_RWF = [1300, 6500, 13000, 32500, 65000, 130000, 260000, 650000];
@@ -107,7 +106,6 @@ export function DonationForm() {
     if (method === "pawapay") {
       const currencies = getAvailableCurrenciesForCountry(countryCode);
       if (currencies.length > 0) {
-        // Si la devise actuelle n'est pas dans la liste des devises permises pour ce pays, basculer vers la 1ère
         if (!currencies.some((c) => c.code === currency)) {
           setCurrency(currencies[0].code);
         }
@@ -120,12 +118,12 @@ export function DonationForm() {
     }
   }, [countryCode, method]);
 
-  // Si on passe à PayPal : devise USD ou EUR
+  // Si on passe à PayPal : devise fixée en USD (standard Ansella facturation & produits)
   useEffect(() => {
     if (method === "paypal") {
-      if (currency !== "USD" && currency !== "EUR") {
-        setCurrency("USD");
-      }
+      setCurrency("USD");
+      setSelectedPreset(25);
+      setCustomAmount("");
     }
   }, [method]);
 
@@ -174,7 +172,7 @@ export function DonationForm() {
     };
   }, [isPendingMomo, countdown, successSummary]);
 
-  // Rendu PayPal
+  // Rendu PayPal Buttons (aligné sur DigitalProductCheckoutModal et Dashboard Payment)
   useEffect(() => {
     if (method !== "paypal" || !paypalLoaded || successSummary) return;
 
@@ -192,9 +190,10 @@ export function DonationForm() {
             .Buttons({
               style: {
                 layout: "vertical",
-                color: "gold",
+                color: "blue",
                 shape: "rect",
-                label: "donate",
+                label: "paypal",
+                height: 44,
               },
               createOrder: async () => {
                 setErrorMsg("");
@@ -205,7 +204,7 @@ export function DonationForm() {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                       amount: effectiveAmount,
-                      currency: currency === "EUR" ? "EUR" : "USD",
+                      currency: "USD",
                       donorName: isAnonymous ? "Donateur anonyme" : donorName || undefined,
                       donorEmail: donorEmail || undefined,
                       message: message || undefined,
@@ -241,12 +240,17 @@ export function DonationForm() {
                     throw new Error(captureData.error || "La capture du don a échoué.");
                   }
 
+                  // Notification en direct pour incrémenter immédiatement la jauge de progression
+                  if (typeof window !== "undefined") {
+                    window.dispatchEvent(new Event("donation-completed"));
+                  }
+
                   setSuccessSummary({
                     donationId: captureData.donation?.id || data.orderID,
                     provider: "paypal",
                     reference: data.orderID,
                     amount: effectiveAmount,
-                    currency: currency === "EUR" ? "EUR" : "USD",
+                    currency: "USD",
                     donorName: isAnonymous ? "Donateur anonyme" : donorName || undefined,
                     donorEmail: donorEmail || undefined,
                     message: message || undefined,
@@ -260,9 +264,8 @@ export function DonationForm() {
               },
               onError: (err: any) => {
                 console.error("[PayPal Donation Error]", err);
-                // Ne pas écraser le message si createOrder a déjà géré l'erreur
                 if (!createOrderErrorRef.current) {
-                  setErrorMsg("La transaction PayPal a échoué ou a été interrompue.");
+                  setErrorMsg("La transaction PayPal a été interrompue ou n'a pas pu aboutir.");
                 }
                 createOrderErrorRef.current = false;
               },
@@ -291,7 +294,7 @@ export function DonationForm() {
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [method, paypalLoaded, effectiveAmount, currency, donorName, donorEmail, message, isAnonymous, successSummary]);
+  }, [method, paypalLoaded, effectiveAmount, donorName, donorEmail, message, isAnonymous, successSummary]);
 
   // Soumission Mobile Money
   const handleInitiatePawaPay = async (e: React.FormEvent) => {
@@ -351,6 +354,12 @@ export function DonationForm() {
 
       if (data.status === "completed") {
         setIsPendingMomo(false);
+
+        // Déclencher l'événement pour incrémenter la jauge de progression
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("donation-completed"));
+        }
+
         setSuccessSummary({
           donationId: data.donation?.id || depositId,
           provider: "pawapay",
@@ -391,8 +400,6 @@ export function DonationForm() {
   const presets =
     currency === "CDF"
       ? PRESET_AMOUNTS_CDF
-      : currency === "EUR"
-      ? PRESET_AMOUNTS_EUR
       : currency === "XAF" || currency === "XOF"
       ? PRESET_AMOUNTS_XAF
       : currency === "RWF"
@@ -403,9 +410,9 @@ export function DonationForm() {
 
   return (
     <div className="w-full max-w-2xl mx-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-xl dark:shadow-2xl overflow-hidden p-6 sm:p-8 transition-colors">
-      {/* Script PayPal SDK conditionnel */}
+      {/* Script PayPal SDK officiel (aligné sur l'ensemble de la plateforme) */}
       <Script
-        src={`https://www.paypal.com/sdk/js?client-id=${paypalClientId}&currency=${currency === "EUR" ? "EUR" : "USD"}&intent=capture`}
+        src={`https://www.paypal.com/sdk/js?client-id=${paypalClientId}&currency=USD`}
         strategy="lazyOnload"
         onLoad={() => setPaypalLoaded(true)}
       />
@@ -484,7 +491,7 @@ export function DonationForm() {
             </div>
           )}
 
-          {/* 1. Moyen de paiement */}
+          {/* 1. Choix du moyen de paiement */}
           <div>
             <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 block mb-2.5">
               1. Choisissez votre moyen de paiement
@@ -515,7 +522,7 @@ export function DonationForm() {
                 </div>
               </button>
 
-              {/* Carte PayPal */}
+              {/* Carte PayPal & Cartes */}
               <button
                 type="button"
                 onClick={() => setMethod("paypal")}
@@ -541,7 +548,7 @@ export function DonationForm() {
             </div>
           </div>
 
-          {/* 2. Configuration du paiement : Pays & Devise */}
+          {/* 2. Configuration : Mobile Money ou PayPal */}
           {method === "pawapay" ? (
             <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -553,7 +560,7 @@ export function DonationForm() {
                   <select
                     value={countryCode}
                     onChange={(e) => setCountryCode(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white text-xs font-medium focus:outline-none focus:border-teal-500"
+                    className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white text-xs font-medium focus:outline-none focus:border-teal-500 cursor-pointer"
                   >
                     {PAWAPAY_COUNTRY_MAPPING.map((c) => (
                       <option key={c.countryCode} value={c.countryCode}>
@@ -563,15 +570,15 @@ export function DonationForm() {
                   </select>
                 </div>
 
-                {/* Étape B : Sélection de la Devise APRÈS le Pays */}
+                {/* Étape B : Sélection de la Devise disponible pour ce pays */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
-                    Devise du compte
+                    Devise de paiement
                   </label>
                   <select
                     value={currency}
                     onChange={(e) => setCurrency(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white text-xs font-medium focus:outline-none focus:border-teal-500"
+                    className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white text-xs font-medium focus:outline-none focus:border-teal-500 cursor-pointer"
                   >
                     {availableCurrencies.map((c) => (
                       <option key={c.code} value={c.code}>
@@ -591,7 +598,7 @@ export function DonationForm() {
                   <select
                     value={operatorId}
                     onChange={(e) => setOperatorId(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white text-xs font-medium focus:outline-none focus:border-teal-500"
+                    className="w-full px-3 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white text-xs font-medium focus:outline-none focus:border-teal-500 cursor-pointer"
                   >
                     {countryConfig?.operators?.map((op) => (
                       <option key={op.id} value={op.id}>
@@ -623,34 +630,28 @@ export function DonationForm() {
               </div>
             </div>
           ) : (
-            /* Configuration PayPal (Devise) */
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-2">
-                Devise de facturation PayPal
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { code: "USD", label: "USD ($) - Dollar américain" },
-                  { code: "EUR", label: "EUR (€) - Euro" },
-                ].map((c) => (
-                  <button
-                    key={c.code}
-                    type="button"
-                    onClick={() => setCurrency(c.code)}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold transition border cursor-pointer ${
-                      currency === c.code
-                        ? "bg-indigo-500/10 border-indigo-500 text-indigo-600 dark:text-indigo-400"
-                        : "bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300"
-                    }`}
-                  >
-                    {c.label}
-                  </button>
-                ))}
+            /* Carte descriptive PayPal (USD) */
+            <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-500/20 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-900 dark:text-white">
+                    Paiement International PayPal & Cartes Bancaires
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Facturé en USD ($). Carte bancaire internationale ou compte PayPal acceptés.
+                  </div>
+                </div>
               </div>
+              <span className="px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-extrabold text-xs">
+                USD ($)
+              </span>
             </div>
           )}
 
-          {/* 3. Choix du Montant (Commence par 1$, inclut 200$ et 500$) */}
+          {/* 3. Choix du Montant (Commence par 1, inclut 200 et 500) */}
           <div>
             <div className="flex justify-between items-center mb-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
@@ -690,7 +691,7 @@ export function DonationForm() {
               <input
                 type="number"
                 min="1"
-                step={currency === "USD" || currency === "EUR" ? "0.01" : "1"}
+                step={currency === "USD" ? "0.01" : "1"}
                 placeholder="Ou saisissez un montant personnalisé libre..."
                 value={customAmount}
                 onChange={(e) => {
@@ -705,7 +706,7 @@ export function DonationForm() {
             </div>
           </div>
 
-          {/* 4. Coordonnées donateur (Épuré et sobre) */}
+          {/* 4. Coordonnées donateur */}
           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 space-y-3">
             <div className="flex justify-between items-center">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
@@ -751,7 +752,7 @@ export function DonationForm() {
             />
           </div>
 
-          {/* 5. Bouton d'action ou PayPal SDK */}
+          {/* 5. Bouton d'action ou Boutons officiels PayPal */}
           {method === "pawapay" ? (
             <button
               type="submit"
