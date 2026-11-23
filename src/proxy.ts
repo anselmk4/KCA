@@ -79,7 +79,15 @@ export async function proxy(request: NextRequest) {
       if (isAdmin) {
         targetRedirect = '/admin';
       } else if (isInstructor) {
-        targetRedirect = '/instructor';
+        // Vérifier si le formateur a un plan payant actif
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('plan')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        const hasPaidPlan = profile?.plan === 'BASE' || profile?.plan === 'PRO' || profile?.plan === 'MAX';
+        targetRedirect = hasPaidPlan ? '/instructor' : '/instructor/billing?required=true';
       }
 
       return NextResponse.redirect(new URL(targetRedirect, request.url));
@@ -107,8 +115,27 @@ export async function proxy(request: NextRequest) {
         return NextResponse.redirect(new URL(redirect, request.url));
       }
 
-      if (pathname.startsWith('/instructor') && !isInstructor && !isAdmin) {
-        return NextResponse.redirect(new URL('/dashboard', request.url));
+      if (pathname.startsWith('/instructor')) {
+        if (!isInstructor && !isAdmin) {
+          return NextResponse.redirect(new URL('/dashboard', request.url));
+        }
+
+        // Suspension du mode gratuit pour les formateurs :
+        // Seules les pages de facturation et de paiement sont accessibles sans forfait payant
+        if (!isAdmin && !pathname.startsWith('/instructor/billing')) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('plan')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          const hasPaidPlan = profile?.plan === 'BASE' || profile?.plan === 'PRO' || profile?.plan === 'MAX';
+          if (!hasPaidPlan) {
+            const billingUrl = new URL('/instructor/billing', request.url);
+            billingUrl.searchParams.set('required', 'true');
+            return NextResponse.redirect(billingUrl);
+          }
+        }
       }
     }
   } else {

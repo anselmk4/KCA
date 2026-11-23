@@ -604,7 +604,7 @@ function RegisterForm() {
         if (queryNext) {
           router.push(queryNext);
         } else if (role === "INSTRUCTOR") {
-          router.push("/instructor");
+          router.push("/instructor/billing?required=true");
         } else {
           // Classic learner registration: find flagship course for chosen theme and redirect with welcome coupon
           let targetUrl = "/dashboard/discover?welcome=true&coupon=BIENVENUE15";

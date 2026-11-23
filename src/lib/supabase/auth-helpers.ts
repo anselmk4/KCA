@@ -263,7 +263,8 @@ export async function loginWithEmail(
   ) {
     redirectTo = '/admin';
   } else if (profile.role === 'INSTRUCTOR' || profile.role === 'TEACHING_ASSISTANT') {
-    redirectTo = '/instructor';
+    const hasPaidPlan = profile.plan === 'BASE' || profile.plan === 'PRO' || profile.plan === 'MAX';
+    redirectTo = hasPaidPlan ? '/instructor' : '/instructor/billing?required=true';
   } else {
     // Student or unassigned: check if they have any active course enrollments
     try {

@@ -87,7 +87,8 @@ function LoginForm() {
           if (nextParam) {
             router.replace(nextParam);
           } else if (userRole === 'INSTRUCTOR' || userRole === 'TEACHING_ASSISTANT') {
-            router.replace('/instructor');
+            const hasPaidPlan = userPlan === 'BASE' || userPlan === 'PRO' || userPlan === 'MAX';
+            router.replace(hasPaidPlan ? '/instructor' : '/instructor/billing?required=true');
           } else if (
             ['SUPER_ADMIN', 'ADMIN', 'FINANCE_ADMIN', 'ACADEMIC_ADMIN', 'SUPPORT_AGENT'].includes(userRole)
           ) {

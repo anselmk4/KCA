@@ -115,7 +115,7 @@ export default function BillingPage() {
   }, [loadBillingData]);
 
   const limits = {
-    FREE: { courses: 1, students: 15, fee: "20%" },
+    FREE: { courses: 0, students: 0, fee: "N/A (Suspendu)" },
     BASE: { courses: 3, students: 50, fee: "10%" },
     PRO: { courses: 10, students: 200, fee: "5%" },
     MAX: { courses: Infinity, students: Infinity, fee: "0%" },
@@ -124,73 +124,17 @@ export default function BillingPage() {
   const currentLimit = limits[currentPlan as keyof typeof limits] || limits.FREE;
 
   // Progress percentages
-  const coursesPercent = currentLimit.courses === Infinity
-    ? 0
+  const coursesPercent = currentLimit.courses === Infinity || currentLimit.courses === 0
+    ? (currentLimit.courses === 0 && coursesCount > 0 ? 100 : 0)
     : Math.min((coursesCount / currentLimit.courses) * 100, 100);
 
-  const studentsPercent = currentLimit.students === Infinity
-    ? 0
+  const studentsPercent = currentLimit.students === Infinity || currentLimit.students === 0
+    ? (currentLimit.students === 0 && totalStudents > 0 ? 100 : 0)
     : Math.min((totalStudents / currentLimit.students) * 100, 100);
 
-  const handleUpgradePlan = async (newPlan: "FREE" | "BASE" | "PRO" | "MAX") => {
+  const handleUpgradePlan = async (newPlan: "BASE" | "PRO" | "MAX") => {
     if (newPlan === currentPlan) return;
-
-    if (newPlan === "BASE" || newPlan === "PRO" || newPlan === "MAX") {
-      router.push(`/instructor/billing/pay?plan=${newPlan}&cycle=${billingCycle}`);
-      return;
-    }
-
-    setActionLoading(true);
-    setSuccessMsg(null);
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // 1. Mettre à jour le profil de l'instructeur dans Supabase
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ plan: newPlan })
-        .eq("id", user.id);
-
-      if (profileError) throw profileError;
-
-      // 2. Mettre en sommeil les cours excédentaires
-      const { data: instructorCourses } = await supabase
-        .from("courses")
-        .select("id, status, created_at")
-        .eq("instructor_id", user.id)
-        .order("created_at", { ascending: true });
-
-      if (instructorCourses && instructorCourses.length > 1) {
-        const coursesToDowngrade = instructorCourses
-          .slice(1)
-          .filter((c) => c.status === "PUBLISHED" || c.status === "REVIEW");
-
-        if (coursesToDowngrade.length > 0) {
-          const downgradeIds = coursesToDowngrade.map((c) => c.id);
-          const { error: downgradeError } = await supabase
-            .from("courses")
-            .update({ status: "DRAFT" })
-            .in("id", downgradeIds);
-
-          if (downgradeError) {
-            console.error("Error downgrading excess courses:", downgradeError);
-          }
-        }
-      }
-
-      setSuccessMsg(
-        `Votre abonnement a été rétrogradé au plan FREE. Vos cours excédentaires ont été automatiquement mis en sommeil pour respecter la limite de 1 cours actif.`
-      );
-      await loadBillingData();
-
-      setTimeout(() => setSuccessMsg(null), 6000);
-    } catch (err: any) {
-      alert("Erreur lors de la mise à jour de l'abonnement : " + err.message);
-    } finally {
-      setActionLoading(false);
-    }
+    router.push(`/instructor/billing/pay?plan=${newPlan}&cycle=${billingCycle}`);
   };
 
   // Price calculations with 10% discount for Annual billing (except FREE)
@@ -310,14 +254,19 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* Warning banner for limit reached */}
-      {(currentPlan === "FREE" || currentPlan === "BASE") && (coursesCount >= currentLimit.courses || totalStudents >= currentLimit.students) && (
-        <div className="p-4 bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/30 rounded-2xl flex items-start gap-3 text-amber-800 dark:text-amber-400 text-sm font-medium">
-          <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5 text-amber-500" />
-          <div>
-            <p className="font-bold">Quota de ressources épuisé</p>
-            <p className="text-xs mt-1 text-zinc-500 dark:text-zinc-400 leading-relaxed">
-              Vous avez atteint les limites de votre forfait actuel ({currentPlan === "FREE" ? "Gratuit" : "Base"}). Pour ajouter de nouveaux cours ou accueillir plus d&apos;élèves, veuillez mettre à niveau votre forfait.
+      {/* Alerte persistante de suspension de la formule gratuite */}
+      {currentPlan === "FREE" && (
+        <div className="p-5 bg-gradient-to-r from-red-500/10 via-amber-500/10 to-red-500/10 border-2 border-red-500/40 rounded-3xl flex items-start gap-4 text-red-900 dark:text-red-200 shadow-sm animate-in slide-in-from-top-2">
+          <ShieldAlert className="w-6 h-6 shrink-0 text-red-600 dark:text-red-400 mt-1" />
+          <div className="space-y-1">
+            <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+              Suspension définitive de la formule gratuite pour les formateurs
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              La formule gratuite n&apos;est plus disponible. Pour héberger vos formations, diffuser vos cours et accueillir vos apprenants, vous devez obligatoirement activer un abonnement payant (<strong>Plan Base</strong>, <strong>Pro</strong> ou <strong>Max</strong>).
+            </p>
+            <p className="text-xs font-bold text-red-600 dark:text-red-400 pt-1">
+              👉 Choisissez votre formule ci-dessous et effectuez votre règlement par Mobile Money, PayPal, Carte Bancaire ou Crypto pour activer votre compte immédiatement.
             </p>
           </div>
         </div>
@@ -328,10 +277,10 @@ export default function BillingPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 dark:border-zinc-800 pb-4">
           <div>
             <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
-              Tous nos Forfaits
+              Nos Forfaits Formateur
             </h2>
             <p className="text-xs text-zinc-400 mt-0.5">
-              Économisez 10% en optant pour la facturation annuelle.
+              Économisez 10% en optant pour la facturation annuelle. Tous les forfaits incluent l&apos;accès complet à l&apos;académie.
             </p>
           </div>
 
@@ -365,47 +314,7 @@ export default function BillingPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Plan Free Card */}
-          <div className={`bg-white dark:bg-zinc-900 p-6 rounded-2xl border flex flex-col justify-between h-full relative ${
-            currentPlan === "FREE" ? "border-teal-500 shadow-md ring-1 ring-teal-500" : "border-zinc-200 dark:border-zinc-800"
-          }`}>
-            {currentPlan === "FREE" && (
-              <span className="absolute -top-3 right-4 bg-teal-500 text-white text-[10px] font-bold uppercase tracking-wide px-2.5 py-0.5 rounded-full">
-                Actif
-              </span>
-            )}
-            <div>
-              <h3 className="font-bold text-lg text-zinc-900 dark:text-white">Plan Free</h3>
-              <p className="text-xs text-zinc-400 mt-1 min-h-[48px]">Pour tester votre académie auprès d&apos;un premier panel.</p>
-              <div className="my-6">
-                <span className="text-3xl font-extrabold text-zinc-900 dark:text-white">0$</span>
-                <span className="text-zinc-400 text-sm ml-1">/ {billingCycle === "ANNUAL" ? "an" : "mois"}</span>
-              </div>
-              <ul className="space-y-3 mb-6 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
-                  <Check className="w-4 h-4 text-teal-600" /> 1 cours actif maximum
-                </li>
-                <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
-                  <Check className="w-4 h-4 text-teal-600" /> 15 apprenants max
-                </li>
-                <li className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
-                  <Check className="w-4 h-4 text-teal-600" /> 20% frais de transaction
-                </li>
-              </ul>
-            </div>
-            <button 
-              disabled={currentPlan === "FREE" || actionLoading}
-              onClick={() => handleUpgradePlan("FREE")}
-              className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                currentPlan === "FREE"
-                  ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 cursor-default"
-                  : "bg-zinc-800 hover:bg-zinc-700 text-white"
-              }`}
-            >
-              Activer gratuitement
-            </button>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
           {/* Plan Base Card */}
           <div className={`bg-white dark:bg-zinc-900 p-6 rounded-2xl border flex flex-col justify-between h-full relative ${

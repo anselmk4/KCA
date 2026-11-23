@@ -554,6 +554,15 @@ function PaymentContent() {
         </div>
       </div>
 
+      {searchParams.get("required") === "true" && (
+        <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs sm:text-sm font-semibold flex items-center gap-3">
+          <ShieldCheck className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+          <div>
+            <strong>Activation formateur obligatoire :</strong> Le mode gratuit est désormais suspendu. Veuillez régler votre abonnement ci-dessous pour débloquer immédiatement l&apos;accès à votre espace formateur et à vos cours.
+          </div>
+        </div>
+      )}
+
       {success ? (
         /* Success Screen */
         <div className="bg-white dark:bg-zinc-900 rounded-3xl p-12 border border-zinc-200 dark:border-zinc-800 shadow-xl text-center space-y-6 max-w-xl mx-auto animate-in zoom-in-95">

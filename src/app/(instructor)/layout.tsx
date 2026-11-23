@@ -77,6 +77,7 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [unconfirmed, setUnconfirmed] = useState(false);
+  const [hasActivePlan, setHasActivePlan] = useState<boolean>(true);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordForm, setPasswordForm] = useState({ current: "", next: "", confirm: "" });
   const [passwordMsg, setPasswordMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -184,8 +185,18 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
         } else {
           setAcademyName("Mon Académie");
         }
+
+        const effectivePlan = profile?.plan || "FREE";
+        const isPaid = effectivePlan === "BASE" || effectivePlan === "PRO" || effectivePlan === "MAX";
+        setHasActivePlan(isPaid);
+
         if (profile?.plan) {
           setSession((prev: any) => prev ? { ...prev, plan: profile.plan } : { plan: profile.plan });
+        }
+
+        // Suspension du mode gratuit : redirection persistante vers le paiement si pas de plan payant
+        if (!isPaid && !pathname.startsWith("/instructor/billing")) {
+          router.replace("/instructor/billing?required=true");
         }
       }
     });
@@ -329,20 +340,21 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
           {menuItems.map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;
-            const isLocked = (
-              item.href === "/instructor/live" ||
-              item.href === "/instructor/coupons" ||
-              item.href === "/instructor/community"
-            ) && session?.plan === "FREE";
+            const isBilling = item.href === "/instructor/billing";
+            // Bloquer tous les items du menu si pas d'abonnement payant
+            const isLocked = !hasActivePlan && !isBilling;
+            const targetHref = isLocked ? "/instructor/billing?required=true" : item.href;
 
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={targetHref}
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all ${
                   active
                     ? "bg-teal-50 dark:bg-teal-900/20 text-teal-600 font-semibold"
+                    : isLocked
+                    ? "text-zinc-400 dark:text-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-800"
                     : "text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white"
                 }`}
               >
@@ -407,9 +419,11 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
                   ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-900/50"
                   : session.plan === "PRO"
                   ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50"
-                  : "bg-zinc-100 text-zinc-600 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700"
+                  : session.plan === "BASE"
+                  ? "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/30 dark:text-teal-400 dark:border-teal-900/50"
+                  : "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50"
               }`}>
-                Plan {session.plan}
+                {session.plan === "FREE" ? "Abonnement Requis" : `Plan ${session.plan}`}
               </span>
             )}
           </div>
@@ -649,6 +663,26 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
             </div>
           </div>
         </header>
+
+        {/* Banner persistant si aucun forfait payant actif */}
+        {!hasActivePlan && (
+          <div className="bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white px-6 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 animate-in slide-in-from-top duration-300 shrink-0 shadow-md">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 shrink-0 animate-bounce" />
+              <p className="text-xs sm:text-sm font-semibold">
+                <strong>Mode gratuit suspendu :</strong> L&apos;accès à votre espace formateur et l&apos;hébergement de cours nécessitent un abonnement actif (Plan <strong>Base</strong>, <strong>Pro</strong> ou <strong>Max</strong>).
+              </p>
+            </div>
+            {!pathname.startsWith("/instructor/billing") && (
+              <Link
+                href="/instructor/billing?required=true"
+                className="bg-white text-red-700 px-4 py-1.5 rounded-xl font-bold text-xs hover:bg-red-50 transition shrink-0 shadow-sm"
+              >
+                Activer mon forfait
+              </Link>
+            )}
+          </div>
+        )}
 
         {unconfirmed && (
           <div className="bg-amber-500 text-white px-6 py-3.5 flex items-center justify-between gap-4 animate-in slide-in-from-top duration-300 shrink-0">
