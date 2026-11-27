@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { DashboardHeader } from "@/components/layout/DashboardHeader";
-import { getSimulatedSession } from "@/lib/rbac";
+import { getSimulatedSession, setSimulatedSession } from "@/lib/rbac";
+import { fetchUserProfile } from "@/lib/supabase/auth-helpers";
 import { OnboardingTour } from "@/components/layout/OnboardingTour";
 import { CompleteProfileModal } from "@/components/auth/CompleteProfileModal";
 import Chatbot from "@/components/Chatbot";
@@ -22,9 +23,37 @@ export default function DashboardLayout({
   const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
-    const s = getSimulatedSession();
+    let s = getSimulatedSession();
     if (!s) {
-      router.replace("/login");
+      supabase.auth.getUser().then(async ({ data: { user } }) => {
+        if (user) {
+          const profile = await fetchUserProfile(user.id);
+          const role = profile?.role || (user.user_metadata?.role as any) || "STUDENT";
+          if (role !== "STUDENT") {
+            if (role === "INSTRUCTOR" || role === "TEACHING_ASSISTANT") {
+              router.replace("/instructor");
+            } else {
+              router.replace("/admin");
+            }
+            return;
+          }
+          const restored = {
+            userId: user.id,
+            name: profile?.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "Étudiant",
+            email: user.email || "",
+            role: role as any,
+            status: "ACTIVE" as const,
+            plan: (profile?.plan as any) || "FREE",
+          };
+          setSimulatedSession(restored);
+          setAuthorized(true);
+          if (typeof window !== "undefined") {
+            setUnconfirmed(localStorage.getItem("kuettu_unconfirmed_email") === "true");
+          }
+        } else {
+          router.replace("/login");
+        }
+      });
       return;
     }
     if (s.role !== "STUDENT") {

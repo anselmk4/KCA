@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { getSimulatedSession, setSimulatedSession, clearSimulatedSession } from "@/lib/rbac";
+import { fetchUserProfile } from "@/lib/supabase/auth-helpers";
 import { getConversationsForUser } from "@/lib/chat";
 import { supabase } from "@/lib/supabase/client";
 import { OnboardingTour } from "@/components/layout/OnboardingTour";
@@ -144,9 +145,35 @@ export default function InstructorLayout({ children }: { children: React.ReactNo
   };
 
   useEffect(() => {
-    const s = getSimulatedSession();
+    let s = getSimulatedSession();
     if (!s) {
-      router.replace("/login");
+      supabase.auth.getUser().then(async ({ data: { user } }) => {
+        if (user) {
+          const profile = await fetchUserProfile(user.id);
+          const role = profile?.role || (user.user_metadata?.role as any) || "INSTRUCTOR";
+          if (role !== "INSTRUCTOR" && role !== "TEACHING_ASSISTANT") {
+            const isAdmin = ["SUPER_ADMIN", "ADMIN", "FINANCE_ADMIN", "ACADEMIC_ADMIN", "SUPPORT_AGENT"].includes(role);
+            router.replace(isAdmin ? "/admin" : "/dashboard");
+            return;
+          }
+          const restored = {
+            userId: user.id,
+            name: profile?.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "Formateur",
+            email: user.email || "",
+            role: role as any,
+            status: "ACTIVE" as const,
+            plan: (profile?.plan as any) || "FREE",
+          };
+          setSimulatedSession(restored);
+          setSession(restored);
+          setUserId(user.id);
+          if (typeof window !== "undefined") {
+            setUnconfirmed(localStorage.getItem("kuettu_unconfirmed_email") === "true");
+          }
+        } else {
+          router.replace("/login");
+        }
+      });
       return;
     }
     if (s.role !== "INSTRUCTOR" && s.role !== "TEACHING_ASSISTANT") {

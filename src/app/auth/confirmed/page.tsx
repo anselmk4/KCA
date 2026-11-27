@@ -97,7 +97,9 @@ function ConfirmedContent() {
 
         const needsRoleParam = searchParams.get("needsRole") === "true";
         const codeParam = searchParams.get("code");
-        if (codeParam) {
+        // Only attempt code exchange client-side if no session is active yet
+        const { data: { session: existingClientSession } } = await supabase.auth.getSession();
+        if (!existingClientSession && codeParam) {
           try {
             await supabase.auth.exchangeCodeForSession(codeParam);
           } catch (codeErr) {
@@ -110,15 +112,19 @@ function ConfirmedContent() {
         let localSessionRole: string | null = null;
         let localAcademyName: string | null = null;
         let localUserName = "Utilisateur";
+        let localUserEmail = "";
+        let localUserId = "";
         if (typeof window !== "undefined") {
           localRegistrationRole = localStorage.getItem("kuettu_registration_role");
           localAcademyName = localStorage.getItem("kuettu_academy_name");
           try {
-            const rawSim = localStorage.getItem("kuettu_user_session");
-            if (rawSim) {
+            const rawSim = localStorage.getItem("kuettu_session");
+            if (rawSim && rawSim !== "logged_out") {
               const parsed = JSON.parse(rawSim);
               localSessionRole = parsed.role || null;
               if (parsed.name) localUserName = parsed.name;
+              if (parsed.email) localUserEmail = parsed.email;
+              if (parsed.userId) localUserId = parsed.userId;
             }
           } catch {}
         }
@@ -183,7 +189,7 @@ function ConfirmedContent() {
           setSimulatedSession({
             userId: profile?.id || user.id,
             name: profile?.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || localUserName,
-            email: profile?.email || user.email || "",
+            email: profile?.email || user.email || localUserEmail,
             role: finalRole as any,
             status: "ACTIVE",
             plan: profile?.plan || "FREE",
@@ -208,15 +214,17 @@ function ConfirmedContent() {
             ? "INSTRUCTOR"
             : (paramRole || localRegistrationRole || localSessionRole || "STUDENT").toUpperCase();
 
-          if (fallbackRole === "INSTRUCTOR" && typeof window !== "undefined") {
-            try {
-              const rawSim = localStorage.getItem("kuettu_user_session");
-              if (rawSim) {
-                const parsed = JSON.parse(rawSim);
-                parsed.role = "INSTRUCTOR";
-                localStorage.setItem("kuettu_user_session", JSON.stringify(parsed));
-              }
-            } catch {}
+          setSimulatedSession({
+            userId: localUserId || "confirmed-user",
+            name: localUserName,
+            email: localUserEmail,
+            role: fallbackRole as any,
+            status: "ACTIVE",
+            plan: "FREE",
+          });
+
+          if (typeof window !== "undefined") {
+            localStorage.setItem("kuettu_unconfirmed_email", "false");
           }
 
           const { href, label } = resolveRedirect(fallbackRole);
@@ -230,6 +238,17 @@ function ConfirmedContent() {
           (typeof window !== "undefined" ? localStorage.getItem("kuettu_registration_role") : null) ||
           "STUDENT"
         ).toUpperCase();
+        setSimulatedSession({
+          userId: "confirmed-user",
+          name: "Utilisateur",
+          email: "",
+          role: fallbackRole as any,
+          status: "ACTIVE",
+          plan: "FREE",
+        });
+        if (typeof window !== "undefined") {
+          localStorage.setItem("kuettu_unconfirmed_email", "false");
+        }
         const { href, label } = resolveRedirect(fallbackRole);
         setDashboardHref(href);
         setDashboardLabel(label);

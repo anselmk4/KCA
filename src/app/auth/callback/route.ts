@@ -45,7 +45,7 @@ export async function GET(request: Request) {
   const redirectWithCookies = (targetUrl: string) => {
     const response = NextResponse.redirect(targetUrl);
     pendingCookiesToSet.forEach(({ name, value, options }) => {
-      response.cookies.set(name, value, options);
+      response.cookies.set({ name, value, ...options });
     });
     return response;
   };
@@ -92,9 +92,9 @@ export async function GET(request: Request) {
 
     const result = await bootstrapUserAndGetRole(user, requestedRole);
     if (result.needsRole) {
-      return redirectWithCookies(`${origin}/auth/confirmed?needsRole=true&code=${encodeURIComponent(code)}`);
+      return redirectWithCookies(`${origin}/auth/confirmed?needsRole=true`);
     }
-    return redirectWithCookies(`${origin}/auth/confirmed?role=${encodeURIComponent(result.role)}&code=${encodeURIComponent(code)}`);
+    return redirectWithCookies(`${origin}/auth/confirmed?role=${encodeURIComponent(result.role)}`);
   }
 
   // Neither token_hash nor code present: check existing server session or fallback to /auth/confirmed
