@@ -71,9 +71,10 @@ export async function proxy(request: NextRequest) {
       const isAdmin = isSuperAdmin || roleNames.some(r =>
         ['SUPER_ADMIN', 'ADMIN', 'FINANCE_ADMIN', 'ACADEMIC_ADMIN', 'SUPPORT_AGENT'].includes(r)
       );
-      const isInstructor = roleNames.some(r =>
-        ['INSTRUCTOR', 'TEACHING_ASSISTANT'].includes(r)
-      );
+      const isInstructor =
+        roleNames.some(r => ['INSTRUCTOR', 'TEACHING_ASSISTANT'].includes(r)) ||
+        (user.user_metadata?.role || user.user_metadata?.registration_role || '').toUpperCase() === 'INSTRUCTOR' ||
+        Boolean(user.user_metadata?.academy_name);
 
       let targetRedirect = '/dashboard';
       if (isAdmin) {
@@ -106,9 +107,10 @@ export async function proxy(request: NextRequest) {
       const isAdmin = isSuperAdmin || roleNames.some(r =>
         ['SUPER_ADMIN', 'ADMIN', 'FINANCE_ADMIN', 'ACADEMIC_ADMIN', 'SUPPORT_AGENT'].includes(r)
       );
-      const isInstructor = roleNames.some(r =>
-        ['INSTRUCTOR', 'TEACHING_ASSISTANT'].includes(r)
-      );
+      const isInstructor =
+        roleNames.some(r => ['INSTRUCTOR', 'TEACHING_ASSISTANT'].includes(r)) ||
+        (user.user_metadata?.role || user.user_metadata?.registration_role || '').toUpperCase() === 'INSTRUCTOR' ||
+        Boolean(user.user_metadata?.academy_name);
 
       if (pathname.startsWith('/admin') && !isAdmin) {
         const redirect = isInstructor ? '/instructor' : '/dashboard';

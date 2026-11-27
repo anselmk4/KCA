@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { AlertCircle, ArrowRight, Loader2, Sparkles, BookOpen, ShieldCheck, Cpu, Coins } from "lucide-react";
+import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, Sparkles, BookOpen, ShieldCheck, Cpu, Coins } from "lucide-react";
 import { initDB } from "@/lib/db";
 import { loginWithEmail, fetchUserProfile, ensureProfile } from "@/lib/supabase/auth-helpers";
 import { supabase } from "@/lib/supabase/client";
@@ -24,6 +24,7 @@ function LoginForm() {
   const ENABLE_GOOGLE_AUTH = false; // Désactivé temporairement pour garantir la collecte obligatoire des informations (pays, téléphone, genre)
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -372,21 +373,37 @@ function LoginForm() {
             </div>
             <div>
               <div className="flex justify-between items-center mb-2">
-                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
+                <label htmlFor="login-password" className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
                   {language === "en" ? "Password" : "Mot de passe"}
                 </label>
                 <Link href="/forgot-password" className="text-xs text-blue-600 hover:text-blue-500 font-medium">
                   {language === "en" ? "Forgot password?" : "Mot de passe oublié ?"}
                 </Link>
               </div>
-              <input
-                required
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-4 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white"
-              />
+              <div className="relative">
+                <input
+                  required
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  className="w-full px-4 py-3 pr-12 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 focus:bg-white dark:focus:bg-zinc-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm text-zinc-900 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword
+                    ? (language === "en" ? "Hide password" : "Masquer le mot de passe")
+                    : (language === "en" ? "Show password" : "Afficher le mot de passe")}
+                  aria-pressed={showPassword}
+                  aria-controls="login-password"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div className="py-2">

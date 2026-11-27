@@ -42,7 +42,7 @@ export async function fetchUserProfile(userId: string): Promise<AuthProfile | nu
     // 2. Fallback to direct client query
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, email, full_name, plan, status')
+      .select('id, email, full_name, plan, status, academy_name')
       .eq('id', userId)
       .single();
 
@@ -70,7 +70,7 @@ export async function fetchUserProfile(userId: string): Promise<AuthProfile | nu
     else if (roleNames.includes('FINANCE_ADMIN')) role = 'FINANCE_ADMIN';
     else if (roleNames.includes('ACADEMIC_ADMIN')) role = 'ACADEMIC_ADMIN';
     else if (roleNames.includes('SUPPORT_AGENT')) role = 'SUPPORT_AGENT';
-    else if (roleNames.includes('INSTRUCTOR')) role = 'INSTRUCTOR';
+    else if (roleNames.includes('INSTRUCTOR') || Boolean((profile as any)?.academy_name)) role = 'INSTRUCTOR';
     else if (roleNames.includes('TEACHING_ASSISTANT')) role = 'TEACHING_ASSISTANT';
     else if (roleNames.includes('STUDENT')) role = 'STUDENT';
     else role = 'UNASSIGNED';

@@ -201,6 +201,8 @@ export async function POST(req: NextRequest) {
           phone: cleanPhone,
           phone_number: cleanPhone,
           gender: cleanGender,
+          role: finalRole,
+          registration_role: finalRole,
           ...(finalRole === "INSTRUCTOR"
             ? {
                 academy_name: academyName || "Mon Académie",

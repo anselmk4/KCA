@@ -97,7 +97,16 @@ export async function GET(request: Request) {
     return redirectWithCookies(`${origin}/auth/confirmed?role=${encodeURIComponent(result.role)}&code=${encodeURIComponent(code)}`);
   }
 
-  // Neither token_hash nor code present: fallback to /auth/confirmed for client-side hash/session detection
+  // Neither token_hash nor code present: check existing server session or fallback to /auth/confirmed
+  const { data: { user: fallbackUser } } = await supabase.auth.getUser();
+  if (fallbackUser) {
+    const result = await bootstrapUserAndGetRole(fallbackUser, requestedRole);
+    if (result.needsRole) {
+      return redirectWithCookies(`${origin}/auth/confirmed?needsRole=true`);
+    }
+    return redirectWithCookies(`${origin}/auth/confirmed?role=${encodeURIComponent(result.role)}`);
+  }
+
   return redirectWithCookies(`${origin}/auth/confirmed?role=${encodeURIComponent(requestedRole || '')}`);
 }
 
@@ -141,8 +150,16 @@ async function bootstrapUserAndGetRole(
     // Role priority:
     // 1. Explicit request from URL/registration parameter (e.g. role=INSTRUCTOR or role=STUDENT)
     const sanitizedReq = requestedRole?.toUpperCase();
-    if (sanitizedReq === 'INSTRUCTOR' || sanitizedReq === 'TEACHING_ASSISTANT') {
-      targetRole = sanitizedReq;
+    const metaRole = (user.user_metadata?.role || user.user_metadata?.registration_role || '').toUpperCase();
+    const hasInstructorMeta =
+      sanitizedReq === 'INSTRUCTOR' ||
+      sanitizedReq === 'TEACHING_ASSISTANT' ||
+      metaRole === 'INSTRUCTOR' ||
+      metaRole === 'TEACHING_ASSISTANT' ||
+      Boolean(user.user_metadata?.academy_name);
+
+    if (hasInstructorMeta) {
+      targetRole = (sanitizedReq === 'TEACHING_ASSISTANT' || metaRole === 'TEACHING_ASSISTANT') ? 'TEACHING_ASSISTANT' : 'INSTRUCTOR';
     } else if (sanitizedReq === 'STUDENT') {
       targetRole = 'STUDENT';
     } else if (existingRoleNames.length > 0) {
@@ -154,18 +171,12 @@ async function bootstrapUserAndGetRole(
       else if (existingRoleNames.includes('ACADEMIC_ADMIN')) targetRole = 'ACADEMIC_ADMIN';
       else if (existingRoleNames.includes('SUPPORT_AGENT')) targetRole = 'SUPPORT_AGENT';
       else targetRole = 'STUDENT';
+    } else if (metaRole === 'STUDENT') {
+      targetRole = 'STUDENT';
     } else {
-      // 3. Brand new user with no existing role and no explicit requested role -> trigger role choice!
-      const metaRole = (user.user_metadata?.role || '').toUpperCase();
-      if (metaRole === 'INSTRUCTOR' || metaRole === 'TEACHING_ASSISTANT') {
-        targetRole = metaRole;
-      } else if (metaRole === 'STUDENT') {
-        targetRole = 'STUDENT';
-      } else {
-        // Needs role choice
-        needsRoleSelection = true;
-        targetRole = 'UNASSIGNED';
-      }
+      // Needs role choice
+      needsRoleSelection = true;
+      targetRole = 'UNASSIGNED';
     }
   }
 

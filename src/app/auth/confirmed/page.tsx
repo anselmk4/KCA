@@ -59,7 +59,7 @@ function ConfirmedContent() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [dashboardHref, setDashboardHref] = useState("/login");
   const [dashboardLabel, setDashboardLabel] = useState("Se connecter");
-  const [countdown, setCountdown] = useState(4);
+  const [countdown, setCountdown] = useState(3);
   const [statusText, setStatusText] = useState("Vérification de votre session en cours...");
   const [hasSession, setHasSession] = useState(false);
   const [needsRoleSelection, setNeedsRoleSelection] = useState(false);
@@ -68,11 +68,12 @@ function ConfirmedContent() {
   useEffect(() => {
     async function run() {
       try {
+        let hashParams: URLSearchParams | null = null;
         if (typeof window !== "undefined") {
           const hash = window.location.hash.replace(/^#/, "");
-          const urlParams = new URLSearchParams(hash || window.location.search);
-          const errDesc = urlParams.get("error_description");
-          const errCode = urlParams.get("error") || searchParams.get("error");
+          hashParams = new URLSearchParams(hash || window.location.search);
+          const errDesc = hashParams.get("error_description");
+          const errCode = hashParams.get("error") || searchParams.get("error");
 
           if (errCode || errDesc) {
             const rawMsg = errDesc || errCode || "Échec d'authentification";
@@ -80,6 +81,17 @@ function ConfirmedContent() {
             setAuthError(cleanMsg);
             setLoading(false);
             return;
+          }
+
+          // Handle hash tokens if returned by implicit flow
+          const accessToken = hashParams.get("access_token");
+          const refreshToken = hashParams.get("refresh_token");
+          if (accessToken && refreshToken) {
+            try {
+              await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+            } catch (setErr) {
+              console.warn("[confirmed] setSession from hash error:", setErr);
+            }
           }
         }
 
@@ -92,6 +104,26 @@ function ConfirmedContent() {
             console.warn("[confirmed] client code exchange fallback info:", codeErr);
           }
         }
+
+        // Check local storage hints for registration role (vital fallback)
+        let localRegistrationRole: string | null = null;
+        let localSessionRole: string | null = null;
+        let localAcademyName: string | null = null;
+        let localUserName = "Utilisateur";
+        if (typeof window !== "undefined") {
+          localRegistrationRole = localStorage.getItem("kuettu_registration_role");
+          localAcademyName = localStorage.getItem("kuettu_academy_name");
+          try {
+            const rawSim = localStorage.getItem("kuettu_user_session");
+            if (rawSim) {
+              const parsed = JSON.parse(rawSim);
+              localSessionRole = parsed.role || null;
+              if (parsed.name) localUserName = parsed.name;
+            }
+          } catch {}
+        }
+
+        const paramRole = searchParams.get("role") || "";
 
         const session = await waitForSession();
 
@@ -110,42 +142,95 @@ function ConfirmedContent() {
 
           const roleNames = (userRoles || []).map((ur: any) => ur.roles?.name).filter(Boolean);
 
-          if (needsRoleParam || roleNames.length === 0 || (profile?.role as string) === "UNASSIGNED") {
-            setNeedsRoleSelection(true);
-            setLoading(false);
-            return;
-          }
+          const metaRole = (user.user_metadata?.role || user.user_metadata?.registration_role || "").toUpperCase();
+          const hasInstructorHint =
+            paramRole.toUpperCase() === "INSTRUCTOR" ||
+            localRegistrationRole?.toUpperCase() === "INSTRUCTOR" ||
+            localSessionRole?.toUpperCase() === "INSTRUCTOR" ||
+            metaRole === "INSTRUCTOR" ||
+            Boolean(user.user_metadata?.academy_name) ||
+            Boolean((profile as any)?.academy_name) ||
+            Boolean(localAcademyName);
 
-          let finalRole = roleNames[0] || (profile?.role as string);
-          if (!finalRole || finalRole === "UNASSIGNED") {
+          let finalRole: string = "STUDENT";
+
+          if (roleNames.includes("SUPER_ADMIN")) {
+            finalRole = "SUPER_ADMIN";
+          } else if (roleNames.some((r: string) => ["ADMIN", "FINANCE_ADMIN", "ACADEMIC_ADMIN", "SUPPORT_AGENT"].includes(r))) {
+            finalRole = roleNames.find((r: string) => ["ADMIN", "FINANCE_ADMIN", "ACADEMIC_ADMIN", "SUPPORT_AGENT"].includes(r)) || "ADMIN";
+          } else if (hasInstructorHint || roleNames.includes("INSTRUCTOR")) {
+            finalRole = "INSTRUCTOR";
+            // Ensure DB role is synced if user_roles didn't have INSTRUCTOR
+            if (!roleNames.includes("INSTRUCTOR")) {
+              fetch("/api/auth/select-role", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ role: "INSTRUCTOR" }),
+              }).catch((e) => console.warn("[confirmed] auto-sync instructor error:", e));
+            }
+          } else if (roleNames.includes("TEACHING_ASSISTANT")) {
+            finalRole = "TEACHING_ASSISTANT";
+          } else if (roleNames.includes("STUDENT")) {
+            finalRole = "STUDENT";
+          } else if (needsRoleParam || (roleNames.length === 0 && !paramRole && !localRegistrationRole)) {
             setNeedsRoleSelection(true);
             setLoading(false);
             return;
+          } else {
+            finalRole = paramRole || localRegistrationRole || (profile?.role as string) || "STUDENT";
           }
 
           setSimulatedSession({
             userId: profile?.id || user.id,
-            name: profile?.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "Utilisateur",
+            name: profile?.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || localUserName,
             email: profile?.email || user.email || "",
             role: finalRole as any,
             status: "ACTIVE",
             plan: profile?.plan || "FREE",
           });
 
+          if (typeof window !== "undefined") {
+            localStorage.setItem("kuettu_unconfirmed_email", "false");
+          }
+
           const { href, label } = resolveRedirect(finalRole);
           setDashboardHref(href);
           setDashboardLabel(label);
         } else {
           setHasSession(false);
-          const roleParam = searchParams.get("role") || "STUDENT";
-          const { href, label } = resolveRedirect(roleParam);
+          const hasInstructorHint =
+            paramRole.toUpperCase() === "INSTRUCTOR" ||
+            localRegistrationRole?.toUpperCase() === "INSTRUCTOR" ||
+            localSessionRole?.toUpperCase() === "INSTRUCTOR" ||
+            Boolean(localAcademyName);
+
+          const fallbackRole = hasInstructorHint
+            ? "INSTRUCTOR"
+            : (paramRole || localRegistrationRole || localSessionRole || "STUDENT").toUpperCase();
+
+          if (fallbackRole === "INSTRUCTOR" && typeof window !== "undefined") {
+            try {
+              const rawSim = localStorage.getItem("kuettu_user_session");
+              if (rawSim) {
+                const parsed = JSON.parse(rawSim);
+                parsed.role = "INSTRUCTOR";
+                localStorage.setItem("kuettu_user_session", JSON.stringify(parsed));
+              }
+            } catch {}
+          }
+
+          const { href, label } = resolveRedirect(fallbackRole);
           setDashboardHref(href);
           setDashboardLabel(label);
         }
       } catch (err: any) {
         console.error("[confirmed] bootstrap error:", err);
-        const roleParam = searchParams.get("role") || "STUDENT";
-        const { href, label } = resolveRedirect(roleParam);
+        const fallbackRole = (
+          searchParams.get("role") ||
+          (typeof window !== "undefined" ? localStorage.getItem("kuettu_registration_role") : null) ||
+          "STUDENT"
+        ).toUpperCase();
+        const { href, label } = resolveRedirect(fallbackRole);
         setDashboardHref(href);
         setDashboardLabel(label);
       } finally {
@@ -193,7 +278,7 @@ function ConfirmedContent() {
 
   // Auto-redirect countdown
   useEffect(() => {
-    if (loading || !hasSession || authError || needsRoleSelection || dashboardHref === "/login") return;
+    if (loading || authError || needsRoleSelection || dashboardHref === "/login") return;
 
     let seconds = 3;
     setCountdown(seconds);
@@ -204,11 +289,16 @@ function ConfirmedContent() {
       if (seconds <= 0) {
         clearInterval(interval);
         router.replace(dashboardHref);
+        setTimeout(() => {
+          if (typeof window !== "undefined" && window.location.pathname.startsWith("/auth/confirmed")) {
+            window.location.href = dashboardHref;
+          }
+        }, 800);
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [loading, hasSession, authError, needsRoleSelection, dashboardHref, router]);
+  }, [loading, authError, needsRoleSelection, dashboardHref, router]);
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-zinc-50 dark:bg-zinc-950 font-sans relative overflow-hidden">

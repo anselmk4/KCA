@@ -207,7 +207,38 @@ export async function POST(req: NextRequest) {
     else if (roleNames.includes("SUPPORT_AGENT")) role = "SUPPORT_AGENT";
     else if (roleNames.includes("INSTRUCTOR")) role = "INSTRUCTOR";
     else if (roleNames.includes("TEACHING_ASSISTANT")) role = "TEACHING_ASSISTANT";
-    else if (roleNames.includes("STUDENT")) role = "STUDENT";
+    else if (
+      (authMeta.role || authMeta.registration_role || "").toUpperCase() === "INSTRUCTOR" ||
+      Boolean(authMeta.academy_name) ||
+      Boolean(profile?.academy_name)
+    ) {
+      // Auto-heal instructor role if registered as instructor
+      role = "INSTRUCTOR";
+      needsRole = false;
+      try {
+        const { data: instRole } = await supabaseAdmin
+          .from("roles")
+          .select("id")
+          .eq("name", "INSTRUCTOR")
+          .single();
+        if (instRole) {
+          const { data: stdRole } = await supabaseAdmin
+            .from("roles")
+            .select("id")
+            .eq("name", "STUDENT")
+            .single();
+          if (stdRole) {
+            await supabaseAdmin.from("user_roles").delete().eq("user_id", userId).eq("role_id", stdRole.id);
+          }
+          await supabaseAdmin.from("user_roles").upsert(
+            { user_id: userId, role_id: instRole.id },
+            { onConflict: "user_id,role_id", ignoreDuplicates: true }
+          );
+        }
+      } catch (e) {
+        console.warn("[login-profile] auto-assign instructor error:", e);
+      }
+    } else if (roleNames.includes("STUDENT")) role = "STUDENT";
     else {
       role = "UNASSIGNED";
       needsRole = true;

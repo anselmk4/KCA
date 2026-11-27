@@ -467,7 +467,7 @@ function RegisterForm() {
             student_level: studentLevel || null,
             interest_course: interestCourse || null,
           },
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=/auth/confirmed`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?role=${encodeURIComponent(role || "STUDENT")}&next=/auth/confirmed`,
         },
       });
 
